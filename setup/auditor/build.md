@@ -16,18 +16,21 @@
 진입점 한 장을 얹어 부팅 때 `ra-serve` 가 vsock 에서 듣게 한다. 응답기 구현은 `tee/request/auditor/aws` 에 그대로 있고
 빌드는 그것을 얹기만 한다. 소프트웨어 이미지는 고치지 않는다.
 
-설계서에 없던 단계가 하나 더 있다 — **레이어 정규화**. `docker build` 는 실행마다 레이어 내부 파일 순서·타임스탬프를
-새로 정한다. 최종 파일 내용이 완전히 같아도 그 파일을 담은 레이어 tar 의 바이트 자체가 달라서, Vendor 와 Auditor 가
-같은 소스로 각자 독립적으로 빌드하면 PCR0·PCR2 가 갈린다(실측: 서로 다른 두 물리 인스턴스에서 재현됨). T1 응답기를
-얹은 뒤, EIF 를 만들기 전에 그 이미지를 export 해서 레이어 구분을 버리고, 이름순 정렬 + 시각 고정(`tar --sort=name
---mtime=@0 --owner=0 --group=0`)으로 재포장한 뒤 같은 태그로 import 한다. 이렇게 하면 서로 다른 물리 서버·시각에
-독립적으로 빌드해도 PCR0·PCR1·PCR2 가 정확히 일치한다(실측 확인: 두 인스턴스 완전 일치).
+**Layer normalization.** `docker build` reassembles layer contents fresh every run — the file ordering and
+timestamps inside each layer differ between runs even when the final filesystem content is byte-identical.
+nitro-cli measures off that assembly, so Vendor and Auditor building the same source independently got
+different PCR0/PCR2 (verified: reproduced on two separate physical instances). After the T1 responder is
+layered on, before the EIF is built, the image is exported (dropping layer boundaries), repacked
+deterministically (`tar --sort=name --mtime=@0 --owner=0 --group=0`), and re-imported under the same tag.
+Independent builds on different physical hosts at different times then produce identical PCR0/PCR1/PCR2
+(verified: exact match across two instances).
 
-**이 정규화가 잡아주는 건 "포장이 매번 달라지는" 문제뿐이다. `tb auditor build` 는 이걸 자동으로 검사하지 않는다** —
-소스 자체가 매번 다른 내용을 만들어내면(예: 무작위 서명키를 생성하는 도구, 버전 미고정 패키지 설치) 정규화를 거쳐도
-Vendor 와 Auditor 의 빌드 결과가 다르게 나온다. 이건 정규화의 버그가 아니라 Dockerfile 이 재현 가능하게 안 짜인
-것이고, 지금은 빌드가 끝나야만(또는 Auditor 가 대조해 봐야만) 드러난다. Dockerfile 을 쓸 때 지킬 것:
-- 베이스 이미지는 태그가 아니라 다이제스트로 고정한다 (`FROM img@sha256:...`)
-- 패키지 설치는 버전을 명시한다 (`apt-get install pkg=1.2.3`), 의존성은 lock 파일을 커밋한다
-- 빌드 중 무작위 값(키·UUID 등)을 스스로 만들어 이미지 안에 남기는 도구를 피한다
-- 빌드 로그처럼 그 순간의 실제 시각이 텍스트로 박히는 파일은 지운다
+**This only fixes "the packaging differs every time." `tb auditor build` does not check this automatically** —
+if the source itself produces different content on each build (a tool that mints a random signing key,
+unpinned package versions), normalization still won't make Vendor's and Auditor's builds match. That's not a
+bug in normalization; it's a Dockerfile that isn't written reproducibly, and right now nothing surfaces it
+until the build finishes (or Auditor compares). To keep a Dockerfile reproducible:
+- Pin the base image by digest, not tag (`FROM img@sha256:...`)
+- Pin package versions on install (`apt-get install pkg=1.2.3`), commit a lockfile for dependencies
+- Avoid tools that generate and leave random state (keys, UUIDs) in the image during build
+- Remove files like build logs that embed the literal build timestamp as text
