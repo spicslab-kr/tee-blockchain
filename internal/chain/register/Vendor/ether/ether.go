@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	l "tb/internal/chain/lookup/vendor"
-	reg "tb/internal/chain/register/vendor"
-	p "tb/internal/tee/parse/vendor"
+	l "tb/internal/chain/lookup/Vendor"
+	reg "tb/internal/chain/register/Vendor"
+	p "tb/internal/tee/parse/Vendor"
 )
 
 type Registrar struct{}

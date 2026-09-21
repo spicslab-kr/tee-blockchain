@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	p "tb/internal/tee/parse/vendor"
-	r "tb/internal/tee/request/vendor"
+	p "tb/internal/tee/parse/Vendor"
+	r "tb/internal/tee/request/Vendor"
 )
 
 type Parser struct{}

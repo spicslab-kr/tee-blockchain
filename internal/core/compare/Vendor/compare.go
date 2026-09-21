@@ -4,8 +4,8 @@ package vendor
 import (
 	"errors"
 
-	l "tb/internal/chain/lookup/vendor"
-	p "tb/internal/tee/parse/vendor"
+	l "tb/internal/chain/lookup/Vendor"
+	p "tb/internal/tee/parse/Vendor"
 )
 
 type Verdict struct {

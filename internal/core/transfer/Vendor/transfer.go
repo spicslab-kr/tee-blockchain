@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 
-	p "tb/internal/tee/parse/vendor"
+	p "tb/internal/tee/parse/Vendor"
 )
 
 // BuildConfig 는 Vendor → Auditor.

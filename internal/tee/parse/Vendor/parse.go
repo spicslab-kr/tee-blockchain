@@ -4,7 +4,7 @@ package vendor
 import (
 	"context"
 
-	"tb/internal/tee/request/vendor"
+	"tb/internal/tee/request/Vendor"
 )
 
 type Measurement struct {

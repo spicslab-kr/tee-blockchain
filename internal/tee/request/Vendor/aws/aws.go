@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"tb/internal/tee/request/vendor"
+	"tb/internal/tee/request/Vendor"
 )
 
 type Requester struct{}
