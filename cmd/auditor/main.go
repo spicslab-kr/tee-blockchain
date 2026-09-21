@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	reg "tb/internal/chain/register/auditor"
 	build "tb/internal/setup/build/auditor/aws"
 	launch "tb/internal/setup/launch/auditor/aws"
 	parse "tb/internal/tee/parse/auditor"
@@ -29,6 +30,10 @@ func main() {
 	}
 	var err error
 	switch os.Args[1] {
+	case "registry-deploy":
+		err = registryDeploy(os.Args[2:])
+	case "register":
+		err = register(os.Args[2:])
 	case "ra-serve":
 		err = raServe(os.Args[2:])
 	case "ra-parse":
@@ -54,8 +59,13 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `tb auditor — RA 요청
+	fmt.Fprintln(os.Stderr, `tb auditor
 
+  registry-deploy  --rpc <url> --key-file <file> --auditor <0x…> --vendor <0x…>
+                   Registry 컨트랙트를 배포한다. 두 주소는 그 뒤 바꿀 수 없다
+  register         --rpc <url> --contract <0x…> --key-file <file> --measurements <measurements.json | NAME=hex,…>
+                   --service <name> --version <v> [--platform aws-nitro] [--expires 2160h]
+                   측정값을 내 키로 서명해 컨트랙트에 등록한다. 결과의 key 가 조회 좌표다
   build       --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--out out]
               Nitro 부모 인스턴스에서. 소프트웨어 이미지를 빌드하고 그 위에 RA 응답기를 얹어 EIF 와 측정값(PCR0·1·2)을 낸다
   launch      --eif <file>  [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
@@ -250,6 +260,12 @@ func raProxy(args []string) error {
 
 func exitCode(err error) int {
 	switch {
+	case errors.Is(err, reg.ErrNotAnApprover):
+		return 4
+	case errors.Is(err, reg.ErrAlreadyRegistered):
+		return 5
+	case errors.Is(err, reg.ErrExpiryPassed):
+		return 6
 	case errors.Is(err, parse.ErrWrongFormat):
 		return 4
 	case errors.Is(err, parse.ErrSignature), errors.Is(err, parse.ErrChain):
