@@ -9,11 +9,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	build "tb/internal/setup/build/auditor/aws"
+	launch "tb/internal/setup/launch/auditor/aws"
 	ra "tb/internal/tee/request/auditor"
 	awsra "tb/internal/tee/request/auditor/aws"
 )
@@ -33,6 +36,8 @@ func main() {
 		err = raProxy(os.Args[2:])
 	case "lo-up":
 		err = awsra.LoopbackUp()
+	case "deploy":
+		err = deployCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -46,7 +51,10 @@ func main() {
 func usage() {
 	fmt.Fprintln(os.Stderr, `tb auditor — RA 요청
 
-      ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
+  deploy      --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--memory <MiB>] [--listen 0.0.0.0] [--out out]
+              Nitro 부모 인스턴스에서 실행. setup/build (소프트웨어 이미지에 T1 응답기를 얹어 EIF · PCR)
+              → setup/launch (엔클레이브 실행 · TCP→vsock 다리) → 자기 자신에게 RA 요청해 확인 → 보안 그룹 포트
+  ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
               TEE 안에서 돈다. 요청마다 난수를 받아 RA 문서를 돌려준다. fixture 는 aws-nitro 형식으로 표시된다
   lo-up       엔클레이브 안에서 loopback 을 올린다. 소프트웨어를 띄우기 전에 한 번
   ra-proxy    --listen <host:port>  --vsock <cid>:<port>
@@ -132,6 +140,71 @@ func raServe(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return ra.Serve(ctx, ln, ex)
+}
+
+func deployCmd(args []string) error {
+	fs := flag.NewFlagSet("deploy", flag.ContinueOnError)
+	b := build.Build{}
+	l := launch.Launch{}
+	fs.StringVar(&b.AppDir, "app-dir", "", "소프트웨어 Dockerfile 이 있는 디렉터리")
+	fs.StringVar(&b.Name, "name", "", "이미지 · 엔클레이브 이름 (기본: 디렉터리 이름)")
+	fs.IntVar(&b.Port, "port", 5000, "RA 포트")
+	fs.IntVar(&l.Memory, "memory", 0, "엔클레이브 메모리 MiB (0: EIF 크기로 정함)")
+	fs.IntVar(&l.CPUs, "cpus", 2, "엔클레이브 CPU 수")
+	fs.IntVar(&l.CID, "cid", 16, "엔클레이브 vsock CID")
+	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "다리가 받을 주소")
+	fs.StringVar(&b.Out, "out", "out", "결과 디렉터리")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if b.AppDir == "" {
+		return errors.New("--app-dir 는 필수")
+	}
+	ctx := context.Background()
+
+	// B 빌드 — 소스 → EIF · 측정값. T1 응답기는 여기서 이미지에 들어간다.
+	built, err := b.Run(ctx, os.Stdout)
+	if err != nil {
+		return err
+	}
+
+	// A 실행 — EIF → 엔클레이브 · 다리.
+	l.Name, l.EIF, l.Port, l.Out = built.Name, built.EIF, b.Port, b.Out
+	started, err := l.Run(ctx, os.Stdout)
+	if err != nil {
+		return err
+	}
+
+	// T1 — 자기 자신에게 한 번 요청해 응답기가 살아 있는지 본다.
+	fmt.Println("== 확인: 이 인스턴스에서 RA 요청", started.Address)
+	nonce, doc, err := ra.TCPRequester{Timeout: 30 * time.Second}.RequestFresh(ctx, started.Address)
+	if err != nil {
+		return err
+	}
+	if err := doc.ExpectFormat(awsra.Format); err != nil {
+		return err
+	}
+	selfDoc := filepath.Join(b.Out, "selfcheck.cbor")
+	if err := os.WriteFile(selfDoc, doc.Raw, 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(selfDoc+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("received %s document, %d bytes → %s\n", doc.Format, len(doc.Raw), selfDoc)
+
+	fmt.Println("== 보안 그룹에 TCP", b.Port, "인바운드")
+	cmd, perr := launch.OpenPort(ctx, b.Port, os.Stdout)
+	switch {
+	case perr == nil:
+		fmt.Printf("\n끝. 누구나:  tb user ra-request --tee <이 인스턴스 공인 IP>:%d --format aws-nitro\n", b.Port)
+	case errors.Is(perr, launch.ErrNoPermission):
+		fmt.Printf("\n이 인스턴스에는 보안 그룹을 바꿀 권한이 없다. AWS 계정에서 한 줄:\n  %s\n그 뒤 누구나:  tb user ra-request --tee <이 인스턴스 공인 IP>:%d --format aws-nitro\n", cmd, b.Port)
+	default:
+		fmt.Printf("\n보안 그룹을 열지 못했다 (%v). AWS 계정에서 한 줄:\n  %s\n", perr, cmd)
+	}
+	fmt.Printf("측정값 기록에 적을 것: %s · %s\n", built.EIF, built.Measurements)
+	return nil
 }
 
 func raProxy(args []string) error {
