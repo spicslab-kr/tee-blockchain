@@ -6,7 +6,7 @@
 | GCP Confidential Space | 컨테이너 이미지 digest(태그 아님) · 쓴 빌드 도구 |
 | Azure Confidential VM | digest(컨테이너) 또는 이미지 ID(VM) · 쓴 빌드 도구 |
 
-## 자동화 (Case 2) — `tb auditor deploy` 의 build 단계 · AWS Nitro
+## 자동화 (Case 2) — `tb auditor build` · AWS Nitro
 
 `internal/setup/build/auditor/aws`. 소프트웨어의 Dockerfile 을 받아 위 표의 값(EIF · PCR0·1·2)을 `out/` 에 낸다.
 도구(docker · nitro-cli)는 라이브러리가 아니라 exec 로 부른다.

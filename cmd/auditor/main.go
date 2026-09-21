@@ -36,8 +36,10 @@ func main() {
 		err = raProxy(os.Args[2:])
 	case "lo-up":
 		err = awsra.LoopbackUp()
-	case "deploy":
-		err = deployCmd(os.Args[2:])
+	case "build":
+		err = buildCmd(os.Args[2:])
+	case "launch":
+		err = launchCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -51,9 +53,11 @@ func main() {
 func usage() {
 	fmt.Fprintln(os.Stderr, `tb auditor — RA 요청
 
-  deploy      --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--memory <MiB>] [--listen 0.0.0.0] [--out out]
-              Nitro 부모 인스턴스에서 실행. setup/build (소프트웨어 이미지에 T1 응답기를 얹어 EIF · PCR)
-              → setup/launch (엔클레이브 실행 · TCP→vsock 다리) → 자기 자신에게 RA 요청해 확인 → 보안 그룹 포트
+  build       --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--out out]
+              Nitro 부모 인스턴스에서. 소프트웨어 이미지를 빌드하고 그 위에 RA 응답기를 얹어 EIF 와 측정값(PCR0·1·2)을 낸다
+  launch      --eif <file>  [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
+              Nitro 부모 인스턴스에서. EIF 를 엔클레이브로 띄우고 TCP→vsock 다리를 놓고, 자기 자신에게 RA 요청해 확인한 뒤
+              보안 그룹 포트를 연다(권한이 있을 때). 받은 EIF 를 띄우기만 할 때도 이것
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
               TEE 안에서 돈다. 요청마다 난수를 받아 RA 문서를 돌려준다. fixture 는 aws-nitro 형식으로 표시된다
   lo-up       엔클레이브 안에서 loopback 을 올린다. 소프트웨어를 띄우기 전에 한 번
@@ -142,17 +146,12 @@ func raServe(args []string) error {
 	return ra.Serve(ctx, ln, ex)
 }
 
-func deployCmd(args []string) error {
-	fs := flag.NewFlagSet("deploy", flag.ContinueOnError)
+func buildCmd(args []string) error {
+	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	b := build.Build{}
-	l := launch.Launch{}
 	fs.StringVar(&b.AppDir, "app-dir", "", "소프트웨어 Dockerfile 이 있는 디렉터리")
-	fs.StringVar(&b.Name, "name", "", "이미지 · 엔클레이브 이름 (기본: 디렉터리 이름)")
-	fs.IntVar(&b.Port, "port", 5000, "RA 포트")
-	fs.IntVar(&l.Memory, "memory", 0, "엔클레이브 메모리 MiB (0: EIF 크기로 정함)")
-	fs.IntVar(&l.CPUs, "cpus", 2, "엔클레이브 CPU 수")
-	fs.IntVar(&l.CID, "cid", 16, "엔클레이브 vsock CID")
-	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "다리가 받을 주소")
+	fs.StringVar(&b.Name, "name", "", "이미지 · EIF 이름 (기본: 디렉터리 이름)")
+	fs.IntVar(&b.Port, "port", 5000, "응답기가 엔클레이브 안에서 들을 포트")
 	fs.StringVar(&b.Out, "out", "out", "결과 디렉터리")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -160,22 +159,37 @@ func deployCmd(args []string) error {
 	if b.AppDir == "" {
 		return errors.New("--app-dir 는 필수")
 	}
-	ctx := context.Background()
-
-	// B 빌드 — 소스 → EIF · 측정값. T1 응답기는 여기서 이미지에 들어간다.
-	built, err := b.Run(ctx, os.Stdout)
+	built, err := b.Run(context.Background(), os.Stdout)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("\n끝. 측정값 기록에 적을 것: %s · %s\n띄우려면:  tb auditor launch --eif %s --port %d\n", built.EIF, built.Measurements, built.EIF, b.Port)
+	return nil
+}
 
-	// A 실행 — EIF → 엔클레이브 · 다리.
-	l.Name, l.EIF, l.Port, l.Out = built.Name, built.EIF, b.Port, b.Out
+func launchCmd(args []string) error {
+	fs := flag.NewFlagSet("launch", flag.ContinueOnError)
+	l := launch.Launch{}
+	fs.StringVar(&l.EIF, "eif", "", "띄울 EIF 파일")
+	fs.StringVar(&l.Name, "name", "", "엔클레이브 이름 (기본: EIF 파일 이름)")
+	fs.IntVar(&l.Port, "port", 5000, "RA 포트. build 때 준 값과 같아야 한다")
+	fs.IntVar(&l.Memory, "memory", 0, "엔클레이브 메모리 MiB (0: EIF 크기로 정함)")
+	fs.IntVar(&l.CPUs, "cpus", 2, "엔클레이브 CPU 수")
+	fs.IntVar(&l.CID, "cid", 16, "엔클레이브 vsock CID")
+	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "다리가 받을 주소")
+	fs.StringVar(&l.Out, "out", "out", "로그 · 확인 문서 디렉터리")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if l.EIF == "" {
+		return errors.New("--eif 는 필수")
+	}
+	ctx := context.Background()
 	started, err := l.Run(ctx, os.Stdout)
 	if err != nil {
 		return err
 	}
 
-	// T1 — 자기 자신에게 한 번 요청해 응답기가 살아 있는지 본다.
 	fmt.Println("== 확인: 이 인스턴스에서 RA 요청", started.Address)
 	nonce, doc, err := ra.TCPRequester{Timeout: 30 * time.Second}.RequestFresh(ctx, started.Address)
 	if err != nil {
@@ -184,7 +198,7 @@ func deployCmd(args []string) error {
 	if err := doc.ExpectFormat(awsra.Format); err != nil {
 		return err
 	}
-	selfDoc := filepath.Join(b.Out, "selfcheck.cbor")
+	selfDoc := filepath.Join(l.Out, "selfcheck.cbor")
 	if err := os.WriteFile(selfDoc, doc.Raw, 0o644); err != nil {
 		return err
 	}
@@ -193,17 +207,16 @@ func deployCmd(args []string) error {
 	}
 	fmt.Printf("received %s document, %d bytes → %s\n", doc.Format, len(doc.Raw), selfDoc)
 
-	fmt.Println("== 보안 그룹에 TCP", b.Port, "인바운드")
-	cmd, perr := launch.OpenPort(ctx, b.Port, os.Stdout)
+	fmt.Println("== 보안 그룹에 TCP", l.Port, "인바운드")
+	cmd, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
 	switch {
 	case perr == nil:
-		fmt.Printf("\n끝. 누구나:  tb user ra-request --tee <이 인스턴스 공인 IP>:%d --format aws-nitro\n", b.Port)
+		fmt.Printf("\n끝. 누구나:  tb user ra-request --tee <이 인스턴스 공인 IP>:%d --format aws-nitro\n", l.Port)
 	case errors.Is(perr, launch.ErrNoPermission):
-		fmt.Printf("\n이 인스턴스에는 보안 그룹을 바꿀 권한이 없다. AWS 계정에서 한 줄:\n  %s\n그 뒤 누구나:  tb user ra-request --tee <이 인스턴스 공인 IP>:%d --format aws-nitro\n", cmd, b.Port)
+		fmt.Printf("\n이 인스턴스에는 보안 그룹을 바꿀 권한이 없다. AWS 계정에서 한 줄:\n  %s\n그 뒤 누구나:  tb user ra-request --tee <이 인스턴스 공인 IP>:%d --format aws-nitro\n", cmd, l.Port)
 	default:
 		fmt.Printf("\n보안 그룹을 열지 못했다 (%v). AWS 계정에서 한 줄:\n  %s\n", perr, cmd)
 	}
-	fmt.Printf("측정값 기록에 적을 것: %s · %s\n", built.EIF, built.Measurements)
 	return nil
 }
 

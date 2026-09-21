@@ -6,17 +6,17 @@ Vendor 가 준비할 것은 **Nitro Enclaves 를 켠 EC2 인스턴스**와 **소
 
 1. Nitro Enclaves 를 켜서 EC2 인스턴스를 만든다 (m5·c5·m6i 등 4 vCPU 이상, Amazon Linux 2023). 여기 들어간다.
 2. `tb-vendor` 리눅스 바이너리와 소프트웨어 Dockerfile 디렉터리를 인스턴스에 올린다.
-3. 인스턴스에서 한 번 실행한다.
+3. 인스턴스에서 두 명령. 설계서의 B 빌드 → A 실행 순서다.
 
-       tb vendor deploy --app-dir ./my-app
+       tb vendor build  --app-dir ./my-app
+       tb vendor launch --eif out/my-app.eif
 
-   두 단계로 돈다. 설계서의 B 빌드 → A 실행 순서다.
    - **build** (`internal/setup/build/Vendor/aws`): nitro-cli · docker 설치 → 소프트웨어 이미지 빌드 → 그 위에 T1 응답기(`ra-serve`)를
      얹어 EIF 빌드. `out/` 에 EIF 파일 · 측정값(PCR0·1·2)이 남는다. 자세한 것은 `build.md`.
-   - **launch** (`internal/setup/launch/Vendor/aws`): 엔클레이브 실행 → 부모에 TCP→vsock 다리(`ra-proxy`). 메모리는 EIF 크기로 정해지며
-     `--memory` 로 바꿀 수 있다.
-   끝나면 자기 자신에게 RA 요청해 확인하고(`out/selfcheck.cbor`), 보안 그룹에 TCP 5000 인바운드를 열어 본다. 인스턴스에 EC2 쓰기
-   권한(IAM 역할)이 있으면 그대로 열리고, 없으면 AWS 계정에서 칠 `aws ec2 authorize-security-group-ingress ...` 한 줄을 찍어 준다.
+   - **launch** (`internal/setup/launch/Vendor/aws`): 엔클레이브 실행 → 부모에 TCP→vsock 다리(`ra-proxy`) → 자기 자신에게 RA 요청해
+     확인(`out/selfcheck.cbor`) → 보안 그룹에 TCP 5000 인바운드를 열어 본다. 인스턴스에 EC2 쓰기 권한(IAM 역할)이 있으면 그대로 열리고,
+     없으면 AWS 계정에서 칠 `aws ec2 authorize-security-group-ingress ...` 한 줄을 찍어 준다. 메모리는 EIF 크기로 정해지며 `--memory` 로 바꾼다.
+   - 남이 빌드한 EIF 를 받아 띄우기만 할 때(흐름 1 의 Vendor)는 `launch` 만 친다. 빌드만 하고 띄우지 않을 때(Auditor)는 `build` 만.
 
 이제 누구나 `tb user ra-request --tee <공인 IP>:5000 --format aws-nitro` 로 RA 문서를 받는다.
 
