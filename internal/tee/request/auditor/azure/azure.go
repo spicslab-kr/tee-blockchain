@@ -7,10 +7,15 @@ import (
 	"tb/internal/tee/request/auditor"
 )
 
-type Requester struct{}
+const Format = "azure-maa-jwt"
 
-var _ auditor.Requester = (*Requester)(nil)
+// Extractor — vTPM 에서 HCL 리포트를 읽어 MAA 에 보내고 JWT 를 받는다. go-tpm 이 필요해 아직 비어 있다.
+type Extractor struct {
+	MAAEndpoint string
+}
 
-func (Requester) Request(ctx context.Context, nonce auditor.Nonce, teeAddr string) (auditor.RADoc, error) {
-	return auditor.RADoc{}, errors.New("tee/request/auditor/azure: not implemented")
+var _ auditor.Extractor = (*Extractor)(nil)
+
+func (Extractor) Extract(context.Context, auditor.Nonce) (auditor.RADoc, error) {
+	return auditor.RADoc{}, errors.New("azure extractor not implemented — needs vTPM (go-tpm) and MAA")
 }
