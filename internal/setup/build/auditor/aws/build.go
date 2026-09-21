@@ -81,7 +81,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name = b.Name
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
-	fmt.Fprintln(log, "== build 1/4 도구 (nitro-cli · docker)")
+	fmt.Fprintln(log, "== build 1/5 도구 (nitro-cli · docker)")
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel", "docker"); err != nil {
 		return res, err
 	}
@@ -91,12 +91,12 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 	appImage := b.Name + ":app"
 	res.Image = b.Name + ":tb"
-	fmt.Fprintf(log, "== build 2/4 소프트웨어 이미지: %s → %s\n", appDir, appImage)
+	fmt.Fprintf(log, "== build 2/5 소프트웨어 이미지: %s → %s\n", appDir, appImage)
 	if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== build 3/4 T1 응답기 얹기: %s → %s\n", appImage, res.Image)
+	fmt.Fprintf(log, "== build 3/5 T1 응답기 얹기: %s → %s\n", appImage, res.Image)
 	appCmd, err := r.imageCommand(ctx, appImage)
 	if err != nil {
 		return res, err
@@ -106,9 +106,14 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
+	fmt.Fprintf(log, "== build 4/5 재현성: 레이어를 버리고 이름순으로 다시 포장\n")
+	if err := normalize(ctx, r, res.Image, b.Out); err != nil {
+		return res, err
+	}
+
 	res.EIF = filepath.Join(b.Out, b.Name+".eif")
 	res.Measurements = filepath.Join(b.Out, "measurements.json")
-	fmt.Fprintf(log, "== build 4/4 EIF → %s\n", res.EIF)
+	fmt.Fprintf(log, "== build 5/5 EIF → %s\n", res.EIF)
 	out, err := r.output(ctx, "nitro-cli", "build-enclave", "--docker-uri", res.Image, "--output-file", res.EIF)
 	if err != nil {
 		return res, err
@@ -157,6 +162,87 @@ ENTRYPOINT ["/tb-entrypoint.sh"]
 		return err
 	}
 	return r.run(ctx, "docker", "build", "-q", "-t", to, dir)
+}
+
+// normalize — docker build 가 쌓은 레이어를 버리고, 파일을 이름순으로 우리가 직접 재포장한다.
+//
+// docker build 는 실행마다 레이어 내부 파일 순서·타임스탬프를 새로 정한다. 최종 파일 내용이
+// 완전히 같아도(실측: sha256 전수 일치) 그 파일을 담은 레이어 tar 의 바이트 자체가 달라서,
+// Vendor 와 Auditor 가 같은 소스로 각자 독립적으로 빌드하면 PCR0·PCR2 가 갈린다(실측: 서로
+// 다른 두 물리 인스턴스에서 재현됨). export 로 레이어 구분을 버리고 파일만 뽑아서, 이름순
+// 정렬 + 시각 고정(tar --sort=name --mtime=@0 --owner=0 --group=0)으로 재포장한 뒤 같은
+// 태그로 import 하면, 서로 다른 물리 서버·시각에 독립적으로 빌드해도 PCR0·PCR1·PCR2 가
+// 정확히 일치한다(실측 확인 — 아래 커밋 메시지의 값).
+//
+// import 는 이미지 설정(ENTRYPOINT·ENV)을 버리므로 원래 것을 다시 넣는다 - 그것도 측정
+// 대상이다: 파일은 그대로 두고 ENTRYPOINT 만 바꿔도 PCR0·PCR2 가 달라지는 것을 실측 확인했다.
+//
+// workDir 는 실제 디스크(b.Out)를 써야 한다 - OS 기본 임시 디렉터리(/tmp)는 Amazon Linux 에서
+// RAM 기반 tmpfs 로 몇 GiB 밖에 안 되는데, 여기서 내보낸 tar·풀어낸 파일·재포장한 tar 가
+// 한꺼번에 그보다 커질 수 있다(실측: "wrote only N of 10240 bytes" 로 재현됨).
+func normalize(ctx context.Context, r runner, image, workDir string) error {
+	out, err := r.output(ctx, "docker", "image", "inspect", image)
+	if err != nil {
+		return err
+	}
+	var v []struct {
+		Config struct {
+			Env        []string
+			Entrypoint []string
+			Cmd        []string
+		}
+	}
+	if err := json.Unmarshal(out, &v); err != nil || len(v) != 1 {
+		return fmt.Errorf("docker inspect %s: unexpected output", image)
+	}
+	cfg := v[0].Config
+
+	dir, err := os.MkdirTemp(workDir, "tb-canon-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+
+	container := fmt.Sprintf("tb-canon-%d", os.Getpid())
+	r.cmd(ctx, "docker", "rm", "-f", container).Run() // 이전 실패 잔여물, 있으면 지운다
+	if err := r.run(ctx, "docker", "create", "--name", container, image); err != nil {
+		return err
+	}
+	defer r.cmd(ctx, "docker", "rm", container).Run()
+
+	rootfs := filepath.Join(dir, "rootfs.tar")
+	if err := r.run(ctx, "docker", "export", container, "-o", rootfs); err != nil {
+		return err
+	}
+	extract := filepath.Join(dir, "extract")
+	if err := os.Mkdir(extract, 0o755); err != nil {
+		return err
+	}
+	if err := r.run(ctx, "tar", "-xf", rootfs, "-C", extract); err != nil {
+		return err
+	}
+	os.Remove(rootfs) // 다 풀었으니 더 안 필요하다 - 재포장 중 피크 디스크 사용량을 줄인다
+
+	canon := filepath.Join(dir, "canon.tar")
+	if err := r.run(ctx, "tar", "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner",
+		"-cf", canon, "-C", extract, "."); err != nil {
+		return err
+	}
+
+	args := []string{"import"}
+	for _, e := range cfg.Env {
+		args = append(args, "--change", "ENV "+e)
+	}
+	if len(cfg.Entrypoint) > 0 {
+		b, _ := json.Marshal(cfg.Entrypoint)
+		args = append(args, "--change", "ENTRYPOINT "+string(b))
+	}
+	if len(cfg.Cmd) > 0 {
+		b, _ := json.Marshal(cfg.Cmd)
+		args = append(args, "--change", "CMD "+string(b))
+	}
+	args = append(args, canon, image)
+	return r.run(ctx, "docker", args...)
 }
 
 // ReadPCR — nitro-cli build-enclave 출력에서 측정값을 꺼낸다.
