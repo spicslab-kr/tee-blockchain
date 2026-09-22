@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"strings"
 	"testing"
-
-	r "tb/internal/tee/request/Vendor"
 )
 
 // 실제 Nitro 엔클레이브(nginx, my-web)에서 받은 문서와 그때 보낸 난수.
@@ -17,11 +15,11 @@ var myWebDoc []byte
 //go:embed fixture-my-web.nonce
 var myWebNonceHex string
 
-func realDoc(t *testing.T) (r.RADoc, r.Nonce) {
+func realDoc(t *testing.T) (raw []byte, nonce []byte) {
 	t.Helper()
 	nonce, err := hex.DecodeString(strings.TrimSpace(myWebNonceHex))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return r.RADoc{Format: Format, Raw: myWebDoc}, nonce
+	return myWebDoc, nonce
 }

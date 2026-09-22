@@ -12,7 +12,6 @@ import (
 	"time"
 
 	p "tb/internal/tee/parse/auditor"
-	pawsra "tb/internal/tee/parse/auditor/aws"
 	ra "tb/internal/tee/request/auditor"
 )
 
@@ -22,7 +21,7 @@ func raParse(args []string) error {
 	fs := flag.NewFlagSet("ra-parse", flag.ContinueOnError)
 	docPath := fs.String("doc", "", "RA 문서 파일 (ra-request 가 저장한 것)")
 	noncePath := fs.String("nonce", "", "보낸 난수. hex 또는 파일. 비우면 <doc>.nonce, 그것도 없으면 난수 확인을 건너뛴다")
-	format := fs.String("format", pawsra.Format, "문서 형식")
+	format := fs.String("format", p.AWSFormat, "문서 형식")
 	rootPath := fs.String("root", "", "플랫폼 검증 키(루트 인증서 PEM). 비우면 내장된 것")
 	out := fs.String("out", "", "측정값을 저장할 파일 (기본: <doc>.measurements.json)")
 	at := fs.String("at", "", "인증서 체인을 판단할 시각 (RFC3339). 비우면 문서의 시각")
@@ -43,8 +42,8 @@ func raParse(args []string) error {
 		Info(ra.RADoc) (p.Info, error)
 	}
 	switch *format {
-	case pawsra.Format:
-		a := pawsra.Parser{}
+	case p.AWSFormat:
+		a := p.AWSParser{}
 		if *at != "" {
 			if a.Now, err = time.Parse(time.RFC3339, *at); err != nil {
 				return fmt.Errorf("--at: %w", err)

@@ -11,8 +11,8 @@ import (
 )
 
 func TestParse_RealDocumentPCRs(t *testing.T) {
-	doc, _ := realDoc(t)
-	ms, err := (Parser{}).Parse(doc)
+	raw, _ := realDoc(t)
+	ms, err := (Parser{}).Parse(Format, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,8 +41,8 @@ func TestParse_RealDocumentPCRs(t *testing.T) {
 }
 
 func TestInfo(t *testing.T) {
-	doc, nonce := realDoc(t)
-	info, err := (Parser{}).Info(doc)
+	raw, nonce := realDoc(t)
+	info, err := (Parser{}).Info(Format, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,13 +56,13 @@ func TestInfo(t *testing.T) {
 
 // hf/nitrite 를 정답으로 두고 우리 해석과 맞춰 본다. 라이브러리는 테스트에서만 쓴다.
 func TestAgainstNitrite(t *testing.T) {
-	doc, _ := realDoc(t)
-	info, _ := (Parser{}).Info(doc)
-	res, err := nitrite.Verify(doc.Raw, nitrite.VerifyOptions{CurrentTime: info.Timestamp})
+	raw, _ := realDoc(t)
+	info, _ := (Parser{}).Info(Format, raw)
+	res, err := nitrite.Verify(raw, nitrite.VerifyOptions{CurrentTime: info.Timestamp})
 	if err != nil || !res.SignatureOK {
 		t.Fatalf("nitrite: %v", err)
 	}
-	ms, _ := (Parser{}).Parse(doc)
+	ms, _ := (Parser{}).Parse(Format, raw)
 	for _, m := range ms {
 		var idx uint
 		if _, err := fmt.Sscanf(m.Name, "PCR%d", &idx); err != nil {
