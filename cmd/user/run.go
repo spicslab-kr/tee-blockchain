@@ -15,10 +15,10 @@ import (
 	cmp "tb/internal/core/compare/user"
 )
 
-// flowCmd — 흐름1의 User 구간(14~18)을 명령 하나로: T1 요청 → T2 파싱 → C2 조회 → 찾은 key 마다 M2 대조.
+// runCmd — 흐름1의 User 구간(14~18)을 명령 하나로: T1 요청 → T2 파싱 → C2 조회 → 찾은 key 마다 M2 대조.
 // 하나라도 PASS 면 그 엔클레이브를 신뢰할 근거가 있다는 뜻이라 exit 0, 하나도 없거나 다 FAIL 이면 exit 1.
-func flowCmd(args []string) error {
-	fs := flag.NewFlagSet("flow", flag.ContinueOnError)
+func runCmd(args []string) error {
+	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	tee := fs.String("tee", "", "TEE 주소 host:port")
 	format := fs.String("format", "aws-nitro", "기대하는 문서 형식")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA 요청 타임아웃")
@@ -36,7 +36,7 @@ func flowCmd(args []string) error {
 
 	dir := *out
 	if dir == "" {
-		tmp, err := os.MkdirTemp("", "tb-user-flow-*")
+		tmp, err := os.MkdirTemp("", "tb-user-run-*")
 		if err != nil {
 			return err
 		}

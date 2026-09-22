@@ -1,4 +1,4 @@
-// flow 를 실제 CLI 로 — 사람이 손으로 T1→T2→C1→C2→M2 를 따로 치던 걸 명령 하나로 묶은 것.
+// run 을 실제 CLI 로 — 사람이 손으로 T1→T2→C1→C2→M2 를 따로 치던 걸 명령 하나로 묶은 것.
 // anvil 이 PATH 에 없으면 건너뛴다.
 package cmd_test
 
@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestFlow_E2E_AuditorVendorUser(t *testing.T) {
+func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
 	}
@@ -45,51 +45,51 @@ func TestFlow_E2E_AuditorVendorUser(t *testing.T) {
 	// fixture 응답기는 보낸 nonce 에 안 묶인다(FixtureExtractor.Extract 가 nonce 를 무시) — ra-parse 는
 	// 그래서 기본값(ra-request 가 방금 보낸 nonce)이 아니라 fixture 가 실제로 들고 있는 nonce 를 받아야 한다.
 	work := t.TempDir()
-	aFlow := exec.Command(auditorBin, "flow",
+	aRun := exec.Command(auditorBin, "run",
 		"--tee", teeAddr, "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
-		"--service", "flow-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "auditor"))
-	aOut, err := aFlow.CombinedOutput()
+		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "auditor"))
+	aOut, err := aRun.CombinedOutput()
 	if err != nil {
-		t.Fatalf("auditor flow: %v\n%s", err, aOut)
+		t.Fatalf("auditor run: %v\n%s", err, aOut)
 	}
 	if !strings.Contains(string(aOut), "PASS") {
-		t.Fatalf("auditor flow 는 self-check PASS 를 찍어야 한다:\n%s", aOut)
+		t.Fatalf("auditor run 은 self-check PASS 를 찍어야 한다:\n%s", aOut)
 	}
 	aKey := keyLineRe.FindSubmatch(aOut)
 	if aKey == nil {
-		t.Fatalf("auditor flow 등록 key 를 못 찾음:\n%s", aOut)
+		t.Fatalf("auditor run 등록 key 를 못 찾음:\n%s", aOut)
 	}
 
 	// Vendor: 같은 TEE 에서 자기도 RA 요청해서 등록 — Auditor 와는 다른 key(서명자가 다르므로).
-	vFlow := exec.Command(vendorBin, "flow",
+	vRun := exec.Command(vendorBin, "run",
 		"--tee", teeAddr, "--rpc", rpc, "--contract", contract, "--key-file", vendorFile,
-		"--service", "flow-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
-	vOut, err := vFlow.CombinedOutput()
+		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
+	vOut, err := vRun.CombinedOutput()
 	if err != nil {
-		t.Fatalf("vendor flow: %v\n%s", err, vOut)
+		t.Fatalf("vendor run: %v\n%s", err, vOut)
 	}
 	if !strings.Contains(string(vOut), "PASS") {
-		t.Fatalf("vendor flow 는 self-check PASS 를 찍어야 한다:\n%s", vOut)
+		t.Fatalf("vendor run 은 self-check PASS 를 찍어야 한다:\n%s", vOut)
 	}
 	vKey := keyLineRe.FindSubmatch(vOut)
 	if vKey == nil || string(vKey[1]) == string(aKey[1]) {
-		t.Fatalf("vendor flow 의 등록 key 가 auditor 것과 같거나 안 잡힘:\n%s", vOut)
+		t.Fatalf("vendor run 의 등록 key 가 auditor 것과 같거나 안 잡힘:\n%s", vOut)
 	}
 
 	// User: 처음부터 끝까지 한 번에 — request → parse → lookup → compare. 둘 다 등록했으니 PASS.
-	uFlow := exec.Command(userBin, "flow", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
+	uRun := exec.Command(userBin, "run", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
 		"--nonce", fixtureNonce, "--out", filepath.Join(work, "user"))
-	uOut, err := uFlow.CombinedOutput()
+	uOut, err := uRun.CombinedOutput()
 	if err != nil {
-		t.Fatalf("user flow: %v\n%s", err, uOut)
+		t.Fatalf("user run: %v\n%s", err, uOut)
 	}
 	if !strings.Contains(string(uOut), "신뢰할 수 있다") {
-		t.Fatalf("user flow 는 둘 다 등록된 뒤엔 신뢰할 수 있다고 해야 한다:\n%s", uOut)
+		t.Fatalf("user run 은 둘 다 등록된 뒤엔 신뢰할 수 있다고 해야 한다:\n%s", uOut)
 	}
 }
 
-// 아무도 등록 안 한 측정값을 내는 TEE 에 User flow 를 돌리면 — 조회에 아무것도 없으니 exit 1.
-func TestFlow_E2E_User_NothingRegistered(t *testing.T) {
+// 아무도 등록 안 한 측정값을 내는 TEE 에 User run 을 돌리면 — 조회에 아무것도 없으니 exit 1.
+func TestRun_E2E_User_NothingRegistered(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
 	}
@@ -120,9 +120,9 @@ func TestFlow_E2E_User_NothingRegistered(t *testing.T) {
 	teeAddr, stopServe := startServe(t, vendorBin, fixture)
 	defer stopServe()
 
-	uFlow := exec.Command(userBin, "flow", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
+	uRun := exec.Command(userBin, "run", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
 		"--nonce", fixtureNonce, "--out", t.TempDir())
-	out, err = uFlow.CombinedOutput()
+	out, err = uRun.CombinedOutput()
 	ee, ok := err.(*exec.ExitError)
 	if !ok || ee.ExitCode() != 1 {
 		t.Fatalf("아무도 등록 안 했으면 exit 1 이어야 한다: %v\n%s", err, out)

@@ -50,7 +50,7 @@ func registryDeploy(args []string) error {
 	return nil
 }
 
-// register — C1. 등록에 쓴 key(조회 좌표)를 돌려준다 — flow 가 이어서 바로 self-check compare 하는 데 쓴다.
+// register — C1. 등록에 쓴 key(조회 좌표)를 돌려준다 — run 이 이어서 바로 self-check compare 하는 데 쓴다.
 func register(args []string) (string, error) {
 	fs := flag.NewFlagSet("register", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
@@ -100,7 +100,7 @@ func register(args []string) (string, error) {
 }
 
 // lookup — C2. --key 가 있으면 바로 그 key 를 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다.
-// 찾은 key 들을 돌려준다 — flow 가 이어서 각각 compare 하는 데 쓴다.
+// 찾은 key 들을 돌려준다 — run 이 이어서 각각 compare 하는 데 쓴다.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "이더리움 RPC 주소")

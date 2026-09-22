@@ -19,7 +19,7 @@ import (
 )
 
 // lookup — C2. User 는 등록을 안 하니 registry-deploy · register 는 없다. --key 가 있으면 바로 그 key 를
-// 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다. 찾은 key 들을 돌려준다 — flow 가
+// 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다. 찾은 key 들을 돌려준다 — run 이
 // 이어서 각각 compare 하는 데 쓴다.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)

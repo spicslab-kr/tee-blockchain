@@ -40,8 +40,8 @@ func main() {
 		_, err = lookup(os.Args[2:])
 	case "compare":
 		err = compareCmd(os.Args[2:])
-	case "flow":
-		err = flowCmd(os.Args[2:])
+	case "run":
+		err = runCmd(os.Args[2:])
 	case "send":
 		err = send(os.Args[2:])
 	case "receive":
@@ -84,7 +84,7 @@ func usage() {
                    측정값 두 묶음을 그대로 맞댄다 (파싱값 vs 빌드값 등). PASS/FAIL 과 근거를 낸다
   compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
                    체인에서 등록 정보를 읽어 값 · 만료 · 신뢰 서명자까지 같이 본다. 실패하면 exit 1
-  flow             (--tee <host:port> | --measurements <file>) --rpc <url> --contract <0x…> --key-file <file>
+  run              (--tee <host:port> | --measurements <file>) --rpc <url> --contract <0x…> --key-file <file>
                    --service <name> --version <v>
                    register 와 그 자리 self-check compare 를 한 번에. --tee 를 주면 T1·T2 도 먼저 한다 (--nonce 로 고정 가능)
   send             --repo <url> --config <build-config.json> [--workdir <clone>]

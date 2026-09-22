@@ -15,11 +15,11 @@ import (
 	cmp "tb/internal/core/compare/auditor"
 )
 
-// flowCmd — register 하고 바로 그 자리에서 self-check 까지 명령 하나로 (C1 → C2 → M2).
+// runCmd — register 하고 바로 그 자리에서 self-check 까지 명령 하나로 (C1 → C2 → M2).
 // --tee 를 주면 그 전에 T1 요청 → T2 파싱까지 해서 측정값을 직접 얻는다(흐름1의 11~13, 흐름2의 2~3에
 // 해당). 이미 측정값 파일이 있으면 --measurements 로 바로 등록만 해도 된다.
-func flowCmd(args []string) error {
-	fs := flag.NewFlagSet("flow", flag.ContinueOnError)
+func runCmd(args []string) error {
+	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	tee := fs.String("tee", "", "TEE 주소 host:port — 있으면 여기서 먼저 RA 를 요청해 측정값을 얻는다")
 	format := fs.String("format", "aws-nitro", "기대하는 문서 형식")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA 요청 타임아웃")
@@ -48,7 +48,7 @@ func flowCmd(args []string) error {
 	if *tee != "" {
 		dir := *out
 		if dir == "" {
-			tmp, err := os.MkdirTemp("", "tb-auditor-flow-*")
+			tmp, err := os.MkdirTemp("", "tb-auditor-run-*")
 			if err != nil {
 				return err
 			}
