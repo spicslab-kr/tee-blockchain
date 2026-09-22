@@ -30,6 +30,10 @@ func runCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	// 옵션으로 안 준 값은 lookup 처럼 차례로 묻는다.
+	ask(tee, "TEE 주소 host:port", "")
+	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
+	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
 	if *tee == "" || *rpc == "" || !common.IsHexAddress(*contract) {
 		return errors.New("--tee, --rpc, --contract 는 필수")
 	}

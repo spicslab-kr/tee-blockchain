@@ -37,6 +37,16 @@ func runCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	// 옵션으로 안 준 값은 register 처럼 차례로 묻는다 — plain 에서 전부 플래그로 줄 필요는 없다.
+	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
+	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
+	ask(keyFile, "내 개인키 파일", "")
+	if *tee == "" && *measurements == "" {
+		ask(tee, "TEE 주소 host:port (비우면 측정값 파일을 쓴다)", "")
+	}
+	if *tee == "" && *measurements == "" {
+		ask(measurements, "측정값 파일", "out/measurements.json")
+	}
 	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" {
 		return errors.New("--rpc, --contract, --key-file 는 필수")
 	}
@@ -108,8 +118,13 @@ func runCmd(args []string) error {
 			break
 		}
 		icancel()
-		if !resolved || *service == "" || *version == "" {
-			return errors.New("--service, --version 을 추론할 기존 등록이 없다 — 직접 지정하라")
+		if !resolved {
+			fmt.Println("   같은 측정값의 기존 등록이 없다 — 직접 입력하라")
+		}
+		ask(service, "서비스 이름", "")
+		ask(version, "버전", "")
+		if *service == "" || *version == "" {
+			return errors.New("--service, --version 은 필수다")
 		}
 	}
 
