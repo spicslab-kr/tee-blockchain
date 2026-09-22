@@ -28,11 +28,11 @@ func TestCmd_E2E_ServeRequestParse(t *testing.T) {
 		t.Skip("go toolchain not on PATH")
 	}
 	root := repoRoot(t)
-	fixture, err := filepath.Abs(filepath.Join(root, "internal", "tee", "parse", "aws", "fixture-my-web.cbor"))
+	fixture, err := filepath.Abs(filepath.Join(root, "internal", "tee", "parse", "aws", "testdata", "fixture-my-web.cbor"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixtureNonceFile, err := filepath.Abs(filepath.Join(root, "internal", "tee", "parse", "aws", "fixture-my-web.nonce"))
+	fixtureNonceFile, err := filepath.Abs(filepath.Join(root, "internal", "tee", "parse", "aws", "testdata", "fixture-my-web.nonce"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestCmd_E2E_ParseRejectsTamperedNonce(t *testing.T) {
 		t.Skip("go toolchain not on PATH")
 	}
 	root := repoRoot(t)
-	fixture, _ := filepath.Abs(filepath.Join(root, "internal", "tee", "parse", "aws", "fixture-my-web.cbor"))
+	fixture, _ := filepath.Abs(filepath.Join(root, "internal", "tee", "parse", "aws", "testdata", "fixture-my-web.cbor"))
 
 	bins := t.TempDir()
 	auditor := build(t, bins, "./cmd/auditor")

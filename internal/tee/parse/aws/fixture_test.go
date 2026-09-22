@@ -9,10 +9,10 @@ import (
 
 // 실제 Nitro 엔클레이브(nginx, my-web)에서 받은 문서와 그때 보낸 난수.
 //
-//go:embed fixture-my-web.cbor
+//go:embed testdata/fixture-my-web.cbor
 var myWebDoc []byte
 
-//go:embed fixture-my-web.nonce
+//go:embed testdata/fixture-my-web.nonce
 var myWebNonceHex string
 
 func realDoc(t *testing.T) (raw []byte, nonce []byte) {
