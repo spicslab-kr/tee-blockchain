@@ -1,4 +1,4 @@
-// Package ether 는 이더리움(EVM) 체인에 등록한다. internal/chain/ether/Registry.sol 과 짝이다.
+// Package ether 는 이더리움(EVM) 체인에 등록한다. contracts/evm/Registry.sol 과 짝이다.
 // registry.go 는 그 컨트랙트에서 abigen 으로 만든 바인딩이다 (generate.go).
 package ether
 

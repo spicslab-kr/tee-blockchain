@@ -35,7 +35,7 @@ go-ethereum 의 시뮬레이션 체인에 컨트랙트를 배포하고 Auditor �
 
 ### 컨트랙트를 고쳤을 때
 
-`internal/chain/ether/Registry.sol` 이 원본이다. solc 0.8.28 로 컴파일하고 abigen 으로 Go 바인딩(`registry.go`)을 다시 만든다.
+`contracts/evm/Registry.sol` 이 원본이다. solc 0.8.28 로 컴파일하고 abigen 으로 Go 바인딩(`registry.go`)을 다시 만든다.
 명령은 각 역할의 `ether/generate.go` 에 있다 (`go generate ./internal/chain/register/...`). OpenZeppelin 은 서브모듈이라
 처음 클론 뒤 `git submodule update --init` 이 필요하다.
 
