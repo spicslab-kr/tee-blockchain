@@ -30,7 +30,7 @@ func lookup(args []string) ([]string, error) {
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
-	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
+	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
 	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) {
 		return nil, errors.New("--rpc, --contract 는 필수")

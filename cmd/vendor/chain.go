@@ -30,7 +30,7 @@ func registryDeploy(args []string) error {
 		return err
 	}
 	// 옵션으로 안 준 값은 차례로 묻는다
-	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
+	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
 	ask(keyFile, "배포 트랜잭션을 보낼 개인키 파일", "")
 	ask(approver, "이 컨트랙트가 받을 서명 키의 주소 (0x…)", "")
 	if *rpc == "" || *keyFile == "" || !common.IsHexAddress(*approver) {
@@ -65,7 +65,7 @@ func register(args []string) (string, error) {
 		return "", err
 	}
 	// 옵션으로 안 준 값은 차례로 묻는다
-	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
+	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
 	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
 	ask(keyFile, "내 개인키 파일", "")
 	ask(measurements, "측정값 (measurements.json 경로 또는 NAME=hex,…)", "out/measurements.json")
@@ -110,7 +110,7 @@ func lookup(args []string) ([]string, error) {
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
-	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
+	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
 	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) {
 		return nil, errors.New("--rpc, --contract 는 필수")

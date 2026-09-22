@@ -38,7 +38,7 @@ func runCmd(args []string) error {
 		return err
 	}
 	// 옵션으로 안 준 값은 register 처럼 차례로 묻는다 — plain 에서 전부 플래그로 줄 필요는 없다.
-	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
+	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
 	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
 	ask(keyFile, "내 개인키 파일", "")
 	if *tee == "" && *measurements == "" {
