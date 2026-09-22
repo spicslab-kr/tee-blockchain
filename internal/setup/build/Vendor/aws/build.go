@@ -25,12 +25,25 @@ import (
 //go:embed entrypoint.sh
 var entrypointScript []byte
 
+// responderBinaryName — cmd/ra-responder 가 만드는 파일 이름. 모든 역할이 정확히 이 이름의
+// 파일을 실행파일 옆에 두고 써야, 서로 다른 역할이 빌드해도 이미지에 같은 바이트가 얹힌다.
+const responderBinaryName = "tb-ra-responder"
+
 // Build 는 한 번의 빌드 입력. AppDir 의 Dockerfile 이 소프트웨어다.
 type Build struct {
 	AppDir string // 소프트웨어 Dockerfile 이 있는 디렉터리
 	Name   string // 이미지 · EIF 이름. 비우면 디렉터리 이름
 	Port   int    // 응답기가 엔클레이브 안에서 들을 vsock 포트. 0 이면 5000
-	Binary string // 얹을 tb 바이너리 (ra-serve · lo-up 가 들어 있는). 비우면 자기 자신
+
+	// Binary — 얹을 T1 응답기. 비우면 실행파일과 같은 디렉터리의 tb-ra-responder 를 찾는다.
+	//
+	// 예전에는 여기가 비면 자기 자신(os.Executable(), 즉 tb-vendor 나 tb-auditor)을 얹었다.
+	// 그건 역할마다 다른 CLI 바이너리를 이미지에 넣는 셈이라, 레이어를 아무리 정규화해도
+	// Vendor 와 Auditor 가 만드는 이미지가 절대 같을 수 없었다(실측: 실제 EC2 두 대에서
+	// Vendor·Auditor 가 같은 Dockerfile 을 정규화까지 거쳐 각자 빌드했는데도 PCR0·PCR2 가
+	// 갈림 — 원인은 /tb-ra 파일 자체가 두 바이너리라 서로 다른 파일이었던 것). 이제는 모든
+	// 역할이 cmd/ra-responder 하나로 빌드한 동일한 파일을 얹어야 한다.
+	Binary string
 	Out    string // 결과 디렉터리. 비우면 out
 }
 
@@ -71,9 +84,14 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		b.Out = "out"
 	}
 	if b.Binary == "" {
-		if b.Binary, err = os.Executable(); err != nil {
+		exe, err := os.Executable()
+		if err != nil {
 			return res, err
 		}
+		b.Binary = filepath.Join(filepath.Dir(exe), responderBinaryName)
+	}
+	if _, err := os.Stat(b.Binary); err != nil {
+		return res, fmt.Errorf("%s: T1 응답기를 찾을 수 없다 — cmd/ra-responder 를 빌드해 그 자리에 두거나 Binary 로 경로를 지정하라", b.Binary)
 	}
 	if err := os.MkdirAll(b.Out, 0o755); err != nil {
 		return res, err

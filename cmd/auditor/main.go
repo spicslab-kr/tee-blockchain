@@ -86,7 +86,7 @@ func usage() {
                    소스 저장소를 clone 해 빌드 설정값을 받는다. 이 디렉터리에서 빌드한다
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
                    측정값 기록과 이미지를 저장소에 커밋 · push 한다
-  build       --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--out out]
+  build       --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
               Nitro 부모 인스턴스에서. 소프트웨어 이미지를 빌드하고 그 위에 RA 응답기를 얹어 EIF 와 측정값(PCR0·1·2)을 낸다
   launch      --eif <file>  [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
               Nitro 부모 인스턴스에서. EIF 를 엔클레이브로 띄우고 TCP→vsock 다리를 놓고, 자기 자신에게 RA 요청해 확인한 뒤
@@ -245,6 +245,7 @@ func buildCmd(args []string) error {
 	fs.StringVar(&b.Name, "name", "", "이미지 · EIF 이름 (기본: 디렉터리 이름)")
 	fs.IntVar(&b.Port, "port", 5000, "응답기가 엔클레이브 안에서 들을 포트")
 	fs.StringVar(&b.Out, "out", "out", "결과 디렉터리")
+	fs.StringVar(&b.Binary, "responder", "", "T1 응답기(tb-ra-responder) 경로. 비우면 이 실행파일 옆의 tb-ra-responder")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
