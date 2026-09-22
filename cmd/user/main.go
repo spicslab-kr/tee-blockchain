@@ -27,6 +27,8 @@ func main() {
 		err = raRequest(os.Args[2:])
 	case "lookup":
 		err = lookup(os.Args[2:])
+	case "compare":
+		err = compareCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -46,7 +48,9 @@ func usage() {
           난수를 만들어 보내고 RA 문서를 받아 저장한다. 난수는 <file>.nonce 에.
               --format 을 주면 그 형식(aws-nitro · gcp-cs-jwt · azure-maa-jwt)의 문서만 받는다
   lookup      --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
-              key 로 바로 읽거나, 측정값으로 key 를 먼저 찾은 뒤 전부 읽는다. User 는 등록은 못 하고 조회만 한다`)
+              key 로 바로 읽거나, 측정값으로 key 를 먼저 찾은 뒤 전부 읽는다. User 는 등록은 못 하고 조회만 한다
+  compare     --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
+              ra-parse 로 받은 값을 체인 등록 정보와 맞댄다 — 값 · 만료 · 신뢰 서명자. 실패하면 exit 1`)
 }
 
 func raRequest(args []string) error {
