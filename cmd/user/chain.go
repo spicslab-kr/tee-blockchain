@@ -19,20 +19,21 @@ import (
 )
 
 // lookup — C2. User 는 등록을 안 하니 registry-deploy · register 는 없다. --key 가 있으면 바로 그 key 를
-// 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다.
-func lookup(args []string) error {
+// 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다. 찾은 key 들을 돌려준다 — flow 가
+// 이어서 각각 compare 하는 데 쓴다.
+func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
 	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
 	key := fs.String("key", "", "조회 key (0x…, register 결과의 key). 있으면 --measurements 는 안 봐도 된다")
 	measurements := fs.String("measurements", "", "측정값: measurements.json 파일, 또는 NAME=hex,NAME=hex")
 	if err := fs.Parse(args); err != nil {
-		return err
+		return nil, err
 	}
 	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
 	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) {
-		return errors.New("--rpc, --contract 는 필수")
+		return nil, errors.New("--rpc, --contract 는 필수")
 	}
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -41,26 +42,26 @@ func lookup(args []string) error {
 	keys := []string{*key}
 	if *key == "" {
 		if *measurements == "" {
-			return errors.New("--key 또는 --measurements 가 필요하다")
+			return nil, errors.New("--key 또는 --measurements 가 필요하다")
 		}
 		values, err := readMeasurements(*measurements)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		keys, err = reader.FindAddress(ctx, values)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(keys) == 0 {
 			fmt.Println("등록된 것이 없다")
-			return nil
+			return nil, nil
 		}
 		fmt.Printf("found %d key(s)\n", len(keys))
 	}
 	for _, k := range keys {
 		reg, err := reader.Lookup(ctx, k)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		fmt.Printf("key       %s\n", k)
 		fmt.Printf("  signer  %s\n", reg.Signer)
@@ -70,7 +71,7 @@ func lookup(args []string) error {
 			fmt.Printf("  measurement hash  %s\n", hex.EncodeToString(h))
 		}
 	}
-	return nil
+	return keys, nil
 }
 
 // readMeasurements — nitro-cli 의 measurements.json({"Measurements":{"PCR0":…}}), 납작한 {"PCR0":…}, 또는 NAME=hex,… 를 받는다.

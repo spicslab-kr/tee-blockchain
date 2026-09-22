@@ -50,7 +50,8 @@ func registryDeploy(args []string) error {
 	return nil
 }
 
-func register(args []string) error {
+// register — C1. 등록에 쓴 key(조회 좌표)를 돌려준다 — flow 가 이어서 바로 self-check compare 하는 데 쓴다.
+func register(args []string) (string, error) {
 	fs := flag.NewFlagSet("register", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
 	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
@@ -61,7 +62,7 @@ func register(args []string) error {
 	version := fs.String("version", "", "버전")
 	expires := fs.Duration("expires", 90*24*time.Hour, "지금부터 얼마 뒤에 만료되나")
 	if err := fs.Parse(args); err != nil {
-		return err
+		return "", err
 	}
 	// 옵션으로 안 준 값은 차례로 묻는다
 	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
@@ -71,47 +72,48 @@ func register(args []string) error {
 	ask(service, "서비스 이름", "")
 	ask(version, "버전", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" || *measurements == "" || *service == "" || *version == "" {
-		return errors.New("--rpc, --contract, --key-file, --measurements, --service, --version 는 필수")
+		return "", errors.New("--rpc, --contract, --key-file, --measurements, --service, --version 는 필수")
 	}
 	key, err := readKey(*keyFile)
 	if err != nil {
-		return err
+		return "", err
 	}
 	values, err := readMeasurements(*measurements)
 	if err != nil {
-		return err
+		return "", err
 	}
 	meta := reg.Meta{Meta: l.Meta{Service: *service, Version: *version, Platform: *platform}, Expires: time.Now().Add(*expires).Truncate(time.Second)}
 	r := ether.Registrar{RPC: *rpc, Contract: common.HexToAddress(*contract), SenderKey: key}
 	signed, err := r.Sign(values, meta, key)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fmt.Printf("signer %s\n", signed.Signer)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	receipt, err := r.Register(ctx, signed)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fmt.Printf("registered\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n", receipt.Key, receipt.TxHash, receipt.Block, meta.Expires.UTC().Format(time.RFC3339))
-	return nil
+	return receipt.Key, nil
 }
 
 // lookup — C2. --key 가 있으면 바로 그 key 를 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다.
-func lookup(args []string) error {
+// 찾은 key 들을 돌려준다 — flow 가 이어서 각각 compare 하는 데 쓴다.
+func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
 	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
 	key := fs.String("key", "", "조회 key (0x…, register 결과의 key). 있으면 --measurements 는 안 봐도 된다")
 	measurements := fs.String("measurements", "", "측정값: measurements.json 파일, 또는 NAME=hex,NAME=hex")
 	if err := fs.Parse(args); err != nil {
-		return err
+		return nil, err
 	}
 	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
 	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) {
-		return errors.New("--rpc, --contract 는 필수")
+		return nil, errors.New("--rpc, --contract 는 필수")
 	}
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -120,26 +122,26 @@ func lookup(args []string) error {
 	keys := []string{*key}
 	if *key == "" {
 		if *measurements == "" {
-			return errors.New("--key 또는 --measurements 가 필요하다")
+			return nil, errors.New("--key 또는 --measurements 가 필요하다")
 		}
 		values, err := readMeasurements(*measurements)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		keys, err = reader.FindAddress(ctx, values)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(keys) == 0 {
 			fmt.Println("등록된 것이 없다")
-			return nil
+			return nil, nil
 		}
 		fmt.Printf("found %d key(s)\n", len(keys))
 	}
 	for _, k := range keys {
 		reg, err := reader.Lookup(ctx, k)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		fmt.Printf("key       %s\n", k)
 		fmt.Printf("  signer  %s\n", reg.Signer)
@@ -149,7 +151,7 @@ func lookup(args []string) error {
 			fmt.Printf("  measurement hash  %s\n", hex.EncodeToString(h))
 		}
 	}
-	return nil
+	return keys, nil
 }
 
 func readKey(path string) ([]byte, error) {

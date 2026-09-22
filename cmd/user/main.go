@@ -26,9 +26,11 @@ func main() {
 	case "ra-request":
 		err = raRequest(os.Args[2:])
 	case "lookup":
-		err = lookup(os.Args[2:])
+		_, err = lookup(os.Args[2:])
 	case "compare":
 		err = compareCmd(os.Args[2:])
+	case "flow":
+		err = flowCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -50,7 +52,9 @@ func usage() {
   lookup      --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
               key 로 바로 읽거나, 측정값으로 key 를 먼저 찾은 뒤 전부 읽는다. User 는 등록은 못 하고 조회만 한다
   compare     --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
-              ra-parse 로 받은 값을 체인 등록 정보와 맞댄다 — 값 · 만료 · 신뢰 서명자. 실패하면 exit 1`)
+              ra-parse 로 받은 값을 체인 등록 정보와 맞댄다 — 값 · 만료 · 신뢰 서명자. 실패하면 exit 1
+  flow        --tee <host:port> --rpc <url> --contract <0x…> [--trusted <0x…,0x…>]
+              ra-request · ra-parse · lookup · compare 를 한 번에 (--nonce 로 고정 가능). 찾은 등록 중 하나라도 PASS 면 exit 0`)
 }
 
 func raRequest(args []string) error {
