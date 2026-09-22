@@ -9,6 +9,16 @@ import (
 	"testing"
 )
 
+// lastKey — keyLineRe 는 "key ... 에서 가져옴"(service/version 추론 로그)에도 걸린다. register 가 실제로
+// 등록한 key 는 항상 그 뒤, 출력의 마지막 매치다.
+func lastKey(out []byte) []byte {
+	m := keyLineRe.FindAllSubmatch(out, -1)
+	if m == nil {
+		return nil
+	}
+	return m[len(m)-1][1]
+}
+
 func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
@@ -55,24 +65,28 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	if !strings.Contains(string(aOut), "PASS") {
 		t.Fatalf("auditor run 은 self-check PASS 를 찍어야 한다:\n%s", aOut)
 	}
-	aKey := keyLineRe.FindSubmatch(aOut)
+	aKey := lastKey(aOut)
 	if aKey == nil {
 		t.Fatalf("auditor run 등록 key 를 못 찾음:\n%s", aOut)
 	}
 
 	// Vendor: 같은 TEE 에서 자기도 RA 요청해서 등록 — Auditor 와는 다른 key(서명자가 다르므로).
+	// --service/--version 을 일부러 안 준다 — Auditor 가 방금 등록한 같은 측정값에서 가져와야 한다.
 	vRun := exec.Command(vendorBin, "run",
 		"--tee", teeAddr, "--rpc", rpc, "--contract", contract, "--key-file", vendorFile,
-		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
+		"--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
 	vOut, err := vRun.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor run: %v\n%s", err, vOut)
 	}
+	if !strings.Contains(string(vOut), "run-e2e") {
+		t.Fatalf("vendor run 은 --service/--version 을 auditor 의 등록에서 가져와야 한다:\n%s", vOut)
+	}
 	if !strings.Contains(string(vOut), "PASS") {
 		t.Fatalf("vendor run 은 self-check PASS 를 찍어야 한다:\n%s", vOut)
 	}
-	vKey := keyLineRe.FindSubmatch(vOut)
-	if vKey == nil || string(vKey[1]) == string(aKey[1]) {
+	vKey := lastKey(vOut)
+	if vKey == nil || string(vKey) == string(aKey) {
 		t.Fatalf("vendor run 의 등록 key 가 auditor 것과 같거나 안 잡힘:\n%s", vOut)
 	}
 

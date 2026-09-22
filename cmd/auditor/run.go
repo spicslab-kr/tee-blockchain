@@ -29,16 +29,16 @@ func runCmd(args []string) error {
 	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
 	keyFile := fs.String("key-file", "", "서명하고 트랜잭션을 보낼 개인키 파일 (hex)")
 	platform := fs.String("platform", "aws-nitro", "측정값 형식")
-	service := fs.String("service", "", "서비스 이름")
-	version := fs.String("version", "", "버전")
+	service := fs.String("service", "", "서비스 이름. 비우면 같은 측정값의 기존 등록(있으면 누구 것이든)에서 가져온다")
+	version := fs.String("version", "", "버전. 비우면 위와 같이 기존 등록에서 가져온다")
 	expires := fs.Duration("expires", 90*24*time.Hour, "지금부터 얼마 뒤에 만료되나")
 	trusted := fs.String("trusted", "", "신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 AUDITOR · VENDOR 를 그대로 쓴다")
 	out := fs.String("out", "", "T1·T2 중간 파일을 둘 디렉터리. 비우면 임시 디렉터리를 쓰고 끝나면 지운다")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" || *service == "" || *version == "" {
-		return errors.New("--rpc, --contract, --key-file, --service, --version 는 필수")
+	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" {
+		return errors.New("--rpc, --contract, --key-file 는 필수")
 	}
 	if *tee == "" && *measurements == "" {
 		return errors.New("--tee 또는 --measurements 가 필요하다")
@@ -77,7 +77,43 @@ func runCmd(args []string) error {
 		fmt.Println("== 2/3 (건너뜀)")
 	}
 
-	fmt.Println("\n== 3/3 C1 등록 후 M2 자기확인")
+	values, err := readMeasurements(measPath)
+	if err != nil {
+		return err
+	}
+	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
+
+	if *service == "" || *version == "" {
+		fmt.Println("\n== service/version 이 비어 있음 — 같은 측정값의 기존 등록에서 가져온다")
+		ictx, icancel := context.WithTimeout(context.Background(), time.Minute)
+		keys, err := reader.FindAddress(ictx, values)
+		if err != nil {
+			icancel()
+			return err
+		}
+		resolved := false
+		for _, k := range keys {
+			existing, err := reader.Lookup(ictx, k)
+			if err != nil {
+				continue
+			}
+			if *service == "" {
+				*service = existing.Meta.Service
+			}
+			if *version == "" {
+				*version = existing.Meta.Version
+			}
+			fmt.Printf("   %s %s (key %s 에서 가져옴)\n", existing.Meta.Service, existing.Meta.Version, k)
+			resolved = true
+			break
+		}
+		icancel()
+		if !resolved || *service == "" || *version == "" {
+			return errors.New("--service, --version 을 추론할 기존 등록이 없다 — 직접 지정하라")
+		}
+	}
+
+	fmt.Println("\n== C1 등록 후 M2 자기확인")
 	key, err := register([]string{
 		"--rpc", *rpc, "--contract", *contract, "--key-file", *keyFile,
 		"--measurements", measPath, "--platform", *platform,
@@ -87,11 +123,6 @@ func runCmd(args []string) error {
 		return err
 	}
 
-	values, err := readMeasurements(measPath)
-	if err != nil {
-		return err
-	}
-	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	reg, err := reader.Lookup(ctx, key)

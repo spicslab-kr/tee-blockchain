@@ -86,7 +86,7 @@ func usage() {
                    체인에서 등록 정보를 읽어 값 · 만료 · 신뢰 서명자까지 같이 본다. 실패하면 exit 1
   run              (--tee <host:port> | --measurements <file>) --rpc <url> --contract <0x…> --key-file <file>
                    --service <name> --version <v>
-                   register 와 그 자리 self-check compare 를 한 번에. --tee 를 주면 T1·T2 도 먼저 한다 (--nonce 로 고정 가능)
+                   register 와 그 자리 self-check compare 를 한 번에. --tee 를 주면 T1·T2 도 먼저 한다 (--nonce 로 고정 가능). --service/--version 비우면 같은 측정값의 기존 등록에서 가져온다
   receive          --repo <url> [--ref <commit>] --into <dir>
                    소스 저장소를 clone 해 빌드 설정값을 받는다. 이 디렉터리에서 빌드한다
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
