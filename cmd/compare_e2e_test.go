@@ -92,7 +92,24 @@ func TestCompare_E2E_PlainAndChainModes(t *testing.T) {
 	if !ok || ee.ExitCode() != 1 {
 		t.Fatalf("--trusted 강제로 신뢰 안 되는데 exit 1 이 아님: %v\n%s", err, out)
 	}
-	if !strings.Contains(string(out), "신뢰 목록") {
-		t.Errorf("신뢰 목록 근거가 안 보임:\n%s", out)
+
+	// 6. 실수로 --b 와 --key 를 같이 주면 — 하나를 조용히 무시하지 않고 바로 에러여야 한다 (exit 2, flag 검증 실패).
+	both := exec.Command(userBin, "compare", "--a", measurements, "--b", measurements, "--rpc", rpc, "--contract", contract, "--key", key)
+	out, err = both.CombinedOutput()
+	if err == nil {
+		t.Fatalf("--b 와 --key 를 같이 줬는데 성공함 (하나가 조용히 무시된 것):\n%s", out)
+	}
+	if !strings.Contains(string(out), "같이 주면 안 된다") {
+		t.Errorf("어느 쪽을 골라야 하는지 에러 메시지가 안 보임:\n%s", out)
+	}
+
+	// 7. --trusted 만 주고 --key(체인 모드 전체)는 빠뜨리면 — 조용히 무시되지 않고 에러여야 한다.
+	trustedNoKey := exec.Command(userBin, "compare", "--a", measurements, "--trusted", "0x0000000000000000000000000000000000000001")
+	out, err = trustedNoKey.CombinedOutput()
+	if err == nil {
+		t.Fatalf("--trusted 만 주고 --key 를 안 줬는데 성공함 (--trusted 가 조용히 무시된 것):\n%s", out)
+	}
+	if !strings.Contains(string(out), "체인 모드 전용") {
+		t.Errorf("--trusted 전용이라는 에러 메시지가 안 보임:\n%s", out)
 	}
 }

@@ -1,2 +1,10 @@
 dist/
 setup/vendor/nitro/tb-*-linux-amd64
+
+# go build ./cmd/<role>/... (개별 패키지 검증) 이 -o 없이 돌면 그 패키지 이름으로 루트에 바이너리를 떨어뜨린다.
+/auditor
+/auditor.exe
+/vendor
+/vendor.exe
+/user
+/user.exe

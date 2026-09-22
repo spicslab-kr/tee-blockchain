@@ -31,6 +31,9 @@ func compareCmd(args []string) error {
 	if *a == "" {
 		return errors.New("--a 는 필수")
 	}
+	if err := checkMode(*b, *rpc, *contract, *key, *trusted); err != nil {
+		return err
+	}
 	va, err := readMeasurements(*a)
 	if err != nil {
 		return err
@@ -62,6 +65,24 @@ func compareCmd(args []string) error {
 		return err
 	}
 	return printVerdict((cmp.Impl{}).Compare(va, vb))
+}
+
+// checkMode — --b(평문 모드)와 --key(체인 모드)는 딱 하나만 받는다. 실수로 둘 다 주면 어느 하나를 조용히
+// 무시하고 넘어가지 않고 바로 에러로 알린다. --trusted 는 체인 모드에서만 뜻이 있다 — --key 없이 주면
+// 그냥 버려지므로 이것도 미리 막는다.
+func checkMode(b, rpc, contract, key, trusted string) error {
+	chainFlags := rpc != "" || contract != "" || key != "" || trusted != ""
+	switch {
+	case b != "" && key != "":
+		return errors.New("--b(평문 비교)와 --key(체인 조회)를 같이 주면 안 된다 — 하나만 골라라")
+	case b != "" && chainFlags:
+		return errors.New("--b 를 줬는데 --rpc/--contract/--trusted 도 같이 줬다 — --key 없인 체인 모드가 아니니 지운다")
+	case key == "" && (rpc != "" || contract != ""):
+		return errors.New("--rpc 또는 --contract 를 줬으면 --key 도 있어야 체인 모드다")
+	case key == "" && trusted != "":
+		return errors.New("--trusted 는 --key 없이는 쓰이지 않는다 (체인 모드 전용)")
+	}
+	return nil
 }
 
 func trustedSigners(ctx context.Context, reader lether.Reader, flag string) ([]string, error) {
