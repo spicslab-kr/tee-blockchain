@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	l "tb/internal/chain/lookup/auditor"
+	lether "tb/internal/chain/lookup/auditor/ether"
 	reg "tb/internal/chain/register/auditor"
 	"tb/internal/chain/register/auditor/ether"
 	p "tb/internal/tee/parse/auditor"
@@ -96,6 +97,60 @@ func register(args []string) error {
 		return err
 	}
 	fmt.Printf("registered\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n", receipt.Key, receipt.TxHash, receipt.Block, meta.Expires.UTC().Format(time.RFC3339))
+	return nil
+}
+
+// lookup — C2. --key 가 있으면 바로 그 key 를 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다.
+func lookup(args []string) error {
+	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
+	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
+	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
+	key := fs.String("key", "", "조회 key (0x…, register 결과의 key). 있으면 --measurements 는 안 봐도 된다")
+	measurements := fs.String("measurements", "", "측정값: measurements.json 파일, 또는 NAME=hex,NAME=hex")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
+	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
+	if *rpc == "" || !common.IsHexAddress(*contract) {
+		return errors.New("--rpc, --contract 는 필수")
+	}
+	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	keys := []string{*key}
+	if *key == "" {
+		if *measurements == "" {
+			return errors.New("--key 또는 --measurements 가 필요하다")
+		}
+		values, err := readMeasurements(*measurements)
+		if err != nil {
+			return err
+		}
+		keys, err = reader.FindAddress(ctx, values)
+		if err != nil {
+			return err
+		}
+		if len(keys) == 0 {
+			fmt.Println("등록된 것이 없다")
+			return nil
+		}
+		fmt.Printf("found %d key(s)\n", len(keys))
+	}
+	for _, k := range keys {
+		reg, err := reader.Lookup(ctx, k)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("key       %s\n", k)
+		fmt.Printf("  signer  %s\n", reg.Signer)
+		fmt.Printf("  service %s %s (%s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform)
+		fmt.Printf("  expires %s\n", time.Unix(reg.Expires, 0).UTC().Format(time.RFC3339))
+		if h := reg.Values.Get("measurementHash"); h != nil {
+			fmt.Printf("  measurement hash  %s\n", hex.EncodeToString(h))
+		}
+	}
 	return nil
 }
 

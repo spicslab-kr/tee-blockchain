@@ -25,6 +25,8 @@ func main() {
 		err = raParse(os.Args[2:])
 	case "ra-request":
 		err = raRequest(os.Args[2:])
+	case "lookup":
+		err = lookup(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -42,7 +44,9 @@ func usage() {
               문서의 서명 · 인증서 체인 · 난수를 확인하고 측정값(PCR)을 꺼낸다. 결과는 register --measurements 에 그대로 넣는다
   ra-request  --tee <host:port> [--out <file>] [--format <name>] [--timeout 30s]
           난수를 만들어 보내고 RA 문서를 받아 저장한다. 난수는 <file>.nonce 에.
-              --format 을 주면 그 형식(aws-nitro · gcp-cs-jwt · azure-maa-jwt)의 문서만 받는다`)
+              --format 을 주면 그 형식(aws-nitro · gcp-cs-jwt · azure-maa-jwt)의 문서만 받는다
+  lookup      --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
+              key 로 바로 읽거나, 측정값으로 key 를 먼저 찾은 뒤 전부 읽는다. User 는 등록은 못 하고 조회만 한다`)
 }
 
 func raRequest(args []string) error {

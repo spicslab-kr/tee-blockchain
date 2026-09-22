@@ -34,6 +34,8 @@ func main() {
 		err = registryDeploy(os.Args[2:])
 	case "register":
 		err = register(os.Args[2:])
+	case "lookup":
+		err = lookup(os.Args[2:])
 	case "ra-serve":
 		err = raServe(os.Args[2:])
 	case "ra-parse":
@@ -66,6 +68,8 @@ func usage() {
   register         --rpc <url> --contract <0x…> --key-file <file> --measurements <measurements.json | NAME=hex,…>
                    --service <name> --version <v> [--platform aws-nitro] [--expires 2160h]
                    측정값을 내 키로 서명해 컨트랙트에 등록한다. 결과의 key 가 조회 좌표다
+  lookup           --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
+                   key 로 바로 읽거나, 측정값으로 key 를 먼저 찾은 뒤 전부 읽는다
   build       --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--out out]
               Nitro 부모 인스턴스에서. 소프트웨어 이미지를 빌드하고 그 위에 RA 응답기를 얹어 EIF 와 측정값(PCR0·1·2)을 낸다
   launch      --eif <file>  [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
