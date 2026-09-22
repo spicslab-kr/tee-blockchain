@@ -30,7 +30,7 @@ func registryDeploy(args []string) error {
 		return err
 	}
 	// 옵션으로 안 준 값은 차례로 묻는다
-	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
+	askMainnetRPC(rpc)
 	ask(keyFile, "배포 트랜잭션을 보낼 개인키 파일", "")
 	ask(approver, "이 컨트랙트가 받을 서명 키의 주소 (0x…)", "")
 	if *rpc == "" || *keyFile == "" || !common.IsHexAddress(*approver) {
@@ -65,7 +65,7 @@ func register(args []string) (string, error) {
 		return "", err
 	}
 	// 옵션으로 안 준 값은 차례로 묻는다
-	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
+	askMainnetRPC(rpc)
 	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
 	ask(keyFile, "내 개인키 파일", "")
 	ask(measurements, "측정값 (measurements.json 경로 또는 NAME=hex,…)", "out/measurements.json")
@@ -221,4 +221,23 @@ func ask(dst *string, label, def string) {
 		line = def
 	}
 	*dst = line
+}
+
+const mainnetRPC = "https://ethereum-rpc.publicnode.com"
+
+// askMainnetRPC — 실제 자금이 오가는 트랜잭션(등록 · 배포)이라, mainnet 을 쓸 땐 그냥 엔터로 넘어가지
+// 못하게 한다. 값이 있으면(플래그로 줬으면) 그대로 쓴다. 비어 있으면 y 를 쳐야 mainnet 을 쓰고, 다른
+// 문자열을 치면 그걸 RPC 주소로 그대로 쓴다(Sepolia 같은 테스트넷도 이렇게 명시적으로 준다).
+func askMainnetRPC(dst *string) {
+	if *dst != "" {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "RPC 주소 — mainnet(%s)에 실제 트랜잭션을 보낸다. 그대로 쓰려면 y, 다른 RPC 를 쓰려면 그 주소: ", mainnetRPC)
+	line, _ := stdin.ReadString('\n')
+	line = strings.TrimSpace(line)
+	if strings.EqualFold(line, "y") {
+		*dst = mainnetRPC
+	} else {
+		*dst = line
+	}
 }
