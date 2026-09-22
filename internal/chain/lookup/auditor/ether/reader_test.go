@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -114,5 +115,57 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 	// 등록되지 않은 key — 에러.
 	if _, err := reader.Lookup(ctx, common.HexToHash("0x3039").Hex()); err == nil {
 		t.Fatal("등록되지 않은 key 는 에러여야 한다")
+	}
+
+	// 길이는 맞는데 hex 가 아닌 key — 조용히 0 으로 바뀌어 "not registered" 로 둔갑하면 안 되고, 그 자체로
+	// 에러여야 한다.
+	bad := "0x" + strings.Repeat("zz", 32)
+	if _, err := reader.Lookup(ctx, bad); err == nil {
+		t.Fatal("hex 가 아닌 key 는 에러여야 한다 (0 으로 조용히 바뀌면 안 된다)")
+	}
+}
+
+// TestReader_Lookup_ScansMultipleLogChunks — 등록 뒤에도 블록이 계속 쌓이는 실제 체인을 흉내 낸다.
+// LogRangeChunk 를 아주 작게 줘서, 최신 블록에서 한 번에 못 찾고 여러 번 거슬러 올라가야만 이벤트를
+// 찾는 경로를 실제로 돌려본다 (기본값 4000 짜리 청크로는 시뮬레이션 체인의 몇 블록 안에서 항상 한 번에
+// 찾아져서 이 경로가 확인되지 않는다).
+func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
+	deployerKey, deployer := newKey(t)
+	auditorKey, auditorAddr := newKey(t)
+	_, vendorAddr := newKey(t)
+	sim := chain(t, deployer, auditorAddr)
+	client := sim.Client()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, auditorAddr, vendorAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := p.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x44}, 48)}}
+	registrar := regether.Registrar{Backend: client, Contract: contract, SenderKey: auditorKey}
+	meta := reg.Meta{Meta: l.Meta{Service: "chunk-test", Version: "0.1.0", Platform: DefaultPlatform}, Expires: time.Now().Add(time.Hour)}
+	signed, err := registrar.Sign(values, meta, auditorKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := registrar.Register(ctx, signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 등록 뒤로도 블록을 여러 개 더 쌓는다 — 실제 체인에서 시간이 지나 최신 블록이 등록 시점보다 한참
+	// 앞서가는 상황.
+	for i := 0; i < 8; i++ {
+		sim.Commit()
+	}
+
+	reader := Reader{Contract: contract, Backend: client, LogRangeChunk: 1}
+	got, err := reader.Lookup(ctx, receipt.Key)
+	if err != nil {
+		t.Fatalf("청크 1개씩 거슬러 올라가며 찾기 실패: %v", err)
+	}
+	if got.Meta.Service != "chunk-test" {
+		t.Fatalf("Lookup = %+v", got)
 	}
 }

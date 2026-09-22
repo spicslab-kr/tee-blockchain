@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,31 +24,44 @@ import (
 // DefaultPlatform — 지금 지원하는 유일한 측정값 형식.
 const DefaultPlatform = "aws-nitro"
 
+// defaultLogRangeChunk — Lookup 이 이벤트 로그를 한 번에 물어보는 블록 범위. 자세한 이유는 auditor/ether
+// 의 같은 상수 주석 참고 — 공개 RPC 는 eth_getLogs 의 블록 범위를 제한해서, 오래된 컨트랙트를 블록 0부터
+// 한 번에 훑으면 거절당한다.
+const defaultLogRangeChunk = 4000
+
+// Backend — 조회에 필요한 것. *ethclient.Client 와 *simulated.Backend.Client() 가 둘 다 만족한다.
+type Backend interface {
+	bind.ContractBackend
+	BlockNumber(ctx context.Context) (uint64, error)
+}
+
 // Reader — RPC 로 컨트랙트를 읽는다. Backend 가 있으면 그걸 쓰고(시뮬레이션 체인 시험용), 없으면 RPC 에 연결한다.
 type Reader struct {
 	RPC      string
 	Contract common.Address
-	Backend  bind.ContractBackend
+	Backend  Backend
+	// LogRangeChunk — 0 이면 defaultLogRangeChunk.
+	LogRangeChunk uint64
 }
 
 var _ l.Reader = (*Reader)(nil)
 
-func (r Reader) client(ctx context.Context) (*regether.Registry, func(), error) {
+func (r Reader) client(ctx context.Context) (*regether.Registry, Backend, func(), error) {
 	backend := r.Backend
 	closeFn := func() {}
 	if backend == nil {
 		c, err := ethclient.DialContext(ctx, r.RPC)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		backend, closeFn = c, c.Close
 	}
 	registry, err := regether.NewRegistry(r.Contract, backend)
 	if err != nil {
 		closeFn()
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return registry, closeFn, nil
+	return registry, backend, closeFn, nil
 }
 
 // measurementHash — chain/register 의 MeasurementHash 와 같은 계산(이름순 "이름=값(hex)\n" 을 keccak256).
@@ -83,7 +97,7 @@ func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]strin
 	if err != nil {
 		return nil, err
 	}
-	registry, done, err := r.client(ctx)
+	registry, _, done, err := r.client(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -107,14 +121,28 @@ func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]strin
 	return out, nil
 }
 
+// parseKey — 길이만 보면 잘못된 hex(오타·복붙 깨짐)가 common.HexToHash 에서 조용히 0 값으로 바뀌어
+// "등록 없음"으로 오인될 수 있어서, hex 로 실제로 디코드되는지까지 본다.
+func parseKey(address string) (common.Hash, error) {
+	s := strings.TrimPrefix(address, "0x")
+	if len(s) != 64 {
+		return common.Hash{}, fmt.Errorf("key %q: want a 32-byte hex value (0x… , 66 글자)", address)
+	}
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("key %q: not valid hex: %w", address, err)
+	}
+	return common.BytesToHash(b), nil
+}
+
 // Lookup — key(FindAddress 가 준 것)로 등록 정보를 읽는다. 자세한 이유는 auditor/ether 의 주석 참고 —
 // 컨트랙트 저장소엔 서명자 · 만료 · 등록 시각만 있어서 나머지는 이벤트 로그에서 채운다.
 func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, error) {
-	if len(address) != 66 {
-		return l.Registration{}, fmt.Errorf("key %q: want a 32-byte hex value (0x… , 66 글자)", address)
+	key, err := parseKey(address)
+	if err != nil {
+		return l.Registration{}, err
 	}
-	key := common.HexToHash(address)
-	registry, done, err := r.client(ctx)
+	registry, backend, done, err := r.client(ctx)
 	if err != nil {
 		return l.Registration{}, err
 	}
@@ -126,15 +154,13 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 	if rec.Signer == (common.Address{}) {
 		return l.Registration{}, fmt.Errorf("key %s: not registered", address)
 	}
-	iter, err := registry.FilterRegistered(&bind.FilterOpts{Start: 0, Context: ctx}, [][32]byte{key}, nil)
+	ev, err := findRegisteredEvent(ctx, backend, registry, key, r.LogRangeChunk)
 	if err != nil {
 		return l.Registration{}, fmt.Errorf("records 에는 있지만 이벤트 로그를 못 읽음: %w", err)
 	}
-	defer iter.Close()
-	if !iter.Next() {
+	if ev == nil {
 		return l.Registration{}, fmt.Errorf("key %s: 등록은 있지만 이벤트 로그가 없다 (오래된 노드가 로그를 지웠을 수 있다)", address)
 	}
-	ev := iter.Event
 	return l.Registration{
 		Address:   address,
 		Values:    p.Measurements{{Name: "measurementHash", Value: ev.Measurement[:]}},
@@ -143,4 +169,46 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 		Signer:    rec.Signer.Hex(),
 		Signature: ev.Signature,
 	}, nil
+}
+
+// findRegisteredEvent — Registered 이벤트를 최신 블록에서부터 chunk 블록씩 거슬러 올라가며 찾는다.
+// 자세한 이유는 auditor/ether 의 같은 함수 주석 참고.
+func findRegisteredEvent(ctx context.Context, backend Backend, registry *regether.Registry, key common.Hash, chunk uint64) (*regether.RegistryRegistered, error) {
+	if chunk == 0 {
+		chunk = defaultLogRangeChunk
+	}
+	latest, err := backend.BlockNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+	to := latest
+	for {
+		var from uint64
+		if to >= chunk {
+			from = to - chunk + 1
+		}
+		end := to
+		iter, err := registry.FilterRegistered(&bind.FilterOpts{Start: from, End: &end, Context: ctx}, [][32]byte{key}, nil)
+		if err != nil {
+			return nil, err
+		}
+		found := iter.Next()
+		var ev *regether.RegistryRegistered
+		if found {
+			e := *iter.Event
+			ev = &e
+		}
+		iterErr := iter.Error()
+		iter.Close()
+		if iterErr != nil {
+			return nil, iterErr
+		}
+		if ev != nil {
+			return ev, nil
+		}
+		if from == 0 {
+			return nil, nil
+		}
+		to = from - 1
+	}
 }
