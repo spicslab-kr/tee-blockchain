@@ -17,6 +17,7 @@ import (
 
 	build "tb/internal/setup/build/auditor/aws"
 	launch "tb/internal/setup/launch/auditor/aws"
+	parse "tb/internal/tee/parse/auditor"
 	ra "tb/internal/tee/request/auditor"
 	awsra "tb/internal/tee/request/auditor/aws"
 )
@@ -30,6 +31,8 @@ func main() {
 	switch os.Args[1] {
 	case "ra-serve":
 		err = raServe(os.Args[2:])
+	case "ra-parse":
+		err = raParse(os.Args[2:])
 	case "ra-request":
 		err = raRequest(os.Args[2:])
 	case "ra-proxy":
@@ -63,6 +66,8 @@ func usage() {
   lo-up       엔클레이브 안에서 loopback 을 올린다. 소프트웨어를 띄우기 전에 한 번
   ra-proxy    --listen <host:port>  --vsock <cid>:<port>
               Nitro 부모 인스턴스에서 돈다. 들어온 TCP 연결을 엔클레이브 vsock 으로 이어 준다
+  ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out <file>] [--at <RFC3339>]
+              문서의 서명 · 인증서 체인 · 난수를 확인하고 측정값(PCR)을 꺼낸다. 결과는 register --measurements 에 그대로 넣는다
   ra-request  --tee <host:port> [--out <file>] [--format <name>] [--timeout 30s]
               난수를 만들어 보내고 RA 문서를 받아 저장한다. 난수는 <file>.nonce 에.
               --format 을 주면 그 형식(aws-nitro · gcp-cs-jwt · azure-maa-jwt)의 문서만 받는다`)
@@ -245,6 +250,14 @@ func raProxy(args []string) error {
 
 func exitCode(err error) int {
 	switch {
+	case errors.Is(err, parse.ErrWrongFormat):
+		return 4
+	case errors.Is(err, parse.ErrSignature), errors.Is(err, parse.ErrChain):
+		return 5
+	case errors.Is(err, parse.ErrNonce):
+		return 6
+	case errors.Is(err, parse.ErrBadDocument):
+		return 7
 	case errors.Is(err, ra.ErrWrongFormat):
 		return 4
 	case errors.Is(err, ra.ErrExtractFailed):
