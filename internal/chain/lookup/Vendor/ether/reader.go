@@ -149,6 +149,27 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 	}, nil
 }
 
+// TrustedSigners — 컨트랙트에 고정된 Auditor · Vendor 주소. M2 의 Check 가 등록 서명자가 이 둘 중
+// 하나인지 볼 때 쓴다. 배포 뒤 바뀌지 않는 값이라(Registry.sol 의 AUDITOR · VENDOR 는 immutable) 매번
+// 새로 불러도 항상 같다.
+func (r Reader) TrustedSigners(ctx context.Context) ([]string, error) {
+	registry, _, done, err := r.client(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	opts := &bind.CallOpts{Context: ctx}
+	a, err := registry.AUDITOR(opts)
+	if err != nil {
+		return nil, err
+	}
+	v, err := registry.VENDOR(opts)
+	if err != nil {
+		return nil, err
+	}
+	return []string{a.Hex(), v.Hex()}, nil
+}
+
 // findRegisteredEvent — Registered 이벤트를 최신 블록에서부터 chunk 블록씩 거슬러 올라가며 찾는다.
 // key 하나에 등록은 최대 하나뿐이라(컨트랙트가 중복을 거절한다), 찾으면 바로 돌려준다. 컨트랙트를 배포한
 // 지점보다 먼저까지 가면(from == 0 을 다 봤는데도 없으면) 못 찾은 것으로 본다.
