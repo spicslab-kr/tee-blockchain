@@ -1,5 +1,5 @@
 // 두 프로세스 — vendor 바이너리가 TEE 쪽 ra-serve 를 띄우고, user 바이너리가 ra-request 로 문서를 받는다.
-package request_test
+package cmd_test
 
 import (
 	"bufio"
@@ -71,7 +71,7 @@ func TestRA_TwoProcesses_UserRequestsVendorTEE(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
 	}
-	fixture, _ := filepath.Abs(filepath.Join("testdata", "nitro-attestation.cbor"))
+	fixture, _ := filepath.Abs(filepath.Join(repoRoot(t), "internal", "tee", "request", "testdata", "nitro-attestation.cbor"))
 	want, err := os.ReadFile(fixture)
 	if err != nil {
 		t.Fatal(err)
