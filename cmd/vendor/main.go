@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	reg "tb/internal/chain/register/Vendor"
+	tr "tb/internal/core/transfer/Vendor"
 	build "tb/internal/setup/build/Vendor/aws"
 	launch "tb/internal/setup/launch/Vendor/aws"
 	parse "tb/internal/tee/parse/Vendor"
@@ -38,6 +40,10 @@ func main() {
 		err = lookup(os.Args[2:])
 	case "compare":
 		err = compareCmd(os.Args[2:])
+	case "send":
+		err = send(os.Args[2:])
+	case "receive":
+		err = receive(os.Args[2:])
 	case "ra-serve":
 		err = raServe(os.Args[2:])
 	case "ra-parse":
@@ -76,6 +82,10 @@ func usage() {
                    측정값 두 묶음을 그대로 맞댄다 (파싱값 vs 빌드값 등). PASS/FAIL 과 근거를 낸다
   compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
                    체인에서 등록 정보를 읽어 값 · 만료 · 신뢰 서명자까지 같이 본다. 실패하면 exit 1
+  send             --repo <url> --config <build-config.json> [--workdir <clone>]
+                   빌드 설정값을 소스 저장소에 커밋 · push 한다
+  receive          --repo <url> [--ref <commit>] --into <dir>
+                   측정값 기록과 이미지를 clone 해 검증한다
   build       --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--out out]
               Nitro 부모 인스턴스에서. 소프트웨어 이미지를 빌드하고 그 위에 RA 응답기를 얹어 EIF 와 측정값(PCR0·1·2)을 낸다
   launch      --eif <file>  [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
@@ -90,7 +100,60 @@ func usage() {
               문서의 서명 · 인증서 체인 · 난수를 확인하고 측정값(PCR)을 꺼낸다. 결과는 register --measurements 에 그대로 넣는다
   ra-request  --tee <host:port> [--out <file>] [--format <name>] [--timeout 30s]
               난수를 만들어 보내고 RA 문서를 받아 저장한다. 난수는 <file>.nonce 에.
-              --format 을 주면 그 형식(aws-nitro · gcp-cs-jwt · azure-maa-jwt)의 문서만 받는다`)
+              --format 을 주면 그 형식(aws-nitro · gcp-cs-jwt · azure-maa-jwt)의 문서만 받는다
+
+직접 하려면: setup/vendor/transfer.md`)
+}
+
+func send(args []string) error {
+	fs := flag.NewFlagSet("send", flag.ContinueOnError)
+	repo := fs.String("repo", "", "소스 저장소 URL")
+	cfgPath := fs.String("config", "", "build-config.json 경로")
+	work := fs.String("workdir", "", "이미 clone 된 작업 트리 (없으면 임시 clone)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *repo == "" || *cfgPath == "" {
+		return errors.New("--repo 와 --config 는 필수")
+	}
+	b, err := os.ReadFile(*cfgPath)
+	if err != nil {
+		return err
+	}
+	var cfg tr.BuildConfig
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return fmt.Errorf("build config: %w", err)
+	}
+	res, err := tr.GitTransport{WorkDir: *work}.Send(context.Background(), cfg, *repo)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("sent %s → %s @ %s\n", res.Path, res.Repo, res.Commit)
+	return nil
+}
+
+func receive(args []string) error {
+	fs := flag.NewFlagSet("receive", flag.ContinueOnError)
+	repo := fs.String("repo", "", "Auditor 저장소 URL")
+	ref := fs.String("ref", "", "커밋 · 브랜치 · 태그 (없으면 기본 브랜치)")
+	into := fs.String("into", "", "clone 할 디렉터리")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *repo == "" || *into == "" {
+		return errors.New("--repo 와 --into 는 필수")
+	}
+	got, err := tr.GitTransport{}.Receive(context.Background(), *repo, *ref, *into)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("received %s (sha256 %s)\n", got.Path, got.SHA256[:12])
+	if got.ImagePath != "" {
+		fmt.Printf("image    %s (verified)\n", got.ImagePath)
+	}
+	fmt.Printf("%s %s %s · %d measurements · %s %s\n", got.Value.Service, got.Value.Version, got.Value.Platform,
+		len(got.Value.Values), got.Value.BuildTool.Name, got.Value.BuildTool.Version)
+	return nil
 }
 
 func raRequest(args []string) error {
@@ -290,6 +353,14 @@ func exitCode(err error) int {
 		return 5
 	case errors.Is(err, ra.ErrBadResponse), errors.Is(err, ra.ErrTooLarge):
 		return 6
+	case errors.Is(err, tr.ErrGitMissing):
+		return 8
+	case errors.Is(err, tr.ErrRepoAccess):
+		return 9
+	case errors.Is(err, tr.ErrCommitNotFound):
+		return 10
+	case errors.Is(err, tr.ErrPushRejected):
+		return 11
 	}
 	var ne net.Error
 	if errors.As(err, &ne) {

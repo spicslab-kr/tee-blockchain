@@ -10,8 +10,8 @@ import (
 )
 
 type Measurement struct {
-	Name  string
-	Value []byte
+	Name  string `json:"name"`
+	Value []byte `json:"value"` // base64
 }
 
 type Measurements []Measurement
