@@ -142,7 +142,4 @@ Separately, that's these four steps:
    tb-user compare --a measurements.json --rpc <url> --contract <0x…> --key <a key from lookup>
    ```
 
-## Documentation
 
-- `setup/vendor/`, `setup/auditor/` — per-role build/launch/chain notes
-- `docs/` — design notes
