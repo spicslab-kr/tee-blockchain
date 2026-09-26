@@ -3,7 +3,6 @@ package aws
 import (
 	"bytes"
 	"fmt"
-	"sort"
 	"time"
 )
 
@@ -34,20 +33,20 @@ type Info struct {
 	Module    string
 }
 
-// Parse — 값이 있는 PCR 을 PCR<n> 이름으로. 전부 0 인 레지스터는 쓰이지 않은 것이라 뺀다.
+// imagePCRs — 이미지(코드)를 말하는 레지스터. nitro-cli build-enclave 가 내는 것과 같은 셋이라, 여기서 나온
+// 값이 빌드값 · 측정값 기록 · 체인 등록값과 그대로 맞대진다. PCR3(IAM 역할) · PCR4(부모 인스턴스 ID) ·
+// PCR8(서명 인증서)은 어느 기계에서 돌았나이지 무엇이 돌았나가 아니라서 뺀다 — 인스턴스는 Info.Module 로 본다.
+var imagePCRs = []uint{0, 1, 2}
+
+// Parse — PCR0 · 1 · 2 를 PCR<n> 이름으로. 전부 0 인 레지스터(디버그 모드)는 뺀다.
 func (a Parser) Parse(format string, raw []byte) (Measurements, error) {
 	_, doc, err := decode(format, raw)
 	if err != nil {
 		return nil, err
 	}
-	idx := make([]int, 0, len(doc.PCRs))
-	for i := range doc.PCRs {
-		idx = append(idx, int(i))
-	}
-	sort.Ints(idx)
 	var out Measurements
-	for _, i := range idx {
-		v := doc.PCRs[uint(i)]
+	for _, i := range imagePCRs {
+		v := doc.PCRs[i]
 		if bytes.Equal(v, make([]byte, 48)) {
 			continue
 		}
