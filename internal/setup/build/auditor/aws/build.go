@@ -219,7 +219,12 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
+	// tar 가 sudo 로 풀어 놓은 트리는 root 소유라 os.RemoveAll 로는 못 지운다 — 그대로 두면 빌드마다 out/ 에 쌓인다.
+	defer func() {
+		if os.RemoveAll(dir) != nil {
+			r.cmd(ctx, "rm", "-rf", dir).Run()
+		}
+	}()
 
 	container := fmt.Sprintf("tb-canon-%d", os.Getpid())
 	r.cmd(ctx, "docker", "rm", "-f", container).Run() // 이전 실패 잔여물, 있으면 지운다
