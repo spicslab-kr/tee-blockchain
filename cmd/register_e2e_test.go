@@ -166,18 +166,28 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	auditorBin := buildBin(t, bins, "./cmd/auditor")
 	vendorBin := buildBin(t, bins, "./cmd/vendor")
 
-	// 1. 컨트랙트 배포 — 누가 해도 된다, 여기서는 deployer 키로.
-	deploy := exec.Command(auditorBin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--auditor", auditorAddr, "--vendor", vendorAddr)
-	out, err := deploy.CombinedOutput()
-	if err != nil {
-		t.Fatalf("registry-deploy: %v\n%s", err, out)
+	// 1. 컨트랙트 배포 — 컨트랙트 하나에 서명자 하나. 역할마다 자기 것을 올린다. 트랜잭션은 누가 보내도 된다,
+	// 여기서는 deployer 키로.
+	deployFor := func(bin, approver string) string {
+		deploy := exec.Command(bin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--approver", approver)
+		out, err := deploy.CombinedOutput()
+		if err != nil {
+			t.Fatalf("registry-deploy: %v\n%s", err, out)
+		}
+		m := deployedAtRe.FindSubmatch(out)
+		if m == nil {
+			t.Fatalf("컨트랙트 주소를 못 찾음:\n%s", out)
+		}
+		if !strings.Contains(string(out), "approver "+approver) {
+			t.Fatalf("배포 출력에 approver 가 안 보임:\n%s", out)
+		}
+		return string(m[1])
 	}
-	m := deployedAtRe.FindSubmatch(out)
-	if m == nil {
-		t.Fatalf("컨트랙트 주소를 못 찾음:\n%s", out)
-	}
-	contract := string(m[1])
-	t.Logf("registry deployed at %s", contract)
+	contract := deployFor(auditorBin, auditorAddr)
+	vContract := deployFor(vendorBin, vendorAddr)
+	t.Logf("registries deployed at %s (auditor) and %s (vendor)", contract, vContract)
+	var out []byte
+	var err error
 
 	// 2. Auditor 등록.
 	measurements := "PCR0=" + strings.Repeat("aa", 48) + ",PCR1=" + strings.Repeat("bb", 48) + ",PCR2=" + strings.Repeat("cc", 48)
@@ -192,8 +202,8 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 		t.Fatalf("auditor 등록 key 를 못 찾음:\n%s", aOut)
 	}
 
-	// 3. 같은 측정값을 Vendor 도 등록 — 다른 key 가 나와야 한다 (서명자가 다르므로).
-	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", vendorFile,
+	// 3. 같은 측정값을 Vendor 도 자기 컨트랙트에 등록 — 다른 key 가 나와야 한다 (서명자가 다르므로).
+	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
 		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
 	vOut, err := vReg.CombinedOutput()
 	if err != nil {
@@ -222,6 +232,14 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	out, err = stranger.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 4 {
 		t.Fatalf("want exit 4 (not an approver), got %v\n%s", err, out)
+	}
+
+	// 5b. Vendor 키로 Auditor 컨트랙트에 — 승인자가 아니라 거부, exit 4. 컨트랙트 하나에 서명자 하나라는 뜻이 이것.
+	cross := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", vendorFile,
+		"--measurements", freshMeasurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
+	out, err = cross.CombinedOutput()
+	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 4 {
+		t.Fatalf("vendor key on the auditor contract: want exit 4, got %v\n%s", err, out)
 	}
 
 	// 6. 이미 지난 만료 — 거부, exit 6.

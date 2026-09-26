@@ -75,12 +75,11 @@ func chain(t *testing.T, funded ...common.Address) *simulated.Backend {
 func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	auditorKey, auditorAddr := newKey(t)
-	_, vendorAddr := newKey(t)
 	client := chain(t, deployer, auditorAddr).Client()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	contract, _, err := audether.Deploy(ctx, "", client, deployerKey, auditorAddr, vendorAddr)
+	contract, _, err := audether.Deploy(ctx, "", client, deployerKey, auditorAddr)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -28,12 +28,19 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	vendorBin := buildBin(t, bins, "./cmd/vendor")
 	userBin := buildBin(t, bins, "./cmd/user")
 
-	deploy := exec.Command(auditorBin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--auditor", auditorAddr, "--vendor", vendorAddr)
+	// 컨트랙트 하나에 서명자 하나 — Auditor 것과 Vendor 것을 따로 올린다.
+	deploy := exec.Command(auditorBin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--approver", auditorAddr)
 	out, err := deploy.CombinedOutput()
 	if err != nil {
 		t.Fatalf("registry-deploy: %v\n%s", err, out)
 	}
 	contract := string(deployedAtRe.FindSubmatch(out)[1])
+	vDeploy := exec.Command(vendorBin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--approver", vendorAddr)
+	vOut, err := vDeploy.CombinedOutput()
+	if err != nil {
+		t.Fatalf("vendor registry-deploy: %v\n%s", err, vOut)
+	}
+	vContract := string(deployedAtRe.FindSubmatch(vOut)[1])
 
 	measurements := "PCR0=" + strings.Repeat("aa", 48) + ",PCR1=" + strings.Repeat("bb", 48) + ",PCR2=" + strings.Repeat("cc", 48)
 	reg := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
@@ -44,8 +51,8 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	}
 	key := string(keyLineRe.FindSubmatch(regOut)[1])
 
-	// Vendor 도 같은 측정값을 등록 — FindAddress 가 둘 다 돌려주는지 보려고.
-	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", vendorFile,
+	// Vendor 도 같은 측정값을 자기 컨트랙트에 등록 — 컨트랙트가 다르니 조회도 각자 한다.
+	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
 		"--measurements", measurements, "--service", "lookup-e2e", "--version", "2.0.0", "--platform", "aws-nitro")
 	vRegOut, err := vReg.CombinedOutput()
 	if err != nil {
@@ -56,26 +63,33 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 		t.Fatal("auditor 와 vendor 의 key 가 같으면 안 된다 (서명자가 다르다)")
 	}
 
-	// 측정값으로 찾기 — auditor 로. 둘 다 등록했으니 key 가 두 개 나와야 한다.
+	// 측정값으로 찾기 — auditor 컨트랙트에서. 서명자가 하나라 key 도 하나, auditor 것이어야 한다.
 	byMeasurements := exec.Command(auditorBin, "lookup", "--rpc", rpc, "--contract", contract, "--measurements", measurements)
 	lmOut, err := byMeasurements.CombinedOutput()
 	if err != nil {
 		t.Fatalf("lookup --measurements: %v\n%s", err, lmOut)
 	}
-	if !strings.Contains(string(lmOut), "found 2 key(s)") {
-		t.Fatalf("auditor · vendor 둘 다 등록했으니 key 두 개가 나와야 한다:\n%s", lmOut)
+	if !strings.Contains(string(lmOut), "found 1 key(s)") || !strings.Contains(string(lmOut), key) {
+		t.Fatalf("auditor 컨트랙트에선 auditor 의 key 하나가 나와야 한다:\n%s", lmOut)
 	}
-	for _, k := range []string{key, vendorKeyHex} {
-		if !strings.Contains(string(lmOut), k) {
-			t.Fatalf("lookup --measurements 결과에 key(%s)가 없다:\n%s", k, lmOut)
-		}
+	if strings.Contains(string(lmOut), vendorKeyHex) {
+		t.Fatalf("auditor 컨트랙트 조회에 vendor 의 key 가 섞였다:\n%s", lmOut)
 	}
 	if !strings.Contains(string(lmOut), "lookup-e2e 2.0.0 (aws-nitro)") {
 		t.Errorf("서비스 메타데이터가 안 보인다:\n%s", lmOut)
 	}
+	// 같은 측정값을 vendor 컨트랙트에서 찾으면 vendor 의 key 하나.
+	vByMeasurements := exec.Command(vendorBin, "lookup", "--rpc", rpc, "--contract", vContract, "--measurements", measurements)
+	vlmOut, err := vByMeasurements.CombinedOutput()
+	if err != nil {
+		t.Fatalf("vendor lookup --measurements: %v\n%s", err, vlmOut)
+	}
+	if !strings.Contains(string(vlmOut), "found 1 key(s)") || !strings.Contains(string(vlmOut), vendorKeyHex) {
+		t.Fatalf("vendor 컨트랙트에선 vendor 의 key 하나가 나와야 한다:\n%s", vlmOut)
+	}
 
 	// vendor 쪽 key 로 직접 조회 — signer 가 vendor 주소여야 한다.
-	vByKey := exec.Command(vendorBin, "lookup", "--rpc", rpc, "--contract", contract, "--key", vendorKeyHex)
+	vByKey := exec.Command(vendorBin, "lookup", "--rpc", rpc, "--contract", vContract, "--key", vendorKeyHex)
 	vbkOut, err := vByKey.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor lookup --key: %v\n%s", err, vbkOut)

@@ -56,13 +56,12 @@ func chain(t *testing.T, funded ...common.Address) *simulated.Backend {
 
 func TestReader_FindAddressAndLookup(t *testing.T) {
 	deployerKey, deployer := newKey(t)
-	_, auditorAddr := newKey(t)
 	vendorKey, vendorAddr := newKey(t)
 	client := chain(t, deployer, vendorAddr).Client()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, auditorAddr, vendorAddr)
+	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, vendorAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,14 +130,13 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 // 찾아져서 이 경로가 확인되지 않는다).
 func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 	deployerKey, deployer := newKey(t)
-	_, auditorAddr := newKey(t)
 	vendorKey, vendorAddr := newKey(t)
 	sim := chain(t, deployer, vendorAddr)
 	client := sim.Client()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, auditorAddr, vendorAddr)
+	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, vendorAddr)
 	if err != nil {
 		t.Fatal(err)
 	}

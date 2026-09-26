@@ -71,13 +71,12 @@ func chain(t *testing.T, funded ...common.Address) *simulated.Backend {
 
 func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 	deployerKey, deployer := newKey(t)
-	_, auditorAddr := newKey(t)
 	vendorKey, vendorAddr := newKey(t)
 	client := chain(t, deployer, vendorAddr).Client()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, auditorAddr, vendorAddr)
+	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, vendorAddr)
 	if err != nil {
 		t.Fatal(err)
 	}

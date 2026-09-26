@@ -1,4 +1,5 @@
 // go-ethereum 의 시뮬레이션 체인에 컨트랙트를 배포하고, Auditor 와 Vendor 가 각자 패키지로 등록하고 읽어 본다.
+// 컨트랙트 하나 = 서명자 하나라, 둘이 다 등록하는 흐름은 컨트랙트가 둘이다.
 // 실제 노드가 없어도 돈다. 실제 체인(Sepolia)에서 한 기록은 setup/*/chain.md 에 있다.
 package register_test
 
@@ -82,22 +83,40 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	contract, _, err := venether.Deploy(ctx, "", client, deployerKey, auditorAddr, vendorAddr)
+	// 각 역할이 자기 주소로 자기 컨트랙트를 배포한다.
+	aContract, _, err := audether.Deploy(ctx, "", client, deployerKey, auditorAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
+	vContract, _, err := venether.Deploy(ctx, "", client, deployerKey, vendorAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if aContract == vContract {
+		t.Fatal("two deployments must land at different addresses")
+	}
 	// 조회는 C2 의 일이다. 여기서는 등록이 실제로 들어갔는지 보기 위해 바인딩으로 직접 읽는다.
-	registry, err := venether.NewRegistry(contract, client)
+	aRegistry, err := audether.NewRegistry(aContract, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vRegistry, err := venether.NewRegistry(vContract, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 	call := &bind.CallOpts{Context: ctx}
+	if a, err := aRegistry.APPROVER(call); err != nil || a != auditorAddr {
+		t.Fatalf("auditor contract APPROVER = %s (%v)", a.Hex(), err)
+	}
+	if v, err := vRegistry.APPROVER(call); err != nil || v != vendorAddr {
+		t.Fatalf("vendor contract APPROVER = %s (%v)", v.Hex(), err)
+	}
 
 	expires := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Second)
 	vValues, aValues := pcrs(0x10)
 
-	// Auditor — auditor 패키지로
-	auditor := audether.Registrar{Backend: client, Contract: contract, SenderKey: auditorKey}
+	// Auditor — auditor 패키지로, 자기 컨트랙트에
+	auditor := audether.Registrar{Backend: client, Contract: aContract, SenderKey: auditorKey}
 	aMeta := aud.Meta{Meta: al.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro"}, Expires: expires}
 	aSigned, err := auditor.Sign(aValues, aMeta, auditorKey)
 	if err != nil {
@@ -107,7 +126,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("signer %s", aSigned.Signer)
 	}
 	h, _ := aud.MeasurementHash(aValues)
-	onchainDigest, err := registry.Digest(call, venether.RegistryEntry{Platform: aMeta.Platform, Service: aMeta.Service, Version: aMeta.Version, Measurement: h, Expires: uint64(expires.Unix())})
+	onchainDigest, err := aRegistry.Digest(call, audether.RegistryEntry{Platform: aMeta.Platform, Service: aMeta.Service, Version: aMeta.Version, Measurement: h, Expires: uint64(expires.Unix())})
 	if err != nil || !bytes.Equal(onchainDigest[:], aSigned.Digest) {
 		t.Fatalf("Go digest differs from the contract's: %x vs %x (%v)", aSigned.Digest, onchainDigest, err)
 	}
@@ -115,7 +134,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec, err := registry.Lookup(call, common.HexToHash(aReceipt.Key))
+	rec, err := aRegistry.Lookup(call, common.HexToHash(aReceipt.Key))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,8 +147,8 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("want ErrAlreadyRegistered, got %v", err)
 	}
 
-	// Vendor — Vendor 패키지로, 같은 측정값. 키가 다르다
-	vendor := venether.Registrar{Backend: client, Contract: contract, SenderKey: vendorKey}
+	// Vendor — Vendor 패키지로, 같은 측정값을 자기 컨트랙트에. 서명자가 달라 키도 다르다
+	vendor := venether.Registrar{Backend: client, Contract: vContract, SenderKey: vendorKey}
 	vMeta := ven.Meta{Meta: vl.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro"}, Expires: expires}
 	vSigned, err := vendor.Sign(vValues, vMeta, vendorKey)
 	if err != nil {
@@ -142,9 +161,22 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if vReceipt.Key == aReceipt.Key {
 		t.Fatal("auditor and vendor registrations must have different keys")
 	}
-	keys, err := registry.KeysOf(call, "aws-nitro", h)
-	if err != nil || common.Hash(keys.AuditorKey).Hex() != aReceipt.Key || common.Hash(keys.VendorKey).Hex() != vReceipt.Key {
-		t.Fatalf("keysOf must return both keys: %+v (%v)", keys, err)
+	// keyFor — 각 컨트랙트가 자기 서명자 기준으로 내는 키가 영수증의 키와 같아야 한다
+	if k, err := aRegistry.KeyFor(call, "aws-nitro", h); err != nil || common.Hash(k).Hex() != aReceipt.Key {
+		t.Fatalf("auditor keyFor = %x (%v), want %s", k, err, aReceipt.Key)
+	}
+	if k, err := vRegistry.KeyFor(call, "aws-nitro", h); err != nil || common.Hash(k).Hex() != vReceipt.Key {
+		t.Fatalf("vendor keyFor = %x (%v), want %s", k, err, vReceipt.Key)
+	}
+
+	// 서명자가 다른 컨트랙트에는 못 올린다 — Auditor 서명을 Vendor 컨트랙트에
+	crossValues, _ := pcrs(0x50)
+	crossSigned, err := vendor.Sign(crossValues, vMeta, auditorKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vendor.Register(ctx, crossSigned); !errors.Is(err, ven.ErrNotAnApprover) {
+		t.Fatalf("auditor signature on the vendor contract: want ErrNotAnApprover, got %v", err)
 	}
 
 	// 제3자 키 — 서명은 되지만 컨트랙트가 거부
@@ -178,13 +210,13 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	}
 
 	// 등록되지 않은 키 — 비어 있음
-	empty, err := registry.Lookup(call, common.HexToHash("0x3039"))
+	empty, err := vRegistry.Lookup(call, common.HexToHash("0x3039"))
 	if err != nil || empty.Signer != (common.Address{}) || empty.Expires != 0 {
 		t.Fatalf("unknown key must be empty: %+v %v", empty, err)
 	}
 
 	// 아무나 트랜잭션을 보내도 서명자가 등록자다
-	relay := venether.Registrar{Backend: client, Contract: contract, SenderKey: deployerKey}
+	relay := venether.Registrar{Backend: client, Contract: vContract, SenderKey: deployerKey}
 	rValues, _ := pcrs(0x40)
 	rSigned, err := relay.Sign(rValues, vMeta, vendorKey)
 	if err != nil {
@@ -194,7 +226,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rec, _ := registry.Lookup(call, common.HexToHash(rReceipt.Key)); rec.Signer != vendorAddr {
+	if rec, _ := vRegistry.Lookup(call, common.HexToHash(rReceipt.Key)); rec.Signer != vendorAddr {
 		t.Fatalf("signer must be the vendor, not the sender: %s", rec.Signer.Hex())
 	}
 }

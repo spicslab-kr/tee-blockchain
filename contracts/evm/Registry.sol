@@ -6,11 +6,11 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 /// @title Registry — 체인에 올라가는 기준값.
 /// @notice 누가 어떤 TEE 이미지의 측정값을 언제까지 보증하는지 적는다.
-///         등록은 미리 정해진 두 키(Auditor · Vendor) 중 하나의 서명이 있어야만 받는다.
+///         등록은 배포 때 정한 서명자(APPROVER) 한 명의 서명이 있어야만 받는다. 컨트랙트 하나 = 서명자 하나.
+///         Auditor 와 Vendor 가 둘 다 등록하는 흐름은 각자 자기 컨트랙트를 배포해 따로 조회한다.
 ///         트랜잭션을 보내는 계정은 누구여도 된다. 서명자가 곧 등록자다.
 contract Registry is EIP712 {
-    address public immutable AUDITOR;
-    address public immutable VENDOR;
+    address public immutable APPROVER;
 
     /// 서명되는 값. 측정값은 이름순으로 묶어 keccak256 한 32바이트(measurement)로 들어간다.
     struct Entry {
@@ -27,7 +27,8 @@ contract Registry is EIP712 {
         uint64 registeredAt;
     }
 
-    /// key = keccak256(signer, platform, measurement). 같은 측정값을 Auditor 와 Vendor 가 각각 등록할 수 있다.
+    /// key = keccak256(signer, platform, measurement). signer 는 이 컨트랙트에선 항상 APPROVER 라, 사실상
+    /// (platform, measurement) 하나에 기록 하나다. keyOf 에 signer 를 남겨 둔 건 다른 컨트랙트의 키와 모양을 맞추기 위해서.
     mapping(bytes32 => Record) public records;
 
     event Registered(
@@ -51,14 +52,12 @@ contract Registry is EIP712 {
         "Entry(string platform,string service,string version,bytes32 measurement,uint64 expires)"
     );
 
-    constructor(address auditor, address vendor) EIP712("Registry", "1") {
-        if (auditor == address(0)) revert MissingField("auditor");
-        if (vendor == address(0)) revert MissingField("vendor");
-        AUDITOR = auditor;
-        VENDOR = vendor;
+    constructor(address approver) EIP712("Registry", "1") {
+        if (approver == address(0)) revert MissingField("approver");
+        APPROVER = approver;
     }
 
-    /// @notice 서명된 값을 등록한다. 서명자를 복원해 Auditor 또는 Vendor 인지 본다.
+    /// @notice 서명된 값을 등록한다. 서명자를 복원해 APPROVER 인지 본다.
     function register(Entry calldata e, bytes calldata signature) external returns (bytes32 key) {
         if (bytes(e.platform).length == 0) revert MissingField("platform");
         if (bytes(e.service).length == 0) revert MissingField("service");
@@ -71,7 +70,7 @@ contract Registry is EIP712 {
         if (e.expires <= nowTime) revert ExpiryAlreadyPassed(e.expires, nowTime);
 
         address signer = ECDSA.recover(digest(e), signature);
-        if (signer != AUDITOR && signer != VENDOR) revert NotAnApprover(signer);
+        if (signer != APPROVER) revert NotAnApprover(signer);
 
         key = keyOf(signer, e.platform, e.measurement);
         if (records[key].expires != 0) revert AlreadyRegistered(key, records[key].expires);
@@ -110,13 +109,9 @@ contract Registry is EIP712 {
         return keccak256(abi.encode(signer, keccak256(bytes(platform)), measurement));
     }
 
-    /// @notice 측정값 하나로 나올 수 있는 키 둘 — Auditor 가 등록한 것, Vendor 가 등록한 것.
-    function keysOf(string calldata platform, bytes32 measurement)
-        external
-        view
-        returns (bytes32 auditorKey, bytes32 vendorKey)
-    {
-        return (keyOf(AUDITOR, platform, measurement), keyOf(VENDOR, platform, measurement));
+    /// @notice 이 컨트랙트에서 측정값 하나가 갖는 키 — keyOf(APPROVER, platform, measurement).
+    function keyFor(string calldata platform, bytes32 measurement) external view returns (bytes32) {
+        return keyOf(APPROVER, platform, measurement);
     }
 
     /// @notice 키 아래 기록과 체인의 현재 시각. 만료 판정은 이 시각으로 한다.

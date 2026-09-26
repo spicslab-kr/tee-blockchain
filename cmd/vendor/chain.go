@@ -25,18 +25,16 @@ func registryDeploy(args []string) error {
 	fs := flag.NewFlagSet("registry-deploy", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
 	keyFile := fs.String("key-file", "", "배포 트랜잭션을 보낼 개인키 파일 (hex)")
-	auditor := fs.String("auditor", "", "Auditor 서명 키의 주소")
-	vendor := fs.String("vendor", "", "Vendor 서명 키의 주소")
+	approver := fs.String("approver", "", "이 컨트랙트가 받을 서명 키의 주소 (보통 내 서명 키)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	// 옵션으로 안 준 값은 차례로 묻는다
 	ask(rpc, "RPC 주소", "https://ethereum-sepolia-rpc.publicnode.com")
 	ask(keyFile, "배포 트랜잭션을 보낼 개인키 파일", "")
-	ask(auditor, "Auditor 서명 키의 주소 (0x…)", "")
-	ask(vendor, "Vendor 서명 키의 주소 (0x…)", "")
-	if *rpc == "" || *keyFile == "" || !common.IsHexAddress(*auditor) || !common.IsHexAddress(*vendor) {
-		return errors.New("--rpc, --key-file, --auditor, --vendor 는 필수")
+	ask(approver, "이 컨트랙트가 받을 서명 키의 주소 (0x…)", "")
+	if *rpc == "" || *keyFile == "" || !common.IsHexAddress(*approver) {
+		return errors.New("--rpc, --key-file, --approver 는 필수")
 	}
 	key, err := readKey(*keyFile)
 	if err != nil {
@@ -44,11 +42,11 @@ func registryDeploy(args []string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	addr, tx, err := ether.Deploy(ctx, *rpc, nil, key, common.HexToAddress(*auditor), common.HexToAddress(*vendor))
+	addr, tx, err := ether.Deploy(ctx, *rpc, nil, key, common.HexToAddress(*approver))
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Registry deployed at %s (tx %s)\nauditor %s\nvendor  %s\n", addr.Hex(), tx, *auditor, *vendor)
+	fmt.Printf("Registry deployed at %s (tx %s)\napprover %s\n", addr.Hex(), tx, *approver)
 	return nil
 }
 

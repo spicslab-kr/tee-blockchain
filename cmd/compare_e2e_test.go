@@ -24,7 +24,7 @@ func TestCompare_E2E_PlainAndChainModes(t *testing.T) {
 	auditorBin := buildBin(t, bins, "./cmd/auditor")
 	userBin := buildBin(t, bins, "./cmd/user")
 
-	deploy := exec.Command(auditorBin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--auditor", auditorAddr, "--vendor", vendorAddr)
+	deploy := exec.Command(auditorBin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--approver", auditorAddr)
 	out, err := deploy.CombinedOutput()
 	if err != nil {
 		t.Fatalf("registry-deploy: %v\n%s", err, out)
@@ -63,7 +63,7 @@ func TestCompare_E2E_PlainAndChainModes(t *testing.T) {
 	}
 
 	// 3. 체인 모드(Check) — 등록한 값 그대로, user 로 (조회만 하는 쪽도 대조는 된다). --trusted 없이 —
-	// 컨트랙트의 AUDITOR·VENDOR 를 자동으로 가져와 써야 한다.
+	// 컨트랙트의 APPROVER 를 자동으로 가져와 써야 한다.
 	chainSame := exec.Command(userBin, "compare", "--a", measurements, "--rpc", rpc, "--contract", contract, "--key", key)
 	out, err = chainSame.CombinedOutput()
 	if err != nil {

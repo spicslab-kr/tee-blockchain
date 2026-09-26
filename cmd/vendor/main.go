@@ -71,8 +71,8 @@ func main() {
 func usage() {
 	fmt.Fprintln(os.Stderr, `tb vendor
 
-  registry-deploy  --rpc <url> --key-file <file> --auditor <0x…> --vendor <0x…>
-                   Registry 컨트랙트를 배포한다. 두 주소는 그 뒤 바꿀 수 없다
+  registry-deploy  --rpc <url> --key-file <file> --approver <0x…>
+                   Registry 컨트랙트를 배포한다. 컨트랙트 하나에 서명자 하나, 그 뒤 바꿀 수 없다
   register         --rpc <url> --contract <0x…> --key-file <file> --measurements <measurements.json | NAME=hex,…>
                    --service <name> --version <v> [--platform aws-nitro] [--expires 2160h]
                    측정값을 내 키로 서명해 컨트랙트에 등록한다. 결과의 key 가 조회 좌표다

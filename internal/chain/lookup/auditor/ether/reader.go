@@ -64,8 +64,9 @@ func (r Reader) client(ctx context.Context) (*regether.Registry, Backend, func()
 	return registry, backend, closeFn, nil
 }
 
-// FindAddress — 측정값을 해시해 DefaultPlatform 아래서 등록된 key 를 찾는다. Auditor · Vendor 가 각자
-// 등록했으면 둘 다 돌아온다. 등록이 없으면 빈 슬라이스.
+// FindAddress — 측정값을 해시해 DefaultPlatform 아래서 등록된 key 를 찾는다. 컨트랙트 하나에 서명자가
+// 하나라 key 도 최대 하나다. 등록이 없으면 빈 슬라이스. (Auditor · Vendor 가 둘 다 등록하는 흐름은 컨트랙트가
+// 둘이고, 각각 따로 조회한다.)
 func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]string, error) {
 	h, err := reg.MeasurementHash(values)
 	if err != nil {
@@ -76,23 +77,20 @@ func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]strin
 		return nil, err
 	}
 	defer done()
-	keys, err := registry.KeysOf(&bind.CallOpts{Context: ctx}, DefaultPlatform, h)
+	key, err := registry.KeyFor(&bind.CallOpts{Context: ctx}, DefaultPlatform, h)
 	if err != nil {
 		return nil, err
 	}
-	// keysOf 는 순수 계산이라 등록 여부와 상관없이 항상 키를 낸다 (키가 0 인 경우도 없다).
-	// 실제로 등록됐는지는 각 key 로 lookup 을 해서 signer 가 채워졌는지로 본다.
-	var out []string
-	for _, key := range [][32]byte{keys.AuditorKey, keys.VendorKey} {
-		rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, key)
-		if err != nil {
-			return nil, err
-		}
-		if rec.Signer != (common.Address{}) {
-			out = append(out, common.Hash(key).Hex())
-		}
+	// keyFor 는 순수 계산이라 등록 여부와 상관없이 항상 키를 낸다 (키가 0 인 경우도 없다).
+	// 실제로 등록됐는지는 그 key 로 lookup 을 해서 signer 가 채워졌는지로 본다.
+	rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, key)
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	if rec.Signer == (common.Address{}) {
+		return nil, nil
+	}
+	return []string{common.Hash(key).Hex()}, nil
 }
 
 // parseKey — address 는 FindAddress 가 준 것과 같은 모양(0x + 32 바이트 hex)이어야 한다. 길이만 보면
@@ -149,25 +147,19 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 	}, nil
 }
 
-// TrustedSigners — 컨트랙트에 고정된 Auditor · Vendor 주소. M2 의 Check 가 등록 서명자가 이 둘 중
-// 하나인지 볼 때 쓴다. 배포 뒤 바뀌지 않는 값이라(Registry.sol 의 AUDITOR · VENDOR 는 immutable) 매번
-// 새로 불러도 항상 같다.
+// TrustedSigners — 컨트랙트에 고정된 서명자(APPROVER) 주소. M2 의 Check 가 등록 서명자가 이 주소인지
+// 볼 때 쓴다. 배포 뒤 바뀌지 않는 값이라(Registry.sol 의 APPROVER 는 immutable) 매번 새로 불러도 항상 같다.
 func (r Reader) TrustedSigners(ctx context.Context) ([]string, error) {
 	registry, _, done, err := r.client(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer done()
-	opts := &bind.CallOpts{Context: ctx}
-	a, err := registry.AUDITOR(opts)
+	a, err := registry.APPROVER(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}
-	v, err := registry.VENDOR(opts)
-	if err != nil {
-		return nil, err
-	}
-	return []string{a.Hex(), v.Hex()}, nil
+	return []string{a.Hex()}, nil
 }
 
 // findRegisteredEvent — Registered 이벤트를 최신 블록에서부터 chunk 블록씩 거슬러 올라가며 찾는다.

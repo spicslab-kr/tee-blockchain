@@ -102,23 +102,20 @@ func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]strin
 		return nil, err
 	}
 	defer done()
-	keys, err := registry.KeysOf(&bind.CallOpts{Context: ctx}, DefaultPlatform, h)
+	key, err := registry.KeyFor(&bind.CallOpts{Context: ctx}, DefaultPlatform, h)
 	if err != nil {
 		return nil, err
 	}
-	// keysOf 는 순수 계산이라 등록 여부와 상관없이 항상 키를 낸다. 실제로 등록됐는지는 각 key 로 lookup
-	// 을 해서 signer 가 채워졌는지로 본다.
-	var out []string
-	for _, key := range [][32]byte{keys.AuditorKey, keys.VendorKey} {
-		rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, key)
-		if err != nil {
-			return nil, err
-		}
-		if rec.Signer != (common.Address{}) {
-			out = append(out, common.Hash(key).Hex())
-		}
+	// keyFor 는 순수 계산이라 등록 여부와 상관없이 항상 키를 낸다 (키가 0 인 경우도 없다).
+	// 실제로 등록됐는지는 그 key 로 lookup 을 해서 signer 가 채워졌는지로 본다.
+	rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, key)
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	if rec.Signer == (common.Address{}) {
+		return nil, nil
+	}
+	return []string{common.Hash(key).Hex()}, nil
 }
 
 // parseKey — 길이만 보면 잘못된 hex(오타·복붙 깨짐)가 common.HexToHash 에서 조용히 0 값으로 바뀌어
@@ -171,24 +168,19 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 	}, nil
 }
 
-// TrustedSigners — 컨트랙트에 고정된 Auditor · Vendor 주소. M2 의 Check 가 등록 서명자가 이 둘 중
-// 하나인지 볼 때 쓴다.
+// TrustedSigners — 컨트랙트에 고정된 서명자(APPROVER) 주소. M2 의 Check 가 등록 서명자가 이 주소인지
+// 볼 때 쓴다.
 func (r Reader) TrustedSigners(ctx context.Context) ([]string, error) {
 	registry, _, done, err := r.client(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer done()
-	opts := &bind.CallOpts{Context: ctx}
-	a, err := registry.AUDITOR(opts)
+	a, err := registry.APPROVER(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}
-	v, err := registry.VENDOR(opts)
-	if err != nil {
-		return nil, err
-	}
-	return []string{a.Hex(), v.Hex()}, nil
+	return []string{a.Hex()}, nil
 }
 
 // findRegisteredEvent — Registered 이벤트를 최신 블록에서부터 chunk 블록씩 거슬러 올라가며 찾는다.

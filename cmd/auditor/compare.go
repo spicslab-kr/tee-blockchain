@@ -24,7 +24,7 @@ func compareCmd(args []string) error {
 	rpc := fs.String("rpc", "", "체인 모드: 이더리움 RPC 주소")
 	contract := fs.String("contract", "", "체인 모드: Registry 컨트랙트 주소")
 	key := fs.String("key", "", "체인 모드: 조회 key (register 결과의 key)")
-	trusted := fs.String("trusted", "", "체인 모드: 신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 AUDITOR · VENDOR 를 그대로 쓴다")
+	trusted := fs.String("trusted", "", "체인 모드: 신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 APPROVER 를 그대로 쓴다")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
