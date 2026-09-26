@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"tb/internal/cli"
 	parse "tb/internal/tee/parse/user"
 	ra "tb/internal/tee/request/user"
 )
@@ -36,7 +37,7 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "tb user:", err)
+		cli.Errorln("tb user: ", err)
 		os.Exit(exitCode(err))
 	}
 }

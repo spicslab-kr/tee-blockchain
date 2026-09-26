@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	lether "tb/internal/chain/lookup/Vendor/ether"
+	"tb/internal/cli"
 	cmp "tb/internal/core/compare/Vendor"
 )
 
@@ -98,9 +99,9 @@ func printVerdict(v cmp.Verdict) error {
 		fmt.Println("PASS")
 		return nil
 	}
-	fmt.Println("FAIL")
+	cli.Errorln("FAIL")
 	for _, r := range v.Reason {
-		fmt.Println("  -", r)
+		cli.Errorln("  - ", r)
 	}
 	os.Exit(1)
 	return nil

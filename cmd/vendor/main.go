@@ -17,6 +17,7 @@ import (
 	"time"
 
 	reg "tb/internal/chain/register/Vendor"
+	"tb/internal/cli"
 	tr "tb/internal/core/transfer/Vendor"
 	build "tb/internal/setup/build/Vendor/aws"
 	launch "tb/internal/setup/launch/Vendor/aws"
@@ -65,7 +66,7 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "tb vendor:", err)
+		cli.Errorln("tb vendor: ", err)
 		os.Exit(exitCode(err))
 	}
 }

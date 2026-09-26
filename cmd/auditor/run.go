@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	lether "tb/internal/chain/lookup/auditor/ether"
+	"tb/internal/cli"
 	cmp "tb/internal/core/compare/auditor"
 )
 
@@ -107,9 +108,9 @@ func runCmd(args []string) error {
 		}
 		v := (cmp.Impl{}).Compare(parsed, values)
 		if !v.Pass {
-			fmt.Println("FAIL")
+			cli.Errorln("FAIL")
 			for _, r := range v.Reason {
-				fmt.Println("  -", r)
+				cli.Errorln("  - ", r)
 			}
 			return errors.New("the TEE-attested value differs from --measurements — not registering")
 		}

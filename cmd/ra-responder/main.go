@@ -33,6 +33,7 @@ import (
 	"strings"
 	"syscall"
 
+	"tb/internal/cli"
 	ra "tb/internal/tee/request/Vendor"
 	awsra "tb/internal/tee/request/Vendor/aws"
 )
@@ -53,7 +54,7 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "tb-ra-responder:", err)
+		cli.Errorln("tb-ra-responder: ", err)
 		os.Exit(1)
 	}
 }

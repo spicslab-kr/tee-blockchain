@@ -17,6 +17,7 @@ import (
 	"time"
 
 	reg "tb/internal/chain/register/auditor"
+	"tb/internal/cli"
 	tr "tb/internal/core/transfer/auditor"
 	build "tb/internal/setup/build/auditor/aws"
 	launch "tb/internal/setup/launch/auditor/aws"
@@ -65,7 +66,7 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "tb auditor:", err)
+		cli.Errorln("tb auditor: ", err)
 		os.Exit(exitCode(err))
 	}
 }

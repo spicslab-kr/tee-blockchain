@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	lether "tb/internal/chain/lookup/user/ether"
+	"tb/internal/cli"
 	cmp "tb/internal/core/compare/user"
 )
 
@@ -99,13 +100,14 @@ func runCmd(args []string) error {
 			anyPass = true
 			continue
 		}
-		fmt.Printf("  %s  FAIL\n", k)
+		cli.Errorf("  %s  FAIL", k)
 		for _, r := range v.Reason {
-			fmt.Println("    -", r)
+			cli.Errorln("    - ", r)
 		}
 	}
 	if !anyPass {
-		fmt.Println("\nno registration matches this attestation")
+		fmt.Fprintln(os.Stderr)
+		cli.Errorln("no registration matches this attestation")
 		os.Exit(1)
 	}
 	fmt.Println("\ntrusted — at least one registration matches this attestation")
