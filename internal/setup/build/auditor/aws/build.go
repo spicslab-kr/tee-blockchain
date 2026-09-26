@@ -240,6 +240,9 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 		return err
 	}
 	os.Remove(rootfs) // 다 풀었으니 더 안 필요하다 - 재포장 중 피크 디스크 사용량을 줄인다
+	for _, p := range stripBuildLogs(ctx, r, extract) {
+		fmt.Fprintf(r.log, "빌드 시각이 박힌 로그 제거: /%s\n", p)
+	}
 
 	canon := filepath.Join(dir, "canon.tar")
 	if err := r.run(ctx, "tar", "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner",
@@ -261,6 +264,36 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 	}
 	args = append(args, canon, image)
 	return r.run(ctx, "docker", args...)
+}
+
+// buildLogs — 패키지 관리자가 docker build 중에 남기는 로그. 무엇을 깔았나가 아니라 언제 깔았나를 적어서
+// (apk: "Running `apk add …` at 2026-09-26 08:14:36") 같은 소스를 빌드해도 내용이 매번 다르다. 실측: nginx 공식
+// alpine-slim Dockerfile 을 Vendor · Auditor 가 각자 빌드했을 때 725개 파일 중 /var/log/apk.log 하나만 달라
+// PCR0·PCR2 가 갈렸다. 파일이 아니라 시각을 재는 것이니 측정 대상에서 뺀다. 소프트웨어 자체의 로그는 건드리지 않는다.
+var buildLogs = []string{
+	"var/log/apk.log",                                             // alpine
+	"var/log/dpkg.log", "var/log/alternatives.log", "var/log/apt", // debian · ubuntu
+	"var/log/yum.log", "var/log/dnf.log", "var/log/dnf.rpm.log", "var/log/dnf.librepo.log", "var/log/hawkey.log", // rhel · amazon
+}
+
+// stripBuildLogs — 풀어낸 rootfs 에서 buildLogs 를 지우고, 실제로 지운 것의 상대 경로를 돌려준다.
+// rootfs 는 tar 가 sudo 로 풀어 root 소유라, 직접 못 지우면 runner(sudo rm)로 지운다.
+func stripBuildLogs(ctx context.Context, r runner, root string) []string {
+	var removed []string
+	for _, p := range buildLogs {
+		full := filepath.Join(root, filepath.FromSlash(p))
+		if _, err := os.Lstat(full); err != nil {
+			continue
+		}
+		if err := os.RemoveAll(full); err != nil {
+			if err := r.cmd(ctx, "rm", "-rf", full).Run(); err != nil {
+				fmt.Fprintf(r.log, "경고: %s 를 지우지 못했다 — 빌드 시각이 측정값에 남는다: %v\n", p, err)
+				continue
+			}
+		}
+		removed = append(removed, p)
+	}
+	return removed
 }
 
 // ReadPCR — nitro-cli build-enclave 출력에서 측정값을 꺼낸다.

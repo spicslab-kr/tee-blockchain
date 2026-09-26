@@ -37,6 +37,12 @@ requirement was found (an earlier version of this note claimed "exact match acro
 normalization alone; that claim was never actually re-tested cross-role and turned out to be wrong once it
 was).
 
+Package-manager logs are dropped during that repack (`/var/log/apk.log`, `dpkg.log`, `apt/`, `dnf*.log`, `yum.log`,
+`hawkey.log`, `alternatives.log`): they record *when* the packages were installed, not *what* was installed, so the
+same source produced a different file on every build (measured: nginx's official alpine-slim Dockerfile built on two
+instances differed in exactly one of 725 files, `/var/log/apk.log`, and PCR0/PCR2 diverged). The software's own logs
+are left alone.
+
 **This only fixes "the packaging differs every time." `tb auditor build` does not check this automatically** —
 if the source itself produces different content on each build (a tool that mints a random signing key,
 unpinned package versions), normalization still won't make Vendor's and Auditor's builds match. That's not a
