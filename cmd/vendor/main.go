@@ -84,9 +84,11 @@ func usage() {
                    측정값 두 묶음을 그대로 맞댄다 (파싱값 vs 빌드값 등). PASS/FAIL 과 근거를 낸다
   compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
                    체인에서 등록 정보를 읽어 값 · 만료 · 신뢰 서명자까지 같이 본다. 실패하면 exit 1
-  run              (--tee <host:port> | --measurements <file>) --rpc <url> --contract <0x…> --key-file <file>
+  run              [--tee <host:port>] [--measurements <file>] --rpc <url> --contract <0x…> --key-file <file>
                    --service <name> --version <v>
-                   register 와 그 자리 self-check compare 를 한 번에. --tee 를 주면 T1·T2 도 먼저 한다 (--nonce 로 고정 가능). --service/--version 비우면 같은 측정값의 기존 등록에서 가져온다
+                   register 와 그 자리 self-check compare 를 한 번에. --tee 를 주면 T1·T2 도 먼저 한다 (--nonce 로 고정 가능).
+                   --tee 와 --measurements 를 같이 주면 검사: TEE 가 증명한 값이 --measurements(빌드값)와 같을 때만 그 빌드값을 등록한다.
+                   --service/--version 비우면 이 컨트랙트의 같은 측정값 기존 등록에서 가져온다
   send             --repo <url> --config <build-config.json> [--workdir <clone>]
                    빌드 설정값을 소스 저장소에 커밋 · push 한다
   receive          --repo <url> [--ref <commit>] --into <dir>
