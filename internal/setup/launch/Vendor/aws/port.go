@@ -15,11 +15,14 @@ import (
 
 // OpenPort 는 이 인스턴스의 보안 그룹에 TCP port 인바운드를 연다. 인스턴스 메타데이터로 자기 ID 와 리전을 알아내고
 // aws CLI 를 부른다. 인스턴스에 EC2 쓰기 권한(IAM 역할)이 없으면 ErrNoPermission 과 함께 손으로 칠 명령을 돌려준다.
-func OpenPort(ctx context.Context, port int, log io.Writer) (command string, err error) {
+// group 은 그 보안 그룹 ID — 콘솔에서 직접 열 때 찾아갈 곳. 메타데이터를 못 읽으면 비어 있고 command 는 자리표시자로 채운다.
+func OpenPort(ctx context.Context, port int, log io.Writer) (command, group string, err error) {
 	region, sg, err := identity(ctx)
 	if err != nil {
-		return "", fmt.Errorf("instance metadata: %w", err)
+		command = fmt.Sprintf("aws ec2 authorize-security-group-ingress --region <region> --group-id <group id> --protocol tcp --port %d --cidr 0.0.0.0/0", port)
+		return command, "", fmt.Errorf("instance metadata: %w", err)
 	}
+	group = sg
 	command = fmt.Sprintf("aws ec2 authorize-security-group-ingress --region %s --group-id %s --protocol tcp --port %d --cidr 0.0.0.0/0", region, sg, port)
 	aws := func(args ...string) ([]byte, error) {
 		c := exec.CommandContext(ctx, "aws", append([]string{"--region", region, "--output", "json"}, args...)...)
@@ -41,18 +44,18 @@ func OpenPort(ctx context.Context, port int, log io.Writer) (command string, err
 	out, err := aws("ec2", "describe-security-groups", "--group-ids", sg,
 		"--query", "SecurityGroups[0].IpPermissions[?IpProtocol=='tcp' && FromPort<=`"+p+"` && ToPort>=`"+p+"`]")
 	if err != nil {
-		return command, err
+		return command, group, err
 	}
 	var rules []any
 	if json.Unmarshal(out, &rules) == nil && len(rules) > 0 {
-		fmt.Fprintf(log, "security group %s: TCP %d already open\n", sg, port)
-		return command, nil
+		fmt.Fprintf(log, "security group %s: inbound TCP %d already open\n", sg, port)
+		return command, group, nil
 	}
 	if _, err := aws("ec2", "authorize-security-group-ingress", "--group-id", sg, "--protocol", "tcp", "--port", p, "--cidr", "0.0.0.0/0"); err != nil {
-		return command, err
+		return command, group, err
 	}
-	fmt.Fprintf(log, "security group %s: opened inbound TCP %d (0.0.0.0/0)\n", sg, port)
-	return command, nil
+	fmt.Fprintf(log, "opened inbound TCP %d on %s (0.0.0.0/0)\n", port, sg)
+	return command, group, nil
 }
 
 var ErrNoPermission = errors.New("this instance has no permission to change its security group")

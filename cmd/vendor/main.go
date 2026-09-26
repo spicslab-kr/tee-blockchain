@@ -305,15 +305,27 @@ func launchCmd(args []string) error {
 	fmt.Printf("received %s document, %d bytes → %s\n", doc.Format, len(doc.Raw), selfDoc)
 
 	fmt.Println("== security group: inbound TCP", l.Port)
-	cmd, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
-	switch {
-	case perr == nil:
+	cmd, group, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
+	if perr == nil {
 		fmt.Printf("\ndone. anyone can now:  tb user ra-request --tee <this instance's public IP>:%d --format aws-nitro\n", l.Port)
-	case errors.Is(perr, launch.ErrNoPermission):
-		fmt.Printf("\nthis instance has no permission to change its security group. from an AWS account that does, one line:\n  %s\nthen anyone can:  tb user ra-request --tee <this instance's public IP>:%d --format aws-nitro\n", cmd, l.Port)
-	default:
-		fmt.Printf("\ncould not open the security group (%v). from an AWS account that can, one line:\n  %s\n", perr, cmd)
+		return nil
 	}
+	// 여기서는 못 열었다 — 무엇을, 어디서, 어떻게 열어야 하는지까지 적어 준다. 권한이 없는 경우와
+	// 그 밖의 실패(메타데이터 · aws CLI)를 두 번째 줄에서만 가른다.
+	why := "This instance has no permission to change it. From an AWS account that does, run:"
+	if !errors.Is(perr, launch.ErrNoPermission) {
+		why = fmt.Sprintf("Could not open it from here (%v). From an AWS account that can, run:", perr)
+	}
+	if group == "" {
+		group = "<this instance's security group>"
+	}
+	fmt.Printf(`
+Inbound TCP %d must be open on this instance's security group so the Auditor and Users can reach the enclave.
+%s
+  %s
+or open it in the console: EC2 → Security Groups → %s → Inbound rules → Custom TCP %d, source 0.0.0.0/0.
+Then anyone can:  tb user ra-request --tee <this instance's public IP>:%d --format aws-nitro
+`, l.Port, why, cmd, group, l.Port, l.Port)
 	return nil
 }
 
