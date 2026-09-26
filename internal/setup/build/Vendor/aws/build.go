@@ -91,7 +91,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		b.Binary = filepath.Join(filepath.Dir(exe), responderBinaryName)
 	}
 	if _, err := os.Stat(b.Binary); err != nil {
-		return res, fmt.Errorf("%s: T1 응답기를 찾을 수 없다 — cmd/ra-responder 를 빌드해 그 자리에 두거나 Binary 로 경로를 지정하라", b.Binary)
+		return res, fmt.Errorf("%s: T1 responder not found — build cmd/ra-responder and put it there, or point Binary at it", b.Binary)
 	}
 	if err := os.MkdirAll(b.Out, 0o755); err != nil {
 		return res, err
@@ -99,7 +99,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name = b.Name
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
-	fmt.Fprintln(log, "== build 1/5 도구 (nitro-cli · docker)")
+	fmt.Fprintln(log, "== build 1/5 tools (nitro-cli · docker)")
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel", "docker"); err != nil {
 		return res, err
 	}
@@ -109,22 +109,22 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 	appImage := b.Name + ":app"
 	res.Image = b.Name + ":tb"
-	fmt.Fprintf(log, "== build 2/5 소프트웨어 이미지: %s → %s\n", appDir, appImage)
+	fmt.Fprintf(log, "== build 2/5 software image: %s → %s\n", appDir, appImage)
 	if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== build 3/5 T1 응답기 얹기: %s → %s\n", appImage, res.Image)
+	fmt.Fprintf(log, "== build 3/5 layering the T1 responder: %s → %s\n", appImage, res.Image)
 	appCmd, err := r.imageCommand(ctx, appImage)
 	if err != nil {
 		return res, err
 	}
-	fmt.Fprintf(log, "소프트웨어 명령: %s\n", strings.Join(appCmd, " "))
+	fmt.Fprintf(log, "software command: %s\n", strings.Join(appCmd, " "))
 	if err := b.layerResponder(ctx, r, appImage, res.Image, appCmd); err != nil {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== build 4/5 재현성: 레이어를 버리고 이름순으로 다시 포장\n")
+	fmt.Fprintf(log, "== build 4/5 reproducibility: dropping the layers and repacking in name order\n")
 	if err := normalize(ctx, r, res.Image, b.Out); err != nil {
 		return res, err
 	}
@@ -246,7 +246,7 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 	}
 	os.Remove(rootfs) // 다 풀었으니 더 안 필요하다 - 재포장 중 피크 디스크 사용량을 줄인다
 	for _, p := range stripBuildLogs(ctx, r, extract) {
-		fmt.Fprintf(r.log, "빌드 시각이 박힌 로그 제거: /%s\n", p)
+		fmt.Fprintf(r.log, "removed a log stamped with the build time: /%s\n", p)
 	}
 
 	canon := filepath.Join(dir, "canon.tar")
@@ -292,7 +292,7 @@ func stripBuildLogs(ctx context.Context, r runner, root string) []string {
 		}
 		if err := os.RemoveAll(full); err != nil {
 			if err := r.cmd(ctx, "rm", "-rf", full).Run(); err != nil {
-				fmt.Fprintf(r.log, "경고: %s 를 지우지 못했다 — 빌드 시각이 측정값에 남는다: %v\n", p, err)
+				fmt.Fprintf(r.log, "warning: could not remove %s — the build time stays in the measurements: %v\n", p, err)
 				continue
 			}
 		}

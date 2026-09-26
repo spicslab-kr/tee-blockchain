@@ -45,13 +45,13 @@ func OpenPort(ctx context.Context, port int, log io.Writer) (command string, err
 	}
 	var rules []any
 	if json.Unmarshal(out, &rules) == nil && len(rules) > 0 {
-		fmt.Fprintf(log, "보안 그룹 %s: TCP %d 이미 열려 있음\n", sg, port)
+		fmt.Fprintf(log, "security group %s: TCP %d already open\n", sg, port)
 		return command, nil
 	}
 	if _, err := aws("ec2", "authorize-security-group-ingress", "--group-id", sg, "--protocol", "tcp", "--port", p, "--cidr", "0.0.0.0/0"); err != nil {
 		return command, err
 	}
-	fmt.Fprintf(log, "보안 그룹 %s: TCP %d 인바운드 열었음 (0.0.0.0/0)\n", sg, port)
+	fmt.Fprintf(log, "security group %s: opened inbound TCP %d (0.0.0.0/0)\n", sg, port)
 	return command, nil
 }
 

@@ -14,11 +14,11 @@ import (
 // git 은 설치된 것을 그대로 실행한다. 인증은 사용자 git 설정을 따른다.
 
 var (
-	ErrGitMissing      = errors.New("git 이 설치되어 있지 않거나 PATH 에 없다")
-	ErrRepoAccess      = errors.New("저장소에 접근할 수 없다 — URL 이 틀렸거나 읽기 권한이 없다. 저장소 소유자에게 권한을 요청하라")
-	ErrCommitNotFound  = errors.New("지정한 커밋이 저장소에 없다")
-	ErrPushRejected    = errors.New("push 가 거절됐다 — 쓰기 권한이 없거나 원격이 앞서 있다 (먼저 pull 하라)")
-	ErrNothingToCommit = errors.New("바뀐 것이 없어 커밋할 것이 없다")
+	ErrGitMissing      = errors.New("git is not installed or not on PATH")
+	ErrRepoAccess      = errors.New("cannot access the repository — wrong URL or no read permission; ask the repository owner for access")
+	ErrCommitNotFound  = errors.New("the given commit is not in the repository")
+	ErrPushRejected    = errors.New("push rejected — no write permission, or the remote is ahead (pull first)")
+	ErrNothingToCommit = errors.New("nothing changed, nothing to commit")
 )
 
 type gitRunner struct{ dir string }

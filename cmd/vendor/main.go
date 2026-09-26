@@ -74,54 +74,54 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `tb vendor
 
   registry-deploy  --rpc <url> --key-file <file> --approver <0x…>
-                   Registry 컨트랙트를 배포한다. 컨트랙트 하나에 서명자 하나, 그 뒤 바꿀 수 없다
+                   deploy the Registry contract. one signer per contract, fixed at deploy time
   register         --rpc <url> --contract <0x…> --key-file <file> --measurements <measurements.json | NAME=hex,…>
                    --service <name> --version <v> [--platform aws-nitro] [--expires 2160h]
-                   측정값을 내 키로 서명해 컨트랙트에 등록한다. 결과의 key 가 조회 좌표다
+                   sign the measurements with my key and register them on the contract. the key in the output is the lookup coordinate
   lookup           --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
-                   key 로 바로 읽거나, 측정값으로 key 를 먼저 찾은 뒤 전부 읽는다
-  compare          --a <measurements.json | NAME=hex,…> --b <같은 모양>
-                   측정값 두 묶음을 그대로 맞댄다 (파싱값 vs 빌드값 등). PASS/FAIL 과 근거를 낸다
+                   read one key directly, or find the key(s) for the measurements first and read them all
+  compare          --a <measurements.json | NAME=hex,…> --b <same shape>
+                   match two sets of measurements as they are (parsed vs built, etc.). prints PASS/FAIL with the reasons
   compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
-                   체인에서 등록 정보를 읽어 값 · 만료 · 신뢰 서명자까지 같이 본다. 실패하면 exit 1
+                   read the registration from the chain and check the value, expiry and trusted signer together. exit 1 on failure
   run              [--tee <host:port>] [--measurements <file>] --rpc <url> --contract <0x…> --key-file <file>
                    --service <name> --version <v>
-                   register 와 그 자리 self-check compare 를 한 번에. --tee 를 주면 T1·T2 도 먼저 한다 (--nonce 로 고정 가능).
-                   --tee 와 --measurements 를 같이 주면 검사: TEE 가 증명한 값이 --measurements(빌드값)와 같을 때만 그 빌드값을 등록한다.
-                   --service/--version 비우면 이 컨트랙트의 같은 측정값 기존 등록에서 가져온다
+                   register and self-check compare in one go. with --tee, does T1·T2 first (--nonce pins the nonce).
+                   with both --tee and --measurements, audits: registers the build value only if the TEE-attested value matches --measurements.
+                   with --service/--version empty, takes them from an existing registration of the same measurements on this contract
   send             --repo <url> --config <build-config.json> [--workdir <clone>]
-                   빌드 설정값을 소스 저장소에 커밋 · push 한다
+                   commit and push the build config to the source repository
   receive          --repo <url> [--ref <commit>] --into <dir>
-                   측정값 기록과 이미지를 clone 해 검증한다
-  build       --app-dir <소프트웨어 Dockerfile 디렉터리>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
-              Nitro 부모 인스턴스에서. 소프트웨어 이미지를 빌드하고 그 위에 RA 응답기를 얹어 EIF 와 측정값(PCR0·1·2)을 낸다
+                   clone the measurement record and image, and verify them
+  build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
+              on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2)
   launch      --eif <file>  [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
-              Nitro 부모 인스턴스에서. EIF 를 엔클레이브로 띄우고 TCP→vsock 다리를 놓고, 자기 자신에게 RA 요청해 확인한 뒤
-              보안 그룹 포트를 연다(권한이 있을 때). 받은 EIF 를 띄우기만 할 때도 이것
+              on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock, requests RA from itself to confirm,
+              then opens the security-group port (when permitted). also the way to just run a received EIF
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
-              TEE 안에서 돈다. 요청마다 난수를 받아 RA 문서를 돌려준다. fixture 는 aws-nitro 형식으로 표시된다
-  lo-up       엔클레이브 안에서 loopback 을 올린다. 소프트웨어를 띄우기 전에 한 번
+              runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
+  lo-up       brings up loopback inside the enclave. once, before starting the software
   ra-proxy    --listen <host:port>  --vsock <cid>:<port>
-              Nitro 부모 인스턴스에서 돈다. 들어온 TCP 연결을 엔클레이브 vsock 으로 이어 준다
+              runs on the Nitro parent instance. forwards incoming TCP connections to the enclave's vsock
   ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out <file>] [--at <RFC3339>]
-              문서의 서명 · 인증서 체인 · 난수를 확인하고 측정값(PCR)을 꺼낸다. 결과는 register --measurements 에 그대로 넣는다
+              verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements
   ra-request  --tee <host:port> [--out <file>] [--format <name>] [--timeout 30s]
-              난수를 만들어 보내고 RA 문서를 받아 저장한다. 난수는 <file>.nonce 에.
-              --format 을 주면 그 형식(aws-nitro · gcp-cs-jwt · azure-maa-jwt)의 문서만 받는다
+              generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
+              with --format, accepts only a document of that format (aws-nitro · gcp-cs-jwt · azure-maa-jwt)
 
-직접 하려면: setup/vendor/transfer.md`)
+to do it by hand: setup/vendor/transfer.md`)
 }
 
 func send(args []string) error {
 	fs := flag.NewFlagSet("send", flag.ContinueOnError)
-	repo := fs.String("repo", "", "소스 저장소 URL")
-	cfgPath := fs.String("config", "", "build-config.json 경로")
-	work := fs.String("workdir", "", "이미 clone 된 작업 트리 (없으면 임시 clone)")
+	repo := fs.String("repo", "", "source repository URL")
+	cfgPath := fs.String("config", "", "path to build-config.json")
+	work := fs.String("workdir", "", "an existing clone to work in (default: a temporary clone)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *repo == "" || *cfgPath == "" {
-		return errors.New("--repo 와 --config 는 필수")
+		return errors.New("--repo and --config are required")
 	}
 	b, err := os.ReadFile(*cfgPath)
 	if err != nil {
@@ -141,14 +141,14 @@ func send(args []string) error {
 
 func receive(args []string) error {
 	fs := flag.NewFlagSet("receive", flag.ContinueOnError)
-	repo := fs.String("repo", "", "Auditor 저장소 URL")
-	ref := fs.String("ref", "", "커밋 · 브랜치 · 태그 (없으면 기본 브랜치)")
-	into := fs.String("into", "", "clone 할 디렉터리")
+	repo := fs.String("repo", "", "Auditor repository URL")
+	ref := fs.String("ref", "", "commit, branch or tag (default: the default branch)")
+	into := fs.String("into", "", "directory to clone into")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *repo == "" || *into == "" {
-		return errors.New("--repo 와 --into 는 필수")
+		return errors.New("--repo and --into are required")
 	}
 	got, err := tr.GitTransport{}.Receive(context.Background(), *repo, *ref, *into)
 	if err != nil {
@@ -165,15 +165,15 @@ func receive(args []string) error {
 
 func raRequest(args []string) error {
 	fs := flag.NewFlagSet("ra-request", flag.ContinueOnError)
-	tee := fs.String("tee", "", "TEE 주소 host:port")
-	out := fs.String("out", "ra-doc.cbor", "문서를 저장할 파일")
-	format := fs.String("format", "", "기대하는 문서 형식. 비우면 무엇이든 받는다")
+	tee := fs.String("tee", "", "TEE address host:port")
+	out := fs.String("out", "ra-doc.cbor", "file to save the document to")
+	format := fs.String("format", "", "expected document format. empty accepts any")
 	timeout := fs.Duration("timeout", 30*time.Second, "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *tee == "" {
-		return errors.New("--tee 는 필수")
+		return errors.New("--tee is required")
 	}
 	nonce, doc, err := ra.TCPRequester{Timeout: *timeout}.RequestFresh(context.Background(), *tee)
 	if err != nil {
@@ -194,9 +194,9 @@ func raRequest(args []string) error {
 
 func raServe(args []string) error {
 	fs := flag.NewFlagSet("ra-serve", flag.ContinueOnError)
-	listen := fs.String("listen", "tcp:127.0.0.1:5000", "tcp:<host:port> 또는 vsock:<port>")
-	extractor := fs.String("extractor", "nsm", "nsm 또는 fixture=<doc 파일>")
-	userData := fs.String("user-data", "", "문서에 묶을 값 (hex)")
+	listen := fs.String("listen", "tcp:127.0.0.1:5000", "tcp:<host:port> or vsock:<port>")
+	extractor := fs.String("extractor", "nsm", "nsm or fixture=<doc file>")
+	userData := fs.String("user-data", "", "value to bind into the document (hex)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func raServe(args []string) error {
 		ex = fx
 		fmt.Fprintln(os.Stderr, "warning: fixture extractor — the document is not bound to the nonce; test use only")
 	default:
-		return errors.New("--extractor: nsm 또는 fixture=<doc>")
+		return errors.New("--extractor: nsm or fixture=<doc>")
 	}
 	var ln net.Listener
 	var err error
@@ -230,7 +230,7 @@ func raServe(args []string) error {
 			ln, err = awsra.ListenVsock(uint32(port))
 		}
 	default:
-		return errors.New("--listen: tcp:<host:port> 또는 vsock:<port>")
+		return errors.New("--listen: tcp:<host:port> or vsock:<port>")
 	}
 	if err != nil {
 		return err
@@ -244,41 +244,41 @@ func raServe(args []string) error {
 func buildCmd(args []string) error {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	b := build.Build{}
-	fs.StringVar(&b.AppDir, "app-dir", "", "소프트웨어 Dockerfile 이 있는 디렉터리")
-	fs.StringVar(&b.Name, "name", "", "이미지 · EIF 이름 (기본: 디렉터리 이름)")
-	fs.IntVar(&b.Port, "port", 5000, "응답기가 엔클레이브 안에서 들을 포트")
-	fs.StringVar(&b.Out, "out", "out", "결과 디렉터리")
-	fs.StringVar(&b.Binary, "responder", "", "T1 응답기(tb-ra-responder) 경로. 비우면 이 실행파일 옆의 tb-ra-responder")
+	fs.StringVar(&b.AppDir, "app-dir", "", "directory with the software's Dockerfile")
+	fs.StringVar(&b.Name, "name", "", "image and EIF name (default: the directory name)")
+	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
+	fs.StringVar(&b.Out, "out", "out", "output directory")
+	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if b.AppDir == "" {
-		return errors.New("--app-dir 는 필수")
+		return errors.New("--app-dir is required")
 	}
 	built, err := b.Run(context.Background(), os.Stdout)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\n끝. 측정값 기록에 적을 것: %s · %s\n띄우려면:  tb vendor launch --eif %s --port %d\n", built.EIF, built.Measurements, built.EIF, b.Port)
+	fmt.Printf("\ndone. for the measurement record: %s · %s\nto launch:  tb vendor launch --eif %s --port %d\n", built.EIF, built.Measurements, built.EIF, b.Port)
 	return nil
 }
 
 func launchCmd(args []string) error {
 	fs := flag.NewFlagSet("launch", flag.ContinueOnError)
 	l := launch.Launch{}
-	fs.StringVar(&l.EIF, "eif", "", "띄울 EIF 파일")
-	fs.StringVar(&l.Name, "name", "", "엔클레이브 이름 (기본: EIF 파일 이름)")
-	fs.IntVar(&l.Port, "port", 5000, "RA 포트. build 때 준 값과 같아야 한다")
-	fs.IntVar(&l.Memory, "memory", 0, "엔클레이브 메모리 MiB (0: EIF 크기로 정함)")
-	fs.IntVar(&l.CPUs, "cpus", 2, "엔클레이브 CPU 수")
-	fs.IntVar(&l.CID, "cid", 16, "엔클레이브 vsock CID")
-	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "다리가 받을 주소")
-	fs.StringVar(&l.Out, "out", "out", "로그 · 확인 문서 디렉터리")
+	fs.StringVar(&l.EIF, "eif", "", "EIF file to run")
+	fs.StringVar(&l.Name, "name", "", "enclave name (default: the EIF file name)")
+	fs.IntVar(&l.Port, "port", 5000, "RA port. must match the value given to build")
+	fs.IntVar(&l.Memory, "memory", 0, "enclave memory in MiB (0: sized from the EIF)")
+	fs.IntVar(&l.CPUs, "cpus", 2, "enclave CPU count")
+	fs.IntVar(&l.CID, "cid", 16, "enclave vsock CID")
+	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "address the bridge listens on")
+	fs.StringVar(&l.Out, "out", "out", "directory for logs and the self-check document")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if l.EIF == "" {
-		return errors.New("--eif 는 필수")
+		return errors.New("--eif is required")
 	}
 	ctx := context.Background()
 	started, err := l.Run(ctx, os.Stdout)
@@ -286,7 +286,7 @@ func launchCmd(args []string) error {
 		return err
 	}
 
-	fmt.Println("== 확인: 이 인스턴스에서 RA 요청", started.Address)
+	fmt.Println("== self-check: requesting RA from this instance", started.Address)
 	nonce, doc, err := ra.TCPRequester{Timeout: 30 * time.Second}.RequestFresh(ctx, started.Address)
 	if err != nil {
 		return err
@@ -303,23 +303,23 @@ func launchCmd(args []string) error {
 	}
 	fmt.Printf("received %s document, %d bytes → %s\n", doc.Format, len(doc.Raw), selfDoc)
 
-	fmt.Println("== 보안 그룹에 TCP", l.Port, "인바운드")
+	fmt.Println("== security group: inbound TCP", l.Port)
 	cmd, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
 	switch {
 	case perr == nil:
-		fmt.Printf("\n끝. 누구나:  tb user ra-request --tee <이 인스턴스 공인 IP>:%d --format aws-nitro\n", l.Port)
+		fmt.Printf("\ndone. anyone can now:  tb user ra-request --tee <this instance's public IP>:%d --format aws-nitro\n", l.Port)
 	case errors.Is(perr, launch.ErrNoPermission):
-		fmt.Printf("\n이 인스턴스에는 보안 그룹을 바꿀 권한이 없다. AWS 계정에서 한 줄:\n  %s\n그 뒤 누구나:  tb user ra-request --tee <이 인스턴스 공인 IP>:%d --format aws-nitro\n", cmd, l.Port)
+		fmt.Printf("\nthis instance has no permission to change its security group. from an AWS account that does, one line:\n  %s\nthen anyone can:  tb user ra-request --tee <this instance's public IP>:%d --format aws-nitro\n", cmd, l.Port)
 	default:
-		fmt.Printf("\n보안 그룹을 열지 못했다 (%v). AWS 계정에서 한 줄:\n  %s\n", perr, cmd)
+		fmt.Printf("\ncould not open the security group (%v). from an AWS account that can, one line:\n  %s\n", perr, cmd)
 	}
 	return nil
 }
 
 func raProxy(args []string) error {
 	fs := flag.NewFlagSet("ra-proxy", flag.ContinueOnError)
-	listen := fs.String("listen", "127.0.0.1:5000", "받을 TCP 주소")
-	target := fs.String("vsock", "16:5000", "엔클레이브 <cid>:<port>")
+	listen := fs.String("listen", "127.0.0.1:5000", "TCP address to listen on")
+	target := fs.String("vsock", "16:5000", "enclave <cid>:<port>")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

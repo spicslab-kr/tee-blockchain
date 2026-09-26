@@ -44,7 +44,7 @@ func (Impl) Compare(a, b p.Measurements) Verdict {
 func (Impl) Check(a p.Measurements, r l.Registration, now int64, trusted []string) Verdict {
 	h, err := reg.MeasurementHash(a)
 	if err != nil {
-		return Verdict{Reason: []string{"측정값 해시 계산 실패: " + err.Error()}}
+		return Verdict{Reason: []string{"could not compute the measurement hash: " + err.Error()}}
 	}
 	return compare.Check(h[:], compare.RegInfo{
 		MeasurementHash: r.Values.Get("measurementHash"),

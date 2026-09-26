@@ -123,7 +123,7 @@ func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]strin
 func parseKey(address string) (common.Hash, error) {
 	s := strings.TrimPrefix(address, "0x")
 	if len(s) != 64 {
-		return common.Hash{}, fmt.Errorf("key %q: want a 32-byte hex value (0x… , 66 글자)", address)
+		return common.Hash{}, fmt.Errorf("key %q: want a 32-byte hex value (0x…, 66 chars)", address)
 	}
 	b, err := hex.DecodeString(s)
 	if err != nil {
@@ -153,10 +153,10 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 	}
 	ev, err := findRegisteredEvent(ctx, backend, registry, key, r.LogRangeChunk)
 	if err != nil {
-		return l.Registration{}, fmt.Errorf("records 에는 있지만 이벤트 로그를 못 읽음: %w", err)
+		return l.Registration{}, fmt.Errorf("record exists but its event log could not be read: %w", err)
 	}
 	if ev == nil {
-		return l.Registration{}, fmt.Errorf("key %s: 등록은 있지만 이벤트 로그가 없다 (오래된 노드가 로그를 지웠을 수 있다)", address)
+		return l.Registration{}, fmt.Errorf("key %s: registered, but no event log found (an old node may have pruned its logs)", address)
 	}
 	return l.Registration{
 		Address:   address,

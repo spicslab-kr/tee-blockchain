@@ -19,17 +19,17 @@ import (
 // 등록 정보를 읽어 만료 · 신뢰 서명자까지 같이 본다(Check).
 func compareCmd(args []string) error {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
-	a := fs.String("a", "", "측정값 A: measurements.json 파일, 또는 NAME=hex,NAME=hex")
-	b := fs.String("b", "", "측정값 B — --key 를 안 쓰면 필수")
-	rpc := fs.String("rpc", "", "체인 모드: 이더리움 RPC 주소")
-	contract := fs.String("contract", "", "체인 모드: Registry 컨트랙트 주소")
-	key := fs.String("key", "", "체인 모드: 조회 key (register 결과의 key)")
-	trusted := fs.String("trusted", "", "체인 모드: 신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 APPROVER 를 그대로 쓴다")
+	a := fs.String("a", "", "measurements A: a measurements.json file, or NAME=hex,NAME=hex")
+	b := fs.String("b", "", "measurements B — required unless --key is used")
+	rpc := fs.String("rpc", "", "chain mode: Ethereum RPC URL")
+	contract := fs.String("contract", "", "chain mode: Registry contract address")
+	key := fs.String("key", "", "chain mode: lookup key (the key from register)")
+	trusted := fs.String("trusted", "", "chain mode: trusted signer addresses, comma-separated. empty uses the contract's APPROVER")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *a == "" {
-		return errors.New("--a 는 필수")
+		return errors.New("--a is required")
 	}
 	if err := checkMode(*b, *rpc, *contract, *key, *trusted); err != nil {
 		return err
@@ -41,7 +41,7 @@ func compareCmd(args []string) error {
 
 	if *key != "" {
 		if *rpc == "" || !common.IsHexAddress(*contract) {
-			return errors.New("체인 모드엔 --rpc, --contract, --key 가 다 있어야 한다")
+			return errors.New("chain mode needs --rpc, --contract and --key together")
 		}
 		reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -58,7 +58,7 @@ func compareCmd(args []string) error {
 	}
 
 	if *b == "" {
-		return errors.New("--b 또는 (--contract 와 --key) 가 필요하다")
+		return errors.New("--b or (--contract and --key) is required")
 	}
 	vb, err := readMeasurements(*b)
 	if err != nil {
@@ -74,13 +74,13 @@ func checkMode(b, rpc, contract, key, trusted string) error {
 	chainFlags := rpc != "" || contract != "" || key != "" || trusted != ""
 	switch {
 	case b != "" && key != "":
-		return errors.New("--b(평문 비교)와 --key(체인 조회)를 같이 주면 안 된다 — 하나만 골라라")
+		return errors.New("--b (plain compare) and --key (chain lookup) cannot be given together — pick one")
 	case b != "" && chainFlags:
-		return errors.New("--b 를 줬는데 --rpc/--contract/--trusted 도 같이 줬다 — --key 없인 체인 모드가 아니니 지운다")
+		return errors.New("--b was given along with --rpc/--contract/--trusted — without --key this is not chain mode, drop them")
 	case key == "" && (rpc != "" || contract != ""):
-		return errors.New("--rpc 또는 --contract 를 줬으면 --key 도 있어야 체인 모드다")
+		return errors.New("--rpc or --contract needs --key as well to be chain mode")
 	case key == "" && trusted != "":
-		return errors.New("--trusted 는 --key 없이는 쓰이지 않는다 (체인 모드 전용)")
+		return errors.New("--trusted is unused without --key (chain mode only)")
 	}
 	return nil
 }

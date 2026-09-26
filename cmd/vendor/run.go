@@ -23,38 +23,38 @@ import (
 // 빌드한 값)와 먼저 맞대고, 같을 때만 그 빌드값을 등록한다. 다르면 등록하지 않고 실패로 끝난다.
 func runCmd(args []string) error {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
-	tee := fs.String("tee", "", "TEE 주소 host:port — 있으면 여기서 먼저 RA 를 요청해 측정값을 얻는다")
-	format := fs.String("format", "aws-nitro", "기대하는 문서 형식")
-	timeout := fs.Duration("timeout", 30*time.Second, "RA 요청 타임아웃")
-	nonce := fs.String("nonce", "", "고정된 nonce(테스트용 fixture 등). 비우면 방금 보낸 것을 쓴다")
-	measurements := fs.String("measurements", "", "이미 있는 측정값 파일(예: build 의 out/measurements.json). --tee 없이 주면 그대로 등록하고, --tee 와 같이 주면 TEE 가 증명한 값과 먼저 대조해 같을 때만 이 파일을 등록한다")
-	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
-	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
-	keyFile := fs.String("key-file", "", "서명하고 트랜잭션을 보낼 개인키 파일 (hex)")
-	platform := fs.String("platform", "aws-nitro", "측정값 형식")
-	service := fs.String("service", "", "서비스 이름. 비우면 같은 측정값의 기존 등록(있으면 누구 것이든)에서 가져온다")
-	version := fs.String("version", "", "버전. 비우면 위와 같이 기존 등록에서 가져온다")
-	expires := fs.Duration("expires", 90*24*time.Hour, "지금부터 얼마 뒤에 만료되나")
-	trusted := fs.String("trusted", "", "신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 APPROVER 를 그대로 쓴다")
-	out := fs.String("out", "", "T1·T2 중간 파일을 둘 디렉터리. 비우면 임시 디렉터리를 쓰고 끝나면 지운다")
+	tee := fs.String("tee", "", "TEE address host:port — if given, RA is requested from it first to obtain the measurements")
+	format := fs.String("format", "aws-nitro", "expected document format")
+	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
+	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
+	measurements := fs.String("measurements", "", "an existing measurements file (e.g. build's out/measurements.json). without --tee it is registered as is; with --tee it is first checked against the TEE-attested value and registered only if they match")
+	rpc := fs.String("rpc", "", "Ethereum RPC URL")
+	contract := fs.String("contract", "", "Registry contract address")
+	keyFile := fs.String("key-file", "", "private key file (hex) that signs and sends the transaction")
+	platform := fs.String("platform", "aws-nitro", "measurement format")
+	service := fs.String("service", "", "service name. empty takes it from an existing registration of the same measurements (anyone's)")
+	version := fs.String("version", "", "version. empty takes it from an existing registration, as above")
+	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
+	trusted := fs.String("trusted", "", "trusted signer addresses, comma-separated. empty uses the contract's APPROVER")
+	out := fs.String("out", "", "directory for the T1·T2 intermediate files. empty uses a temporary directory, removed at the end")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	// 옵션으로 안 준 값은 register 처럼 차례로 묻는다 — plain 에서 전부 플래그로 줄 필요는 없다.
 	askMainnetRPC(rpc)
-	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
-	ask(keyFile, "내 개인키 파일", "")
+	ask(contract, "Registry contract address (0x…)", "")
+	ask(keyFile, "my private key file", "")
 	if *tee == "" && *measurements == "" {
-		ask(tee, "TEE 주소 host:port (비우면 측정값 파일을 쓴다)", "")
+		ask(tee, "TEE address host:port (empty uses a measurements file)", "")
 	}
 	if *tee == "" && *measurements == "" {
-		ask(measurements, "측정값 파일", "out/measurements.json")
+		ask(measurements, "measurements file", "out/measurements.json")
 	}
 	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" {
-		return errors.New("--rpc, --contract, --key-file 는 필수")
+		return errors.New("--rpc, --contract and --key-file are required")
 	}
 	if *tee == "" && *measurements == "" {
-		return errors.New("--tee 또는 --measurements 가 필요하다")
+		return errors.New("--tee or --measurements is required")
 	}
 
 	measPath := *measurements
@@ -74,11 +74,11 @@ func runCmd(args []string) error {
 		docPath := filepath.Join(dir, "doc.cbor")
 		parsedPath = filepath.Join(dir, "parsed.json")
 
-		fmt.Println("== 1/3 T1 RA 요청")
+		fmt.Println("== 1/3 T1 RA request")
 		if err := raRequest([]string{"--tee", *tee, "--out", docPath, "--format", *format, "--timeout", timeout.String()}); err != nil {
 			return err
 		}
-		fmt.Println("\n== 2/3 T2 RA 파싱")
+		fmt.Println("\n== 2/3 T2 RA parse")
 		parseArgs := []string{"--doc", docPath, "--out", parsedPath}
 		if *nonce != "" {
 			parseArgs = append(parseArgs, "--nonce", *nonce)
@@ -90,8 +90,8 @@ func runCmd(args []string) error {
 			measPath = parsedPath
 		}
 	} else {
-		fmt.Println("== 1/3 (건너뜀 — --measurements 를 그대로 씀)")
-		fmt.Println("== 2/3 (건너뜀)")
+		fmt.Println("== 1/3 (skipped — using --measurements as is)")
+		fmt.Println("== 2/3 (skipped)")
 	}
 
 	values, err := readMeasurements(measPath)
@@ -99,7 +99,7 @@ func runCmd(args []string) error {
 		return err
 	}
 	if parsedPath != "" && parsedPath != measPath {
-		fmt.Println("\n== 검사: TEE 가 증명한 값 vs --measurements (내 빌드값)")
+		fmt.Println("\n== audit: TEE-attested value vs --measurements (my build value)")
 		parsed, err := readMeasurements(parsedPath)
 		if err != nil {
 			return err
@@ -110,14 +110,14 @@ func runCmd(args []string) error {
 			for _, r := range v.Reason {
 				fmt.Println("  -", r)
 			}
-			return errors.New("TEE 가 증명한 값이 --measurements 와 다르다 — 등록하지 않는다")
+			return errors.New("the TEE-attested value differs from --measurements — not registering")
 		}
 		fmt.Println("PASS")
 	}
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 
 	if *service == "" || *version == "" {
-		fmt.Println("\n== service/version 이 비어 있음 — 같은 측정값의 기존 등록에서 가져온다")
+		fmt.Println("\n== service/version empty — taking them from an existing registration of the same measurements")
 		ictx, icancel := context.WithTimeout(context.Background(), time.Minute)
 		keys, err := reader.FindAddress(ictx, values)
 		if err != nil {
@@ -136,22 +136,22 @@ func runCmd(args []string) error {
 			if *version == "" {
 				*version = existing.Meta.Version
 			}
-			fmt.Printf("   %s %s (key %s 에서 가져옴)\n", existing.Meta.Service, existing.Meta.Version, k)
+			fmt.Printf("   %s %s (taken from key %s)\n", existing.Meta.Service, existing.Meta.Version, k)
 			resolved = true
 			break
 		}
 		icancel()
 		if !resolved {
-			fmt.Println("   같은 측정값의 기존 등록이 없다 — 직접 입력하라")
+			fmt.Println("   no existing registration of the same measurements — enter them by hand")
 		}
-		ask(service, "서비스 이름", "")
-		ask(version, "버전", "")
+		ask(service, "service name", "")
+		ask(version, "version", "")
 		if *service == "" || *version == "" {
-			return errors.New("--service, --version 은 필수다")
+			return errors.New("--service and --version are required")
 		}
 	}
 
-	fmt.Println("\n== C1 등록 후 M2 자기확인")
+	fmt.Println("\n== C1 register, then M2 self-check")
 	key, err := register([]string{
 		"--rpc", *rpc, "--contract", *contract, "--key-file", *keyFile,
 		"--measurements", measPath, "--platform", *platform,

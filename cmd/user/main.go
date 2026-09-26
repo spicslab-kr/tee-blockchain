@@ -42,32 +42,32 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `tb user — RA 요청
+	fmt.Fprintln(os.Stderr, `tb user — RA request
 
   ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out <file>] [--at <RFC3339>]
-              문서의 서명 · 인증서 체인 · 난수를 확인하고 측정값(PCR)을 꺼낸다. 결과는 register --measurements 에 그대로 넣는다
+              verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements
   ra-request  --tee <host:port> [--out <file>] [--format <name>] [--timeout 30s]
-          난수를 만들어 보내고 RA 문서를 받아 저장한다. 난수는 <file>.nonce 에.
-              --format 을 주면 그 형식(aws-nitro · gcp-cs-jwt · azure-maa-jwt)의 문서만 받는다
+              generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
+              with --format, accepts only a document of that format (aws-nitro · gcp-cs-jwt · azure-maa-jwt)
   lookup      --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
-              key 로 바로 읽거나, 측정값으로 key 를 먼저 찾은 뒤 전부 읽는다. User 는 등록은 못 하고 조회만 한다
+              read one key directly, or find the key(s) for the measurements first and read them all. a User only looks up, never registers
   compare     --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
-              ra-parse 로 받은 값을 체인 등록 정보와 맞댄다 — 값 · 만료 · 신뢰 서명자. 실패하면 exit 1
+              match the value from ra-parse against the chain registration — value, expiry and trusted signer. exit 1 on failure
   run         --tee <host:port> --rpc <url> --contract <0x…> [--trusted <0x…,0x…>]
-              ra-request · ra-parse · lookup · compare 를 한 번에 (--nonce 로 고정 가능). 찾은 등록 중 하나라도 PASS 면 exit 0`)
+              ra-request · ra-parse · lookup · compare in one go (--nonce pins the nonce). exit 0 if any registration found PASSes`)
 }
 
 func raRequest(args []string) error {
 	fs := flag.NewFlagSet("ra-request", flag.ContinueOnError)
-	tee := fs.String("tee", "", "TEE 주소 host:port")
-	out := fs.String("out", "ra-doc.cbor", "문서를 저장할 파일")
-	format := fs.String("format", "", "기대하는 문서 형식. 비우면 무엇이든 받는다")
+	tee := fs.String("tee", "", "TEE address host:port")
+	out := fs.String("out", "ra-doc.cbor", "file to save the document to")
+	format := fs.String("format", "", "expected document format. empty accepts any")
 	timeout := fs.Duration("timeout", 30*time.Second, "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *tee == "" {
-		return errors.New("--tee 는 필수")
+		return errors.New("--tee is required")
 	}
 	nonce, doc, err := ra.TCPRequester{Timeout: *timeout}.RequestFresh(context.Background(), *tee)
 	if err != nil {

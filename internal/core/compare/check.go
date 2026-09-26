@@ -17,13 +17,13 @@ type RegInfo struct {
 func Check(measurementHash []byte, reg RegInfo, now int64, trusted []string) Verdict {
 	var reasons []string
 	if reg.Expires <= now {
-		reasons = append(reasons, "등록이 만료됨")
+		reasons = append(reasons, "registration expired")
 	}
 	if !contains(trusted, reg.Signer) {
-		reasons = append(reasons, "서명자("+reg.Signer+")가 신뢰 목록에 없음")
+		reasons = append(reasons, "signer "+reg.Signer+" is not in the trusted list")
 	}
 	if !bytes.Equal(measurementHash, reg.MeasurementHash) {
-		reasons = append(reasons, "측정값 해시가 체인 등록값과 다름")
+		reasons = append(reasons, "measurement hash differs from the chain registration")
 	}
 	return Verdict{Pass: len(reasons) == 0, Reason: reasons}
 }

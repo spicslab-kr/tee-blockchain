@@ -18,7 +18,7 @@ func TestCompare_ValueDiffers(t *testing.T) {
 	if v.Pass {
 		t.Fatal("differing values must fail")
 	}
-	if len(v.Reason) != 1 || v.Reason[0] != "PCR0: 값이 다름" {
+	if len(v.Reason) != 1 || v.Reason[0] != "PCR0: values differ" {
 		t.Fatalf("Reason = %v", v.Reason)
 	}
 }

@@ -123,7 +123,7 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("lookup (등록 안 된 측정값): %v\n%s", err, nfOut)
 	}
-	if !strings.Contains(string(nfOut), "등록된 것이 없다") {
+	if !strings.Contains(string(nfOut), "nothing registered") {
 		t.Errorf("등록 안 된 측정값인데 뭔가 찾았다:\n%s", nfOut)
 	}
 

@@ -59,18 +59,18 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `tb-ra-responder — 엔클레이브 안에서만 돈다. 어느 역할의 빌드든 이 바이너리 하나를 그대로 얹는다
+	fmt.Fprintln(os.Stderr, `tb-ra-responder — runs only inside the enclave. every role's build layers this one binary as is
 
   ra-serve  --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
-            요청마다 난수를 받아 RA 문서를 돌려준다
-  lo-up     loopback 을 올린다. 소프트웨어를 띄우기 전에 한 번`)
+            takes a nonce per request and returns an RA document
+  lo-up     brings up loopback. once, before starting the software`)
 }
 
 func raServe(args []string) error {
 	fs := flag.NewFlagSet("ra-serve", flag.ContinueOnError)
-	listen := fs.String("listen", "tcp:127.0.0.1:5000", "tcp:<host:port> 또는 vsock:<port>")
-	extractor := fs.String("extractor", "nsm", "nsm 또는 fixture=<doc 파일>")
-	userData := fs.String("user-data", "", "문서에 묶을 값 (hex)")
+	listen := fs.String("listen", "tcp:127.0.0.1:5000", "tcp:<host:port> or vsock:<port>")
+	extractor := fs.String("extractor", "nsm", "nsm or fixture=<doc file>")
+	userData := fs.String("user-data", "", "value to bind into the document (hex)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func raServe(args []string) error {
 		ex = fx
 		fmt.Fprintln(os.Stderr, "warning: fixture extractor — the document is not bound to the nonce; test use only")
 	default:
-		return errors.New("--extractor: nsm 또는 fixture=<doc>")
+		return errors.New("--extractor: nsm or fixture=<doc>")
 	}
 	var ln net.Listener
 	var err error
@@ -104,7 +104,7 @@ func raServe(args []string) error {
 			ln, err = awsra.ListenVsock(uint32(port))
 		}
 	default:
-		return errors.New("--listen: tcp:<host:port> 또는 vsock:<port>")
+		return errors.New("--listen: tcp:<host:port> or vsock:<port>")
 	}
 	if err != nil {
 		return err

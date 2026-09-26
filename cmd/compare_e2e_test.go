@@ -80,7 +80,7 @@ func TestCompare_E2E_PlainAndChainModes(t *testing.T) {
 	if !ok || ee.ExitCode() != 1 {
 		t.Fatalf("체인모드, 다른 값인데 exit 1 이 아님: %v\n%s", err, out)
 	}
-	if !strings.Contains(string(out), "측정값 해시") {
+	if !strings.Contains(string(out), "measurement hash") {
 		t.Errorf("해시 불일치 근거가 안 보임:\n%s", out)
 	}
 
@@ -99,7 +99,7 @@ func TestCompare_E2E_PlainAndChainModes(t *testing.T) {
 	if err == nil {
 		t.Fatalf("--b 와 --key 를 같이 줬는데 성공함 (하나가 조용히 무시된 것):\n%s", out)
 	}
-	if !strings.Contains(string(out), "같이 주면 안 된다") {
+	if !strings.Contains(string(out), "pick one") {
 		t.Errorf("어느 쪽을 골라야 하는지 에러 메시지가 안 보임:\n%s", out)
 	}
 
@@ -109,7 +109,7 @@ func TestCompare_E2E_PlainAndChainModes(t *testing.T) {
 	if err == nil {
 		t.Fatalf("--trusted 만 주고 --key 를 안 줬는데 성공함 (--trusted 가 조용히 무시된 것):\n%s", out)
 	}
-	if !strings.Contains(string(out), "체인 모드 전용") {
+	if !strings.Contains(string(out), "chain mode only") {
 		t.Errorf("--trusted 전용이라는 에러 메시지가 안 보임:\n%s", out)
 	}
 }

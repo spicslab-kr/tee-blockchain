@@ -88,7 +88,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name, res.Memory = l.Name, l.Memory
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
-	fmt.Fprintf(log, "== launch 1/3 도구와 자원 (%d cpu · %d MiB)\n", l.CPUs, l.Memory)
+	fmt.Fprintf(log, "== launch 1/3 tools and resources (%d cpu · %d MiB)\n", l.CPUs, l.Memory)
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel"); err != nil {
 		return res, err
 	}
@@ -99,7 +99,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== launch 2/3 엔클레이브 실행 (cid %d)\n", l.CID)
+	fmt.Fprintf(log, "== launch 2/3 running the enclave (cid %d)\n", l.CID)
 	_ = r.quiet(ctx, "nitro-cli", "terminate-enclave", "--enclave-name", l.Name)
 	if err := r.run(ctx, "nitro-cli", "run-enclave", "--eif-path", l.EIF, "--cpu-count", strconv.Itoa(l.CPUs),
 		"--memory", strconv.Itoa(l.Memory), "--enclave-cid", strconv.Itoa(l.CID), "--enclave-name", l.Name); err != nil {
@@ -110,7 +110,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== launch 3/3 다리 TCP %s:%d → vsock %d:%d\n", l.Listen, l.Port, l.CID, l.Port)
+	fmt.Fprintf(log, "== launch 3/3 bridge TCP %s:%d → vsock %d:%d\n", l.Listen, l.Port, l.CID, l.Port)
 	if err := l.startProxy(ctx, log); err != nil {
 		return res, err
 	}
@@ -249,7 +249,7 @@ func (r runner) ensureAllocator(ctx context.Context, memory, cpus int) error {
 	if curMem >= memory && curCPU >= cpus {
 		return nil
 	}
-	fmt.Fprintf(r.log, "엔클레이브 자원 %d MiB / %d cpu → %d MiB / %d cpu\n", curMem, curCPU, max(curMem, memory), max(curCPU, cpus))
+	fmt.Fprintf(r.log, "enclave resources %d MiB / %d cpu → %d MiB / %d cpu\n", curMem, curCPU, max(curMem, memory), max(curCPU, cpus))
 	c := r.cmd(ctx, "tee", allocatorFile)
 	c.Stdin = strings.NewReader(strings.Join(lines, "\n"))
 	if err := c.Run(); err != nil {

@@ -26,11 +26,11 @@ func Compare(a, b Items) Verdict {
 		vb, okB := bv[n]
 		switch {
 		case !okA:
-			reasons = append(reasons, n+": a 에 없음")
+			reasons = append(reasons, n+": missing in a")
 		case !okB:
-			reasons = append(reasons, n+": b 에 없음")
+			reasons = append(reasons, n+": missing in b")
 		case !bytes.Equal(va, vb):
-			reasons = append(reasons, n+": 값이 다름")
+			reasons = append(reasons, n+": values differ")
 		}
 	}
 	return Verdict{Pass: len(reasons) == 0, Reason: reasons}

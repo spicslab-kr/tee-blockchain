@@ -23,18 +23,18 @@ import (
 
 func registryDeploy(args []string) error {
 	fs := flag.NewFlagSet("registry-deploy", flag.ContinueOnError)
-	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
-	keyFile := fs.String("key-file", "", "배포 트랜잭션을 보낼 개인키 파일 (hex)")
-	approver := fs.String("approver", "", "이 컨트랙트가 받을 서명 키의 주소 (보통 내 서명 키)")
+	rpc := fs.String("rpc", "", "Ethereum RPC URL")
+	keyFile := fs.String("key-file", "", "private key file (hex) that sends the deploy transaction")
+	approver := fs.String("approver", "", "address of the signing key this contract accepts (usually my signing key)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	// 옵션으로 안 준 값은 차례로 묻는다
 	askMainnetRPC(rpc)
-	ask(keyFile, "배포 트랜잭션을 보낼 개인키 파일", "")
-	ask(approver, "이 컨트랙트가 받을 서명 키의 주소 (0x…)", "")
+	ask(keyFile, "private key file that sends the deploy transaction", "")
+	ask(approver, "address of the signing key this contract accepts (0x…)", "")
 	if *rpc == "" || *keyFile == "" || !common.IsHexAddress(*approver) {
-		return errors.New("--rpc, --key-file, --approver 는 필수")
+		return errors.New("--rpc, --key-file and --approver are required")
 	}
 	key, err := readKey(*keyFile)
 	if err != nil {
@@ -53,26 +53,26 @@ func registryDeploy(args []string) error {
 // register — C1. 등록에 쓴 key(조회 좌표)를 돌려준다 — run 이 이어서 바로 self-check compare 하는 데 쓴다.
 func register(args []string) (string, error) {
 	fs := flag.NewFlagSet("register", flag.ContinueOnError)
-	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
-	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
-	keyFile := fs.String("key-file", "", "서명하고 트랜잭션을 보낼 개인키 파일 (hex)")
-	measurements := fs.String("measurements", "", "측정값: nitro measurements.json 파일, 또는 NAME=hex,NAME=hex")
-	platform := fs.String("platform", "aws-nitro", "측정값 형식")
-	service := fs.String("service", "", "서비스 이름")
-	version := fs.String("version", "", "버전")
-	expires := fs.Duration("expires", 90*24*time.Hour, "지금부터 얼마 뒤에 만료되나")
+	rpc := fs.String("rpc", "", "Ethereum RPC URL")
+	contract := fs.String("contract", "", "Registry contract address")
+	keyFile := fs.String("key-file", "", "private key file (hex) that signs and sends the transaction")
+	measurements := fs.String("measurements", "", "measurements: a nitro measurements.json file, or NAME=hex,NAME=hex")
+	platform := fs.String("platform", "aws-nitro", "measurement format")
+	service := fs.String("service", "", "service name")
+	version := fs.String("version", "", "version")
+	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
 	if err := fs.Parse(args); err != nil {
 		return "", err
 	}
 	// 옵션으로 안 준 값은 차례로 묻는다
 	askMainnetRPC(rpc)
-	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
-	ask(keyFile, "내 개인키 파일", "")
-	ask(measurements, "측정값 (measurements.json 경로 또는 NAME=hex,…)", "out/measurements.json")
-	ask(service, "서비스 이름", "")
-	ask(version, "버전", "")
+	ask(contract, "Registry contract address (0x…)", "")
+	ask(keyFile, "my private key file", "")
+	ask(measurements, "measurements (path to measurements.json, or NAME=hex,…)", "out/measurements.json")
+	ask(service, "service name", "")
+	ask(version, "version", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" || *measurements == "" || *service == "" || *version == "" {
-		return "", errors.New("--rpc, --contract, --key-file, --measurements, --service, --version 는 필수")
+		return "", errors.New("--rpc, --contract, --key-file, --measurements, --service and --version are required")
 	}
 	key, err := readKey(*keyFile)
 	if err != nil {
@@ -103,17 +103,17 @@ func register(args []string) (string, error) {
 // 찾은 key 들을 돌려준다 — run 이 이어서 각각 compare 하는 데 쓴다.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
-	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
-	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
-	key := fs.String("key", "", "조회 key (0x…, register 결과의 key). 있으면 --measurements 는 안 봐도 된다")
-	measurements := fs.String("measurements", "", "측정값: measurements.json 파일, 또는 NAME=hex,NAME=hex")
+	rpc := fs.String("rpc", "", "Ethereum RPC URL")
+	contract := fs.String("contract", "", "Registry contract address")
+	key := fs.String("key", "", "lookup key (0x…, the key from register). with it, --measurements is not needed")
+	measurements := fs.String("measurements", "", "measurements: a measurements.json file, or NAME=hex,NAME=hex")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
-	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
-	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
+	ask(rpc, "RPC URL", "https://ethereum-rpc.publicnode.com")
+	ask(contract, "Registry contract address (0x…)", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) {
-		return nil, errors.New("--rpc, --contract 는 필수")
+		return nil, errors.New("--rpc and --contract are required")
 	}
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -122,7 +122,7 @@ func lookup(args []string) ([]string, error) {
 	keys := []string{*key}
 	if *key == "" {
 		if *measurements == "" {
-			return nil, errors.New("--key 또는 --measurements 가 필요하다")
+			return nil, errors.New("--key or --measurements is required")
 		}
 		values, err := readMeasurements(*measurements)
 		if err != nil {
@@ -133,7 +133,7 @@ func lookup(args []string) ([]string, error) {
 			return nil, err
 		}
 		if len(keys) == 0 {
-			fmt.Println("등록된 것이 없다")
+			fmt.Println("nothing registered")
 			return nil, nil
 		}
 		fmt.Printf("found %d key(s)\n", len(keys))
@@ -232,7 +232,7 @@ func askMainnetRPC(dst *string) {
 	if *dst != "" {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "RPC 주소 — mainnet(%s)에 실제 트랜잭션을 보낸다. 그대로 쓰려면 y, 다른 RPC 를 쓰려면 그 주소: ", mainnetRPC)
+	fmt.Fprintf(os.Stderr, "RPC URL — this sends a real transaction to mainnet (%s). y to use it, or type another RPC URL: ", mainnetRPC)
 	line, _ := stdin.ReadString('\n')
 	line = strings.TrimSpace(line)
 	if strings.EqualFold(line, "y") {

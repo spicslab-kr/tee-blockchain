@@ -23,17 +23,17 @@ import (
 // 이어서 각각 compare 하는 데 쓴다.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
-	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
-	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
-	key := fs.String("key", "", "조회 key (0x…, register 결과의 key). 있으면 --measurements 는 안 봐도 된다")
-	measurements := fs.String("measurements", "", "측정값: measurements.json 파일, 또는 NAME=hex,NAME=hex")
+	rpc := fs.String("rpc", "", "Ethereum RPC URL")
+	contract := fs.String("contract", "", "Registry contract address")
+	key := fs.String("key", "", "lookup key (0x…, the key from register). with it, --measurements is not needed")
+	measurements := fs.String("measurements", "", "measurements: a measurements.json file, or NAME=hex,NAME=hex")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
-	ask(rpc, "RPC 주소", "https://ethereum-rpc.publicnode.com")
-	ask(contract, "Registry 컨트랙트 주소 (0x…)", "")
+	ask(rpc, "RPC URL", "https://ethereum-rpc.publicnode.com")
+	ask(contract, "Registry contract address (0x…)", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) {
-		return nil, errors.New("--rpc, --contract 는 필수")
+		return nil, errors.New("--rpc and --contract are required")
 	}
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -42,7 +42,7 @@ func lookup(args []string) ([]string, error) {
 	keys := []string{*key}
 	if *key == "" {
 		if *measurements == "" {
-			return nil, errors.New("--key 또는 --measurements 가 필요하다")
+			return nil, errors.New("--key or --measurements is required")
 		}
 		values, err := readMeasurements(*measurements)
 		if err != nil {
@@ -53,7 +53,7 @@ func lookup(args []string) ([]string, error) {
 			return nil, err
 		}
 		if len(keys) == 0 {
-			fmt.Println("등록된 것이 없다")
+			fmt.Println("nothing registered")
 			return nil, nil
 		}
 		fmt.Printf("found %d key(s)\n", len(keys))

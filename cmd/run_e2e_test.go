@@ -91,7 +91,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	if err == nil {
 		t.Fatalf("빌드값이 TEE 값과 다르면 run 은 실패해야 한다:\n%s", aBadOut)
 	}
-	if !strings.Contains(string(aBadOut), "등록하지 않는다") || !strings.Contains(string(aBadOut), "PCR0") {
+	if !strings.Contains(string(aBadOut), "not registering") || !strings.Contains(string(aBadOut), "PCR0") {
 		t.Fatalf("검사 FAIL 의 이유(PCR0)와 '등록하지 않는다'가 찍혀야 한다:\n%s", aBadOut)
 	}
 	if strings.Contains(string(aBadOut), "registered") {
@@ -106,7 +106,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("auditor run: %v\n%s", err, aOut)
 	}
-	if !strings.Contains(string(aOut), "== 검사") || strings.Count(string(aOut), "PASS") < 2 {
+	if !strings.Contains(string(aOut), "== audit") || strings.Count(string(aOut), "PASS") < 2 {
 		t.Fatalf("auditor run 은 검사 PASS 와 self-check PASS 를 둘 다 찍어야 한다:\n%s", aOut)
 	}
 	aKey := lastKey(aOut)
@@ -147,7 +147,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 		if err != nil {
 			t.Fatalf("user run (%s): %v\n%s", contract, err, uOut)
 		}
-		if !strings.Contains(string(uOut), "신뢰할 수 있다") {
+		if !strings.Contains(string(uOut), "trusted —") {
 			t.Fatalf("user run 은 등록된 컨트랙트에선 신뢰할 수 있다고 해야 한다:\n%s", uOut)
 		}
 	}
@@ -183,7 +183,7 @@ func TestRun_E2E_User_NothingRegistered(t *testing.T) {
 	if !ok || ee.ExitCode() != 1 {
 		t.Fatalf("아무도 등록 안 했으면 exit 1 이어야 한다: %v\n%s", err, out)
 	}
-	if !strings.Contains(string(out), "등록한 사람이 없다") {
+	if !strings.Contains(string(out), "nobody has registered") {
 		t.Fatalf("이유가 명확해야 한다:\n%s", out)
 	}
 }
