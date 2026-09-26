@@ -25,7 +25,7 @@ func runCmd(args []string) error {
 	nonce := fs.String("nonce", "", "고정된 nonce(테스트용 fixture 등). 비우면 방금 보낸 것을 쓴다")
 	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
 	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
-	trusted := fs.String("trusted", "", "신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 AUDITOR · VENDOR 를 그대로 쓴다")
+	trusted := fs.String("trusted", "", "신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 APPROVER 를 그대로 쓴다")
 	out := fs.String("out", "", "중간 파일(문서 · 측정값)을 둘 디렉터리. 비우면 임시 디렉터리를 쓰고 끝나면 지운다")
 	if err := fs.Parse(args); err != nil {
 		return err

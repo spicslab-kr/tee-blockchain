@@ -18,13 +18,17 @@ import (
 // runCmd — register 하고 바로 그 자리에서 self-check 까지 명령 하나로 (C1 → C2 → M2).
 // --tee 를 주면 그 전에 T1 요청 → T2 파싱까지 해서 측정값을 직접 얻는다(흐름1의 11~13, 흐름2의 2~3에
 // 해당). 이미 측정값 파일이 있으면 --measurements 로 바로 등록만 해도 된다.
+//
+// --tee 와 --measurements 를 같이 주면 검사가 된다(흐름1의 3~6): TEE 가 증명한 값을 --measurements(내가
+// 소스로 빌드한 값)와 먼저 맞대고, 같을 때만 그 빌드값을 등록한다. 다르면 등록하지 않고 실패로 끝난다 —
+// 그래야 "지금 도는 것"이 아니라 "내가 검증한 소스"가 체인에 올라간다.
 func runCmd(args []string) error {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	tee := fs.String("tee", "", "TEE 주소 host:port — 있으면 여기서 먼저 RA 를 요청해 측정값을 얻는다")
 	format := fs.String("format", "aws-nitro", "기대하는 문서 형식")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA 요청 타임아웃")
 	nonce := fs.String("nonce", "", "고정된 nonce(테스트용 fixture 등). 비우면 방금 보낸 것을 쓴다")
-	measurements := fs.String("measurements", "", "이미 있는 측정값 파일. --tee 대신 쓴다")
+	measurements := fs.String("measurements", "", "이미 있는 측정값 파일(예: build 의 out/measurements.json). --tee 없이 주면 그대로 등록하고, --tee 와 같이 주면 TEE 가 증명한 값과 먼저 대조해 같을 때만 이 파일을 등록한다")
 	rpc := fs.String("rpc", "", "이더리움 RPC 주소")
 	contract := fs.String("contract", "", "Registry 컨트랙트 주소")
 	keyFile := fs.String("key-file", "", "서명하고 트랜잭션을 보낼 개인키 파일 (hex)")
@@ -32,7 +36,7 @@ func runCmd(args []string) error {
 	service := fs.String("service", "", "서비스 이름. 비우면 같은 측정값의 기존 등록(있으면 누구 것이든)에서 가져온다")
 	version := fs.String("version", "", "버전. 비우면 위와 같이 기존 등록에서 가져온다")
 	expires := fs.Duration("expires", 90*24*time.Hour, "지금부터 얼마 뒤에 만료되나")
-	trusted := fs.String("trusted", "", "신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 AUDITOR · VENDOR 를 그대로 쓴다")
+	trusted := fs.String("trusted", "", "신뢰할 서명자 주소, 콤마로 구분. 비우면 컨트랙트의 APPROVER 를 그대로 쓴다")
 	out := fs.String("out", "", "T1·T2 중간 파일을 둘 디렉터리. 비우면 임시 디렉터리를 쓰고 끝나면 지운다")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -55,6 +59,7 @@ func runCmd(args []string) error {
 	}
 
 	measPath := *measurements
+	parsedPath := ""
 	if *tee != "" {
 		dir := *out
 		if dir == "" {
@@ -68,19 +73,22 @@ func runCmd(args []string) error {
 			return err
 		}
 		docPath := filepath.Join(dir, "doc.cbor")
-		measPath = filepath.Join(dir, "measurements.json")
+		parsedPath = filepath.Join(dir, "parsed.json")
 
 		fmt.Println("== 1/3 T1 RA 요청")
 		if err := raRequest([]string{"--tee", *tee, "--out", docPath, "--format", *format, "--timeout", timeout.String()}); err != nil {
 			return err
 		}
 		fmt.Println("\n== 2/3 T2 RA 파싱")
-		parseArgs := []string{"--doc", docPath, "--out", measPath}
+		parseArgs := []string{"--doc", docPath, "--out", parsedPath}
 		if *nonce != "" {
 			parseArgs = append(parseArgs, "--nonce", *nonce)
 		}
 		if err := raParse(parseArgs); err != nil {
 			return err
+		}
+		if measPath == "" {
+			measPath = parsedPath
 		}
 	} else {
 		fmt.Println("== 1/3 (건너뜀 — --measurements 를 그대로 씀)")
@@ -90,6 +98,22 @@ func runCmd(args []string) error {
 	values, err := readMeasurements(measPath)
 	if err != nil {
 		return err
+	}
+	if parsedPath != "" && parsedPath != measPath {
+		fmt.Println("\n== 검사: TEE 가 증명한 값 vs --measurements (내 빌드값)")
+		parsed, err := readMeasurements(parsedPath)
+		if err != nil {
+			return err
+		}
+		v := (cmp.Impl{}).Compare(parsed, values)
+		if !v.Pass {
+			fmt.Println("FAIL")
+			for _, r := range v.Reason {
+				fmt.Println("  -", r)
+			}
+			return errors.New("TEE 가 증명한 값이 --measurements 와 다르다 — 등록하지 않는다")
+		}
+		fmt.Println("PASS")
 	}
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 
