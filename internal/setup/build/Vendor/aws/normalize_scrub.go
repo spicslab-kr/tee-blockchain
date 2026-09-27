@@ -3,7 +3,9 @@ package aws
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -116,7 +118,7 @@ func stripBuildCaches(ctx context.Context, r runner, root string) []string {
 	var removed []string
 	for _, p := range buildCaches {
 		full := filepath.Join(root, filepath.FromSlash(p))
-		if _, err := os.Lstat(full); err != nil {
+		if !exists(ctx, r, full) {
 			continue
 		}
 		if err := os.RemoveAll(full); err != nil {
@@ -128,6 +130,19 @@ func stripBuildCaches(ctx context.Context, r runner, root string) []string {
 		removed = append(removed, p)
 	}
 	return removed
+}
+
+// exists — 풀어낸 트리에서 경로가 있는지. /root(700) · /var/cache/ldconfig(700) 처럼 root 만 들여다볼 수 있는 디렉터리 안은
+// os.Lstat 이 권한 오류를 내므로(실측: mariadb 의 root/.wget-hsts 가 그래서 안 지워졌다) 그때는 runner(sudo)의 test -e 로 본다.
+func exists(ctx context.Context, r runner, path string) bool {
+	_, err := os.Lstat(path)
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	return r.cmd(ctx, "test", "-e", path).Run() == nil
 }
 
 // readRoot · writeRoot — 풀어낸 rootfs 는 tar 가 sudo 로 풀어 root 소유다. 직접 안 되면 runner(sudo)로 읽고 쓴다.

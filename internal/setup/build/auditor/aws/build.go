@@ -285,7 +285,7 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 
 	args := []string{"import"}
 	for _, e := range cfg.Env {
-		args = append(args, "--change", "ENV "+e)
+		args = append(args, "--change", envChange(e))
 	}
 	if len(cfg.Entrypoint) > 0 {
 		b, _ := json.Marshal(cfg.Entrypoint)
@@ -318,7 +318,7 @@ func stripBuildLogs(ctx context.Context, r runner, root string) []string {
 	var removed []string
 	for _, p := range buildLogs {
 		full := filepath.Join(root, filepath.FromSlash(p))
-		if _, err := os.Lstat(full); err != nil {
+		if !exists(ctx, r, full) {
 			continue
 		}
 		if err := os.RemoveAll(full); err != nil {
@@ -415,4 +415,13 @@ func (r runner) imageCommand(ctx context.Context, image string) ([]string, error
 		return nil, fmt.Errorf("%s has no ENTRYPOINT or CMD; nothing to run", image)
 	}
 	return cmd, nil
+}
+
+// envChange — docker import --change 의 ENV 한 줄. 값에 공백이 있으면(실측: php 공식 이미지의
+// PHPIZE_DEPS="autoconf dpkg-dev dpkg file g++ …") 따옴표 없는 `ENV k=v` 꼴은 "can't find = in dpkg-dev" 로
+// 거부되므로, 항상 ENV k="v" 꼴로 쓰고 백슬래시와 따옴표를 이스케이프한다.
+func envChange(kv string) string {
+	k, v, _ := strings.Cut(kv, "=")
+	v = strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v)
+	return `ENV ` + k + `="` + v + `"`
 }
