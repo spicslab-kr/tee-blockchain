@@ -1,5 +1,5 @@
 ﻿# 준비 — 바이너리를 리눅스용으로 빌드해 두 인스턴스에 올린다 (누가 하든 한 번). 응답기는 같은 파일 하나를 양쪽에.
-#    실행: TB-live 에서  .\e2e\setup\(windows)\0-upload.ps1
+#    실행: TB-live 에서  .\e2e\setup\(local)\windows\0-upload.ps1
 . "$PSScriptRoot\env.ps1"
 $ErrorActionPreference = "Stop"
 

@@ -2,7 +2,7 @@
 #    handoff 와 같지만 PCR0 의 첫 글자를 바꿔 보낸다. 그리고 Auditor 인스턴스에서 check-received-image.sh 를 돌려
 #    빨간 ✗ (it does NOT measure to what … says — not running it) 로 거부되는 것을 보인다. 엔클레이브는 뜨지 않는다.
 #    실행: .\e2e\normal\vendor\tamper\vendor\1-send-tampered-json.ps1     (1-pack-image.sh 를 Vendor 인스턴스에서 먼저)
-. "$PSScriptRoot\..\..\..\setup\(windows)\env.ps1"
+. "$PSScriptRoot\..\..\..\..\setup\(local)\windows\env.ps1"
 $ErrorActionPreference = "Stop"
 $v = "$($E2E.SshUser)@$($E2E.VendorHost)"; $a = "$($E2E.SshUser)@$($E2E.AuditorHost)"
 

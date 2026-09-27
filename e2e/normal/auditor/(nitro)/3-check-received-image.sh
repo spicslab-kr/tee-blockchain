@@ -3,7 +3,7 @@
 # 📍 Auditor 인스턴스, ~ 에서 ./3-check-received-image.sh     입력: from-vendor/nginx.eif, from-vendor/measurements.json (노트북이 올려 둔다)
 # 결과: out/measurements.json (= 내가 직접 잰 값 → audit --measurements 에 쓴다), 엔클레이브 + TCP 5000
 set -euo pipefail
-test -f from-vendor/nginx.eif -a -f from-vendor/measurements.json || { echo "from-vendor/nginx.eif and measurements.json are missing — the Vendor runs e2e/normal/vendor/(windows)/2-handoff.ps1 first"; exit 1; }
+test -f from-vendor/nginx.eif -a -f from-vendor/measurements.json || { echo "from-vendor/nginx.eif and measurements.json are missing — the Vendor runs e2e/normal/vendor/(local)/windows/2-handoff.ps1 first"; exit 1; }
 
 echo "== received files"
 sha256sum from-vendor/nginx.eif from-vendor/measurements.json

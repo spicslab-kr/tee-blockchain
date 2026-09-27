@@ -1,6 +1,6 @@
 ﻿# Vendor — 만든 EIF 를 Auditor 에게 파일로 넘긴다: Vendor 의 out/nginx.eif · out/measurements.json → 노트북 → Auditor 의 from-vendor/
 #     (인스턴스끼리 ssh 키가 없어서 노트북을 거친다. 메일·카톡으로 보내도 같다.)
-. "$PSScriptRoot\..\..\..\setup\(windows)\env.ps1"
+. "$PSScriptRoot\..\..\..\..\setup\(local)\windows\env.ps1"
 $ErrorActionPreference = "Stop"
 $v = "$($E2E.SshUser)@$($E2E.VendorHost)"; $a = "$($E2E.SshUser)@$($E2E.AuditorHost)"
 

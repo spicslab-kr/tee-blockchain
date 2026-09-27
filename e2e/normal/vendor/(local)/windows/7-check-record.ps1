@@ -2,8 +2,8 @@
 #    입력: e2e-work\from-auditor\measurement-record.json (6-handback.ps1 이 만든 것).
 #    하는 일: 내 엔클레이브에 attestation → 파싱 → (a) 받은 기록의 값과 대조, (b) 기록이 가리키는 체인 등록과 대조(값·만료·서명자).
 #    둘 다 PASS 면 "Auditor 가 보증한 것 = 내가 지금 띄운 것" 이 내 눈으로도 확인된 것.
-#    실행: .\e2e\normal\vendor\(windows)\7-check-record.ps1
-. "$PSScriptRoot\..\..\..\setup\(windows)\env.ps1"
+#    실행: .\e2e\normal\vendor\(local)\windows\7-check-record.ps1
+. "$PSScriptRoot\..\..\..\..\setup\(local)\windows\env.ps1"
 $rec = Get-Content e2e-work\from-auditor\measurement-record.json -Raw | ConvertFrom-Json
 New-Item -ItemType Directory -Force e2e-work\vendor-check | Out-Null
 
