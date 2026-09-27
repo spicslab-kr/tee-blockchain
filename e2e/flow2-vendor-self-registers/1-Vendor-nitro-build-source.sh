@@ -16,8 +16,9 @@ echo "== source $SRC_REPO @ $SRC_COMMIT ($SRC_DIR)"
 git -C src/docker-nginx checkout -q $SRC_COMMIT
 fix_modes src/docker-nginx
 
-echo "== tb-vendor build: docker build → responder layer → normalize → EIF + measurements  (add --verify to build twice)"
-./tb-vendor build --app-dir src/docker-nginx/$SRC_DIR --out out
+echo "== tb-vendor build: docker build → responder layer → normalize → EIF + measurements, twice, checking both give the same value"
+echo "   (내가 이 소스로 등록하려면 내 값도 재현 가능해야 한다 — Auditor 한테만 강요할 게 아니다)"
+./tb-vendor build --app-dir src/docker-nginx/$SRC_DIR --out out --verify
 
 echo "== tb-vendor launch"
 ./tb-vendor launch --eif out/alpine-slim.eif
