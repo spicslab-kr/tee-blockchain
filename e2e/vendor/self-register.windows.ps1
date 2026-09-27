@@ -1,8 +1,8 @@
-﻿# Vendor — Auditor 없이 직접 등록 (흐름 2). Vendor 인스턴스에서 pack-image.sh 또는 build-source.sh 를 돌린 뒤.
+﻿# Vendor — Auditor 없이 직접 등록 (흐름 2). Vendor 인스턴스에서 pack-image.nitro.sh 또는 build-source.nitro.sh 를 돌린 뒤.
 #    Vendor 의 등록부(approver = Vendor 주소)를 깔고, self-register: 자기 TEE 에 RA → 자기 빌드값과 대조 → 등록 → 자기확인.
-#    실행: .\e2e\vendor\self-register.ps1 [-Contract 0x…]      컨트랙트는 e2e-work\contract-flow2.txt
+#    실행: .\e2e\vendor\self-register.windows.ps1 [-Contract 0x…]      컨트랙트는 e2e-work\contract-flow2.txt
 param([string]$Contract)
-. "$PSScriptRoot\..\setup\env.ps1"
+. "$PSScriptRoot\..\setup\env.windows.ps1"
 $ErrorActionPreference = "Stop"
 $v = "$($E2E.SshUser)@$($E2E.VendorHost)"
 
