@@ -75,7 +75,8 @@ docker build -t app:tb .
 
 If an Auditor is going to rebuild this and compare, normalize the image now or the measurements
 will differ: export the container filesystem, drop package-manager logs (`/var/log/apk.log`,
-`dpkg.log`, `apt/`, `dnf*.log` — they embed the build time), repack with
+`dpkg.log`, `apt/`, `dnf*.log` — they embed the build time), empty `/tmp` and `/var/tmp`, pin apk
+virtual-package versions (`.name=20260927.082249` in `/etc/apk/world` is the install time), repack with
 `tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner`, and `docker import` it under
 the same tag with the same ENTRYPOINT/ENV/CMD. `build` does exactly this; `setup/vendor/build.md`
 spells it out. Skip it only if nobody will ever rebuild.

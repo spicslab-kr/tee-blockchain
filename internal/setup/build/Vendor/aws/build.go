@@ -245,6 +245,12 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 		return err
 	}
 	os.Remove(rootfs) // 다 풀었으니 더 안 필요하다 - 재포장 중 피크 디스크 사용량을 줄인다
+	for _, d := range scrubBuildScratch(ctx, r, extract) {
+		fmt.Fprintf(r.log, "emptied build scratch: /%s\n", d)
+	}
+	for _, p := range fixApkVirtualVersions(ctx, r, extract) {
+		fmt.Fprintf(r.log, "pinned apk virtual-package versions (they were the install time): /%s\n", p)
+	}
 	for _, p := range stripBuildLogs(ctx, r, extract) {
 		fmt.Fprintf(r.log, "removed a log stamped with the build time: /%s\n", p)
 	}
