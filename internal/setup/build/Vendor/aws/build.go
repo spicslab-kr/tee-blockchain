@@ -31,8 +31,9 @@ const responderBinaryName = "tb-ra-responder"
 
 // Build 는 한 번의 빌드 입력. AppDir 의 Dockerfile 이 소프트웨어다.
 type Build struct {
-	AppDir string // 소프트웨어 Dockerfile 이 있는 디렉터리
-	Name   string // 이미지 · EIF 이름. 비우면 디렉터리 이름
+	AppDir string // 소프트웨어 Dockerfile 이 있는 디렉터리 (build). Image 와 둘 중 하나
+	Image  string // 사용자가 이미 만든 docker 이미지 (pack): docker build 는 사용자가, 얹기·정규화·EIF 는 tb 가
+	Name   string // 이미지 · EIF 이름. 비우면 디렉터리 이름 (pack: 이미지 이름의 태그 앞부분)
 	Port   int    // 응답기가 엔클레이브 안에서 들을 vsock 포트. 0 이면 5000
 
 	// Binary — 얹을 T1 응답기. 비우면 실행파일과 같은 디렉터리의 tb-ra-responder 를 찾는다.
@@ -60,24 +61,37 @@ type Result struct {
 var ErrNotLinux = errors.New("build runs on the Nitro parent instance (linux)")
 
 // Run — 도구 → 소프트웨어 이미지 → T1 응답기 얹기 → EIF · PCR.
+//
+// 두 입구. AppDir(build, Case B): tb 가 docker build 부터 한다 — Vendor 와 Auditor 가 같은 명령을 치면 같은 값이
+// 나오도록. Image(pack, Case A): 사용자가 자기 방식으로 만든 이미지를 받아 얹기·정규화·EIF 만 한다 — Auditor 는 이
+// EIF 파일을 받아 재므로 Vendor 혼자 만들면 된다.
 func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	var res Result
 	if runtime.GOOS != "linux" {
 		return res, ErrNotLinux
 	}
-	if b.AppDir == "" {
-		return res, errors.New("app dir is required")
+	if (b.AppDir == "") == (b.Image == "") {
+		return res, errors.New("give either an app dir (build) or an image (pack)")
 	}
-	appDir, err := filepath.Abs(b.AppDir)
-	if err != nil {
-		return res, err
+	if b.Image != "" && b.Verify {
+		return res, errors.New("--verify needs the Dockerfile: it rebuilds; pack only packs an image you built")
 	}
-	dockerfile := filepath.Join(appDir, "Dockerfile")
-	if st, err := os.Stat(dockerfile); err != nil || st.IsDir() {
-		return res, fmt.Errorf("%s: Dockerfile not found", appDir)
-	}
-	if b.Name == "" {
-		b.Name = Sanitize(filepath.Base(appDir))
+	var appDir, dockerfile string
+	if b.Image == "" {
+		var err error
+		if appDir, err = filepath.Abs(b.AppDir); err != nil {
+			return res, err
+		}
+		dockerfile = filepath.Join(appDir, "Dockerfile")
+		if st, err := os.Stat(dockerfile); err != nil || st.IsDir() {
+			return res, fmt.Errorf("%s: Dockerfile not found", appDir)
+		}
+		if b.Name == "" {
+			b.Name = Sanitize(filepath.Base(appDir))
+		}
+	} else if b.Name == "" {
+		name, _, _ := strings.Cut(b.Image, ":")
+		b.Name = Sanitize(filepath.Base(name))
 	}
 	if b.Port == 0 {
 		b.Port = 5000
@@ -101,13 +115,25 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name = b.Name
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
-	risks, err := LintDockerfile(dockerfile)
-	if err != nil {
-		return res, err
+	// 단계 이름표: build 는 5 단계, pack 은 docker build 가 빠져 4 단계.
+	verb, total, n := "build", 5, 0
+	if b.Image != "" {
+		verb, total = "pack", 4
 	}
-	printRisks(log, dockerfile, risks)
+	step := func(what string) {
+		n++
+		fmt.Fprintf(log, "== %s %d/%d %s\n", verb, n, total, what)
+	}
 
-	fmt.Fprintln(log, "== build 1/5 tools (nitro-cli · docker)")
+	if b.Image == "" {
+		risks, err := LintDockerfile(dockerfile)
+		if err != nil {
+			return res, err
+		}
+		printRisks(log, dockerfile, risks)
+	}
+
+	step("tools (nitro-cli · docker)")
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel", "docker"); err != nil {
 		return res, err
 	}
@@ -115,14 +141,19 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	appImage := b.Name + ":app"
+	appImage := b.Image
 	res.Image = b.Name + ":tb"
-	fmt.Fprintf(log, "== build 2/5 software image: %s → %s\n", appDir, appImage)
-	if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
-		return res, err
+	if b.Image == "" {
+		appImage = b.Name + ":app"
+		step(fmt.Sprintf("software image: %s → %s", appDir, appImage))
+		if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
+			return res, err
+		}
+	} else if _, err := r.output(ctx, "docker", "image", "inspect", appImage); err != nil {
+		return res, fmt.Errorf("%s: no such docker image here — docker build it first, or docker load it", appImage)
 	}
 
-	fmt.Fprintf(log, "== build 3/5 layering the T1 responder: %s → %s\n", appImage, res.Image)
+	step(fmt.Sprintf("layering the T1 responder: %s → %s", appImage, res.Image))
 	appCmd, err := r.imageCommand(ctx, appImage)
 	if err != nil {
 		return res, err
@@ -132,7 +163,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== build 4/5 reproducibility: dropping the layers and repacking in name order\n")
+	step("reproducibility: dropping the layers and repacking in name order")
 	first, err := normalize(ctx, r, res.Image, b.Out)
 	if err != nil {
 		return res, err
@@ -140,7 +171,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 	res.EIF = filepath.Join(b.Out, b.Name+".eif")
 	res.Measurements = filepath.Join(b.Out, "measurements.json")
-	fmt.Fprintf(log, "== build 5/5 EIF → %s\n", res.EIF)
+	step("EIF → " + res.EIF)
 	out, err := r.output(ctx, "nitro-cli", "build-enclave", "--docker-uri", res.Image, "--output-file", res.EIF)
 	if err != nil {
 		return res, err

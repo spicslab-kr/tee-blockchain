@@ -59,6 +59,8 @@ func main() {
 		err = awsra.LoopbackUp()
 	case "build":
 		err = buildCmd(os.Args[2:])
+	case "pack":
+		err = packCmd(os.Args[2:])
 	case "launch":
 		err = launchCmd(os.Args[2:])
 	default:
@@ -94,8 +96,12 @@ func usage() {
                    clone the source repository and read the build config. build from that directory
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
                    commit and push the measurement record and image to the repository
-  build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
-              on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2)
+  build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>] [--verify]
+              on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
+              for source that an Auditor will rebuild the same way (Case B)
+  pack        --image <docker image you built>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
+              same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
+              for an image handed over as a file (Case A)
   launch      --eif <file>  [--measurements <file>] [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
               on the Nitro parent instance. measures the EIF (→ out/measurements.json), runs it as an enclave, bridges TCP→vsock,
               requests RA from itself to confirm, then opens the security-group port (when permitted).
@@ -261,6 +267,28 @@ func buildCmd(args []string) error {
 	}
 	if b.AppDir == "" {
 		return errors.New("--app-dir is required")
+	}
+	built, err := b.Run(context.Background(), os.Stdout)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("\ndone. for the measurement record: %s · %s\nto launch:  tb auditor launch --eif %s --port %d\n", built.EIF, built.Measurements, built.EIF, b.Port)
+	return nil
+}
+
+func packCmd(args []string) error {
+	fs := flag.NewFlagSet("pack", flag.ContinueOnError)
+	b := build.Build{}
+	fs.StringVar(&b.Image, "image", "", "a docker image you built (name:tag)")
+	fs.StringVar(&b.Name, "name", "", "EIF name (default: the image name without its tag)")
+	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
+	fs.StringVar(&b.Out, "out", "out", "output directory")
+	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if b.Image == "" {
+		return errors.New("--image is required")
 	}
 	built, err := b.Run(context.Background(), os.Stdout)
 	if err != nil {
