@@ -268,6 +268,9 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	for _, p := range stripBuildLogs(ctx, r, extract) {
 		fmt.Fprintf(r.log, "removed a log stamped with the build time: /%s\n", p)
 	}
+	for _, p := range stripBuildCaches(ctx, r, extract) {
+		fmt.Fprintf(r.log, "removed a build-time cache (it records when, not what): /%s\n", p)
+	}
 
 	m, err := readManifest(ctx, r, extract)
 	if err != nil {

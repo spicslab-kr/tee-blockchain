@@ -113,3 +113,26 @@ func TestFixApkVirtualVersions_NoApk(t *testing.T) {
 		t.Fatalf("fixed = %v, want nothing", got)
 	}
 }
+
+func TestStripBuildCaches(t *testing.T) {
+	root := t.TempDir()
+	writeAt(t, root, "var/cache/ldconfig/aux-cache", "x")
+	writeAt(t, root, "root/.wget-hsts", "x")
+	writeAt(t, root, "root/.cache/pip/http/abc", "x")
+	writeAt(t, root, "etc/ld.so.cache", "keep") // 내용 기반 캐시는 둔다
+	got := stripBuildCaches(context.Background(), runner{log: io.Discard}, root)
+	if len(got) != 3 {
+		t.Fatalf("removed = %v", got)
+	}
+	for _, p := range []string{"var/cache/ldconfig/aux-cache", "root/.wget-hsts", "root/.cache"} {
+		if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(p))); err == nil {
+			t.Errorf("%s still there", p)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "etc", "ld.so.cache")); err != nil {
+		t.Errorf("ld.so.cache must survive: %v", err)
+	}
+	if again := stripBuildCaches(context.Background(), runner{log: io.Discard}, root); len(again) != 0 {
+		t.Errorf("second pass removed %v", again)
+	}
+}

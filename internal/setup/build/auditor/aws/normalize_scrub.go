@@ -100,6 +100,36 @@ func fixApkVirtualVersions(ctx context.Context, r runner, root string) []string 
 	return fixed
 }
 
+// buildCaches — 빌드 중 도구가 남기는 캐시. 내용이 파일 내용이 아니라 시각·inode 같은 그때의 상태라 같은 소스를 빌드해도
+// 매번 다르고, 엔클레이브 안에서 다시 쓰이지 않는다(실측: 두 인스턴스에서 mariadb 공식 Dockerfile — 13,063 항목 중
+// root/.wget-hsts(wget 의 HSTS 저장소, 방문 시각) 와 var/cache/ldconfig/aux-cache(ldconfig 가 라이브러리 stat 을 적어 둔
+// 캐시) 둘만 달라 PCR0·PCR2 가 갈렸다. tomcat 도 aux-cache 가 달랐다). 지운다.
+var buildCaches = []string{
+	"var/cache/ldconfig/aux-cache", // glibc ldconfig: 라이브러리의 inode·mtime 을 적는다. ld.so.cache 는 내용 기반이라 둔다
+	"root/.wget-hsts",              // wget: 방문한 HSTS 호스트와 시각
+	"root/.gnupg/random_seed",      // gnupg: 난수 시드
+	"root/.cache",                  // pip · go · npm 등이 두는 캐시 트리
+}
+
+// stripBuildCaches — 풀어낸 rootfs 에서 buildCaches 를 지우고, 실제로 지운 것의 상대 경로를 돌려준다.
+func stripBuildCaches(ctx context.Context, r runner, root string) []string {
+	var removed []string
+	for _, p := range buildCaches {
+		full := filepath.Join(root, filepath.FromSlash(p))
+		if _, err := os.Lstat(full); err != nil {
+			continue
+		}
+		if err := os.RemoveAll(full); err != nil {
+			if err := r.cmd(ctx, "rm", "-rf", full).Run(); err != nil {
+				fmt.Fprintf(r.log, "warning: could not remove %s: %v\n", p, err)
+				continue
+			}
+		}
+		removed = append(removed, p)
+	}
+	return removed
+}
+
 // readRoot · writeRoot — 풀어낸 rootfs 는 tar 가 sudo 로 풀어 root 소유다. 직접 안 되면 runner(sudo)로 읽고 쓴다.
 func readRoot(ctx context.Context, r runner, path string) ([]byte, error) {
 	if b, err := os.ReadFile(path); err == nil {
