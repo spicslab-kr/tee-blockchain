@@ -105,24 +105,15 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== launch 2/4 measuring the EIF (nitro-cli describe-eif)\n")
-	if res.PCR, err = measureEIF(ctx, r, l.EIF); err != nil {
-		return res, err
-	}
-	for _, k := range imagePCRs {
-		fmt.Fprintf(log, "%s %s\n", k, res.PCR[k])
-	}
-	res.Measurements = filepath.Join(l.Out, "measurements.json")
-	wrote, err := writeMeasurements(res.Measurements, res.PCR)
-	if err != nil {
-		return res, err
-	}
-	if wrote {
-		fmt.Fprintf(log, "→ %s\n", res.Measurements)
-	} else {
-		fmt.Fprintf(log, "= %s (build's file, same values)\n", res.Measurements)
-	}
+	// 남이 준 EIF(--measurements 가 같이 온다)만 다시 잰다. 내가 build·pack 한 EIF 는 그때 이미 잰 값이 out/ 에 있다.
 	if l.Measurements != "" {
+		fmt.Fprintf(log, "== launch 2/4 measuring the received EIF (nitro-cli describe-eif)\n")
+		if res.PCR, err = measureEIF(ctx, r, l.EIF); err != nil {
+			return res, err
+		}
+		for _, k := range imagePCRs {
+			fmt.Fprintf(log, "%s %s\n", k, res.PCR[k])
+		}
 		reasons, err := checkAgainst(res.PCR, l.Measurements)
 		if err != nil {
 			return res, err
@@ -135,6 +126,13 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 			return res, errMeasurementMismatch
 		}
 		fmt.Fprintf(log, "PASS — the EIF measures exactly what %s claims\n", l.Measurements)
+		res.Measurements = filepath.Join(l.Out, "measurements.json")
+		if _, err := writeMeasurements(res.Measurements, res.PCR); err != nil {
+			return res, err
+		}
+		fmt.Fprintf(log, "→ %s (what I measured; give this to audit --measurements)\n", res.Measurements)
+	} else {
+		fmt.Fprintf(log, "== launch 2/4 my own EIF, measured when it was built — not measuring again\n")
 	}
 
 	fmt.Fprintf(log, "== launch 3/4 running the enclave (cid %d)\n", l.CID)

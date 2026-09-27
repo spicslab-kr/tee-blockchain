@@ -103,9 +103,9 @@ func usage() {
               same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
               for an image you hand to the Auditor as a file (Case A)
   launch      --eif <file>  [--measurements <file>] [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
-              on the Nitro parent instance. measures the EIF (→ out/measurements.json), runs it as an enclave, bridges TCP→vsock,
+              on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock,
               requests RA from itself to confirm, then opens the security-group port (when permitted).
-              --measurements is for a received EIF: the file it came with; the EIF is launched only if it measures to that
+              --measurements is for a received EIF: the file it came with. the EIF is then measured itself (→ out/measurements.json) and launched only if it measures to that
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
   lo-up       brings up loopback inside the enclave. once, before starting the software
