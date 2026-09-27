@@ -58,20 +58,31 @@ Build the software image as you normally would:
 docker build -t app:base <dir>
 ```
 
-Layer the responder on top and make it the entrypoint. In a scratch directory put `tb-ra` (a
-copy of `tb-ra-responder`), `entrypoint.sh` (copy `internal/setup/build/Vendor/aws/entrypoint.sh`
-— it starts the responder on vsock, then execs the software's original command), and this
-Dockerfile:
+Layer the responder on top and make it the entrypoint. In a scratch directory put three files
+and this Dockerfile:
+- `tb-ra` — a copy of `tb-ra-responder`, mode 755
+- `entrypoint.sh` — copy `internal/setup/build/Vendor/aws/entrypoint.sh`, mode 755. It brings up
+  loopback, starts the responder on vsock, then execs the software's original command
+- `tb-app-cmd` — the software's original ENTRYPOINT then CMD, **one argument per line**, mode 644.
+  `docker inspect app:base --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}}'` shows them;
+  nginx's is `/docker-entrypoint.sh`, `nginx`, `-g`, `daemon off;` on four lines. The entrypoint
+  reads this file because nitro-cli does not pass a Docker CMD on to a script entrypoint
 ```
 FROM app:base
 COPY tb-ra /tb-ra
 COPY entrypoint.sh /tb-entrypoint.sh
+COPY tb-app-cmd /tb-app-cmd
 ENV TB_RA_PORT=5000
 ENTRYPOINT ["/tb-entrypoint.sh"]
 ```
 ```
 docker build -t app:tb .
 ```
+File modes are measured too. With the default `umask 002` on an EC2 user a freshly written
+`tb-app-cmd` is 664, not 644, and that one bit gives a different PCR0/PCR2 from `build`
+(measured: 664 → `3849653b…`, 644 → `d08ad360…`, everything else byte-identical). Either is fine
+as long as the Vendor and the Auditor make the file the same way, so `chmod` the three files
+explicitly.
 
 If an Auditor is going to rebuild this and compare, normalize the image now or the measurements
 will differ: export the container filesystem, drop package-manager logs (`/var/log/apk.log`,
@@ -84,6 +95,14 @@ spells it out. Skip it only if nobody will ever rebuild.
 Make the EIF. nitro-cli's output *is* your measurements file — keep it:
 ```
 nitro-cli build-enclave --docker-uri app:tb --output-file app.eif > measurements.json
+```
+
+Reserve CPUs and memory for enclaves, once per instance. Without this `run-enclave` fails with
+`[ E22 ] Insufficient CPUs available in the pool` even though `/etc/nitro_enclaves/allocator.yaml`
+already says `cpu_count: 2` / `memory_mib: 512` — the numbers there only take effect when the
+service runs (`launch` does this for you):
+```
+sudo systemctl enable --now nitro-enclaves-allocator.service
 ```
 
 Run the enclave:
