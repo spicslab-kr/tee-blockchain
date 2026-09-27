@@ -3,7 +3,9 @@
 #    스크립트는 안 올린다 — 모든 단계가 SSH 로 그 자리에서 직접 실행되므로, 인스턴스엔 바이너리만 있으면 된다.
 #    실행: TB-live 에서  bash "e2e/0-Setup-local-upload.sh"
 set -euo pipefail
-. "$(dirname "$0")/env.sh"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here/.."
+. "$here/env.sh"
 
 # ▶ 우리가 만든 tb 명령의 실행 파일 그 자체 — 리눅스용(인스턴스에 올릴 것)과 내 컴퓨터용을 둘 다 빌드한다.
 GOOS=linux GOARCH=amd64 go build -o tb-vendor ./cmd/vendor

@@ -4,7 +4,9 @@
 #    그래도 내가 검증한 값은 정상적으로 등록된다. Auditor 인스턴스에 자기 빌드값(out/measurements.json)이
 #    이미 있어야 한다 (flow1 의 1-Auditor-build-audit-handoff 를 먼저 돌려 둔 상태).
 #    실행: bash "e2e/flow2-vendor-self-registers/4-Auditor-tamper-audit-check-vendor.sh" [-c 0x컨트랙트]
-. "$(dirname "$0")/../env.sh"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here/../.."
+. "$here/../env.sh"
 CONTRACT=""
 while getopts "c:" o; do case $o in c) CONTRACT=$OPTARG;; esac; done  # 준비 — 옵션 파싱
 

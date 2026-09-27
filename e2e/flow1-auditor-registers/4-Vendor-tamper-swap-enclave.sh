@@ -3,7 +3,8 @@
 #    Vendor 인스턴스 안에서 자동으로 접속해 실행된다. (정상 흐름 2-Vendor-launch-check-record 까지 끝난 뒤)
 #    다음: 5-User-tamper-verify   → ✗ nobody … not trusted
 #    실행: bash "e2e/flow1-auditor-registers/4-Vendor-tamper-swap-enclave.sh"
-here="$(dirname "$0")"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here/../.."
 . "$here/../env.sh"
 
 echo "== Vendor 인스턴스로 접속 중..."

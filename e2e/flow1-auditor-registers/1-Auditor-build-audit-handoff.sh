@@ -6,7 +6,8 @@
 #      -v  audit 할 때 Vendor 엔클레이브에도 물어본다 (Vendor 가 다른 이미지를 띄웠는지 조작 감사용)
 #      0x키  handoff 가 쓸 등록 key. 생략하면 체인에서 measurement 로 찾는다
 set -uo pipefail
-here="$(dirname "$0")"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here/../.."
 . "$here/../env.sh"
 
 echo "== Auditor 인스턴스로 접속 중..."

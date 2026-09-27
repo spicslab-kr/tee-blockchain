@@ -3,7 +3,8 @@
 #    여기, 내 컴퓨터에서 실행 — 띄우기만 Vendor 인스턴스 안에서 자동으로 접속해 실행된다.
 #    입력: from-auditor/alpine-slim.eif, from-auditor/measurements.json (1-Auditor-build-audit-handoff 가 그 인스턴스에 올려 둔다)
 #    실행: bash "e2e/flow1-auditor-registers/2-Vendor-launch-check-record.sh"
-here="$(dirname "$0")"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here/../.."
 . "$here/../env.sh"
 
 echo "== Vendor 인스턴스로 접속 중..."
