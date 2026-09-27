@@ -16,8 +16,8 @@ echo "responder sha256: $(sha256 tb-ra-responder | cut -c1-64)"
 # 떠 있던 ra-proxy 가 옛 바이너리를 잡고 있으면 덮어쓸 수 없다 — 엔클레이브와 함께 먼저 내린다
 V 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-vendor; true'
 A 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-auditor; true'
-$SCP tb-vendor tb-ra-responder "e2e/flow1-auditor-registers/4-Vendor-nitro-launch-received.sh" "e2e/flow2-vendor-self-registers/1-Vendor-nitro-build-source.sh" "e2e/flow1-auditor-registers/7-Vendor-nitro-tamper-swap-enclave.sh" "e2e/flow2-vendor-self-registers/4-Vendor-nitro-tamper-swap-enclave.sh" "$SSH_USER@$VENDOR_HOST:~/"
-$SCP tb-auditor tb-ra-responder "e2e/flow1-auditor-registers/1-Auditor-nitro-build-source.sh" "$SSH_USER@$AUDITOR_HOST:~/"
+$SCP tb-vendor tb-ra-responder "e2e/flow1-auditor-registers/_remote-vendor-launch-received.sh" "e2e/flow2-vendor-self-registers/_remote-vendor-build-source.sh" "e2e/flow1-auditor-registers/_remote-vendor-tamper-swap-enclave-flow1.sh" "e2e/flow2-vendor-self-registers/_remote-vendor-tamper-swap-enclave-flow2.sh" "$SSH_USER@$VENDOR_HOST:~/"
+$SCP tb-auditor tb-ra-responder "e2e/flow1-auditor-registers/_remote-auditor-build-source.sh" "$SSH_USER@$AUDITOR_HOST:~/"
 V 'chmod +x tb-vendor tb-ra-responder *.sh; sed -i "s/\r$//" *.sh; sha256sum tb-ra-responder'
 A 'chmod +x tb-auditor tb-ra-responder *.sh; sed -i "s/\r$//" *.sh; sha256sum tb-ra-responder'
-echo "uploaded. next: on the Auditor instance  ./1-Auditor-nitro-build-source.sh   (the Auditor builds; the Vendor deploys what it gets)"
+echo "uploaded. next: bash e2e/flow1-auditor-registers/1-Auditor-build-audit-handoff.sh   (내 컴퓨터에서. 자동으로 Auditor 인스턴스에 접속해 빌드한다)"
