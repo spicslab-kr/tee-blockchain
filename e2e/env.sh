@@ -33,3 +33,7 @@ sha256() { if command -v sha256sum >/dev/null; then sha256sum "$@"; else shasum 
 nitroBanner() { echo; echo "== Nitro 접속완료 — 지금부터 $1 인스턴스 안에서 실행됩니다 =="; sleep 2; }
 localBanner() { echo; echo "== Local 접속완료 — 내 컴퓨터로 복귀 =="; sleep 2; }
 mkdir -p "$WORK"
+
+# 파일 탐색기에서 더블클릭으로 실행하면 끝나자마자 창이 닫혀서 결과를 못 본다 — 끝나면(성공·실패 상관없이)
+# 키 하나 누를 때까지 창을 붙잡아 둔다. 터미널에서 bash 로 직접 실행할 때도 그냥 Enter 한 번이면 된다.
+trap 'ec=$?; echo; if [ $ec -eq 0 ]; then echo "== 완료 (exit 0) =="; else echo "== 종료 (exit $ec) =="; fi; read -n 1 -s -r -p "아무 키나 누르면 창이 닫힙니다..."; echo' EXIT
