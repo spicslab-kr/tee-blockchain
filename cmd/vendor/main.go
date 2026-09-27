@@ -250,6 +250,7 @@ func buildCmd(args []string) error {
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
 	fs.StringVar(&b.Out, "out", "out", "output directory")
 	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	fs.BoolVar(&b.Verify, "verify", false, "build the Dockerfile a second time without cache and fail unless PCR0·1·2 come out the same, listing the files that differed")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
