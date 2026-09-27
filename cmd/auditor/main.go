@@ -96,9 +96,10 @@ func usage() {
                    commit and push the measurement record and image to the repository
   build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2)
-  launch      --eif <file>  [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
-              on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock, requests RA from itself to confirm,
-              then opens the security-group port (when permitted). also the way to just run a received EIF
+  launch      --eif <file>  [--measurements <file>] [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
+              on the Nitro parent instance. measures the EIF (→ out/measurements.json), runs it as an enclave, bridges TCP→vsock,
+              requests RA from itself to confirm, then opens the security-group port (when permitted).
+              --measurements is for a received EIF: the file it came with; the EIF is launched only if it measures to that
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
   lo-up       brings up loopback inside the enclave. once, before starting the software
@@ -280,6 +281,7 @@ func launchCmd(args []string) error {
 	fs.IntVar(&l.CID, "cid", 16, "enclave vsock CID")
 	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "address the bridge listens on")
 	fs.StringVar(&l.Out, "out", "out", "directory for logs and the self-check document")
+	fs.StringVar(&l.Measurements, "measurements", "", "the measurements.json that came with a received EIF: the EIF is measured itself and must match, or it is not launched")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
