@@ -63,7 +63,7 @@ func raParse(args []string) error {
 	if err := parser.VerifySig(context.Background(), doc, root); err != nil {
 		return err
 	}
-	fmt.Println("signature  ok (chain to platform root)")
+	say("signature  ok (chain to platform root)")
 
 	nonce, err := loadNonce(*noncePath, *docPath)
 	if err != nil {
@@ -73,16 +73,16 @@ func raParse(args []string) error {
 		if err := parser.CheckNonce(doc, nonce); err != nil {
 			return err
 		}
-		fmt.Println("nonce      ok")
+		say("nonce      ok")
 	} else {
-		fmt.Println("nonce      not checked (none given)")
+		say("nonce      not checked (none given)")
 	}
 
 	info, err := parser.Info(doc)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("module     %s\ntimestamp  %s\ndebug      %v\n", info.Module, info.Timestamp.Format(time.RFC3339), info.Debug)
+	say(fmt.Sprintf("module     %s\ntimestamp  %s\ndebug      %v", info.Module, info.Timestamp.Format(time.RFC3339), info.Debug))
 	ms, err := parser.Parse(doc)
 	if err != nil {
 		return err
@@ -90,7 +90,7 @@ func raParse(args []string) error {
 	values := map[string]string{}
 	for _, m := range ms {
 		values[m.Name] = hex.EncodeToString(m.Value)
-		fmt.Printf("%-10s %s\n", m.Name, values[m.Name])
+		say(fmt.Sprintf("%-10s %s", m.Name, values[m.Name]))
 	}
 	if *out == "" {
 		*out = *docPath + ".measurements.json"
@@ -99,7 +99,7 @@ func raParse(args []string) error {
 	if err := os.WriteFile(*out, append(b, '\n'), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("→ %s\n", *out)
+	say("→ " + *out)
 	return nil
 }
 
@@ -119,4 +119,11 @@ func loadNonce(src, docPath string) (ra.Nonce, error) {
 		return nil, fmt.Errorf("--nonce: %w", err)
 	}
 	return n, nil
+}
+
+// say — quiet 가 아닐 때만 한 줄 찍는다.
+func say(line string) {
+	if !quiet {
+		fmt.Println(line)
+	}
 }

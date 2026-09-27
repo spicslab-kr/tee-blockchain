@@ -61,3 +61,17 @@ func TestReadPCR(t *testing.T) {
 		t.Fatal("garbage must be rejected")
 	}
 }
+
+func TestEnvChange(t *testing.T) {
+	cases := map[string]string{
+		"PATH=/usr/bin:/bin":                     `ENV PATH="/usr/bin:/bin"`,
+		"PHPIZE_DEPS=autoconf dpkg-dev dpkg g++": `ENV PHPIZE_DEPS="autoconf dpkg-dev dpkg g++"`,
+		`Q=say "hi" \ bye`:                       `ENV Q="say \"hi\" \\ bye"`,
+		"EMPTY=":                                 `ENV EMPTY=""`,
+	}
+	for in, want := range cases {
+		if got := envChange(in); got != want {
+			t.Errorf("envChange(%q) = %s, want %s", in, got, want)
+		}
+	}
+}

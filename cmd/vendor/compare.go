@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -96,7 +95,7 @@ func trustedSigners(ctx context.Context, reader lether.Reader, flag string) ([]s
 // printVerdict — 판정을 찍고, 실패면 exit 1 로 끝낸다(스크립트에서 성공 여부를 종료코드로 보게).
 func printVerdict(v cmp.Verdict) error {
 	if v.Pass {
-		fmt.Println("PASS")
+		cli.Okln("PASS")
 		return nil
 	}
 	cli.Errorln("FAIL")

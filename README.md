@@ -11,7 +11,7 @@ before trusting it.
 
 Each role gets its own binary (`tb-vendor`, `tb-auditor`, `tb-user`). A role's binary only
 contains that role's commands — User's binary has no `register` at all. The chain-side work of
-each role collapses to one `run` command; the steps it wraps are listed under each role so you
+each role collapses to one command — `audit` (Auditor), `verify` (User), `self-register` (Vendor, flow 2); the steps it wraps are listed under each role so you
 can see exactly what it does, or drive them by hand.
 
 ## 0. Build the binaries and put them where they run
@@ -49,71 +49,50 @@ Both cases must end with the same three things, because that is all the rest of 
 Building is optional for the Vendor — an EIF received from the Auditor works too (see 1.3); then
 only the launch half applies.
 
-#### Case A — you do it yourself
+#### Case A — your image, handed over as a file
 
-The design's "document it" default: your Dockerfile, your tools; you write the three values down.
+You build the software image however you like; tb packs it into an EIF; you give the Auditor the
+EIF and its measurements. The Auditor never rebuilds — it measures the file it received.
 
 Build the software image as you normally would:
 ```
 docker build -t app:base <dir>
 ```
 
-Layer the responder on top and make it the entrypoint. In a scratch directory put `tb-ra` (a
-copy of `tb-ra-responder`), `entrypoint.sh` (copy `internal/setup/build/Vendor/aws/entrypoint.sh`
-— it starts the responder on vsock, then execs the software's original command), and this
-Dockerfile:
+Pack it. Reads the image's original command, layers the responder and its entrypoint on top,
+normalizes the layers, and writes `out/app.eif` and `out/measurements.json`:
 ```
-FROM app:base
-COPY tb-ra /tb-ra
-COPY entrypoint.sh /tb-entrypoint.sh
-ENV TB_RA_PORT=5000
-ENTRYPOINT ["/tb-entrypoint.sh"]
-```
-```
-docker build -t app:tb .
+tb-vendor pack --image app:base --out out
 ```
 
-If an Auditor is going to rebuild this and compare, normalize the image now or the measurements
-will differ: export the container filesystem, drop package-manager logs (`/var/log/apk.log`,
-`dpkg.log`, `apt/`, `dnf*.log` — they embed the build time), repack with
-`tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner`, and `docker import` it under
-the same tag with the same ENTRYPOINT/ENV/CMD. `build` does exactly this; `setup/vendor/build.md`
-spells it out. Skip it only if nobody will ever rebuild.
-
-Make the EIF. nitro-cli's output *is* your measurements file — keep it:
+Run it — the enclave, the TCP 5000 → vsock bridge, a self-check attestation, and the
+security-group port (or the one `aws ec2` line to run elsewhere):
 ```
-nitro-cli build-enclave --docker-uri app:tb --output-file app.eif > measurements.json
+tb-vendor launch --eif out/app.eif
 ```
 
-Run the enclave:
-```
-nitro-cli run-enclave --eif-path app.eif --cpu-count 2 --memory <MiB> --enclave-cid 16
-```
+Hand `out/app.eif` and `out/measurements.json` to the Auditor by any means (scp, mail). Its
+`launch --eif <file> --measurements <file>` measures the EIF itself and launches it only if the
+file measures to what the JSON claims.
 
-Bridge TCP on the parent instance to the enclave's vsock (this is what `--tee host:port` talks to):
-```
-tb-vendor ra-proxy --listen 0.0.0.0:5000 --vsock 16:5000 &
-```
+To do all of this by hand instead (the responder layer is three files and a six-line Dockerfile,
+then `nitro-cli build-enclave`), see `setup/vendor/build.md`.
 
-Open the port so Auditor and User can reach it:
-```
-aws ec2 authorize-security-group-ingress --group-id <sg> --protocol tcp --port 5000 --cidr 0.0.0.0/0
-```
+#### Case B — the source, rebuilt by the Auditor
 
-Check it answers. The RA address is now `<public-ip>:5000`:
-```
-tb-user ra-request --tee <public-ip>:5000 --format aws-nitro --out t.cbor
-```
-
-#### Case B — let tb do it
-
-Same result, two commands, on the Nitro instance.
+You give the Auditor the repository and commit; both of you run the same two commands on your
+own Nitro instance and must get the same PCR0·1·2. That is the audit.
 
 Build. Installs docker/nitro-cli, builds the image, layers the responder, normalizes the layers,
 makes the EIF, and writes the measurements — `out/<name>.eif` and `out/measurements.json`:
 ```
 tb-vendor build --app-dir <dir with Dockerfile> --out out
 ```
+It first scans the Dockerfile for things known to break reproducibility (unpinned base image or
+packages, `date`/`hostname`, random keys, compiling from source) and prints each with its line.
+Add `--verify` to build a second time from scratch and fail unless the measurements come out
+identical, listing the files that differed — worth it the first time a source is handed to an
+Auditor.
 
 Launch. Starts the enclave, bridges TCP 5000 → vsock, requests an attestation from itself to
 prove it answers (`out/selfcheck.cbor`), and opens the security-group port — or, without IAM
@@ -122,12 +101,12 @@ permission on the instance, prints the one `aws ec2` line to run from your accou
 tb-vendor launch --eif out/<name>.eif
 ```
 
-### 1.2 `run` — attest my enclave, register, self-check
+### 1.2 `self-register` — attest my enclave, register, self-check
 
 In flow 1 (the Auditor audits and registers) the Vendor does **not** register — after 1.1 it is
-done. `run` is for flow 2, where the Vendor registers its own enclave:
+done. `self-register` is for flow 2, where the Vendor registers its own enclave:
 ```
-tb-vendor run --tee 127.0.0.1:5000 --rpc <url> --contract <0x…> --key-file <key>
+tb-vendor self-register --tee 127.0.0.1:5000 --rpc <url> --contract <0x…> --key-file <key>
 ```
 
 What that does, one step at a time.
@@ -159,7 +138,7 @@ signer the contract's approver:
 tb-vendor compare --a parsed.json --rpc <url> --contract <0x…> --key <key register printed>
 ```
 
-Options. Add `--measurements out/measurements.json` to `run` and it compares the attestation
+Options. Add `--measurements out/measurements.json` to `self-register` and it compares the attestation
 against your build value first and refuses to register on a mismatch (exit ≠ 0, the differing
 PCRs are printed). `--service`/`--version` are asked for on the first registration; later ones
 reuse them. Any flag you leave out is asked for interactively — except `--rpc`, which defaults to
@@ -215,10 +194,10 @@ uses it:
 tb-auditor registry-deploy --rpc <url> --key-file <deployer.key> --approver <my 0x…>
 ```
 
-### 2.4 `run` — attest my enclave, check it against my build, register, self-check
+### 2.4 `audit` — attest my enclave, check it against my build, register, self-check
 
 ```
-tb-auditor run --tee <my-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
+tb-auditor audit --tee <my-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
 ```
 `--tee` is **my own** enclave, running **my own** build of the Vendor's source. That is the
 audit: what goes on-chain is what I built from the source and ran myself, checked against the
@@ -272,7 +251,7 @@ tb-auditor send --repo <git url> --record measurement-record.json --image out/<n
 ## 3. User
 
 ```
-tb-user run --tee <vendor-public-ip>:5000 --rpc <url> --contract <0x…>
+tb-user verify --tee <vendor-public-ip>:5000 --rpc <url> --contract <0x…>
 ```
 Ask the Vendor's enclave to attest → verify the document → find who registered that measurement
 → check each registration. Exit 0 if at least one registration matches (value, expiry, signer);

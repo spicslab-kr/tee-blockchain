@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"tb/internal/cli"
 )
 
 //go:embed entrypoint.sh
@@ -31,8 +33,9 @@ const responderBinaryName = "tb-ra-responder"
 
 // Build 는 한 번의 빌드 입력. AppDir 의 Dockerfile 이 소프트웨어다.
 type Build struct {
-	AppDir string // 소프트웨어 Dockerfile 이 있는 디렉터리
-	Name   string // 이미지 · EIF 이름. 비우면 디렉터리 이름
+	AppDir string // 소프트웨어 Dockerfile 이 있는 디렉터리 (build). Image 와 둘 중 하나
+	Image  string // 사용자가 이미 만든 docker 이미지 (pack): docker build 는 사용자가, 얹기·정규화·EIF 는 tb 가
+	Name   string // 이미지 · EIF 이름. 비우면 디렉터리 이름 (pack: 이미지 이름의 태그 앞부분)
 	Port   int    // 응답기가 엔클레이브 안에서 들을 vsock 포트. 0 이면 5000
 
 	// Binary — 얹을 T1 응답기. 비우면 실행파일과 같은 디렉터리의 tb-ra-responder 를 찾는다.
@@ -45,6 +48,7 @@ type Build struct {
 	// 역할이 cmd/ra-responder 하나로 빌드한 동일한 파일을 얹어야 한다.
 	Binary string
 	Out    string // 결과 디렉터리. 비우면 out
+	Verify bool   // 같은 Dockerfile 을 캐시 없이 한 번 더 빌드해 같은 PCR 이 나오는지 본다 (verify.go)
 }
 
 // Result — 측정값 기록에 적을 것.
@@ -59,23 +63,37 @@ type Result struct {
 var ErrNotLinux = errors.New("build runs on the Nitro parent instance (linux)")
 
 // Run — 도구 → 소프트웨어 이미지 → T1 응답기 얹기 → EIF · PCR.
+//
+// 두 입구. AppDir(build, Case B): tb 가 docker build 부터 한다 — Vendor 와 Auditor 가 같은 명령을 치면 같은 값이
+// 나오도록. Image(pack, Case A): 사용자가 자기 방식으로 만든 이미지를 받아 얹기·정규화·EIF 만 한다 — Auditor 는 이
+// EIF 파일을 받아 재므로 Vendor 혼자 만들면 된다.
 func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	var res Result
 	if runtime.GOOS != "linux" {
 		return res, ErrNotLinux
 	}
-	if b.AppDir == "" {
-		return res, errors.New("app dir is required")
+	if (b.AppDir == "") == (b.Image == "") {
+		return res, errors.New("give either an app dir (build) or an image (pack)")
 	}
-	appDir, err := filepath.Abs(b.AppDir)
-	if err != nil {
-		return res, err
+	if b.Image != "" && b.Verify {
+		return res, errors.New("--verify needs the Dockerfile: it rebuilds; pack only packs an image you built")
 	}
-	if st, err := os.Stat(filepath.Join(appDir, "Dockerfile")); err != nil || st.IsDir() {
-		return res, fmt.Errorf("%s: Dockerfile not found", appDir)
-	}
-	if b.Name == "" {
-		b.Name = Sanitize(filepath.Base(appDir))
+	var appDir, dockerfile string
+	if b.Image == "" {
+		var err error
+		if appDir, err = filepath.Abs(b.AppDir); err != nil {
+			return res, err
+		}
+		dockerfile = filepath.Join(appDir, "Dockerfile")
+		if st, err := os.Stat(dockerfile); err != nil || st.IsDir() {
+			return res, fmt.Errorf("%s: Dockerfile not found", appDir)
+		}
+		if b.Name == "" {
+			b.Name = Sanitize(filepath.Base(appDir))
+		}
+	} else if b.Name == "" {
+		name, _, _ := strings.Cut(b.Image, ":")
+		b.Name = Sanitize(filepath.Base(name))
 	}
 	if b.Port == 0 {
 		b.Port = 5000
@@ -99,7 +117,26 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name = b.Name
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
-	fmt.Fprintln(log, "== build 1/5 tools (nitro-cli · docker)")
+	// 단계 이름표: build 는 5 단계, pack 은 docker build 가 빠져 4 단계.
+	verb, total, n := "build", 5, 0
+	if b.Image != "" {
+		verb, total = "pack", 4
+	}
+	// 단계마다 두 줄: 무엇을 하는 중인지, 그리고 왜 하는지 한 문장. 보는 사람이 우리 용어를 몰라도 따라올 수 있게.
+	step := func(what, why string) {
+		n++
+		fmt.Fprintf(log, "\n%s %s…\n           %s\n", cli.Green(fmt.Sprintf("[%s %d/%d]", verb, n, total)), what, why)
+	}
+
+	if b.Image == "" {
+		risks, err := LintDockerfile(dockerfile)
+		if err != nil {
+			return res, err
+		}
+		printRisks(log, dockerfile, risks)
+	}
+
+	step("Installing the tools (nitro-cli, docker)", "docker builds the image; nitro-cli turns it into an enclave image and measures it")
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel", "docker"); err != nil {
 		return res, err
 	}
@@ -107,14 +144,19 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	appImage := b.Name + ":app"
+	appImage := b.Image
 	res.Image = b.Name + ":tb"
-	fmt.Fprintf(log, "== build 2/5 software image: %s → %s\n", appDir, appImage)
-	if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
-		return res, err
+	if b.Image == "" {
+		appImage = b.Name + ":app"
+		step(fmt.Sprintf("Building the software image from %s → %s", appDir, appImage), "the software exactly as its own Dockerfile makes it — nothing of ours inside yet. an Auditor runs this same step on the same source")
+		if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
+			return res, err
+		}
+	} else if _, err := r.output(ctx, "docker", "image", "inspect", appImage); err != nil {
+		return res, fmt.Errorf("%s: no such docker image here — docker build it first, or docker load it", appImage)
 	}
 
-	fmt.Fprintf(log, "== build 3/5 layering the T1 responder: %s → %s\n", appImage, res.Image)
+	step(fmt.Sprintf("Adding the attestation responder to the image: %s → %s", appImage, res.Image), "a small program that runs inside the enclave next to the software and hands out signed attestation documents on request — without it nobody could ask the enclave what it is running")
 	appCmd, err := r.imageCommand(ctx, appImage)
 	if err != nil {
 		return res, err
@@ -124,14 +166,15 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== build 4/5 reproducibility: dropping the layers and repacking in name order\n")
-	if err := normalize(ctx, r, res.Image, b.Out); err != nil {
+	step("Repacking the image so that anyone rebuilding it gets the same bytes", "docker layers carry build timestamps and an arbitrary file order; we lay the filesystem out in a fixed order and drop files that only record when it was built, so the Vendor's and the Auditor's builds of one source are byte-identical")
+	first, err := normalize(ctx, r, res.Image, b.Out)
+	if err != nil {
 		return res, err
 	}
 
 	res.EIF = filepath.Join(b.Out, b.Name+".eif")
 	res.Measurements = filepath.Join(b.Out, "measurements.json")
-	fmt.Fprintf(log, "== build 5/5 EIF → %s\n", res.EIF)
+	step("Making the enclave image (EIF) → "+res.EIF, "nitro-cli produces the bootable enclave image and its measurements PCR0·1·2 — the fingerprint that the enclave will attest to and that goes on the chain")
 	out, err := r.output(ctx, "nitro-cli", "build-enclave", "--docker-uri", res.Image, "--output-file", res.EIF)
 	if err != nil {
 		return res, err
@@ -142,8 +185,14 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if res.PCR, err = ReadPCR(out); err != nil {
 		return res, err
 	}
+	fmt.Fprintln(log, cli.Green("✓ measured"), "— these three values identify the image:")
 	for _, k := range []string{"PCR0", "PCR1", "PCR2"} {
-		fmt.Fprintf(log, "%s %s\n", k, res.PCR[k])
+		fmt.Fprintf(log, "    %s %s\n", k, res.PCR[k])
+	}
+	if b.Verify {
+		if err := b.verify(ctx, r, appDir, appImage, first, res.PCR); err != nil {
+			return res, err
+		}
 	}
 	return res, nil
 }
@@ -198,10 +247,10 @@ ENTRYPOINT ["/tb-entrypoint.sh"]
 // workDir 는 실제 디스크(b.Out)를 써야 한다 - OS 기본 임시 디렉터리(/tmp)는 Amazon Linux 에서
 // RAM 기반 tmpfs 로 몇 GiB 밖에 안 되는데, 여기서 내보낸 tar·풀어낸 파일·재포장한 tar 가
 // 한꺼번에 그보다 커질 수 있다(실측: "wrote only N of 10240 bytes" 로 재현됨).
-func normalize(ctx context.Context, r runner, image, workDir string) error {
+func normalize(ctx context.Context, r runner, image, workDir string) (manifest, error) {
 	out, err := r.output(ctx, "docker", "image", "inspect", image)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var v []struct {
 		Config struct {
@@ -211,13 +260,13 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 		}
 	}
 	if err := json.Unmarshal(out, &v); err != nil || len(v) != 1 {
-		return fmt.Errorf("docker inspect %s: unexpected output", image)
+		return nil, fmt.Errorf("docker inspect %s: unexpected output", image)
 	}
 	cfg := v[0].Config
 
 	dir, err := os.MkdirTemp(workDir, "tb-canon-*")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// tar 가 sudo 로 풀어 놓은 트리는 root 소유라 os.RemoveAll 로는 못 지운다 — 그대로 두면 빌드마다 out/ 에 쌓인다.
 	defer func() {
@@ -229,35 +278,49 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 	container := fmt.Sprintf("tb-canon-%d", os.Getpid())
 	r.cmd(ctx, "docker", "rm", "-f", container).Run() // 이전 실패 잔여물, 있으면 지운다
 	if err := r.run(ctx, "docker", "create", "--name", container, image); err != nil {
-		return err
+		return nil, err
 	}
 	defer r.cmd(ctx, "docker", "rm", container).Run()
 
 	rootfs := filepath.Join(dir, "rootfs.tar")
 	if err := r.run(ctx, "docker", "export", container, "-o", rootfs); err != nil {
-		return err
+		return nil, err
 	}
 	extract := filepath.Join(dir, "extract")
 	if err := os.Mkdir(extract, 0o755); err != nil {
-		return err
+		return nil, err
 	}
 	if err := r.run(ctx, "tar", "-xf", rootfs, "-C", extract); err != nil {
-		return err
+		return nil, err
 	}
 	os.Remove(rootfs) // 다 풀었으니 더 안 필요하다 - 재포장 중 피크 디스크 사용량을 줄인다
+	for _, d := range scrubBuildScratch(ctx, r, extract) {
+		fmt.Fprintf(r.log, "    dropped build scratch: /%s\n", d)
+	}
+	for _, p := range fixApkVirtualVersions(ctx, r, extract) {
+		fmt.Fprintf(r.log, "    pinned apk virtual-package versions (they were the install time): /%s\n", p)
+	}
 	for _, p := range stripBuildLogs(ctx, r, extract) {
-		fmt.Fprintf(r.log, "removed a log stamped with the build time: /%s\n", p)
+		fmt.Fprintf(r.log, "    dropped a log stamped with the build time: /%s\n", p)
+	}
+	for _, p := range stripBuildCaches(ctx, r, extract) {
+		fmt.Fprintf(r.log, "    dropped a build-time cache (it records when, not what): /%s\n", p)
+	}
+
+	m, err := readManifest(ctx, r, extract)
+	if err != nil {
+		return nil, err
 	}
 
 	canon := filepath.Join(dir, "canon.tar")
 	if err := r.run(ctx, "tar", "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner",
 		"-cf", canon, "-C", extract, "."); err != nil {
-		return err
+		return nil, err
 	}
 
 	args := []string{"import"}
 	for _, e := range cfg.Env {
-		args = append(args, "--change", "ENV "+e)
+		args = append(args, "--change", envChange(e))
 	}
 	if len(cfg.Entrypoint) > 0 {
 		b, _ := json.Marshal(cfg.Entrypoint)
@@ -268,7 +331,10 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 		args = append(args, "--change", "CMD "+string(b))
 	}
 	args = append(args, canon, image)
-	return r.run(ctx, "docker", args...)
+	if err := r.run(ctx, "docker", args...); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // buildLogs — 패키지 관리자가 docker build 중에 남기는 로그. 무엇을 깔았나가 아니라 언제 깔았나를 적어서
@@ -287,7 +353,7 @@ func stripBuildLogs(ctx context.Context, r runner, root string) []string {
 	var removed []string
 	for _, p := range buildLogs {
 		full := filepath.Join(root, filepath.FromSlash(p))
-		if _, err := os.Lstat(full); err != nil {
+		if !exists(ctx, r, full) {
 			continue
 		}
 		if err := os.RemoveAll(full); err != nil {
@@ -384,4 +450,13 @@ func (r runner) imageCommand(ctx context.Context, image string) ([]string, error
 		return nil, fmt.Errorf("%s has no ENTRYPOINT or CMD; nothing to run", image)
 	}
 	return cmd, nil
+}
+
+// envChange — docker import --change 의 ENV 한 줄. 값에 공백이 있으면(실측: php 공식 이미지의
+// PHPIZE_DEPS="autoconf dpkg-dev dpkg file g++ …") 따옴표 없는 `ENV k=v` 꼴은 "can't find = in dpkg-dev" 로
+// 거부되므로, 항상 ENV k="v" 꼴로 쓰고 백슬래시와 따옴표를 이스케이프한다.
+func envChange(kv string) string {
+	k, v, _ := strings.Cut(kv, "=")
+	v = strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v)
+	return `ENV ` + k + `="` + v + `"`
 }

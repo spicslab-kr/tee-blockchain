@@ -41,8 +41,8 @@ func main() {
 		_, err = lookup(os.Args[2:])
 	case "compare":
 		err = compareCmd(os.Args[2:])
-	case "run":
-		err = runCmd(os.Args[2:])
+	case "audit":
+		err = auditCmd(os.Args[2:])
 	case "receive":
 		err = receive(os.Args[2:])
 	case "send":
@@ -59,6 +59,8 @@ func main() {
 		err = awsra.LoopbackUp()
 	case "build":
 		err = buildCmd(os.Args[2:])
+	case "pack":
+		err = packCmd(os.Args[2:])
 	case "launch":
 		err = launchCmd(os.Args[2:])
 	default:
@@ -85,20 +87,28 @@ func usage() {
                    match two sets of measurements as they are (parsed vs built, etc.). prints PASS/FAIL with the reasons
   compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
                    read the registration from the chain and check the value, expiry and trusted signer together. exit 1 on failure
-  run              [--tee <host:port>] [--measurements <file>] --rpc <url> --contract <0x…> --key-file <file>
-                   --service <name> --version <v>
-                   register and self-check compare in one go. with --tee, does T1·T2 first (--nonce pins the nonce).
-                   with both --tee and --measurements, audits: registers the build value only if the TEE-attested value matches --measurements.
-                   with --service/--version empty, takes them from an existing registration of the same measurements on this contract
+  audit            --tee <my enclave host:port> --measurements <my out/measurements.json> --rpc <url> --contract <0x…> --key-file <file>
+                   --service <name> --version <v> [--vendor-tee <the Vendor's enclave host:port>]
+                   flow 1 in one go: attest my own enclave (T1·T2), check the attested value against --measurements (the value I
+                   built or measured myself), register that value only if they match (C1), then read it back and self-check (C2·M2).
+                   --nonce pins the nonce. with --service/--version empty, takes them from an existing registration of the same
+                   measurements on this contract. without --tee registers --measurements as is (no audit).
+                   --vendor-tee also asks the Vendor's running enclave and says whether it runs the same value (flow 2 step 15); what is
+                   registered is still my value
   receive          --repo <url> [--ref <commit>] --into <dir>
                    clone the source repository and read the build config. build from that directory
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
                    commit and push the measurement record and image to the repository
-  build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
-              on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2)
-  launch      --eif <file>  [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
-              on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock, requests RA from itself to confirm,
-              then opens the security-group port (when permitted). also the way to just run a received EIF
+  build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>] [--verify]
+              on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
+              for source that an Auditor will rebuild the same way (Case B)
+  pack        --image <docker image you built>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
+              same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
+              for an image handed over as a file (Case A)
+  launch      --eif <file>  [--measurements <file>] [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
+              on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock,
+              requests RA from itself to confirm, then opens the security-group port (when permitted).
+              --measurements is for a received EIF: the file it came with. the EIF is then measured itself (→ out/measurements.json) and launched only if it measures to that
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
   lo-up       brings up loopback inside the enclave. once, before starting the software
@@ -193,7 +203,9 @@ func raRequest(args []string) error {
 	if err := os.WriteFile(*out+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *out, *out)
+	if !quiet {
+		fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *out, *out)
+	}
 	return nil
 }
 
@@ -254,6 +266,7 @@ func buildCmd(args []string) error {
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
 	fs.StringVar(&b.Out, "out", "out", "output directory")
 	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	fs.BoolVar(&b.Verify, "verify", false, "build the Dockerfile a second time without cache and fail unless PCR0·1·2 come out the same, listing the files that differed")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -264,7 +277,31 @@ func buildCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\ndone. for the measurement record: %s · %s\nto launch:  tb auditor launch --eif %s --port %d\n", built.EIF, built.Measurements, built.EIF, b.Port)
+	cli.Okln("\n✓ enclave image ready: ", built.EIF, "   measurements: ", built.Measurements)
+	fmt.Printf("next:  tb auditor launch --eif %s --port %d\n", built.EIF, b.Port)
+	return nil
+}
+
+func packCmd(args []string) error {
+	fs := flag.NewFlagSet("pack", flag.ContinueOnError)
+	b := build.Build{}
+	fs.StringVar(&b.Image, "image", "", "a docker image you built (name:tag)")
+	fs.StringVar(&b.Name, "name", "", "EIF name (default: the image name without its tag)")
+	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
+	fs.StringVar(&b.Out, "out", "out", "output directory")
+	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if b.Image == "" {
+		return errors.New("--image is required")
+	}
+	built, err := b.Run(context.Background(), os.Stdout)
+	if err != nil {
+		return err
+	}
+	cli.Okln("\n✓ enclave image ready: ", built.EIF, "   measurements: ", built.Measurements)
+	fmt.Printf("next:  tb auditor launch --eif %s --port %d\n", built.EIF, b.Port)
 	return nil
 }
 
@@ -279,6 +316,7 @@ func launchCmd(args []string) error {
 	fs.IntVar(&l.CID, "cid", 16, "enclave vsock CID")
 	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "address the bridge listens on")
 	fs.StringVar(&l.Out, "out", "out", "directory for logs and the self-check document")
+	fs.StringVar(&l.Measurements, "measurements", "", "the measurements.json that came with a received EIF: the EIF is measured itself and must match, or it is not launched")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -291,12 +329,15 @@ func launchCmd(args []string) error {
 		return err
 	}
 
-	fmt.Println("== self-check: requesting RA from this instance", started.Address)
+	fmt.Println()
+	t := cli.Start(fmt.Sprintf("Asking the new enclave at %s for an attestation, to be sure it answers", started.Address))
 	nonce, doc, err := ra.TCPRequester{Timeout: 30 * time.Second}.RequestFresh(ctx, started.Address)
 	if err != nil {
+		t.Fail("no answer")
 		return err
 	}
 	if err := doc.ExpectFormat(awsra.Format); err != nil {
+		t.Fail("wrong format")
 		return err
 	}
 	selfDoc := filepath.Join(l.Out, "selfcheck.cbor")
@@ -306,12 +347,12 @@ func launchCmd(args []string) error {
 	if err := os.WriteFile(selfDoc+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("received %s document, %d bytes → %s\n", doc.Format, len(doc.Raw), selfDoc)
+	t.Done(fmt.Sprintf("%s document, %d bytes → %s", doc.Format, len(doc.Raw), selfDoc))
 
-	fmt.Println("== security group: inbound TCP", l.Port)
+	fmt.Printf("Security group: inbound TCP %d\n", l.Port)
 	cmd, group, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
 	if perr == nil {
-		fmt.Printf("\ndone. anyone can now:  tb user ra-request --tee <this instance's public IP>:%d --format aws-nitro\n", l.Port)
+		cli.Okln("✓ enclave is up and reachable. anyone can now:  tb user verify --tee <this instance's public IP>:", l.Port, " --rpc … --contract …")
 		return nil
 	}
 	// 여기서는 못 열었다 — 무엇을, 어디서, 어떻게 열어야 하는지까지 적어 준다. 권한이 없는 경우와

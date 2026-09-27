@@ -19,6 +19,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"tb/internal/cli"
 )
 
 // Launch 는 한 번의 실행 입력. EIF 는 build 의 결과다.
@@ -32,13 +34,19 @@ type Launch struct {
 	Listen string // 다리가 받을 주소. 비우면 0.0.0.0
 	Binary string // ra-proxy 로 띄울 tb 바이너리. 비우면 자기 자신
 	Out    string // 다리 로그 디렉터리. 비우면 out
+
+	// Measurements — 남이 준 EIF 와 같이 온 measurements.json (Case A). EIF 를 직접 잰 값이 이것과 다르면 띄우지 않는다.
+	// 내가 build 로 만든 EIF(Case B)에는 줄 게 없으니 비운다.
+	Measurements string
 }
 
 // Result — 설정값에 적을 것.
 type Result struct {
-	Name    string
-	Memory  int    // 실제로 준 메모리 MiB
-	Address string // 이 인스턴스에서 확인할 주소 127.0.0.1:port. 밖에서는 <공인 IP>:port
+	Name         string
+	Measurements string            // out/measurements.json — 이 EIF 를 nitro-cli 로 직접 잰 값
+	PCR          map[string]string // PCR0 · PCR1 · PCR2
+	Memory       int               // 실제로 준 메모리 MiB
+	Address      string            // 이 인스턴스에서 확인할 주소 127.0.0.1:port. 밖에서는 <공인 IP>:port
 }
 
 var ErrNotLinux = errors.New("launch runs on the Nitro parent instance (linux)")
@@ -88,7 +96,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name, res.Memory = l.Name, l.Memory
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
-	fmt.Fprintf(log, "== launch 1/3 tools and resources (%d cpu · %d MiB)\n", l.CPUs, l.Memory)
+	launchStep(log, 1, fmt.Sprintf("Reserving enclave resources (%d cpu · %d MiB)", l.CPUs, l.Memory), "an enclave takes CPUs and memory away from this host for itself; the allocator sets them aside")
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel"); err != nil {
 		return res, err
 	}
@@ -99,7 +107,37 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== launch 2/3 running the enclave (cid %d)\n", l.CID)
+	// 남이 준 EIF(--measurements 가 같이 온다)만 다시 잰다. 내가 build·pack 한 EIF 는 그때 이미 잰 값이 out/ 에 있다.
+	if l.Measurements != "" {
+		launchStep(log, 2, "Measuring the received enclave image myself (nitro-cli describe-eif)", "the sender's measurements.json is only a claim — the file itself is measured here and must say the same")
+		if res.PCR, err = measureEIF(ctx, r, l.EIF); err != nil {
+			return res, err
+		}
+		for _, k := range imagePCRs {
+			fmt.Fprintf(log, "    %s %s\n", k, res.PCR[k])
+		}
+		reasons, err := checkAgainst(res.PCR, l.Measurements)
+		if err != nil {
+			return res, err
+		}
+		if len(reasons) > 0 {
+			fmt.Fprintln(log, cli.Red("✗ it does NOT measure to what "+l.Measurements+" says — not running it"))
+			for _, why := range reasons {
+				fmt.Fprintln(log, cli.Red("    "+why))
+			}
+			return res, errMeasurementMismatch
+		}
+		fmt.Fprintln(log, cli.Green("✓ it measures exactly what "+l.Measurements+" says"), "— the file is what the sender described; safe to run")
+		res.Measurements = filepath.Join(l.Out, "measurements.json")
+		if _, err := writeMeasurements(res.Measurements, res.PCR); err != nil {
+			return res, err
+		}
+		fmt.Fprintf(log, "    → %s (what I measured myself; this is the value to register)\n", res.Measurements)
+	} else {
+		launchStep(log, 2, "Skipping the measurement", "this is my own enclave image — build/pack measured it when it was made, and that value is already in out/measurements.json")
+	}
+
+	launchStep(log, 3, fmt.Sprintf("Starting the enclave (cid %d)", l.CID), "the image boots inside the Nitro enclave; from here on nothing on this host can read or change its memory")
 	_ = r.quiet(ctx, "nitro-cli", "terminate-enclave", "--enclave-name", l.Name)
 	if err := r.run(ctx, "nitro-cli", "run-enclave", "--eif-path", l.EIF, "--cpu-count", strconv.Itoa(l.CPUs),
 		"--memory", strconv.Itoa(l.Memory), "--enclave-cid", strconv.Itoa(l.CID), "--enclave-name", l.Name); err != nil {
@@ -110,7 +148,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== launch 3/3 bridge TCP %s:%d → vsock %d:%d\n", l.Listen, l.Port, l.CID, l.Port)
+	launchStep(log, 4, fmt.Sprintf("Opening TCP %s:%d → the enclave (vsock %d:%d)", l.Listen, l.Port, l.CID, l.Port), "an enclave has no network of its own; this bridge on the host forwards port 5000 to it so the Auditor and Users can ask it for attestations")
 	if err := l.startProxy(ctx, log); err != nil {
 		return res, err
 	}
@@ -256,4 +294,9 @@ func (r runner) ensureAllocator(ctx context.Context, memory, cpus int) error {
 		return fmt.Errorf("write %s: %w", allocatorFile, err)
 	}
 	return r.run(ctx, "systemctl", "restart", "nitro-enclaves-allocator.service")
+}
+
+// launchStep — 단계마다 두 줄: 무엇을 하는 중인지, 그리고 왜 하는지 한 문장.
+func launchStep(log io.Writer, n int, what, why string) {
+	fmt.Fprintf(log, "\n%s %s…\n             %s\n", cli.Green(fmt.Sprintf("[launch %d/4]", n)), what, why)
 }

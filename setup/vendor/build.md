@@ -43,12 +43,39 @@ same source produced a different file on every build (measured: nginx's official
 instances differed in exactly one of 725 files, `/var/log/apk.log`, and PCR0/PCR2 diverged). The software's own logs
 are left alone.
 
-**This only fixes "the packaging differs every time." `tb vendor build` does not check this automatically** —
-if the source itself produces different content on each build (a tool that mints a random signing key,
-unpinned package versions), normalization still won't make Vendor's and Auditor's builds match. That's not a
-bug in normalization; it's a Dockerfile that isn't written reproducibly, and right now nothing surfaces it
-until the build finishes (or Auditor compares). To keep a Dockerfile reproducible:
+Two more build-time leftovers are normalized for the same reason (both measured on the official alpine Dockerfiles of
+haproxy and memcached, built on two instances: every binary matched, only these differed, and PCR0/PCR2 diverged):
+- `/tmp` and `/var/tmp` are emptied. A `mktemp` in the Dockerfile leaves a file with a random name that no one reads
+  at run time (memcached: `/tmp/<random>` holding a `nproc` count).
+- apk *virtual* packages (`apk add --virtual .name`, the dot-prefixed entries in `/etc/apk/world` and
+  `/lib/apk/db/installed`) get their version pinned to `0`. apk's default version for a virtual package is the install
+  time (`20260927.082249`), and the package identity next to it is derived from that version, so both are replaced.
+  Real packages are untouched.
+
+**This only fixes "the packaging differs every time."** If the source itself produces different content on
+each build (a tool that mints a random signing key, unpinned package versions, a compiler that stamps the
+time), normalization still won't make Vendor's and Auditor's builds match. That's not a bug in
+normalization; it's a Dockerfile that isn't written reproducibly. Two things in `build` surface it:
+
+- **The scan, always on.** Before building, the Dockerfile is scanned for patterns known to break
+  reproducibility (`FROM` by tag instead of digest, `date`/`uname -n`/`hostname`, random or key
+  generation, `git clone` without a pinned commit, `curl | sh`, package/dependency installs without exact
+  versions, compiling from source). Each hit is printed with its line and why it can matter. The build goes
+  on: the scan only knows "can differ", not "does differ" (measured: nginx's Dockerfile trips `apk add`
+  and `FROM alpine:3.22` yet reproduces exactly).
+- **`--verify`, opt in.** Builds the same Dockerfile a second time with `--no-cache`, normalizes and
+  measures it, and fails unless PCR0·1·2 come out identical — printing the paths whose content, mode or
+  link target differed between the two trees. Same host twice is a weaker test than two hosts, but a
+  difference here is certain to show up at the Auditor too, and it names the file (measured: redis →
+  `usr/local/bin/redis-server`, haproxy before the apk fix → `etc/apk/world`, `lib/apk/db/installed`). It
+  roughly doubles the build time; use it before handing a measurement on for the first time.
+
+To keep a Dockerfile reproducible:
 - Pin the base image by digest, not tag (`FROM img@sha256:...`)
 - Pin package versions on install (`apt-get install pkg=1.2.3`), commit a lockfile for dependencies
 - Avoid tools that generate and leave random state (keys, UUIDs) in the image during build
 - Remove files like build logs that embed the literal build timestamp as text
+- Don't let the build stamp the host name or build time into the binary. redis does exactly this
+  (`src/mkreleasehdr.sh` sets `BUILD_ID=$(uname -n)-$(date +%s)` and bakes it into `redis-server`), so the official
+  redis Dockerfile is not reproducible on any tool: two instances gave `build=b289e3600ae6c0af` vs `build=1d13116fe1678663`
+  and every other file matched. Only a source-side fix (a fixed BUILD_ID / SOURCE_DATE_EPOCH) helps there.

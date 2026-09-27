@@ -53,15 +53,22 @@ func lookup(args []string) ([]string, error) {
 			return nil, err
 		}
 		if len(keys) == 0 {
-			fmt.Println("nothing registered")
+			if !quiet {
+				fmt.Println("nothing registered")
+			}
 			return nil, nil
 		}
-		fmt.Printf("found %d key(s)\n", len(keys))
+		if !quiet {
+			fmt.Printf("found %d key(s)\n", len(keys))
+		}
 	}
 	for _, k := range keys {
 		reg, err := reader.Lookup(ctx, k)
 		if err != nil {
 			return nil, err
+		}
+		if quiet {
+			continue
 		}
 		fmt.Printf("key       %s\n", k)
 		fmt.Printf("  signer  %s\n", reg.Signer)

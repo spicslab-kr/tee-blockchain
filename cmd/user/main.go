@@ -30,8 +30,8 @@ func main() {
 		_, err = lookup(os.Args[2:])
 	case "compare":
 		err = compareCmd(os.Args[2:])
-	case "run":
-		err = runCmd(os.Args[2:])
+	case "verify":
+		err = verifyCmd(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -54,8 +54,10 @@ func usage() {
               read one key directly, or find the key(s) for the measurements first and read them all. a User only looks up, never registers
   compare     --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
               match the value from ra-parse against the chain registration — value, expiry and trusted signer. exit 1 on failure
-  run         --tee <host:port> --rpc <url> --contract <0x…> [--trusted <0x…,0x…>]
-              ra-request · ra-parse · lookup · compare in one go (--nonce pins the nonce). exit 0 if any registration found PASSes`)
+  verify      --tee <the Vendor's enclave host:port> --rpc <url> --contract <0x…> [--contract <0x…> …] [--trusted <0x…,0x…>]
+              the trust decision in one go: attest the enclave (T1·T2), find who registered that measurement (C2), check each
+              registration (M2). exit 0 if at least one PASSes, 1 with the reason otherwise. no key, no ETH. --nonce pins the nonce.
+              several --contract (e.g. the Vendor's and the Auditor's registry): each is shown side by side and every one must vouch`)
 }
 
 func raRequest(args []string) error {
@@ -83,7 +85,9 @@ func raRequest(args []string) error {
 	if err := os.WriteFile(*out+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *out, *out)
+	if !quiet {
+		fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *out, *out)
+	}
 	return nil
 }
 

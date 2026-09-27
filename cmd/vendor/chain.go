@@ -88,14 +88,20 @@ func register(args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("signer %s\n", signed.Signer)
+	if !quiet {
+		fmt.Printf("signer %s\n", signed.Signer)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	receipt, err := r.Register(ctx, signed)
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("registered\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n", receipt.Key, receipt.TxHash, receipt.Block, meta.Expires.UTC().Format(time.RFC3339))
+	lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block = receipt.Key, receipt.TxHash, receipt.Block
+	lastRegistered.Expires, lastRegistered.Signer = meta.Expires.UTC().Format(time.RFC3339), signed.Signer
+	if !quiet {
+		fmt.Printf("registered\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n", receipt.Key, receipt.TxHash, receipt.Block, lastRegistered.Expires)
+	}
 	return receipt.Key, nil
 }
 
@@ -133,15 +139,22 @@ func lookup(args []string) ([]string, error) {
 			return nil, err
 		}
 		if len(keys) == 0 {
-			fmt.Println("nothing registered")
+			if !quiet {
+				fmt.Println("nothing registered")
+			}
 			return nil, nil
 		}
-		fmt.Printf("found %d key(s)\n", len(keys))
+		if !quiet {
+			fmt.Printf("found %d key(s)\n", len(keys))
+		}
 	}
 	for _, k := range keys {
 		reg, err := reader.Lookup(ctx, k)
 		if err != nil {
 			return nil, err
+		}
+		if quiet {
+			continue
 		}
 		fmt.Printf("key       %s\n", k)
 		fmt.Printf("  signer  %s\n", reg.Signer)

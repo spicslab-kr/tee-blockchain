@@ -8,3 +8,9 @@ setup/vendor/nitro/tb-*-linux-amd64
 /vendor.exe
 /user
 /user.exe
+
+# e2e scripts: files fetched from the instances during a run
+e2e-work/
+
+# SSH private key — never commit
+pem2.pem

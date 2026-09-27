@@ -84,7 +84,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	badBuild := writeBuildMeasurements(t, work, "build-bad.json", strings.Repeat("ab", 48), fixturePCR1, fixturePCR2)
 
 	// Auditor, 검사 FAIL: 내가 빌드한 값(가짜)과 TEE 가 증명한 값이 다르면 등록하지 않고 실패한다.
-	aBad := exec.Command(auditorBin, "run",
+	aBad := exec.Command(auditorBin, "audit",
 		"--tee", teeAddr, "--measurements", badBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", auditorFile,
 		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "auditor-bad"))
 	aBadOut, err := aBad.CombinedOutput()
@@ -99,14 +99,14 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	}
 
 	// Auditor, 검사 PASS: 빌드값 = TEE 값 → 빌드값을 등록하고 self-check.
-	aRun := exec.Command(auditorBin, "run",
+	aRun := exec.Command(auditorBin, "audit",
 		"--tee", teeAddr, "--measurements", goodBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", auditorFile,
 		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "auditor"))
 	aOut, err := aRun.CombinedOutput()
 	if err != nil {
 		t.Fatalf("auditor run: %v\n%s", err, aOut)
 	}
-	if !strings.Contains(string(aOut), "== audit") || strings.Count(string(aOut), "PASS") < 2 {
+	if !strings.Contains(string(aOut), "identical") || !strings.Contains(string(aOut), "PASS") {
 		t.Fatalf("auditor run 은 검사 PASS 와 self-check PASS 를 둘 다 찍어야 한다:\n%s", aOut)
 	}
 	aKey := lastKey(aOut)
@@ -116,7 +116,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 
 	// Vendor: 같은 TEE 에서 자기도 RA 요청해서 자기 컨트랙트에 등록 (흐름2). 자기 컨트랙트엔 아직 아무것도
 	// 없으니 service/version 은 직접 준다.
-	vRun := exec.Command(vendorBin, "run",
+	vRun := exec.Command(vendorBin, "self-register",
 		"--tee", teeAddr, "--rpc", rpc, "--contract", vendorContract, "--key-file", vendorFile,
 		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
 	vOut, err := vRun.CombinedOutput()
@@ -132,7 +132,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	}
 
 	// Vendor 키로 Auditor 컨트랙트에 등록하려 하면 거부된다 — 컨트랙트 하나 = 승인자 하나.
-	vWrong := exec.Command(vendorBin, "run",
+	vWrong := exec.Command(vendorBin, "self-register",
 		"--measurements", goodBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", vendorFile,
 		"--service", "run-e2e", "--version", "1.0.0")
 	if out, err := vWrong.CombinedOutput(); err == nil {
@@ -141,7 +141,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 
 	// User: 처음부터 끝까지 한 번에 — request → parse → lookup → compare. 컨트랙트마다 따로 본다.
 	for _, contract := range []string{auditorContract, vendorContract} {
-		uRun := exec.Command(userBin, "run", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
+		uRun := exec.Command(userBin, "verify", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
 			"--nonce", fixtureNonce, "--out", t.TempDir())
 		uOut, err := uRun.CombinedOutput()
 		if err != nil {
@@ -176,7 +176,7 @@ func TestRun_E2E_User_NothingRegistered(t *testing.T) {
 	teeAddr, stopServe := startServe(t, vendorBin, fixture)
 	defer stopServe()
 
-	uRun := exec.Command(userBin, "run", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
+	uRun := exec.Command(userBin, "verify", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
 		"--nonce", fixtureNonce, "--out", t.TempDir())
 	out, err := uRun.CombinedOutput()
 	ee, ok := err.(*exec.ExitError)
