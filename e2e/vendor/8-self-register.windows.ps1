@@ -1,6 +1,6 @@
-﻿# Vendor — Auditor 없이 직접 등록 (흐름 2). Vendor 인스턴스에서 pack-image.nitro.sh 또는 build-source.nitro.sh 를 돌린 뒤.
+﻿# Vendor — Auditor 없이 직접 등록 (흐름 2). Vendor 인스턴스에서 1-pack-image.nitro.sh 또는 1-build-source.nitro.sh 를 돌린 뒤.
 #    Vendor 의 등록부(approver = Vendor 주소)를 깔고, self-register: 자기 TEE 에 RA → 자기 빌드값과 대조 → 등록 → 자기확인.
-#    실행: .\e2e\vendor\self-register.windows.ps1 [-Contract 0x…]      컨트랙트는 e2e-work\contract-flow2.txt
+#    실행: .\e2e\vendor\8-self-register.windows.ps1 [-Contract 0x…]      컨트랙트는 e2e-work\contract-flow2.txt
 param([string]$Contract, [string]$RemoteOut = "out")
 . "$PSScriptRoot\..\setup\env.windows.ps1"
 $ErrorActionPreference = "Stop"
@@ -12,7 +12,7 @@ Invoke-Expression "$($E2E.Scp) ${v}:$RemoteOut/measurements.json e2e-work/vendor
 
 if (-not $Contract) {
   "== registry-deploy (approver = Vendor itself $($E2E.VendorAddr))"
-  $out = .\tb-vendor.exe registry-deploy --rpc $E2E.Rpc --key-file $E2E.VendorKey --approver $E2E.VendorAddr 2>&1 | Out-String
+  $out = .\tb-vendor.exe registry-deploy --rpc $E2E.Rpc --key-file $E2E.VendorKey --approver $E2E.VendorAddr 2>&1 | Out-String -Width 4096
   $out
   $Contract = ([regex]::Match($out, 'deployed at (0x[0-9a-fA-F]{40})')).Groups[1].Value
   if (-not $Contract) { throw "no contract address in registry-deploy output" }

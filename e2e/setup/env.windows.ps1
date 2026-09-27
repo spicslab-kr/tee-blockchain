@@ -19,7 +19,7 @@ $E2E = @{
   Service     = "nginx"
   Version     = "1.31.6"
 
-  # 인스턴스 쪽 EIF 이름 (vendor/pack-image.nitro.sh 는 out/nginx.eif, build-source.nitro.sh 는 out/alpine-slim.eif)
+  # 인스턴스 쪽 EIF 이름 (vendor/1-pack-image.nitro.sh 는 out/nginx.eif, build-source.nitro.sh 는 out/alpine-slim.eif)
   EifPacked   = "out/nginx.eif"
   EifBuilt    = "out/alpine-slim.eif"
 }

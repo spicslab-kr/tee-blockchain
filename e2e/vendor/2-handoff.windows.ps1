@@ -13,4 +13,4 @@ Get-FileHash e2e-work\from-vendor\* -Algorithm SHA256 | ForEach-Object { "  " + 
 A 'mkdir -p from-vendor'
 Invoke-Expression "$($E2E.Scp) e2e-work/from-vendor/nginx.eif ${a}:from-vendor/nginx.eif"
 Invoke-Expression "$($E2E.Scp) e2e-work/from-vendor/measurements.json ${a}:from-vendor/measurements.json"
-"handed to the Auditor. next: on the Auditor instance  ./check-received-image.nitro.sh"
+"handed to the Auditor. next: on the Auditor instance  ./3-check-received-image.nitro.sh"
