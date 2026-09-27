@@ -16,8 +16,8 @@ echo "responder sha256: $(sha256 tb-ra-responder | cut -c1-64)"
 # 떠 있던 ra-proxy 가 옛 바이너리를 잡고 있으면 덮어쓸 수 없다 — 엔클레이브와 함께 먼저 내린다
 V 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-vendor; true'
 A 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-auditor; true'
-$SCP tb-vendor tb-ra-responder "e2e/normal/vendor/(nitro)/1-pack-image.sh" "e2e/normal/vendor/(nitro)/1-build-source.sh" "e2e/tamper/vendor/(nitro)/2-swap-enclave.sh" "$SSH_USER@$VENDOR_HOST:~/"
-$SCP tb-auditor tb-ra-responder "e2e/normal/auditor/(nitro)/3-check-received-image.sh" "e2e/normal/auditor/(nitro)/3-rebuild-source.sh" "$SSH_USER@$AUDITOR_HOST:~/"
+$SCP tb-vendor tb-ra-responder "e2e/normal/vendor/(nitro)/4-launch-received.sh" "e2e/flow2/vendor/(nitro)/1-build-source.sh" "e2e/tamper/vendor/(nitro)/1-swap-enclave.sh" "$SSH_USER@$VENDOR_HOST:~/"
+$SCP tb-auditor tb-ra-responder "e2e/normal/auditor/(nitro)/1-build-source.sh" "$SSH_USER@$AUDITOR_HOST:~/"
 V 'chmod +x tb-vendor tb-ra-responder *.sh; sed -i "s/\r$//" *.sh; sha256sum tb-ra-responder'
 A 'chmod +x tb-auditor tb-ra-responder *.sh; sed -i "s/\r$//" *.sh; sha256sum tb-ra-responder'
-echo "uploaded. next: on the Vendor instance  ./1-pack-image.sh  (your own docker image)  or  ./1-build-source.sh  (tb builds the source)"
+echo "uploaded. next: on the Auditor instance  ./1-build-source.sh   (the Auditor builds; the Vendor deploys what it gets)"

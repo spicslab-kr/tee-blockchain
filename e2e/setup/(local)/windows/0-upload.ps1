@@ -17,8 +17,8 @@ $v = "$($E2E.SshUser)@$($E2E.VendorHost)"; $a = "$($E2E.SshUser)@$($E2E.AuditorH
 # a running ra-proxy holds the old binary open — stop it (and any enclave) before overwriting
 V 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-vendor; true'
 A 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-auditor; true'
-Invoke-Expression "$($E2E.Scp) tb-vendor tb-ra-responder 'e2e/normal/vendor/(nitro)/1-pack-image.sh' 'e2e/normal/vendor/(nitro)/1-build-source.sh' 'e2e/tamper/vendor/(nitro)/2-swap-enclave.sh' ${v}:~/"
-Invoke-Expression "$($E2E.Scp) tb-auditor tb-ra-responder 'e2e/normal/auditor/(nitro)/3-check-received-image.sh' 'e2e/normal/auditor/(nitro)/3-rebuild-source.sh' ${a}:~/"
+Invoke-Expression "$($E2E.Scp) tb-vendor tb-ra-responder 'e2e/normal/vendor/(nitro)/4-launch-received.sh' 'e2e/flow2/vendor/(nitro)/1-build-source.sh' 'e2e/tamper/vendor/(nitro)/1-swap-enclave.sh' ${v}:~/"
+Invoke-Expression "$($E2E.Scp) tb-auditor tb-ra-responder 'e2e/normal/auditor/(nitro)/1-build-source.sh' ${a}:~/"
 V 'chmod +x tb-vendor tb-ra-responder *.sh; sed -i "s/\r$//" *.sh; sha256sum tb-ra-responder'
 A 'chmod +x tb-auditor tb-ra-responder *.sh; sed -i "s/\r$//" *.sh; sha256sum tb-ra-responder'
-"uploaded. next: on the Vendor instance  ./1-pack-image.sh  (your own docker image)  or  ./1-build-source.sh  (tb builds the source)"
+"uploaded. next: on the Auditor instance  ./1-build-source.sh   (the Auditor builds; the Vendor deploys what it gets)"
