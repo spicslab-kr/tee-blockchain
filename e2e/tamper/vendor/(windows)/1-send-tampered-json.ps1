@@ -1,8 +1,8 @@
 ﻿# 데모 — Vendor 가 measurements.json 을 조작해서 보내면 Auditor 가 잡는다.
-#    handoff 와 같지만 PCR0 의 첫 글자를 바꿔 보낸다. 그리고 Auditor 인스턴스에서 check-received-image.nitro.sh 를 돌려
+#    handoff 와 같지만 PCR0 의 첫 글자를 바꿔 보낸다. 그리고 Auditor 인스턴스에서 check-received-image.sh 를 돌려
 #    빨간 ✗ (it does NOT measure to what … says — not running it) 로 거부되는 것을 보인다. 엔클레이브는 뜨지 않는다.
-#    실행: .\e2e\vendor\9a-demo-tampered-json.windows.ps1     (1-pack-image.nitro.sh 를 Vendor 인스턴스에서 먼저)
-. "$PSScriptRoot\..\setup\env.windows.ps1"
+#    실행: .\e2e\normal\vendor\tamper\vendor\1-send-tampered-json.ps1     (1-pack-image.sh 를 Vendor 인스턴스에서 먼저)
+. "$PSScriptRoot\..\..\..\setup\(windows)\env.ps1"
 $ErrorActionPreference = "Stop"
 $v = "$($E2E.SshUser)@$($E2E.VendorHost)"; $a = "$($E2E.SshUser)@$($E2E.AuditorHost)"
 
@@ -23,5 +23,5 @@ Invoke-Expression "$($E2E.Scp) e2e-work/tampered/measurements.json ${a}:from-ven
 "handed the tampered pair to the Auditor. now the Auditor checks it:"
 ""
 $ErrorActionPreference = "Continue"
-A './3-check-received-image.nitro.sh'
+A './3-check-received-image.sh'
 "exit=$LASTEXITCODE  (expected: not 0 — the Auditor measured the file itself and refused to run it)"

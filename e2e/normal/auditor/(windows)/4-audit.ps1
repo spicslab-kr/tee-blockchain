@@ -1,11 +1,11 @@
 ﻿# Auditor (자기 키가 있는 자기 컴퓨터에서) — Auditor 가 직접 얻은 값(out/measurements.json)을 가져와,
 #    새 등록부를 깔고, audit: 자기 TEE 에 RA → 그 값과 대조 → 같을 때만 등록 → 자기확인.
-#    실행: .\e2e\auditor\4-audit.windows.ps1 [-Contract 0x…]     컨트랙트 주소는 e2e-work\contract.txt 에 남는다.
+#    실행: .\e2e\normal\auditor\(windows)\4-audit.ps1 [-Contract 0x…]     컨트랙트 주소는 e2e-work\contract.txt 에 남는다.
 #    -Contract 를 주면 새로 깔지 않고 그 등록부에 등록한다 (운영: 한 번 깔고 계속 쓴다).
 #    -CheckVendor 를 주면 Vendor 의 엔클레이브에도 물어봐 내 값과 같은지 찍는다 (설계 흐름 2 의 8·9·15). 등록되는 값은 어차피 내 값.
 #    (테스트에선 같은 값을 같은 컨트랙트에 또 올리면 AlreadyRegistered 라 매번 새로 깐다.)
 param([string]$Contract, [switch]$CheckVendor)
-. "$PSScriptRoot\..\setup\env.windows.ps1"
+. "$PSScriptRoot\..\..\..\setup\(windows)\env.ps1"
 $ErrorActionPreference = "Stop"
 $a = "$($E2E.SshUser)@$($E2E.AuditorHost)"
 
@@ -26,4 +26,4 @@ Set-Content e2e-work\contract.txt $Contract
 $ErrorActionPreference = "Continue"
 $extra = @(); if ($CheckVendor) { $extra = @("--vendor-tee", "$($E2E.VendorHost):5000") }
 .\tb-auditor.exe audit --tee "$($E2E.AuditorHost):5000" --measurements e2e-work\auditor-measured.json --rpc $E2E.Rpc --contract $Contract --key-file $E2E.AuditorKey --service $E2E.Service --version $E2E.Version @extra
-"audit exit=$LASTEXITCODE   contract=$Contract   next: .\e2e\user\5-verify.windows.ps1"
+"audit exit=$LASTEXITCODE   contract=$Contract   next: .\e2e\normal\user\(windows)\5-verify.ps1"
