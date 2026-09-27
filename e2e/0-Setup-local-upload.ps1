@@ -17,7 +17,7 @@ $v = "$($E2E.SshUser)@$($E2E.VendorHost)"; $a = "$($E2E.SshUser)@$($E2E.AuditorH
 # a running ra-proxy holds the old binary open — stop it (and any enclave) before overwriting
 V 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-vendor; true'
 A 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-auditor; true'
-Invoke-Expression "$($E2E.Scp) tb-vendor tb-ra-responder 'e2e/flow1-auditor-registers/4-Vendor-nitro-launch-received.sh' 'e2e/flow2-vendor-self-registers/1-Vendor-nitro-build-source.sh' 'e2e/flow2-vendor-self-registers/11-Vendor-nitro-tamper-swap-enclave.sh' ${v}:~/"
+Invoke-Expression "$($E2E.Scp) tb-vendor tb-ra-responder 'e2e/flow1-auditor-registers/4-Vendor-nitro-launch-received.sh' 'e2e/flow2-vendor-self-registers/1-Vendor-nitro-build-source.sh' 'e2e/flow1-auditor-registers/7-Vendor-nitro-tamper-swap-enclave.sh' 'e2e/flow2-vendor-self-registers/4-Vendor-nitro-tamper-swap-enclave.sh' ${v}:~/"
 Invoke-Expression "$($E2E.Scp) tb-auditor tb-ra-responder 'e2e/flow1-auditor-registers/1-Auditor-nitro-build-source.sh' ${a}:~/"
 V 'chmod +x tb-vendor tb-ra-responder *.sh; sed -i "s/\r$//" *.sh; sha256sum tb-ra-responder'
 A 'chmod +x tb-auditor tb-ra-responder *.sh; sed -i "s/\r$//" *.sh; sha256sum tb-ra-responder'
