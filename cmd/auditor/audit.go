@@ -24,6 +24,7 @@ import (
 func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	tee := fs.String("tee", "", "my enclave's host:port — an attestation is requested from it first")
+	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port — also ask it, and say whether it runs the same value I built (flow 2 step 15). it is registered either way: what I built, not what the Vendor runs")
 	format := fs.String("format", "aws-nitro", "expected document format")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
@@ -124,6 +125,43 @@ func auditCmd(args []string) error {
 		t.Done("identical — the enclave runs exactly what I built")
 		cli.Why("this is the audit: the value I obtained myself and the value the running enclave attests to are the same, so the enclave is not running something else")
 	}
+
+	// 흐름 2 의 8·9·15: Vendor 가 지금 띄워 둔 것도 물어본다. 다르면 그 사실을 찍되, 등록하는 값은 내가 빌드한 값 그대로다 —
+	// 체인에 올라가는 건 "Vendor 가 돌리는 것"이 아니라 "내가 검증한 것"이어야 하니까.
+	vendorRunsSomethingElse := false
+	if *vendorTee != "" {
+		dir, err := os.MkdirTemp("", "tb-auditor-vendor-*")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(dir)
+		vDoc, vParsed := filepath.Join(dir, "doc.cbor"), filepath.Join(dir, "parsed.json")
+		t := cli.Start(fmt.Sprintf("Asking the Vendor's enclave at %s what it is running", *vendorTee))
+		if err := raRequest([]string{"--tee", *vendorTee, "--out", vDoc, "--format", *format, "--timeout", timeout.String()}); err != nil {
+			t.Fail("no answer")
+			return err
+		}
+		if err := raParse([]string{"--doc", vDoc, "--out", vParsed}); err != nil {
+			t.Fail("invalid attestation")
+			return err
+		}
+		vendorValues, err := readMeasurements(vParsed)
+		if err != nil {
+			return err
+		}
+		v := (cmp.Impl{}).Compare(vendorValues, values)
+		if v.Pass {
+			t.Done("same — the Vendor's enclave runs exactly what I built")
+		} else {
+			vendorRunsSomethingElse = true
+			t.Fail("the Vendor's enclave runs something else")
+			for _, r := range v.Reason {
+				cli.Errorln("    ", r)
+			}
+			printPCRs(vParsed)
+		}
+		cli.Why("the Vendor claims to run this source; the only way to know is to ask its enclave and compare with what the source really builds to")
+	}
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 
 	if *service == "" || *version == "" {
@@ -202,6 +240,9 @@ func auditCmd(args []string) error {
 	t.Done("value, expiry and signer all check out")
 	cli.Why("the same check a User will run: read the registration back and make sure it matches, is not expired, and was signed by the approver this registry trusts")
 	cli.Okln("PASS — audited and registered. Users can now verify against contract ", *contract)
+	if vendorRunsSomethingElse {
+		cli.Errorln("but note: the Vendor's enclave at ", *vendorTee, " does NOT run this value. a User verifying that enclave against this registry will be told not to trust it")
+	}
 	return nil
 }
 

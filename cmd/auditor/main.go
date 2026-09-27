@@ -88,11 +88,13 @@ func usage() {
   compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
                    read the registration from the chain and check the value, expiry and trusted signer together. exit 1 on failure
   audit            --tee <my enclave host:port> --measurements <my out/measurements.json> --rpc <url> --contract <0x…> --key-file <file>
-                   --service <name> --version <v>
+                   --service <name> --version <v> [--vendor-tee <the Vendor's enclave host:port>]
                    flow 1 in one go: attest my own enclave (T1·T2), check the attested value against --measurements (the value I
                    built or measured myself), register that value only if they match (C1), then read it back and self-check (C2·M2).
                    --nonce pins the nonce. with --service/--version empty, takes them from an existing registration of the same
-                   measurements on this contract. without --tee registers --measurements as is (no audit)
+                   measurements on this contract. without --tee registers --measurements as is (no audit).
+                   --vendor-tee also asks the Vendor's running enclave and says whether it runs the same value (flow 2 step 15); what is
+                   registered is still my value
   receive          --repo <url> [--ref <commit>] --into <dir>
                    clone the source repository and read the build config. build from that directory
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
