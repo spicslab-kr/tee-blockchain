@@ -45,6 +45,7 @@ type Build struct {
 	// 역할이 cmd/ra-responder 하나로 빌드한 동일한 파일을 얹어야 한다.
 	Binary string
 	Out    string // 결과 디렉터리. 비우면 out
+	Verify bool   // 같은 Dockerfile 을 캐시 없이 한 번 더 빌드해 같은 PCR 이 나오는지 본다 (verify.go)
 }
 
 // Result — 측정값 기록에 적을 것.
@@ -71,7 +72,8 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if err != nil {
 		return res, err
 	}
-	if st, err := os.Stat(filepath.Join(appDir, "Dockerfile")); err != nil || st.IsDir() {
+	dockerfile := filepath.Join(appDir, "Dockerfile")
+	if st, err := os.Stat(dockerfile); err != nil || st.IsDir() {
 		return res, fmt.Errorf("%s: Dockerfile not found", appDir)
 	}
 	if b.Name == "" {
@@ -99,6 +101,12 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name = b.Name
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
+	risks, err := LintDockerfile(dockerfile)
+	if err != nil {
+		return res, err
+	}
+	printRisks(log, dockerfile, risks)
+
 	fmt.Fprintln(log, "== build 1/5 tools (nitro-cli · docker)")
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel", "docker"); err != nil {
 		return res, err
@@ -125,7 +133,8 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 
 	fmt.Fprintf(log, "== build 4/5 reproducibility: dropping the layers and repacking in name order\n")
-	if err := normalize(ctx, r, res.Image, b.Out); err != nil {
+	first, err := normalize(ctx, r, res.Image, b.Out)
+	if err != nil {
 		return res, err
 	}
 
@@ -144,6 +153,11 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 	for _, k := range []string{"PCR0", "PCR1", "PCR2"} {
 		fmt.Fprintf(log, "%s %s\n", k, res.PCR[k])
+	}
+	if b.Verify {
+		if err := b.verify(ctx, r, appDir, appImage, first, res.PCR); err != nil {
+			return res, err
+		}
 	}
 	return res, nil
 }
@@ -198,10 +212,10 @@ ENTRYPOINT ["/tb-entrypoint.sh"]
 // workDir 는 실제 디스크(b.Out)를 써야 한다 - OS 기본 임시 디렉터리(/tmp)는 Amazon Linux 에서
 // RAM 기반 tmpfs 로 몇 GiB 밖에 안 되는데, 여기서 내보낸 tar·풀어낸 파일·재포장한 tar 가
 // 한꺼번에 그보다 커질 수 있다(실측: "wrote only N of 10240 bytes" 로 재현됨).
-func normalize(ctx context.Context, r runner, image, workDir string) error {
+func normalize(ctx context.Context, r runner, image, workDir string) (manifest, error) {
 	out, err := r.output(ctx, "docker", "image", "inspect", image)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var v []struct {
 		Config struct {
@@ -211,13 +225,13 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 		}
 	}
 	if err := json.Unmarshal(out, &v); err != nil || len(v) != 1 {
-		return fmt.Errorf("docker inspect %s: unexpected output", image)
+		return nil, fmt.Errorf("docker inspect %s: unexpected output", image)
 	}
 	cfg := v[0].Config
 
 	dir, err := os.MkdirTemp(workDir, "tb-canon-*")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// tar 가 sudo 로 풀어 놓은 트리는 root 소유라 os.RemoveAll 로는 못 지운다 — 그대로 두면 빌드마다 out/ 에 쌓인다.
 	defer func() {
@@ -229,20 +243,20 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 	container := fmt.Sprintf("tb-canon-%d", os.Getpid())
 	r.cmd(ctx, "docker", "rm", "-f", container).Run() // 이전 실패 잔여물, 있으면 지운다
 	if err := r.run(ctx, "docker", "create", "--name", container, image); err != nil {
-		return err
+		return nil, err
 	}
 	defer r.cmd(ctx, "docker", "rm", container).Run()
 
 	rootfs := filepath.Join(dir, "rootfs.tar")
 	if err := r.run(ctx, "docker", "export", container, "-o", rootfs); err != nil {
-		return err
+		return nil, err
 	}
 	extract := filepath.Join(dir, "extract")
 	if err := os.Mkdir(extract, 0o755); err != nil {
-		return err
+		return nil, err
 	}
 	if err := r.run(ctx, "tar", "-xf", rootfs, "-C", extract); err != nil {
-		return err
+		return nil, err
 	}
 	os.Remove(rootfs) // 다 풀었으니 더 안 필요하다 - 재포장 중 피크 디스크 사용량을 줄인다
 	for _, d := range scrubBuildScratch(ctx, r, extract) {
@@ -255,10 +269,15 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 		fmt.Fprintf(r.log, "removed a log stamped with the build time: /%s\n", p)
 	}
 
+	m, err := readManifest(ctx, r, extract)
+	if err != nil {
+		return nil, err
+	}
+
 	canon := filepath.Join(dir, "canon.tar")
 	if err := r.run(ctx, "tar", "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--numeric-owner",
 		"-cf", canon, "-C", extract, "."); err != nil {
-		return err
+		return nil, err
 	}
 
 	args := []string{"import"}
@@ -274,7 +293,10 @@ func normalize(ctx context.Context, r runner, image, workDir string) error {
 		args = append(args, "--change", "CMD "+string(b))
 	}
 	args = append(args, canon, image)
-	return r.run(ctx, "docker", args...)
+	if err := r.run(ctx, "docker", args...); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // buildLogs — 패키지 관리자가 docker build 중에 남기는 로그. 무엇을 깔았나가 아니라 언제 깔았나를 적어서

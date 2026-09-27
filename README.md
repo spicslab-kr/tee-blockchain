@@ -134,6 +134,11 @@ makes the EIF, and writes the measurements — `out/<name>.eif` and `out/measure
 ```
 tb-vendor build --app-dir <dir with Dockerfile> --out out
 ```
+It first scans the Dockerfile for things known to break reproducibility (unpinned base image or
+packages, `date`/`hostname`, random keys, compiling from source) and prints each with its line.
+Add `--verify` to build a second time from scratch and fail unless the measurements come out
+identical, listing the files that differed — worth it the first time a source is handed to an
+Auditor.
 
 Launch. Starts the enclave, bridges TCP 5000 → vsock, requests an attestation from itself to
 prove it answers (`out/selfcheck.cbor`), and opens the security-group port — or, without IAM

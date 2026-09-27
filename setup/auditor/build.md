@@ -52,11 +52,25 @@ haproxy and memcached, built on two instances: every binary matched, only these 
   time (`20260927.082249`), and the package identity next to it is derived from that version, so both are replaced.
   Real packages are untouched.
 
-**This only fixes "the packaging differs every time." `tb auditor build` does not check this automatically** —
-if the source itself produces different content on each build (a tool that mints a random signing key,
-unpinned package versions), normalization still won't make Vendor's and Auditor's builds match. That's not a
-bug in normalization; it's a Dockerfile that isn't written reproducibly, and right now nothing surfaces it
-until the build finishes (or Auditor compares). To keep a Dockerfile reproducible:
+**This only fixes "the packaging differs every time."** If the source itself produces different content on
+each build (a tool that mints a random signing key, unpinned package versions, a compiler that stamps the
+time), normalization still won't make Vendor's and Auditor's builds match. That's not a bug in
+normalization; it's a Dockerfile that isn't written reproducibly. Two things in `build` surface it:
+
+- **The scan, always on.** Before building, the Dockerfile is scanned for patterns known to break
+  reproducibility (`FROM` by tag instead of digest, `date`/`uname -n`/`hostname`, random or key
+  generation, `git clone` without a pinned commit, `curl | sh`, package/dependency installs without exact
+  versions, compiling from source). Each hit is printed with its line and why it can matter. The build goes
+  on: the scan only knows "can differ", not "does differ" (measured: nginx's Dockerfile trips `apk add`
+  and `FROM alpine:3.22` yet reproduces exactly).
+- **`--verify`, opt in.** Builds the same Dockerfile a second time with `--no-cache`, normalizes and
+  measures it, and fails unless PCR0·1·2 come out identical — printing the paths whose content, mode or
+  link target differed between the two trees. Same host twice is a weaker test than two hosts, but a
+  difference here is certain to show up at the Auditor too, and it names the file (measured: redis →
+  `usr/local/bin/redis-server`, haproxy before the apk fix → `etc/apk/world`, `lib/apk/db/installed`). It
+  roughly doubles the build time; use it before handing a measurement on for the first time.
+
+To keep a Dockerfile reproducible:
 - Pin the base image by digest, not tag (`FROM img@sha256:...`)
 - Pin package versions on install (`apt-get install pkg=1.2.3`), commit a lockfile for dependencies
 - Avoid tools that generate and leave random state (keys, UUIDs) in the image during build
