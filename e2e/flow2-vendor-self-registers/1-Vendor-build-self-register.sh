@@ -2,7 +2,8 @@
 # Vendor — Auditor 없이 나 혼자 소스를 빌드해 띄우고, 내가 만든 값을 내 키로 체인에 등록한다.
 #    여기, 내 컴퓨터에서 실행 — 빌드만 Vendor 인스턴스 안에서 자동으로 접속해 실행된다.
 #    실행: bash "e2e/flow2-vendor-self-registers/1-Vendor-build-self-register.sh" [-c 0x컨트랙트]
-here="$(dirname "$0")"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here/../.."
 . "$here/../env.sh"
 
 echo "== Vendor 인스턴스로 접속 중..."

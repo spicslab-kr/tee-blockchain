@@ -3,7 +3,8 @@
 #    여기, 내 컴퓨터에서 실행 — 교체만 Vendor 인스턴스 안에서 자동으로 접속해 실행된다. (1-Vendor-build-self-register 까지 끝난 뒤)
 #    다음: 4-Auditor-tamper-audit-check-vendor → 5-User-tamper-verify-both-registries
 #    실행: bash "e2e/flow2-vendor-self-registers/3-Vendor-tamper-swap-self-register.sh"
-here="$(dirname "$0")"
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here/../.."
 . "$here/../env.sh"
 
 echo "== Vendor 인스턴스로 접속 중..."
