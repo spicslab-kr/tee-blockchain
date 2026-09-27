@@ -1,10 +1,10 @@
-﻿# 5. 노트북 (Auditor 의 키가 여기 있다) — Auditor 가 직접 얻은 값(out/measurements.json)을 가져와,
+﻿# Auditor (자기 키가 있는 자기 컴퓨터에서) — Auditor 가 직접 얻은 값(out/measurements.json)을 가져와,
 #    새 등록부를 깔고, audit: 자기 TEE 에 RA → 그 값과 대조 → 같을 때만 등록 → 자기확인.
-#    실행: .\e2e\laptop\20-audit.ps1 [-Contract 0x…]     컨트랙트 주소는 e2e-work\contract.txt 에 남는다.
+#    실행: .\e2e\auditor\audit.ps1 [-Contract 0x…]     컨트랙트 주소는 e2e-work\contract.txt 에 남는다.
 #    -Contract 를 주면 새로 깔지 않고 그 등록부에 등록한다 (운영: 한 번 깔고 계속 쓴다).
 #    (테스트에선 같은 값을 같은 컨트랙트에 또 올리면 AlreadyRegistered 라 매번 새로 깐다.)
 param([string]$Contract)
-. "$PSScriptRoot\..\env.ps1"
+. "$PSScriptRoot\..\setup\env.ps1"
 $ErrorActionPreference = "Stop"
 $a = "$($E2E.SshUser)@$($E2E.AuditorHost)"
 
@@ -24,4 +24,4 @@ Set-Content e2e-work\contract.txt $Contract
 "== audit (contract $Contract)"
 $ErrorActionPreference = "Continue"
 .\tb-auditor.exe audit --tee "$($E2E.AuditorHost):5000" --measurements e2e-work\auditor-measured.json --rpc $E2E.Rpc --contract $Contract --key-file $E2E.AuditorKey --service $E2E.Service --version $E2E.Version
-"audit exit=$LASTEXITCODE   contract=$Contract   next: .\e2e\laptop\30-verify.ps1"
+"audit exit=$LASTEXITCODE   contract=$Contract   next: .\e2e\user\verify.ps1"

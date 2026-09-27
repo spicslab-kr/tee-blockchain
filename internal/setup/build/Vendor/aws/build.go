@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"tb/internal/cli"
 )
 
 //go:embed entrypoint.sh
@@ -120,9 +122,10 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if b.Image != "" {
 		verb, total = "pack", 4
 	}
-	step := func(what string) {
+	// 단계마다 두 줄: 무엇을 하는 중인지, 그리고 왜 하는지 한 문장. 보는 사람이 우리 용어를 몰라도 따라올 수 있게.
+	step := func(what, why string) {
 		n++
-		fmt.Fprintf(log, "\n[%s %d/%d] %s\n", verb, n, total, what)
+		fmt.Fprintf(log, "\n%s %s…\n           %s\n", cli.Green(fmt.Sprintf("[%s %d/%d]", verb, n, total)), what, why)
 	}
 
 	if b.Image == "" {
@@ -133,7 +136,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		printRisks(log, dockerfile, risks)
 	}
 
-	step("installing the tools (nitro-cli, docker)")
+	step("Installing the tools (nitro-cli, docker)", "docker builds the image; nitro-cli turns it into an enclave image and measures it")
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel", "docker"); err != nil {
 		return res, err
 	}
@@ -145,7 +148,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Image = b.Name + ":tb"
 	if b.Image == "" {
 		appImage = b.Name + ":app"
-		step(fmt.Sprintf("building the software image from %s → %s", appDir, appImage))
+		step(fmt.Sprintf("Building the software image from %s → %s", appDir, appImage), "the software exactly as its own Dockerfile makes it — nothing of ours inside yet. an Auditor runs this same step on the same source")
 		if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
 			return res, err
 		}
@@ -153,7 +156,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, fmt.Errorf("%s: no such docker image here — docker build it first, or docker load it", appImage)
 	}
 
-	step(fmt.Sprintf("adding the attestation responder to the image: %s → %s", appImage, res.Image))
+	step(fmt.Sprintf("Adding the attestation responder to the image: %s → %s", appImage, res.Image), "a small program that runs inside the enclave next to the software and hands out signed attestation documents on request — without it nobody could ask the enclave what it is running")
 	appCmd, err := r.imageCommand(ctx, appImage)
 	if err != nil {
 		return res, err
@@ -163,7 +166,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	step("repacking the image so that anyone rebuilding it gets the same bytes")
+	step("Repacking the image so that anyone rebuilding it gets the same bytes", "docker layers carry build timestamps and an arbitrary file order; we lay the filesystem out in a fixed order and drop files that only record when it was built, so the Vendor's and the Auditor's builds of one source are byte-identical")
 	first, err := normalize(ctx, r, res.Image, b.Out)
 	if err != nil {
 		return res, err
@@ -171,7 +174,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 	res.EIF = filepath.Join(b.Out, b.Name+".eif")
 	res.Measurements = filepath.Join(b.Out, "measurements.json")
-	step("making the enclave image (EIF) → " + res.EIF)
+	step("Making the enclave image (EIF) → "+res.EIF, "nitro-cli produces the bootable enclave image and its measurements PCR0·1·2 — the fingerprint that the enclave will attest to and that goes on the chain")
 	out, err := r.output(ctx, "nitro-cli", "build-enclave", "--docker-uri", res.Image, "--output-file", res.EIF)
 	if err != nil {
 		return res, err
@@ -182,8 +185,9 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if res.PCR, err = ReadPCR(out); err != nil {
 		return res, err
 	}
+	fmt.Fprintln(log, cli.Green("✓ measured"), "— these three values identify the image:")
 	for _, k := range []string{"PCR0", "PCR1", "PCR2"} {
-		fmt.Fprintf(log, "%s %s\n", k, res.PCR[k])
+		fmt.Fprintf(log, "    %s %s\n", k, res.PCR[k])
 	}
 	if b.Verify {
 		if err := b.verify(ctx, r, appDir, appImage, first, res.PCR); err != nil {
@@ -291,16 +295,16 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	}
 	os.Remove(rootfs) // 다 풀었으니 더 안 필요하다 - 재포장 중 피크 디스크 사용량을 줄인다
 	for _, d := range scrubBuildScratch(ctx, r, extract) {
-		fmt.Fprintf(r.log, "emptied build scratch: /%s\n", d)
+		fmt.Fprintf(r.log, "    dropped build scratch: /%s\n", d)
 	}
 	for _, p := range fixApkVirtualVersions(ctx, r, extract) {
-		fmt.Fprintf(r.log, "pinned apk virtual-package versions (they were the install time): /%s\n", p)
+		fmt.Fprintf(r.log, "    pinned apk virtual-package versions (they were the install time): /%s\n", p)
 	}
 	for _, p := range stripBuildLogs(ctx, r, extract) {
-		fmt.Fprintf(r.log, "removed a log stamped with the build time: /%s\n", p)
+		fmt.Fprintf(r.log, "    dropped a log stamped with the build time: /%s\n", p)
 	}
 	for _, p := range stripBuildCaches(ctx, r, extract) {
-		fmt.Fprintf(r.log, "removed a build-time cache (it records when, not what): /%s\n", p)
+		fmt.Fprintf(r.log, "    dropped a build-time cache (it records when, not what): /%s\n", p)
 	}
 
 	m, err := readManifest(ctx, r, extract)

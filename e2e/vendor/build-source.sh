@@ -1,6 +1,6 @@
 #!/bin/bash
-# Vendor · Case B — 소스를 tb 가 빌드해 띄운다. Auditor 는 같은 소스를 같은 명령으로 빌드해 같은 값이 나와야 한다.
-# 📍 Vendor 인스턴스, ~ 에서 ./case-b.sh     결과: out/alpine-slim.eif, out/measurements.json, 엔클레이브 + TCP 5000
+# Vendor — 소스를 tb 가 빌드해 띄운다 (Auditor 가 같은 소스를 다시 빌드하는 흐름). 같은 명령으로 같은 값이 나와야 한다.
+# 📍 Vendor 인스턴스, ~ 에서 ./build-source.sh     결과: out/alpine-slim.eif, out/measurements.json, 엔클레이브 + TCP 5000
 set -euo pipefail
 SRC_REPO=https://github.com/qixiangme/docker-nginx
 SRC_COMMIT=ef5a25a6314e652a2dcfbce6074bef729f4d9639

@@ -62,6 +62,7 @@ func verifyCmd(args []string) error {
 		return err
 	}
 	t.Done(fmt.Sprintf("%s document, %d bytes", *format, fileSize(docPath)))
+	cli.Why("an attestation is a document the enclave hardware signs on the spot, stating which image is running; the fresh nonce inside proves it was made just now")
 
 	t = cli.Start("Checking the attestation (signature chain to the platform root, nonce)")
 	parseArgs := []string{"--doc", docPath, "--out", measPath}
@@ -73,6 +74,7 @@ func verifyCmd(args []string) error {
 		return err
 	}
 	t.Done("genuine")
+	cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from an enclave; PCR0·1·2 below are the image it runs")
 	printPCRs(measPath)
 	values, err := readMeasurements(measPath)
 	if err != nil {
@@ -90,6 +92,7 @@ func verifyCmd(args []string) error {
 		return errors.New("nobody has registered these measurements on the chain — no basis for trust")
 	}
 	t.Done(fmt.Sprintf("%d registration(s)", len(keys)))
+	cli.Why("the registry is searched by the measurement itself — no need to know who registered it or to trust the Vendor's word")
 
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -99,6 +102,7 @@ func verifyCmd(args []string) error {
 		return err
 	}
 	fmt.Println("Checking each registration against the attestation (value, expiry, signer):")
+	cli.Why("a registration counts only if its value equals what the enclave attested, it has not expired, and it was signed by the approver this registry trusts")
 	anyPass := false
 	var goodSigner string
 	for _, k := range keys {

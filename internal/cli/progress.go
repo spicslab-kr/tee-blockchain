@@ -82,6 +82,11 @@ func (t *Task) Done(detail string) { t.end(Green("✓"), detail) }
 // Fail closes the step as a failure: "msg... ✗ detail" (red).
 func (t *Task) Fail(detail string) { t.end(Red("✗"), detail) }
 
+// Why — 방금 끝난 단계가 왜 필요한지 한 문장. 들여쓴 보조 줄로 찍어, 우리 용어를 모르는 사람도 따라오게 한다.
+func Why(s string) {
+	fmt.Println("      · " + s)
+}
+
 func colorStdout() bool {
 	if _, set := os.LookupEnv("NO_COLOR"); set {
 		return false

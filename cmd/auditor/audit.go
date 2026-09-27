@@ -81,6 +81,7 @@ func auditCmd(args []string) error {
 			return err
 		}
 		t.Done(fmt.Sprintf("%s document, %d bytes", *format, fileSize(docPath)))
+		cli.Why("an attestation is a document the enclave hardware signs on the spot, stating which image is running; the fresh nonce inside proves it was made just now")
 
 		t = cli.Start("Checking the attestation (signature chain to the platform root, nonce)")
 		parseArgs := []string{"--doc", docPath, "--out", parsedPath}
@@ -92,6 +93,7 @@ func auditCmd(args []string) error {
 			return err
 		}
 		t.Done("genuine")
+		cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from an enclave; PCR0·1·2 below are the image it runs")
 		printPCRs(parsedPath)
 		if measPath == "" {
 			measPath = parsedPath
@@ -120,6 +122,7 @@ func auditCmd(args []string) error {
 			return errors.New("the enclave is not running what I built — not registering")
 		}
 		t.Done("identical — the enclave runs exactly what I built")
+		cli.Why("this is the audit: the value I obtained myself and the value the running enclave attests to are the same, so the enclave is not running something else")
 	}
 	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
 
@@ -170,6 +173,7 @@ func auditCmd(args []string) error {
 		return err
 	}
 	t.Done("registered")
+	cli.Why("the value now sits on the public registry under my signature; anyone can look it up by measurement alone, without asking me")
 	fmt.Printf("    key     %s\n    tx      %s\n    block   %d\n    expires %s\n    signer  %s\n",
 		lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block, lastRegistered.Expires, lastRegistered.Signer)
 
@@ -196,6 +200,7 @@ func auditCmd(args []string) error {
 		os.Exit(1)
 	}
 	t.Done("value, expiry and signer all check out")
+	cli.Why("the same check a User will run: read the registration back and make sure it matches, is not expired, and was signed by the approver this registry trusts")
 	cli.Okln("PASS — audited and registered. Users can now verify against contract ", *contract)
 	return nil
 }

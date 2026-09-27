@@ -19,9 +19,9 @@ $E2E = @{
   Service     = "nginx"
   Version     = "1.31.6"
 
-  # 인스턴스 쪽 EIF 이름 (vendor/case-a.sh 는 out/nginx.eif, case-b.sh 는 out/alpine-slim.eif)
-  EifCaseA    = "out/nginx.eif"
-  EifCaseB    = "out/alpine-slim.eif"
+  # 인스턴스 쪽 EIF 이름 (vendor/pack-image.sh 는 out/nginx.eif, build-source.sh 는 out/alpine-slim.eif)
+  EifPacked   = "out/nginx.eif"
+  EifBuilt    = "out/alpine-slim.eif"
 }
 
 $E2E.Ssh = "ssh -i $($E2E.Pem) -o StrictHostKeyChecking=no"

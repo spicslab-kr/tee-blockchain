@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"tb/internal/cli"
 )
 
 // manifest — 정규화 직전 rootfs 의 파일별 요약: 경로 → "모드 종류 내용해시(또는 링크 대상)". 측정에 들어가는 것 그대로다
@@ -127,11 +129,11 @@ func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, fi
 		}
 	}
 	if same {
-		fmt.Fprintln(r.log, "reproducible on this host: a second build from scratch gave the same PCR0·1·2")
+		fmt.Fprintln(r.log, cli.Green("✓ reproducible on this host"), "— a second build from scratch gave the same PCR0·1·2")
 		return nil
 	}
 	d := first.diff(second)
-	fmt.Fprintf(r.log, "%d path(s) differ between the two builds (mode type sha256):\n", len(d))
+	fmt.Fprintf(r.log, "%s %d path(s) differ between the two builds (mode type sha256):\n", cli.Red("✗ not reproducible —"), len(d))
 	for i, line := range d {
 		if i == 40 {
 			fmt.Fprintf(r.log, "  … %d more\n", len(d)-i)
