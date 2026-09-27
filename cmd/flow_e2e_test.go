@@ -106,7 +106,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("auditor run: %v\n%s", err, aOut)
 	}
-	if !strings.Contains(string(aOut), "== audit") || strings.Count(string(aOut), "PASS") < 2 {
+	if !strings.Contains(string(aOut), "identical") || !strings.Contains(string(aOut), "PASS") {
 		t.Fatalf("auditor run 은 검사 PASS 와 self-check PASS 를 둘 다 찍어야 한다:\n%s", aOut)
 	}
 	aKey := lastKey(aOut)

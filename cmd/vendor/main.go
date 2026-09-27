@@ -196,7 +196,9 @@ func raRequest(args []string) error {
 	if err := os.WriteFile(*out+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *out, *out)
+	if !quiet {
+		fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *out, *out)
+	}
 	return nil
 }
 
@@ -268,7 +270,8 @@ func buildCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\ndone. for the measurement record: %s · %s\nto launch:  tb vendor launch --eif %s --port %d\n", built.EIF, built.Measurements, built.EIF, b.Port)
+	cli.Okln("\n✓ enclave image ready: ", built.EIF, "   measurements: ", built.Measurements)
+	fmt.Printf("next:  tb vendor launch --eif %s --port %d\n", built.EIF, b.Port)
 	return nil
 }
 
@@ -290,7 +293,8 @@ func packCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\ndone. hand these to the Auditor: %s · %s\nto launch:  tb vendor launch --eif %s --port %d\n", built.EIF, built.Measurements, built.EIF, b.Port)
+	cli.Okln("\n✓ enclave image ready: ", built.EIF, "   measurements: ", built.Measurements, "   — hand both to the Auditor")
+	fmt.Printf("next:  tb vendor launch --eif %s --port %d\n", built.EIF, b.Port)
 	return nil
 }
 
@@ -318,12 +322,15 @@ func launchCmd(args []string) error {
 		return err
 	}
 
-	fmt.Println("== self-check: requesting RA from this instance", started.Address)
+	fmt.Println()
+	t := cli.Start(fmt.Sprintf("Asking the new enclave at %s for an attestation, to be sure it answers", started.Address))
 	nonce, doc, err := ra.TCPRequester{Timeout: 30 * time.Second}.RequestFresh(ctx, started.Address)
 	if err != nil {
+		t.Fail("no answer")
 		return err
 	}
 	if err := doc.ExpectFormat(awsra.Format); err != nil {
+		t.Fail("wrong format")
 		return err
 	}
 	selfDoc := filepath.Join(l.Out, "selfcheck.cbor")
@@ -333,12 +340,12 @@ func launchCmd(args []string) error {
 	if err := os.WriteFile(selfDoc+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("received %s document, %d bytes → %s\n", doc.Format, len(doc.Raw), selfDoc)
+	t.Done(fmt.Sprintf("%s document, %d bytes → %s", doc.Format, len(doc.Raw), selfDoc))
 
-	fmt.Println("== security group: inbound TCP", l.Port)
+	fmt.Printf("Security group: inbound TCP %d\n", l.Port)
 	cmd, group, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
 	if perr == nil {
-		fmt.Printf("\ndone. anyone can now:  tb user ra-request --tee <this instance's public IP>:%d --format aws-nitro\n", l.Port)
+		cli.Okln("✓ enclave is up and reachable. anyone can now:  tb user verify --tee <this instance's public IP>:", l.Port, " --rpc … --contract …")
 		return nil
 	}
 	// 여기서는 못 열었다 — 무엇을, 어디서, 어떻게 열어야 하는지까지 적어 준다. 권한이 없는 경우와

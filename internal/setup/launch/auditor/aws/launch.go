@@ -43,8 +43,8 @@ type Result struct {
 	Name         string
 	Measurements string            // out/measurements.json — 이 EIF 를 nitro-cli 로 직접 잰 값
 	PCR          map[string]string // PCR0 · PCR1 · PCR2
-	Memory  int    // 실제로 준 메모리 MiB
-	Address string // 이 인스턴스에서 확인할 주소 127.0.0.1:port. 밖에서는 <공인 IP>:port
+	Memory       int               // 실제로 준 메모리 MiB
+	Address      string            // 이 인스턴스에서 확인할 주소 127.0.0.1:port. 밖에서는 <공인 IP>:port
 }
 
 var ErrNotLinux = errors.New("launch runs on the Nitro parent instance (linux)")
@@ -94,7 +94,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name, res.Memory = l.Name, l.Memory
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
-	fmt.Fprintf(log, "== launch 1/4 tools and resources (%d cpu · %d MiB)\n", l.CPUs, l.Memory)
+	fmt.Fprintf(log, "\n[launch 1/4] preparing the tools and enclave resources (%d cpu · %d MiB)\n", l.CPUs, l.Memory)
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel"); err != nil {
 		return res, err
 	}
@@ -107,7 +107,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 	// 남이 준 EIF(--measurements 가 같이 온다)만 다시 잰다. 내가 build·pack 한 EIF 는 그때 이미 잰 값이 out/ 에 있다.
 	if l.Measurements != "" {
-		fmt.Fprintf(log, "== launch 2/4 measuring the received EIF (nitro-cli describe-eif)\n")
+		fmt.Fprintf(log, "\n[launch 2/4] measuring the received enclave image myself (nitro-cli describe-eif)\n")
 		if res.PCR, err = measureEIF(ctx, r, l.EIF); err != nil {
 			return res, err
 		}
@@ -119,23 +119,23 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 			return res, err
 		}
 		if len(reasons) > 0 {
-			fmt.Fprintf(log, "FAIL against %s\n", l.Measurements)
+			fmt.Fprintf(log, "✗ it does NOT measure to what %s says — not running it\n", l.Measurements)
 			for _, why := range reasons {
 				fmt.Fprintf(log, "  %s\n", why)
 			}
 			return res, errMeasurementMismatch
 		}
-		fmt.Fprintf(log, "PASS — the EIF measures exactly what %s claims\n", l.Measurements)
+		fmt.Fprintf(log, "✓ it measures exactly what %s says — safe to run\n", l.Measurements)
 		res.Measurements = filepath.Join(l.Out, "measurements.json")
 		if _, err := writeMeasurements(res.Measurements, res.PCR); err != nil {
 			return res, err
 		}
 		fmt.Fprintf(log, "→ %s (what I measured; give this to audit --measurements)\n", res.Measurements)
 	} else {
-		fmt.Fprintf(log, "== launch 2/4 my own EIF, measured when it was built — not measuring again\n")
+		fmt.Fprintf(log, "\n[launch 2/4] my own enclave image — measured when it was built, not measuring again\n")
 	}
 
-	fmt.Fprintf(log, "== launch 3/4 running the enclave (cid %d)\n", l.CID)
+	fmt.Fprintf(log, "\n[launch 3/4] starting the enclave (cid %d)\n", l.CID)
 	_ = r.quiet(ctx, "nitro-cli", "terminate-enclave", "--enclave-name", l.Name)
 	if err := r.run(ctx, "nitro-cli", "run-enclave", "--eif-path", l.EIF, "--cpu-count", strconv.Itoa(l.CPUs),
 		"--memory", strconv.Itoa(l.Memory), "--enclave-cid", strconv.Itoa(l.CID), "--enclave-name", l.Name); err != nil {
@@ -146,7 +146,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	fmt.Fprintf(log, "== launch 4/4 bridge TCP %s:%d → vsock %d:%d\n", l.Listen, l.Port, l.CID, l.Port)
+	fmt.Fprintf(log, "\n[launch 4/4] opening TCP %s:%d → the enclave (vsock %d:%d)\n", l.Listen, l.Port, l.CID, l.Port)
 	if err := l.startProxy(ctx, log); err != nil {
 		return res, err
 	}

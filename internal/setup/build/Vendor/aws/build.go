@@ -122,7 +122,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 	step := func(what string) {
 		n++
-		fmt.Fprintf(log, "== %s %d/%d %s\n", verb, n, total, what)
+		fmt.Fprintf(log, "\n[%s %d/%d] %s\n", verb, n, total, what)
 	}
 
 	if b.Image == "" {
@@ -133,7 +133,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		printRisks(log, dockerfile, risks)
 	}
 
-	step("tools (nitro-cli · docker)")
+	step("installing the tools (nitro-cli, docker)")
 	if err := r.run(ctx, "dnf", "install", "-y", "-q", "aws-nitro-enclaves-cli", "aws-nitro-enclaves-cli-devel", "docker"); err != nil {
 		return res, err
 	}
@@ -145,7 +145,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Image = b.Name + ":tb"
 	if b.Image == "" {
 		appImage = b.Name + ":app"
-		step(fmt.Sprintf("software image: %s → %s", appDir, appImage))
+		step(fmt.Sprintf("building the software image from %s → %s", appDir, appImage))
 		if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
 			return res, err
 		}
@@ -153,7 +153,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, fmt.Errorf("%s: no such docker image here — docker build it first, or docker load it", appImage)
 	}
 
-	step(fmt.Sprintf("layering the T1 responder: %s → %s", appImage, res.Image))
+	step(fmt.Sprintf("adding the attestation responder to the image: %s → %s", appImage, res.Image))
 	appCmd, err := r.imageCommand(ctx, appImage)
 	if err != nil {
 		return res, err
@@ -163,7 +163,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	step("reproducibility: dropping the layers and repacking in name order")
+	step("repacking the image so that anyone rebuilding it gets the same bytes")
 	first, err := normalize(ctx, r, res.Image, b.Out)
 	if err != nil {
 		return res, err
@@ -171,7 +171,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 	res.EIF = filepath.Join(b.Out, b.Name+".eif")
 	res.Measurements = filepath.Join(b.Out, "measurements.json")
-	step("EIF → " + res.EIF)
+	step("making the enclave image (EIF) → " + res.EIF)
 	out, err := r.output(ctx, "nitro-cli", "build-enclave", "--docker-uri", res.Image, "--output-file", res.EIF)
 	if err != nil {
 		return res, err
