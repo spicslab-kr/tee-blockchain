@@ -11,7 +11,7 @@ before trusting it.
 
 Each role gets its own binary (`tb-vendor`, `tb-auditor`, `tb-user`). A role's binary only
 contains that role's commands — User's binary has no `register` at all. The chain-side work of
-each role collapses to one `run` command; the steps it wraps are listed under each role so you
+each role collapses to one command — `audit` (Auditor), `verify` (User), `self-register` (Vendor, flow 2); the steps it wraps are listed under each role so you
 can see exactly what it does, or drive them by hand.
 
 ## 0. Build the binaries and put them where they run
@@ -101,12 +101,12 @@ permission on the instance, prints the one `aws ec2` line to run from your accou
 tb-vendor launch --eif out/<name>.eif
 ```
 
-### 1.2 `run` — attest my enclave, register, self-check
+### 1.2 `self-register` — attest my enclave, register, self-check
 
 In flow 1 (the Auditor audits and registers) the Vendor does **not** register — after 1.1 it is
-done. `run` is for flow 2, where the Vendor registers its own enclave:
+done. `self-register` is for flow 2, where the Vendor registers its own enclave:
 ```
-tb-vendor run --tee 127.0.0.1:5000 --rpc <url> --contract <0x…> --key-file <key>
+tb-vendor self-register --tee 127.0.0.1:5000 --rpc <url> --contract <0x…> --key-file <key>
 ```
 
 What that does, one step at a time.
@@ -138,7 +138,7 @@ signer the contract's approver:
 tb-vendor compare --a parsed.json --rpc <url> --contract <0x…> --key <key register printed>
 ```
 
-Options. Add `--measurements out/measurements.json` to `run` and it compares the attestation
+Options. Add `--measurements out/measurements.json` to `self-register` and it compares the attestation
 against your build value first and refuses to register on a mismatch (exit ≠ 0, the differing
 PCRs are printed). `--service`/`--version` are asked for on the first registration; later ones
 reuse them. Any flag you leave out is asked for interactively — except `--rpc`, which defaults to
@@ -194,10 +194,10 @@ uses it:
 tb-auditor registry-deploy --rpc <url> --key-file <deployer.key> --approver <my 0x…>
 ```
 
-### 2.4 `run` — attest my enclave, check it against my build, register, self-check
+### 2.4 `audit` — attest my enclave, check it against my build, register, self-check
 
 ```
-tb-auditor run --tee <my-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
+tb-auditor audit --tee <my-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
 ```
 `--tee` is **my own** enclave, running **my own** build of the Vendor's source. That is the
 audit: what goes on-chain is what I built from the source and ran myself, checked against the
@@ -251,7 +251,7 @@ tb-auditor send --repo <git url> --record measurement-record.json --image out/<n
 ## 3. User
 
 ```
-tb-user run --tee <vendor-public-ip>:5000 --rpc <url> --contract <0x…>
+tb-user verify --tee <vendor-public-ip>:5000 --rpc <url> --contract <0x…>
 ```
 Ask the Vendor's enclave to attest → verify the document → find who registered that measurement
 → check each registration. Exit 0 if at least one registration matches (value, expiry, signer);

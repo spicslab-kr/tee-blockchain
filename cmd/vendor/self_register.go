@@ -16,14 +16,14 @@ import (
 	cmp "tb/internal/core/compare/Vendor"
 )
 
-// runCmd — register 하고 바로 그 자리에서 self-check 까지 명령 하나로 (C1 → C2 → M2).
+// selfRegisterCmd — 흐름 2, Vendor 가 자기 엔클레이브를 직접 등록: 자기 TEE 에 RA(T1·T2) → 등록(C1) → 자기확인(C2·M2).
 // --tee 를 주면 그 전에 T1 요청 → T2 파싱까지 해서 측정값을 직접 얻는다(흐름1의 11~13, 흐름2의 2~3에
 // 해당). 이미 측정값 파일이 있으면 --measurements 로 바로 등록만 해도 된다.
 //
 // --tee 와 --measurements 를 같이 주면 검사가 된다(흐름2의 4): 내 TEE 가 증명한 값을 --measurements(내가
 // 빌드한 값)와 먼저 맞대고, 같을 때만 그 빌드값을 등록한다. 다르면 등록하지 않고 실패로 끝난다.
-func runCmd(args []string) error {
-	fs := flag.NewFlagSet("run", flag.ContinueOnError)
+func selfRegisterCmd(args []string) error {
+	fs := flag.NewFlagSet("self-register", flag.ContinueOnError)
 	tee := fs.String("tee", "", "TEE address host:port — if given, RA is requested from it first to obtain the measurements")
 	format := fs.String("format", "aws-nitro", "expected document format")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
@@ -63,7 +63,7 @@ func runCmd(args []string) error {
 	if *tee != "" {
 		dir := *out
 		if dir == "" {
-			tmp, err := os.MkdirTemp("", "tb-vendor-run-*")
+			tmp, err := os.MkdirTemp("", "tb-vendor-self-register-*")
 			if err != nil {
 				return err
 			}

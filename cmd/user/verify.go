@@ -16,10 +16,10 @@ import (
 	cmp "tb/internal/core/compare/user"
 )
 
-// runCmd — 흐름1의 User 구간(14~18)을 명령 하나로: T1 요청 → T2 파싱 → C2 조회 → 찾은 key 마다 M2 대조.
+// verifyCmd — 흐름1의 User 구간(14~18)을 명령 하나로: T1 요청 → T2 파싱 → C2 조회 → 찾은 key 마다 M2 대조.
 // 하나라도 PASS 면 그 엔클레이브를 신뢰할 근거가 있다는 뜻이라 exit 0, 하나도 없거나 다 FAIL 이면 exit 1.
-func runCmd(args []string) error {
-	fs := flag.NewFlagSet("run", flag.ContinueOnError)
+func verifyCmd(args []string) error {
+	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	tee := fs.String("tee", "", "TEE address host:port")
 	format := fs.String("format", "aws-nitro", "expected document format")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
@@ -41,7 +41,7 @@ func runCmd(args []string) error {
 
 	dir := *out
 	if dir == "" {
-		tmp, err := os.MkdirTemp("", "tb-user-run-*")
+		tmp, err := os.MkdirTemp("", "tb-user-verify-*")
 		if err != nil {
 			return err
 		}
