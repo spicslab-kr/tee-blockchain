@@ -16,7 +16,7 @@ echo "Auditor's own value:"; cat "$WORK/auditor-measured.json"
 
 if [ -z "$CONTRACT" ]; then
   # ▶ 우리가 만든 tb 명령 — 등록부(레지스트리 컨트랙트)를 체인에 새로 배포한다.
-  echo "== registry-deploy (approver = Auditor $AUDITOR_ADDR)"
+  step "DEPLOYING REGISTRY"
   out=$("$TBA" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$AUDITOR_ADDR" 2>&1); echo "$out"
   CONTRACT=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # 준비 — 출력에서 주소 뽑기
   [ -n "$CONTRACT" ] || { echo "no contract address in registry-deploy output"; exit 1; }
@@ -25,7 +25,7 @@ echo "$CONTRACT" > "$WORK/contract.txt"  # 준비 — 다음 단계가 읽을 �
 
 # ▶ 우리가 만든 tb 명령 — 내 값을 등록하면서, --vendor-tee 로 Vendor 엔클레이브에도 RA 를 보내 직접 비교한다.
 #   이게 바꿔치기를 실측으로 잡아내는 핵심 명령이다.
-echo "== audit (contract $CONTRACT), also asking the Vendor's enclave"
+step "AUDITING (checking Vendor's enclave)"
 "$TBA" audit --tee "$AUDITOR_HOST:5000" --measurements "$WORK/auditor-measured.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$AUDITOR_KEY" --service "$SERVICE" --version "$VERSION" --vendor-tee "$VENDOR_HOST:5000"
 rc=$?
 echo "audit exit=$rc   contract=$CONTRACT   next: 5-User-tamper-verify-both-registries"

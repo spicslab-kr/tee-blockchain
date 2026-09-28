@@ -10,10 +10,10 @@ here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
 
-echo "== Auditor 인스턴스로 접속 중..."
 nitroBanner "Auditor"
 A 'bash -s' <<'REMOTE'
 set -euo pipefail
+step() { printf '\033[1;32m==================== %s' "$1"; for _ in 1 2 3; do sleep 0.15; printf '.'; done; printf ' ====================\033[0m\n'; }
 SRC_REPO=https://github.com/qixiangme/docker-nginx
 SRC_COMMIT=ef5a25a6314e652a2dcfbce6074bef729f4d9639
 SRC_DIR=mainline/alpine-slim
@@ -22,17 +22,17 @@ umask 022
 # 준비 — 테스트용 소스를 받는다. git 은 실행 비트만 저장해서, 체크아웃한 쉘의 umask 에 따라 파일 모드가 달라진다.
 # 그러면 도커 이미지 안 파일 모드도 달라져 측정값이 흔들리니, 소스 저장소(git 인덱스)에 적힌 모드로 강제로 맞춘다.
 fix_modes() { (cd "$1" && git ls-files -s | while read -r mode _ _ path; do case $mode in 100755) chmod 755 "$path";; 100644) chmod 644 "$path";; esac; done && find . -type d -not -path './.git*' -exec chmod 755 {} +); }
-echo "== source from the Vendor: $SRC_REPO @ $SRC_COMMIT ($SRC_DIR)"
+step "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
 [ -d src/docker-nginx ] || git clone -q $SRC_REPO src/docker-nginx
 git -C src/docker-nginx checkout -q $SRC_COMMIT
 fix_modes src/docker-nginx
 
 # ▶ 우리가 만든 tb 명령 — 소스를 도커로 빌드해서 엔클레이브 이미지(EIF)와 측정값(PCR0/1/2)을 만든다.
-echo "== tb-auditor build"
+step "BUILDING SOURCE"
 ./tb-auditor build --app-dir src/docker-nginx/$SRC_DIR --out out
 
 # ▶ 우리가 만든 tb 명령 — 그 이미지를 내 TEE 에 실제로 띄운다.
-echo "== tb-auditor launch"
+step "LAUNCHING ENCLAVE"
 ./tb-auditor launch --eif out/alpine-slim.eif
 
 echo
@@ -54,7 +54,7 @@ echo "Auditor's own value:"; cat "$WORK/auditor-measured.json"
 
 if [ -z "$CONTRACT" ]; then
   # ▶ 우리가 만든 tb 명령 — 등록부(레지스트리 컨트랙트)를 체인에 새로 배포한다.
-  echo "== registry-deploy (approver = Auditor $AUDITOR_ADDR)"
+  step "DEPLOYING REGISTRY"
   out=$("$TBA" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$AUDITOR_ADDR" 2>&1); echo "$out"
   CONTRACT=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # 준비 — 출력 문장에서 주소만 뽑기
   [ -n "$CONTRACT" ] || { echo "no contract address in registry-deploy output"; exit 1; }
@@ -63,7 +63,7 @@ echo "$CONTRACT" > "$WORK/contract.txt"  # 준비 — 다음 단계가 읽을 �
 
 # ▶ 우리가 만든 tb 명령 — 내 TEE 에 RA 를 보내 받은 값과 위에서 만든 빌드값이 같은지 대조하고, 같을 때만 체인에 등록한다.
 extra=(); [ -n "$CHECK_VENDOR" ] && extra=(--vendor-tee "$VENDOR_HOST:5000")
-echo "== audit (contract $CONTRACT)"
+step "AUDITING"
 "$TBA" audit --tee "$AUDITOR_HOST:5000" --measurements "$WORK/auditor-measured.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$AUDITOR_KEY" --service "$SERVICE" --version "$VERSION" "${extra[@]}"
 rc=$?
 echo "audit exit=$rc   contract=$CONTRACT"
@@ -76,6 +76,7 @@ $SCP "$SSH_USER@$AUDITOR_HOST:out/alpine-slim.eif" "$WORK/from-auditor/alpine-sl
 $SCP "$SSH_USER@$AUDITOR_HOST:out/measurements.json" "$WORK/from-auditor/measurements.json"
 if [ -z "$KEY" ]; then
   # ▶ 우리가 만든 tb 명령 — 체인에서 이 측정값의 등록 key 를 조회한다.
+  step "LOOKING UP REGISTRATION"
   out=$("$TBA" lookup --rpc "$RPC" --contract "$CONTRACT" --measurements "$WORK/from-auditor/measurements.json" 2>&1)
   KEY=$(echo "$out" | grep -oE 'key +0x[0-9a-fA-F]{64}' | awk '{print $2}' | head -1)  # 준비 — 출력에서 key 뽑기
   [ -n "$KEY" ] || { echo "no registration of this value found on $CONTRACT"; exit 1; }

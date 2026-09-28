@@ -7,10 +7,10 @@ here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
 
-echo "== Vendor 인스턴스로 접속 중..."
 nitroBanner "Vendor"
 V 'bash -s' <<'REMOTE'
 set -euo pipefail
+step() { printf '\033[1;32m==================== %s' "$1"; for _ in 1 2 3; do sleep 0.15; printf '.'; done; printf ' ====================\033[0m\n'; }
 umask 022
 mkdir -p tampered
 # 준비 — 조작 데모용으로 작은 이미지 하나를 직접 만든다. Auditor 는 이 이미지를 본 적이 없다.
@@ -19,11 +19,11 @@ FROM alpine:3.20
 RUN echo "not the audited image" > /etc/tb-tampered
 CMD ["sleep", "1000000"]
 DOCKER
-echo "== building my own image (the Auditor never saw this one)"
+step "BUILDING TAMPERED IMAGE"
 sudo docker build -q -t tampered:latest tampered
 
 # ▶ 우리가 만든 tb 명령 — 이 도커 이미지를 엔클레이브 이미지(EIF)로 포장한다.
-echo "== tb-vendor pack"
+step "PACKING IMAGE"
 ./tb-vendor pack --image tampered:latest --name tampered --out out-tampered
 
 # 준비 — 인스턴스 하나가 가진 엔클레이브 자원은 하나 분량이라, 먼저 내리고 바꿔 띄운다.
@@ -31,7 +31,7 @@ sudo nitro-cli terminate-enclave --all >/dev/null 2>&1 || true
 pkill -x tb-vendor || true
 
 # ▶ 우리가 만든 tb 명령 — 그 조작된 이미지를 내 TEE 에 띄운다 (Auditor 가 준 것 대신).
-echo "== tb-vendor launch (조작된 이미지)"
+step "LAUNCHING TAMPERED ENCLAVE"
 ./tb-vendor launch --eif out-tampered/tampered.eif
 
 echo

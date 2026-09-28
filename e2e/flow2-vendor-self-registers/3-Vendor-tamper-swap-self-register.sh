@@ -7,10 +7,10 @@ here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
 
-echo "== Vendor 인스턴스로 접속 중..."
 nitroBanner "Vendor"
 V 'bash -s' <<'REMOTE'
 set -euo pipefail
+step() { printf '\033[1;32m==================== %s' "$1"; for _ in 1 2 3; do sleep 0.15; printf '.'; done; printf ' ====================\033[0m\n'; }
 umask 022
 mkdir -p tampered
 # 준비 — 조작 데모용으로 작은 이미지 하나를 직접 만든다. 아무도 검증한 적 없는 값이다.
@@ -19,18 +19,18 @@ FROM alpine:3.20
 RUN echo "not the audited image" > /etc/tb-tampered
 CMD ["sleep", "1000000"]
 DOCKER
-echo "== building my own image (nobody has audited this one)"
+step "BUILDING TAMPERED IMAGE"
 sudo docker build -q -t tampered:latest tampered
 
 # ▶ 우리가 만든 tb 명령 — 이 도커 이미지를 엔클레이브 이미지(EIF)로 포장한다.
-echo "== tb-vendor pack"
+step "PACKING IMAGE"
 ./tb-vendor pack --image tampered:latest --name tampered --out out-tampered
 
 sudo nitro-cli terminate-enclave --all >/dev/null 2>&1 || true
 pkill -x tb-vendor || true
 
 # ▶ 우리가 만든 tb 명령 — 그 조작된 이미지를 내 TEE 에 띄운다 (내가 빌드해 등록한 것 대신).
-echo "== tb-vendor launch (조작된 이미지)"
+step "LAUNCHING TAMPERED ENCLAVE"
 ./tb-vendor launch --eif out-tampered/tampered.eif
 
 echo
@@ -49,18 +49,18 @@ echo "Vendor's build value:"; cat "$WORK/vendor-build.json"
 
 # ▶ 우리가 만든 tb 명령 — 새 등록부를 하나 더 배포한다. "A 여야 하는데 B 를 등록"하는 새 사건이라 기존 등록부에
 #   더하지 않고 새로 만든다 (기존 등록부엔 이미 정직한 값 A 가 있다).
-echo "== registry-deploy (approver = Vendor itself $VENDOR_ADDR)"
+step "DEPLOYING REGISTRY"
 out=$("$TBV" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$VENDOR_ADDR" 2>&1); echo "$out"
 CONTRACT=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # 준비 — 출력에서 주소 뽑기
 [ -n "$CONTRACT" ] || { echo "no contract address in registry-deploy output"; exit 1; }
 echo "$CONTRACT" > "$WORK/contract-flow2.txt"  # 준비 — 다음 단계가 읽을 파일에 남기기
 
 # ▶ 우리가 만든 tb 명령 — 바뀐 값도 내 키로 서명해서 그대로 등록한다 (제3자 대조 없이 통과되는지 보여주는 것).
-echo "== self-register (contract $CONTRACT)"
+step "SELF-REGISTERING"
 "$TBV" self-register --tee "$VENDOR_HOST:5000" --measurements "$WORK/vendor-build.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$VENDOR_KEY" --service "$SERVICE" --version "$VERSION"
 echo "self-register exit=$?"
 # ▶ 우리가 만든 tb 명령 — User 입장에서 검증해도 이 등록부만 보면 통과된다는 걸 보여준다.
-echo "== verify (User) — the signer will be the Vendor itself"
+step "VERIFYING"
 "$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
 echo "verify exit=$?"
 echo "next: 4-Auditor-tamper-audit-check-vendor"

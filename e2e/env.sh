@@ -30,8 +30,10 @@ SCP="scp -q -i $PEM -o StrictHostKeyChecking=no"
 V() { $SSH "$SSH_USER@$VENDOR_HOST" "$@"; }
 A() { $SSH "$SSH_USER@$AUDITOR_HOST" "$@"; }
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
-nitroBanner() { echo; echo "== Nitro 접속완료 — 지금부터 $1 인스턴스 안에서 실행됩니다 =="; sleep 2; }
-localBanner() { echo; echo "== Local 접속완료 — 내 컴퓨터로 복귀 =="; sleep 2; }
+# step — 지금 무엇을 하고 있는지 초록색 띠로 표시. 아래 실제 명령의 출력과 구분되도록 항상 먼저 찍는다.
+step() { printf '\033[1;32m==================== %s' "$1"; for _ in 1 2 3; do sleep 0.15; printf '.'; done; printf ' ====================\033[0m\n'; }
+nitroBanner() { echo; step "CONNECTING TO NITRO ($1)"; sleep 2; }
+localBanner() { echo; step "RETURNING TO LOCAL"; sleep 2; }
 mkdir -p "$WORK"
 
 # 파일 탐색기에서 더블클릭으로 실행하면 끝나자마자 창이 닫혀서 결과를 못 본다 — 끝나면(성공·실패 상관없이)
