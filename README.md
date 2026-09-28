@@ -43,7 +43,7 @@ Both cases must end with the same three things, because that is all the rest of 
 | what | where it goes |
 |---|---|
 | the enclave image (`.eif`) | `launch`, and the M1 hand-off |
-| the measurements, nitro-cli's JSON (`{"Measurements":{"PCR0":…,"PCR1":…,"PCR2":…}}`) | `run --measurements`, `register --measurements`, `compare --b` |
+| the measurements, nitro-cli's JSON (`{"Measurements":{"PCR0":…,"PCR1":…,"PCR2":…}}`) | `launch --measurements`, `register --measurements`, `compare --b` |
 | the RA address `host:port` the enclave answers on | `--tee` for Auditor and User |
 
 Building is optional for the Vendor — an EIF received from the Auditor works too (see 1.3); then
