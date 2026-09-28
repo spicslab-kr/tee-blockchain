@@ -30,8 +30,12 @@ SCP="scp -q -i $PEM -o StrictHostKeyChecking=no"
 V() { $SSH "$SSH_USER@$VENDOR_HOST" "$@"; }
 A() { $SSH "$SSH_USER@$AUDITOR_HOST" "$@"; }
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
-# step — 지금 무엇을 하고 있는지 초록색 띠로 표시. 아래 실제 명령의 출력과 구분되도록 항상 먼저 찍는다.
-step() { printf '\033[1;32m==================== %s' "$1"; for _ in 1 2 3; do sleep 0.15; printf '.'; done; printf ' ====================\033[0m\n'; }
+# step — 지금 무엇을 하고 있는지 초록색 띠로 한 줄 찍고 나서 그 일을 한다. step_start/step_stop 은 같은 배너를
+# 시작/끝에 따로 찍어야 할 때(중간에 다른 명령이 여러 개 끼는 경우)를 위한 것 — 지금은 애니메이션 없이 둘 다
+# 그냥 한 번 찍는다. tb 명령은 대개 자기 진행상황을 스스로 찍어서, 여기서 점을 더 움직이면 그 출력과 겹쳐 깨진다.
+step_start() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; }
+step_stop() { :; }
+step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; shift; "$@"; }
 nitroBanner() { echo; step "CONNECTING TO NITRO ($1)"; sleep 2; }
 localBanner() { echo; step "RETURNING TO LOCAL"; sleep 2; }
 mkdir -p "$WORK"

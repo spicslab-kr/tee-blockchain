@@ -6,12 +6,12 @@
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
+step "READING REGISTRIES"
 VREG=$(cat "$WORK/contract-flow2.txt"); AREG=$(cat "$WORK/contract.txt")
 echo "Vendor's registry  $VREG"
 echo "Auditor's registry $AREG"
 # ▶ 우리가 만든 tb 명령 — 등록부 두 개를 콤마로 같이 주면, 둘 다 보증해야 trusted 로 판정한다.
-step "VERIFYING (both registries)"
-"$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$VREG,$AREG"
+step "VERIFYING (both registries)" "$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$VREG,$AREG"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = nothing registered or nothing matches)"
 exit $rc

@@ -9,8 +9,7 @@ cd "$here/../.."
 echo "the Vendor's enclave now runs something the Auditor never registered — the same verify as step 3 must turn red:"
 CONTRACT=$(cat "$WORK/contract.txt")
 # ▶ 우리가 만든 tb 명령 — RA 로 값 확인 → 체인에서 등록 조회 → 대조 → 믿을지 판단.
-step "VERIFYING"
-"$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
+step "VERIFYING" "$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = nothing registered or nothing matches)"
 exit $rc

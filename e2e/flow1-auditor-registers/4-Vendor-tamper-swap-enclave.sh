@@ -10,7 +10,9 @@ cd "$here/../.."
 nitroBanner "Vendor"
 V 'bash -s' <<'REMOTE'
 set -euo pipefail
-step() { printf '\033[1;32m==================== %s' "$1"; for _ in 1 2 3; do sleep 0.15; printf '.'; done; printf ' ====================\033[0m\n'; }
+step_start() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; }
+step_stop() { :; }
+step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; shift; "$@"; }
 umask 022
 mkdir -p tampered
 # 준비 — 조작 데모용으로 작은 이미지 하나를 직접 만든다. Auditor 는 이 이미지를 본 적이 없다.
@@ -19,20 +21,19 @@ FROM alpine:3.20
 RUN echo "not the audited image" > /etc/tb-tampered
 CMD ["sleep", "1000000"]
 DOCKER
-step "BUILDING TAMPERED IMAGE"
-sudo docker build -q -t tampered:latest tampered
+step "BUILDING TAMPERED IMAGE" sudo docker build -q -t tampered:latest tampered
 
 # ▶ 우리가 만든 tb 명령 — 이 도커 이미지를 엔클레이브 이미지(EIF)로 포장한다.
-step "PACKING IMAGE"
-./tb-vendor pack --image tampered:latest --name tampered --out out-tampered
+step "PACKING IMAGE" ./tb-vendor pack --image tampered:latest --name tampered --out out-tampered
 
 # 준비 — 인스턴스 하나가 가진 엔클레이브 자원은 하나 분량이라, 먼저 내리고 바꿔 띄운다.
+step_start "STOPPING PREVIOUS ENCLAVE"
 sudo nitro-cli terminate-enclave --all >/dev/null 2>&1 || true
 pkill -x tb-vendor || true
+step_stop "STOPPING PREVIOUS ENCLAVE"
 
 # ▶ 우리가 만든 tb 명령 — 그 조작된 이미지를 내 TEE 에 띄운다 (Auditor 가 준 것 대신).
-step "LAUNCHING TAMPERED ENCLAVE"
-./tb-vendor launch --eif out-tampered/tampered.eif
+step "LAUNCHING TAMPERED ENCLAVE" ./tb-vendor launch --eif out-tampered/tampered.eif
 
 echo
 echo "the enclave on :5000 now runs my own image, not what the Auditor registered."

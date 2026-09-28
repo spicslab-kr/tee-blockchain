@@ -10,15 +10,17 @@ cd "$here/../.."
 nitroBanner "Vendor"
 V 'bash -s' <<'REMOTE'
 set -euo pipefail
-step() { printf '\033[1;32m==================== %s' "$1"; for _ in 1 2 3; do sleep 0.15; printf '.'; done; printf ' ====================\033[0m\n'; }
+step_start() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; }
+step_stop() { :; }
+step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; shift; "$@"; }
 test -f from-auditor/alpine-slim.eif -a -f from-auditor/measurements.json || { echo "from-auditor/alpine-slim.eif and measurements.json are missing — the Auditor runs 1-Auditor-build-audit-handoff first"; exit 1; }
 
-step "CHECKING RECEIVED FILES"
+step_start "CHECKING RECEIVED FILES"
 sha256sum from-auditor/alpine-slim.eif from-auditor/measurements.json  # 준비 — 받은 파일 확인용 해시
+step_stop "CHECKING RECEIVED FILES"
 
 # ▶ 우리가 만든 tb 명령 — 받은 이미지를 직접 재서, Auditor 가 넘겨준 측정값과 같을 때만 내 TEE 에 띄운다.
-step "LAUNCHING ENCLAVE"
-./tb-vendor launch --eif from-auditor/alpine-slim.eif --measurements from-auditor/measurements.json
+step "LAUNCHING ENCLAVE" ./tb-vendor launch --eif from-auditor/alpine-slim.eif --measurements from-auditor/measurements.json
 REMOTE
 rc=$?
 [ $rc -eq 0 ] || exit $rc
@@ -31,17 +33,13 @@ R_RPC=$(field rpc); R_CONTRACT=$(field contract); R_KEY=$(field key)
 mkdir -p "$WORK/vendor-check"
 
 # ▶ 우리가 만든 tb 명령 — 내 엔클레이브에 RA 를 보내 증명서를 받는다.
-step "REQUESTING ATTESTATION"
-"$TBV" ra-request --tee "$VENDOR_HOST:5000" --out "$WORK/vendor-check/doc.cbor" --format aws-nitro || exit 1
+step "REQUESTING ATTESTATION" "$TBV" ra-request --tee "$VENDOR_HOST:5000" --out "$WORK/vendor-check/doc.cbor" --format aws-nitro || exit 1
 # ▶ 우리가 만든 tb 명령 — 그 증명서를 검증하고 안의 측정값을 꺼낸다.
-step "PARSING ATTESTATION"
-"$TBV" ra-parse --doc "$WORK/vendor-check/doc.cbor" --out "$WORK/vendor-check/parsed.json" || exit 1
+step "PARSING ATTESTATION" "$TBV" ra-parse --doc "$WORK/vendor-check/doc.cbor" --out "$WORK/vendor-check/parsed.json" || exit 1
 # ▶ 우리가 만든 tb 명령 — 내 엔클레이브 값과 Auditor 가 준 기록의 값을 대조한다.
-step "COMPARING TO AUDITOR'S RECORD"
-"$TBV" compare --a "$WORK/vendor-check/parsed.json" --b "$WORK/from-auditor/measurements.json"; a=$?
+step "COMPARING TO AUDITOR'S RECORD" "$TBV" compare --a "$WORK/vendor-check/parsed.json" --b "$WORK/from-auditor/measurements.json"; a=$?
 # ▶ 우리가 만든 tb 명령 — 내 엔클레이브 값과 실제 체인 등록(값·만료·서명자)을 대조한다.
-step "COMPARING TO CHAIN REGISTRATION"
-"$TBV" compare --a "$WORK/vendor-check/parsed.json" --rpc "$R_RPC" --contract "$R_CONTRACT" --key "$R_KEY"; b=$?
+step "COMPARING TO CHAIN REGISTRATION" "$TBV" compare --a "$WORK/vendor-check/parsed.json" --rpc "$R_RPC" --contract "$R_CONTRACT" --key "$R_KEY"; b=$?
 if [ $a -eq 0 ] && [ $b -eq 0 ]; then
   echo "OK — what I run is exactly what the Auditor audited and registered. Users will get 'trusted'."
 else

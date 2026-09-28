@@ -11,6 +11,7 @@ CONTRACT=""
 while getopts "c:" o; do case $o in c) CONTRACT=$OPTARG;; esac; done  # 준비 — 옵션 파싱
 
 # 준비 — Auditor 인스턴스에서 자기 빌드값을 가져온다.
+step "FETCHING BUILD VALUE"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/measurements.json" "$WORK/auditor-measured.json"
 echo "Auditor's own value:"; cat "$WORK/auditor-measured.json"
 
