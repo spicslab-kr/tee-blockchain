@@ -42,7 +42,7 @@ Both cases must end with the same three things, because that is all the rest of 
 
 | what | where it goes |
 |---|---|
-| the enclave image (`.eif`) | `launch`, and the M1 hand-off |
+| the enclave image (`.eif`) | `launch`, and the hand-off |
 | the measurements, nitro-cli's JSON (`{"Measurements":{"PCR0":…,"PCR1":…,"PCR2":…}}`) | `launch --measurements`, `register --measurements`, `compare --b` |
 | the RA address `host:port` the enclave answers on | `--tee` for Auditor and User |
 
@@ -111,28 +111,28 @@ tb-vendor self-register --tee 127.0.0.1:5000 --rpc <url> --contract <0x…> --ke
 
 What that does, one step at a time.
 
-T1 — send a fresh nonce to the enclave, get back the signed attestation document:
+Send a fresh nonce to the enclave, get back the signed attestation document:
 ```
 tb-vendor ra-request --tee 127.0.0.1:5000 --out doc.cbor
 ```
 
-T2 — verify the signature chain up to the platform root and the nonce, extract PCR0·1·2:
+Verify the signature chain up to the platform root and the nonce, extract PCR0·1·2:
 ```
 tb-vendor ra-parse --doc doc.cbor --out parsed.json
 ```
 
-C1 — sign those measurements with my key and register them on the contract. The `key` it prints
+Sign those measurements with my key and register them on the contract. The `key` it prints
 is the lookup coordinate:
 ```
 tb-vendor register --rpc <url> --contract <0x…> --key-file <key> --measurements parsed.json --service <name> --version <v>
 ```
 
-C2 — read the registration back by measurement alone:
+Read the registration back by measurement alone:
 ```
 tb-vendor lookup --rpc <url> --contract <0x…> --measurements parsed.json
 ```
 
-M2 — self-check: does what's on-chain match what the enclave attested, is it unexpired, is the
+Self-check: does what's on-chain match what the enclave attested, is it unexpired, is the
 signer the contract's approver:
 ```
 tb-vendor compare --a parsed.json --rpc <url> --contract <0x…> --key <key register printed>
@@ -144,7 +144,7 @@ PCRs are printed). `--service`/`--version` are asked for on the first registrati
 reuse them. Any flag you leave out is asked for interactively — except `--rpc`, which defaults to
 Ethereum **mainnet** and requires typing `y` to accept; any other URL (a testnet) is taken as-is.
 
-### 1.3 Hand-off with the Auditor (M1)
+### 1.3 Hand-off with the Auditor
 
 Simplest: tell the Auditor the repository and the commit. That is all it needs to rebuild.
 
@@ -205,33 +205,33 @@ build value, not what the Vendor told me.
 
 What that does, one step at a time.
 
-T1 — attestation document from my enclave:
+Attestation document from my enclave:
 ```
 tb-auditor ra-request --tee <my-instance>:5000 --out doc.cbor
 ```
 
-T2 — verify it, extract PCR0·1·2:
+Verify it, extract PCR0·1·2:
 ```
 tb-auditor ra-parse --doc doc.cbor --out parsed.json
 ```
 
-M2 — the audit gate: the enclave's attested value must equal my build value. FAIL means the
+The audit gate: the enclave's attested value must equal my build value. FAIL means the
 enclave is not running what I built; nothing gets registered:
 ```
 tb-auditor compare --a parsed.json --b out/measurements.json
 ```
 
-C1 — register the **build value** with my key:
+Register the **build value** with my key:
 ```
 tb-auditor register --rpc <url> --contract <0x…> --key-file <key> --measurements out/measurements.json --service <name> --version <v>
 ```
 
-C2 — read it back by measurement:
+Read it back by measurement:
 ```
 tb-auditor lookup --rpc <url> --contract <0x…> --measurements out/measurements.json
 ```
 
-M2 — self-check against the chain:
+Self-check against the chain:
 ```
 tb-auditor compare --a parsed.json --rpc <url> --contract <0x…> --key <key>
 ```
@@ -240,7 +240,7 @@ Pointing `--tee` at the **Vendor's** enclave instead is flow 2's "something look
 (attest what the Vendor is actually running and compare it to my build) — fine as an extra
 step, but flow 1 registers from my own enclave. Same optional flags and prompts as 1.2.
 
-### 2.5 Hand the result to the Vendor (M1)
+### 2.5 Hand the result to the Vendor
 
 `measurement-record.json` carries the service/version, the PCRs and the build tool version;
 `send` fills in the EIF's sha256 and pushes both to the repository:
@@ -259,22 +259,22 @@ exit 1 with the reason if nobody registered it or none check out. No keys, no ET
 
 What that does, one step at a time.
 
-T1 — attestation document from the Vendor's enclave:
+Attestation document from the Vendor's enclave:
 ```
 tb-user ra-request --tee <vendor-public-ip>:5000 --out doc.cbor --format aws-nitro
 ```
 
-T2 — verify it, extract PCR0·1·2:
+Verify it, extract PCR0·1·2:
 ```
 tb-user ra-parse --doc doc.cbor --out parsed.json
 ```
 
-C2 — find the registration by measurement alone; no key from anyone is needed:
+Find the registration by measurement alone; no key from anyone is needed:
 ```
 tb-user lookup --rpc <url> --contract <0x…> --measurements parsed.json
 ```
 
-M2 — the trust decision, for each key `lookup` found:
+The trust decision, for each key `lookup` found:
 ```
 tb-user compare --a parsed.json --rpc <url> --contract <0x…> --key <a key lookup found>
 ```
