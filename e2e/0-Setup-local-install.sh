@@ -125,7 +125,17 @@ echo
 echo "== 설치 확인"
 git --version
 ssh -V
-GOBIN="$( [ -x /usr/local/go/bin/go ] && echo /usr/local/go/bin/go || echo go )"
+# 방금 이 창 안에서 처음 설치했으면, Windows 는 이미 열려 있는 창의 PATH 를 새로고침 안 해서 'go' 가
+# 아직 안 잡힐 수 있다 — PATH 말고 각 설치 방식이 실제로 파일을 두는 자리를 직접 찾아본다.
+GOBIN=go
+for cand in /usr/local/go/bin/go "/c/Program Files/Go/bin/go.exe"; do
+  [ -x "$cand" ] && GOBIN="$cand" && break
+done
+if ! "$GOBIN" version >/dev/null 2>&1; then
+  echo "Go 는 방금 설치됐지만 이 창에는 아직 안 잡힙니다 — 새 Git Bash 창을 열어서"
+  echo "'go version'으로 확인해 주세요 (설치 자체는 끝났습니다)."
+  exit 0
+fi
 "$GOBIN" version
 HAVE_GO="$("$GOBIN" version | awk '{print $3}' | sed 's/^go//')"
 if [ "$HAVE_GO" != "$GO_VERSION" ]; then
