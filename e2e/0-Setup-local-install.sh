@@ -95,8 +95,17 @@ case "$OS_KIND" in
   windows)
     echo "== Git Bash 안에는 git·ssh·bash 가 이미 들어있어서 따로 설치 안 함"
     if go_version_ok; then
-      echo "== Go 는 이미 충분한 버전 — 건너뜀"
+      echo "== Go 는 이미 정확히 $GO_VERSION — 건너뜀"
     elif command -v winget >/dev/null 2>&1; then
+      # Go 의 공식 설치 프로그램(.msi)은 Program Files 에 깔리는 머신 전체용이라, 항상 관리자 권한이 필요하다
+      # (winget 에 사용자 권한 설치 옵션 자체가 없다). 관리자가 아니면 미리 알려주고 여기서 멈춘다 — 안 그러면
+      # winget 이 알아보기 힘든 에러(1603/1618)만 남기고 실패한다.
+      if ! net session >/dev/null 2>&1; then
+        echo "Go 설치는 관리자 권한이 필요합니다 (Go 의 설치 프로그램 자체가 그렇게 만들어져 있음)."
+        echo "관리자 권한으로 Git Bash 나 PowerShell 을 새로 열어서 (시작 메뉴에서 검색 → 오른쪽 클릭 →"
+        echo "'관리자 권한으로 실행') 이 스크립트를 다시 실행해 주세요."
+        exit 1
+      fi
       echo "== Go $GO_VERSION 설치 (winget, 버전 고정 — --version 없이는 winget 이 그냥 최신을 받는다)"
       winget install --id GoLang.Go --version "$GO_VERSION" --silent --accept-package-agreements --accept-source-agreements
       echo "새 Git Bash 창을 열어야 PATH 에 go 가 잡힙니다."
