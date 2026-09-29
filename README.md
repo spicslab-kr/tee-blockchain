@@ -17,12 +17,15 @@ can see exactly what it does, or drive them by hand.
 ## 0. Build the binaries and put them where they run
 
 ```
-go build -o tb-vendor  ./cmd/vendor
-go build -o tb-auditor ./cmd/auditor
-go build -o tb-user    ./cmd/user
-go build -o tb-ra-responder ./cmd/ra-responder
+go build -trimpath -o tb-vendor  ./cmd/vendor
+go build -trimpath -o tb-auditor ./cmd/auditor
+go build -trimpath -o tb-user    ./cmd/user
+go build -trimpath -o tb-ra-responder ./cmd/ra-responder
 ```
 Requires Go 1.26+. Cross-compile for the Nitro instances (Linux) with `GOOS=linux GOARCH=amd64`.
+`-trimpath` matters for `tb-ra-responder` specifically — it gets layered straight into the enclave
+image, so building the identical source from a different folder path would otherwise leave a
+different absolute path baked into the binary, and the measurement (PCR) with it.
 
 - **Vendor's Nitro instance**: `tb-vendor` **and** `tb-ra-responder`, in the same directory.
 - **Auditor's Nitro instance**: `tb-auditor` **and** `tb-ra-responder`, in the same directory.
