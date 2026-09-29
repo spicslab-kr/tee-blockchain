@@ -8,14 +8,16 @@ cd "$here/.."
 . "$here/env.sh"
 
 # ▶ 우리가 만든 tb 명령의 실행 파일 그 자체 — 리눅스용(인스턴스에 올릴 것)과 내 컴퓨터용을 둘 다 빌드한다.
+#   -trimpath: 빌드한 폴더의 절대경로를 바이너리 안에 안 남긴다. tb-ra-responder 는 엔클레이브 이미지에
+#   그대로 얹히므로, 이게 없으면 사람마다 소스를 받은 경로가 달라 같은 소스로도 측정값이 갈린다.
 step "BUILDING BINARIES"
-GOOS=linux GOARCH=amd64 go build -o tb-vendor ./cmd/vendor
-GOOS=linux GOARCH=amd64 go build -o tb-auditor ./cmd/auditor
-GOOS=linux GOARCH=amd64 go build -o tb-ra-responder ./cmd/ra-responder
+GOOS=linux GOARCH=amd64 go build -trimpath -o tb-vendor ./cmd/vendor
+GOOS=linux GOARCH=amd64 go build -trimpath -o tb-auditor ./cmd/auditor
+GOOS=linux GOARCH=amd64 go build -trimpath -o tb-ra-responder ./cmd/ra-responder
 mkdir -p "$BIN"
-go build -o "$TBV" ./cmd/vendor
-go build -o "$TBA" ./cmd/auditor
-go build -o "$TBU" ./cmd/user
+go build -trimpath -o "$TBV" ./cmd/vendor
+go build -trimpath -o "$TBA" ./cmd/auditor
+go build -trimpath -o "$TBU" ./cmd/user
 echo "responder sha256: $(sha256 tb-ra-responder | cut -c1-64)"  # 준비 — 두 인스턴스에 같은 바이너리가 올라갔는지 나중에 대조용
 
 # 준비 — 떠 있던 ra-proxy 가 옛 바이너리를 잡고 있으면 덮어쓸 수 없다. 엔클레이브와 함께 먼저 내린다.
