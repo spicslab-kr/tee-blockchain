@@ -165,14 +165,33 @@ Ethereum **mainnet** and requires typing `y` to accept; any other URL (a testnet
 
 Simplest: tell the Auditor the repository and the commit. That is all it needs to rebuild.
 
-Or hand it over as a file. `send` writes `build-config.json` (source repo/commit/path plus the
-instance's id/region/AMI) to the root of the repository and pushes it:
+Or hand it over as a file. You write `build-config.json`; `send` pushes it to the root of the
+repository:
 ```
 tb-vendor send --repo <git url> --config build-config.json
 ```
-It also records the environment you built in — OS, CPU architecture, Go toolchain, and whether
-`-trimpath` was used — as `build_env`. The Auditor builds to that, not to whatever it has: PCR0·1·2
-differ between x86_64 and arm64, and between Go versions.
+```json
+{
+  "schema": "tb.build-config/1",
+  "service": "nginx",
+  "version": "1.31.6",
+  "platform": "aws",
+  "source":   { "repo": "https://github.com/<you>/<app>", "commit": "<git commit>", "path": "mainline/alpine-slim" },
+  "tee_info": { "instance_id": "i-…", "region": "eu-north-1", "ami_id": "ami-…" },
+  "build_env": { "os": "linux", "arch": "amd64", "go": "go1.26.1", "trimpath": true }
+}
+```
+`build_env` is the environment the image was built in — OS, CPU architecture (`amd64` or
+`arm64`), Go toolchain, and whether `-trimpath` was used. If you built with tb, leave it out and
+`send` fills it in from the running binary; if you built outside tb, write it yourself. The Auditor
+builds to that, not to whatever it has: PCR0·1·2 differ between x86_64 and arm64, and between Go
+versions.
+
+The Auditor must be able to read the repository — for a private one, give them read access
+(collaborator or deploy key); tb does not manage permissions. `send`/`receive` exit codes: 3 git
+not found, 4 repository unreachable (URL or permissions), 5 commit not found (`--ref`), 6 push
+rejected (write access, or the remote is ahead — pull first). To do it by hand instead: commit
+`build-config.json` at the repository root and push; the Auditor clones it and reads the file.
 
 Later, when the Auditor has published its result, fetch it — `measurement-record.json` and the
 EIF, with their hashes verified:
@@ -327,6 +346,6 @@ tb-user compare --a parsed.json --rpc <url> --contract <0x…> --key <a key look
 ```
 
 
-- `setup/vendor/`, `setup/auditor/` — build / launch / chain / transfer notes per role, including
+- `setup/vendor/`, `setup/auditor/` — build / launch / chain notes per role, including
   what exactly `build` normalizes and what it cannot fix (unpinned package versions, random state)
 - `docs/` — design notes
