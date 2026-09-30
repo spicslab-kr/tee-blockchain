@@ -56,6 +56,9 @@ step_start "FETCHING BUILD VALUE"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/measurements.json" "$WORK/auditor-measured.json"
 case "$(A 'uname -m' | tr -d '\r\n')" in x86_64) ARCH=amd64;; aarch64|arm64) ARCH=arm64;; *) ARCH="";; esac
 [ -n "$ARCH" ] || { echo "cannot tell the Auditor instance's architecture from uname -m"; exit 1; }
+# 준비 — 인스턴스에 올린 tb 바이너리는 이 컴퓨터의 Go 로 크로스 빌드했고(0-Setup 이 고정된 Go 가 아니면 거절한다),
+#   그 Go 가 tb-ra-responder 를 컴파일했다. 기록의 build_env.go 에 적을 값은 그래서 이 컴퓨터의 Go 버전이다.
+GOVER=$(go env GOVERSION)
 step_stop "FETCHING BUILD VALUE"
 echo "Auditor's own value (arch: $ARCH):"; cat "$WORK/auditor-measured.json"
 
@@ -95,7 +98,7 @@ cat > "$WORK/from-auditor/measurement-record.json" <<EOF
   "service": "$SERVICE",
   "version": "$VERSION",
   "platform": "aws-nitro",
-  "arch": "$ARCH",
+  "build_env": { "os": "linux", "arch": "$ARCH", "go": "$GOVER", "trimpath": true },
   "image": "alpine-slim.eif",
   "measurements": { "PCR0": "$(pcr PCR0)", "PCR1": "$(pcr PCR1)", "PCR2": "$(pcr PCR2)" },
   "registry": { "rpc": "$RPC", "contract": "$CONTRACT", "key": "$KEY", "approver": "$AUDITOR_ADDR" },

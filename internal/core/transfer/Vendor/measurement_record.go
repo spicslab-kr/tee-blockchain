@@ -41,7 +41,7 @@ type MeasurementRecord struct {
 	Service      string         `json:"service"`
 	Version      string         `json:"version"`
 	Platform     string         `json:"platform"`
-	Arch         string         `json:"arch"` // GOARCH the image was built for and measured on: amd64 or arm64. Measurements differ per architecture, so one service/version has one record per architecture.
+	BuildEnv     BuildEnv       `json:"build_env"` // the environment the image was built in and measured on — same shape as build-config.json's. Measurements differ per architecture and per Go toolchain, so one service/version has one record per architecture.
 	Image        Image          `json:"image"`
 	Values       p.Measurements `json:"values"`
 	BuildTool    BuildTool      `json:"build_tool"`
@@ -65,8 +65,16 @@ func (r MeasurementRecord) Validate() error {
 	}
 	switch r.Platform {
 	case "aws":
-		if !validArch(r.Arch) {
-			errs = append(errs, "arch: want one of "+strings.Join(archNames(), "|")+" (GOARCH spelling), got "+quote(r.Arch))
+		// build_env: the record is what the Vendor reads to learn which architecture and which
+		// Go toolchain the measured image came from, so on aws it must be declared in full.
+		if r.BuildEnv.OS == "" {
+			errs = append(errs, "build_env.os: required for aws")
+		}
+		if !validArch(r.BuildEnv.Arch) {
+			errs = append(errs, "build_env.arch: want one of "+strings.Join(archNames(), "|")+" (GOARCH spelling), got "+quote(r.BuildEnv.Arch))
+		}
+		if r.BuildEnv.Go == "" {
+			errs = append(errs, "build_env.go: required for aws")
 		}
 		if r.Image.Path == "" {
 			errs = append(errs, "image.path: EIF file required for aws")
@@ -85,6 +93,10 @@ func (r MeasurementRecord) Validate() error {
 		if !isDigest(r.Image.Digest) && r.Image.ImageID == "" {
 			errs = append(errs, "image: digest (container) or image_id (VM) required for azure")
 		}
+	}
+	// as in build-config: an architecture the project does not build for is refused on any platform.
+	if r.Platform != "aws" && r.BuildEnv.Arch != "" && !validArch(r.BuildEnv.Arch) {
+		errs = append(errs, "build_env.arch: unknown "+quote(r.BuildEnv.Arch)+" (want one of "+archList()+")")
 	}
 	if len(r.Values) == 0 {
 		errs = append(errs, "values: empty")

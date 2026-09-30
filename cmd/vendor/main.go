@@ -179,8 +179,9 @@ func receive(args []string) error {
 	if got.ImagePath != "" {
 		fmt.Printf("image    %s (verified)\n", got.ImagePath)
 	}
-	fmt.Printf("%s %s %s · arch: %s · %d measurements · %s %s\n", got.Value.Service, got.Value.Version, got.Value.Platform,
-		got.Value.Arch, len(got.Value.Values), got.Value.BuildTool.Name, got.Value.BuildTool.Version)
+	fmt.Printf("%s %s %s · build env: %s · %d measurements · %s %s\n", got.Value.Service, got.Value.Version, got.Value.Platform,
+		got.Value.BuildEnv, len(got.Value.Values), got.Value.BuildTool.Name, got.Value.BuildTool.Version)
+	warnToolchain(got.Value.BuildEnv)
 	return nil
 }
 

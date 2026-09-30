@@ -1,6 +1,7 @@
 package vendor
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -75,52 +76,83 @@ func TestMeasurementRecord_Registration(t *testing.T) {
 	}
 }
 
-// 같은 소스도 x86_64 와 arm64 에서 PCR 이 다르다. 그래서 aws 기록은 어느 아키텍처 것인지(arch) 반드시 적는다.
-// 철자는 GOARCH(amd64 · arm64) 하나로 — uname 이 내는 x86_64 · aarch64 는 거절한다. 출처는 build.ArchTargets.
-func TestMeasurementRecord_Arch(t *testing.T) {
+// 같은 소스도 x86_64 와 arm64 에서, 그리고 Go 툴체인이 다르면 PCR 이 다르다. 그래서 aws 기록은 어느 빌드 환경 것인지
+// (build_env: os · arch · go · trimpath) 반드시 적는다 — build-config.json 의 build_env 와 같은 모양이다.
+// arch 철자는 GOARCH(amd64 · arm64) 하나로 — uname 이 내는 x86_64 · aarch64 는 거절한다. 출처는 build.ArchTargets.
+func TestMeasurementRecord_BuildEnvArch(t *testing.T) {
 	for _, ok := range []string{"amd64", "arm64"} {
 		r := recAWS()
-		r.Arch = ok
+		r.BuildEnv.Arch = ok
 		if err := r.Validate(); err != nil {
-			t.Errorf("arch %q must validate: %v", ok, err)
+			t.Errorf("build_env.arch %q must validate: %v", ok, err)
 		}
 	}
 	for _, bad := range []string{"", "x86_64", "aarch64", "AMD64", "arm"} {
 		r := recAWS()
-		r.Arch = bad
-		mustErr(t, r, "arch: want one of amd64|arm64")
+		r.BuildEnv.Arch = bad
+		mustErr(t, r, "build_env.arch: want one of amd64|arm64")
 	}
-	// gcp · azure 는 아직 arch 를 요구하지 않는다 (측정값이 이미지 digest 라 아키텍처가 따로 갈리지 않는다).
+	// gcp · azure 는 아직 build_env 를 요구하지 않는다 (측정값이 이미지 digest 라 아키텍처가 따로 갈리지 않는다).
 	for _, r := range []MeasurementRecord{recGCP(), recAzure()} {
 		if err := r.Validate(); err != nil {
-			t.Errorf("%s without arch must still validate: %v", r.Platform, err)
+			t.Errorf("%s without build_env must still validate: %v", r.Platform, err)
 		}
+	}
+	// 다만 적혀 있다면 이 프로젝트가 빌드하는 아키텍처여야 한다 — 어느 플랫폼이든.
+	r := recGCP()
+	r.BuildEnv.Arch = "mips"
+	mustErr(t, r, "build_env.arch: unknown")
+}
+
+// aws 기록은 OS 와 Go 툴체인도 비워 둘 수 없다 — Vendor 가 이 기록으로 어느 툴체인이 이미지를 만들었는지 안다.
+func TestMeasurementRecord_BuildEnvRequiresOSAndGoOnAWS(t *testing.T) {
+	r := recAWS()
+	r.BuildEnv.OS = ""
+	mustErr(t, r, "build_env.os: required for aws")
+	r = recAWS()
+	r.BuildEnv.Go = ""
+	mustErr(t, r, "build_env.go: required for aws")
+	// trimpath=false 는 허용한다 — 사실을 적는 것이지 요구 조건이 아니다.
+	r = recAWS()
+	r.BuildEnv.Trimpath = false
+	if err := r.Validate(); err != nil {
+		t.Errorf("trimpath=false must validate: %v", err)
+	}
+	// 통째로 빠진 build_env 는 세 필드를 모두 지목한다.
+	r = recAWS()
+	r.BuildEnv = BuildEnv{}
+	for _, want := range []string{"build_env.os", "build_env.arch", "build_env.go"} {
+		mustErr(t, r, want)
 	}
 }
 
-// arch 는 파일에 그대로 실려 왕복해야 한다 — 받는 쪽(Vendor)이 어느 아키텍처의 기록인지 알 수 있게.
-func TestMeasurementRecord_ArchRoundTrip(t *testing.T) {
+// build_env 는 파일에 그대로 실려 왕복해야 한다 — 받는 쪽(Vendor)이 어느 아키텍처·어느 툴체인의 기록인지 알 수 있게.
+func TestMeasurementRecord_BuildEnvRoundTrip(t *testing.T) {
 	r := recAWS()
-	r.Arch = "arm64"
+	r.BuildEnv = BuildEnv{OS: "linux", Arch: "arm64", Go: "go1.26.1", Trimpath: true}
 	b, err := Encode(r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(b), `"arch": "arm64"`) && !strings.Contains(string(b), `"arch":"arm64"`) {
-		t.Fatalf("arch must be encoded:\n%s", b)
+	if !strings.Contains(string(b), `"build_env"`) || !strings.Contains(string(b), `"arch": "arm64"`) || !strings.Contains(string(b), `"go": "go1.26.1"`) {
+		t.Fatalf("build_env must be encoded:\n%s", b)
 	}
 	got, err := DecodeMeasurementRecord(b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Arch != "arm64" {
-		t.Fatalf("arch lost in round trip: %q", got.Arch)
+	if got.BuildEnv != r.BuildEnv {
+		t.Fatalf("build_env lost in round trip: %+v", got.BuildEnv)
 	}
-	// arch 가 빠진 파일은 받는 쪽에서 거절한다.
-	stripped := strings.Replace(string(b), `"arch": "arm64",`, "", 1)
-	stripped = strings.Replace(stripped, `"arch":"arm64",`, "", 1)
-	if _, err := DecodeMeasurementRecord([]byte(stripped)); err == nil || !strings.Contains(err.Error(), "arch") {
-		t.Fatalf("record without arch must be rejected naming arch, got %v", err)
+	// build_env 가 빠진 파일은 받는 쪽에서 거절한다 — 메시지가 build_env 를 지목한다.
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	delete(m, "build_env")
+	stripped, _ := json.Marshal(m)
+	if _, err := DecodeMeasurementRecord(stripped); err == nil || !strings.Contains(err.Error(), "build_env") {
+		t.Fatalf("record without build_env must be rejected naming build_env, got %v", err)
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 	lether "tb/internal/chain/lookup/Vendor/ether"
 	reg "tb/internal/chain/register/Vendor"
 	"tb/internal/chain/register/Vendor/ether"
+	tr "tb/internal/core/transfer/Vendor"
 	p "tb/internal/tee/parse/Vendor"
 )
 
@@ -92,9 +93,19 @@ func register(args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// the build environment this registration is for: --arch says which machine the image was built for and measured
+	// on; the Go toolchain is this binary's — it is pinned project-wide (build.CheckToolchain at build start), so it is
+	// the one that compiled tb-ra-responder into the image. none of it goes into the chain Entry (the measurement hash
+	// already differs per architecture, so the key splits by itself); it is said here and in measurement-record.json.
+	env := tr.CurrentBuildEnv()
+	env.Arch = *arch
+	env.OS = "linux" // the enclave image is Linux whichever machine runs register
+	goVer := env.Go
+	if env.Trimpath {
+		goVer += " -trimpath"
+	}
 	if !quiet {
-		// arch 는 체인 Entry 에 들어가지 않는다 — 측정값 해시가 아키텍처마다 이미 다르니 키는 저절로 갈린다. 어느 것인지는 여기와 기록 파일에만 적는다.
-		fmt.Printf("registering %s %s (%s)\nsigner %s\n", *service, *version, *arch, signed.Signer)
+		fmt.Printf("registering %s %s (%s, %s)\nsigner %s\n", *service, *version, *arch, goVer, signed.Signer)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -103,12 +114,21 @@ func register(args []string) (string, error) {
 		return "", err
 	}
 	lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block = receipt.Key, receipt.TxHash, receipt.Block
-	lastRegistered.Expires, lastRegistered.Signer, lastRegistered.Arch = meta.Expires.UTC().Format(time.RFC3339), signed.Signer, *arch
+	lastRegistered.Expires, lastRegistered.Signer, lastRegistered.BuildEnv = meta.Expires.UTC().Format(time.RFC3339), signed.Signer, env
 	if !quiet {
-		fmt.Printf("registered %s %s (%s)\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n  arch    %s\n", *service, *version, *arch, receipt.Key, receipt.TxHash, receipt.Block, lastRegistered.Expires, *arch)
-		fmt.Printf("  this registration is for %s only — put \"arch\": \"%s\" in measurement-record.json, and register the other architecture's build separately\n", *arch, *arch)
+		fmt.Printf("registered %s %s (%s, %s)\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n  build env  %s\n", *service, *version, *arch, goVer, receipt.Key, receipt.TxHash, receipt.Block, lastRegistered.Expires, env)
+		fmt.Printf("  this registration is for %s only — put \"build_env\": %s in measurement-record.json, and register the other architecture's build separately\n", *arch, buildEnvJSON(env))
 	}
 	return receipt.Key, nil
+}
+
+// buildEnvJSON — the record's build_env object on one line, as it should be pasted into measurement-record.json.
+func buildEnvJSON(env tr.BuildEnv) string {
+	b, err := json.Marshal(env)
+	if err != nil {
+		return env.String()
+	}
+	return string(b)
 }
 
 // lookup — C2. --key 가 있으면 바로 그 key 를 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다.

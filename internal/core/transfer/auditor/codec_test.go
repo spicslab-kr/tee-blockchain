@@ -34,7 +34,12 @@ const (
   "service": "svc",
   "version": "1.2.0",
   "platform": "aws",
-  "arch": "amd64",
+  "build_env": {
+    "os": "linux",
+    "arch": "amd64",
+    "go": "go1.26.1",
+    "trimpath": true
+  },
   "image": {
     "path": "svc.eif",
     "sha256": "abababababababababababababababababababababababababababababababab"

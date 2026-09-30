@@ -11,7 +11,7 @@ const commit = "0123456789abcdef0123456789abcdef01234567"
 
 func cfgAWS() BuildConfig {
 	return BuildConfig{Schema: SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "aws",
-		Source:  Source{Repo: "https://example.com/svc.git", Commit: commit},
+		Source:   Source{Repo: "https://example.com/svc.git", Commit: commit},
 		TEEInfo:  map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
 		BuildEnv: envAWS()}
 }
@@ -35,7 +35,7 @@ func cfgAzure() BuildConfig {
 func pcr(fill byte) []byte { return bytes.Repeat([]byte{fill}, 48) }
 
 func recAWS() MeasurementRecord {
-	return MeasurementRecord{Schema: SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", Arch: "amd64",
+	return MeasurementRecord{Schema: SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", BuildEnv: envAWS(),
 		Image:     Image{Path: "svc.eif", SHA256: strings.Repeat("ab", 32)},
 		Values:    p.Measurements{{Name: "PCR0", Value: pcr(1)}, {Name: "PCR1", Value: pcr(2)}, {Name: "PCR2", Value: pcr(3)}},
 		BuildTool: BuildTool{Name: "nitro-cli", Version: "1.3.0"}}

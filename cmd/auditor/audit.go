@@ -216,8 +216,8 @@ func auditCmd(args []string) error {
 	}
 	t.Done("registered")
 	cli.Why("the value now sits on the public registry under my signature; anyone can look it up by measurement alone, without asking me")
-	fmt.Printf("    key     %s\n    tx      %s\n    block   %d\n    expires %s\n    signer  %s\n    arch    %s\n",
-		lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block, lastRegistered.Expires, lastRegistered.Signer, lastRegistered.Arch)
+	fmt.Printf("    key     %s\n    tx      %s\n    block   %d\n    expires %s\n    signer  %s\n    build env  %s\n",
+		lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block, lastRegistered.Expires, lastRegistered.Signer, lastRegistered.BuildEnv)
 
 	t = cli.Start("Reading the registration back from the chain and checking it")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

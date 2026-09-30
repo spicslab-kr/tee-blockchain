@@ -113,6 +113,9 @@ done. `self-register` is for flow 2, where the Vendor registers its own enclave:
 ```
 tb-vendor self-register --tee 127.0.0.1:5000 --rpc <url> --contract <0x…> --key-file <key>
 ```
+The confirmation names the CPU architecture and the Go toolchain the enclave was built with
+(`registered nginx 1.31.6 (amd64, go1.26.1 -trimpath)`), since the registered value is only
+reproducible in that environment.
 
 What that does, one step at a time.
 
@@ -255,10 +258,12 @@ step, but flow 1 registers from my own enclave. Same optional flags and prompts 
 ### 2.5 Hand the result to the Vendor
 
 `measurement-record.json` carries the service/version, the PCRs, the build tool version and
-the `arch` the image was built on (`amd64` or `arm64`, GOARCH spelling). The same source
-measures differently on x86_64 and on arm64, so one service/version has one record — and one
-registration — per CPU architecture; `send` refuses a record that does not say which.
-`send` fills in the EIF's sha256 and pushes both to the repository:
+the `build_env` the image was built in — OS, CPU architecture (`amd64` or `arm64`, GOARCH
+spelling), Go toolchain and whether `-trimpath` was on — the same shape as build-config.json's
+`build_env`. The same source measures differently on x86_64 and on arm64 (and under a different
+Go), so one service/version has one record — and one registration — per CPU architecture;
+`send` refuses a record that does not say which, and warns when the record's Go is not the one
+this project pins. `send` fills in the EIF's sha256 and pushes both to the repository:
 ```
 tb-auditor send --repo <git url> --record measurement-record.json --image out/<name>.eif
 ```

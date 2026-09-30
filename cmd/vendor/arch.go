@@ -5,6 +5,8 @@ import (
 	"runtime"
 	"strings"
 
+	"tb/internal/cli"
+	tr "tb/internal/core/transfer/Vendor"
 	"tb/internal/setup/build"
 )
 
@@ -29,4 +31,12 @@ func checkArch(s string) error {
 		}
 	}
 	return fmt.Errorf("--arch: want one of %s (GOARCH spelling: x86_64 is amd64, aarch64 is arm64), got %q", strings.Join(archNames(), "|"), s)
+}
+
+// warnToolchain — 기록의 build_env.go 가 이 프로젝트가 고정한 Go(internal/setup/build/GO_TOOLCHAIN)와 다르면 한 줄 알린다.
+// 오류는 아니다 — 기록이 다른 체크아웃에서 왔거나 더 오래된 것일 수 있다 — 하지만 재빌드하면 다른 바이트가 나온다는 뜻이다.
+func warnToolchain(env tr.BuildEnv) {
+	if env.Go != "" && env.Go != build.RequiredToolchain() {
+		cli.Errorf("warning: the record was produced with %s, but this project pins %s — a rebuild here will not reproduce its measurements", env.Go, build.RequiredToolchain())
+	}
 }

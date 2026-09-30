@@ -20,7 +20,7 @@ const commit = "0123456789abcdef0123456789abcdef01234567"
 func TestTransfer_VendorToAuditor_BuildConfig(t *testing.T) {
 	cases := []vendor.BuildConfig{
 		{Schema: vendor.SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "aws",
-			Source:  vendor.Source{Repo: "https://example.com/svc.git", Commit: commit},
+			Source:   vendor.Source{Repo: "https://example.com/svc.git", Commit: commit},
 			TEEInfo:  map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
 			BuildEnv: vendor.BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true}},
 		{Schema: vendor.SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "gcp",
@@ -62,7 +62,7 @@ func TestTransfer_AuditorToVendor_MeasurementRecordWithImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := auditor.MeasurementRecord{
-		Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", Arch: "amd64",
+		Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", BuildEnv: auditor.BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true},
 		Image: auditor.Image{Path: eif},
 		Values: ap.Measurements{
 			{Name: "PCR0", Value: bytes.Repeat([]byte{1}, 48)},
@@ -133,7 +133,7 @@ func TestTransfer_TamperInTransitIsCaught(t *testing.T) {
 	eif := filepath.Join(build, "svc.eif")
 	_ = os.WriteFile(eif, []byte("eif-bytes"), 0o644)
 	rec := auditor.MeasurementRecord{
-		Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", Arch: "amd64",
+		Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", BuildEnv: auditor.BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true},
 		Image:     auditor.Image{Path: eif},
 		Values:    ap.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{1}, 48)}, {Name: "PCR1", Value: bytes.Repeat([]byte{2}, 48)}, {Name: "PCR2", Value: bytes.Repeat([]byte{3}, 48)}},
 		BuildTool: auditor.BuildTool{Name: "nitro-cli", Version: "1.3.0"},
