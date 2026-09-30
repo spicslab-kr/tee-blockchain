@@ -145,11 +145,18 @@ func send(args []string) error {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return fmt.Errorf("build config: %w", err)
 	}
+	// the environment this tb was built in is the one its build command compiles tb-ra-responder
+	// in — record it so the Auditor rebuilds to it, not to whatever it happens to have. a config
+	// that already declares one (the Vendor built somewhere else) is left as written.
+	if cfg.BuildEnv.IsZero() {
+		cfg.BuildEnv = tr.CurrentBuildEnv()
+	}
 	res, err := tr.GitTransport{WorkDir: *work}.Send(context.Background(), cfg, *repo)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("sent %s → %s @ %s\n", res.Path, res.Repo, res.Commit)
+	fmt.Printf("build env: %s\n", cfg.BuildEnv)
 	return nil
 }
 

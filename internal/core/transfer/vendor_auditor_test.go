@@ -21,7 +21,8 @@ func TestTransfer_VendorToAuditor_BuildConfig(t *testing.T) {
 	cases := []vendor.BuildConfig{
 		{Schema: vendor.SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "aws",
 			Source:  vendor.Source{Repo: "https://example.com/svc.git", Commit: commit},
-			TEEInfo: map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"}},
+			TEEInfo:  map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
+			BuildEnv: vendor.BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true}},
 		{Schema: vendor.SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "gcp",
 			Source:  vendor.Source{Repo: "https://example.com/svc.git", Commit: commit},
 			TEEInfo: map[string]string{"instance_name": "svc-1", "project_id": "proj", "container_image": "gcr.io/proj/svc@sha256:" + strings.Repeat("cd", 32)}},
@@ -45,6 +46,9 @@ func TestTransfer_VendorToAuditor_BuildConfig(t *testing.T) {
 			if got.Value.TEEInfo[k] != v {
 				t.Errorf("%s: tee_info.%s = %q, want %q", cfg.Platform, k, got.Value.TEEInfo[k], v)
 			}
+		}
+		if got.Value.BuildEnv != auditor.BuildEnv(cfg.BuildEnv) {
+			t.Errorf("%s: build_env = %+v, want %+v", cfg.Platform, got.Value.BuildEnv, cfg.BuildEnv)
 		}
 	}
 }

@@ -158,6 +158,9 @@ instance's id/region/AMI) to the root of the repository and pushes it:
 ```
 tb-vendor send --repo <git url> --config build-config.json
 ```
+It also records the environment you built in — OS, CPU architecture, Go toolchain, and whether
+`-trimpath` was used — as `build_env`. The Auditor builds to that, not to whatever it has: PCR0·1·2
+differ between x86_64 and arm64, and between Go versions.
 
 Later, when the Auditor has published its result, fetch it — `measurement-record.json` and the
 EIF, with their hashes verified:
@@ -176,6 +179,10 @@ that the commit it names really is in the history:
 ```
 tb-auditor receive --repo <git url> --into work/src
 ```
+It also compares the Vendor's `build_env` with this instance and refuses to go on (exit ≠ 0) if
+the OS, CPU architecture or Go version differ — a build here would not reproduce the Vendor's
+measurements, and the mismatch would look like a finding. Move to a matching instance, or pass
+`--ignore-env` if you know better. A Vendor that built without `-trimpath` gets a warning only.
 
 ### 2.2 Build and launch — Case A or Case B
 

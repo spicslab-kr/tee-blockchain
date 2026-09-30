@@ -20,6 +20,12 @@ const (
     "ami_id": "ami-0123",
     "instance_id": "i-0abc",
     "region": "ap-northeast-2"
+  },
+  "build_env": {
+    "os": "linux",
+    "arch": "amd64",
+    "go": "go1.26.1",
+    "trimpath": true
   }
 }
 `

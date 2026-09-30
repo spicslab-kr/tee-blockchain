@@ -12,7 +12,12 @@ const commit = "0123456789abcdef0123456789abcdef01234567"
 func cfgAWS() BuildConfig {
 	return BuildConfig{Schema: SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "aws",
 		Source:  Source{Repo: "https://example.com/svc.git", Commit: commit},
-		TEEInfo: map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"}}
+		TEEInfo:  map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
+		BuildEnv: envAWS()}
+}
+
+func envAWS() BuildEnv {
+	return BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true}
 }
 
 func cfgGCP() BuildConfig {

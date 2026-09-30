@@ -101,7 +101,7 @@ func usage() {
                    measurements on this contract. without --tee registers --measurements as is (no audit).
                    --vendor-tee also asks the Vendor's running enclave and says whether it runs the same value (flow 2 step 15); what is
                    registered is still my value
-  receive          --repo <url> [--ref <commit>] --into <dir>
+  receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
                    clone the source repository and read the build config. build from that directory
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
                    commit and push the measurement record and image to the repository
@@ -134,6 +134,7 @@ func receive(args []string) error {
 	repo := fs.String("repo", "", "Vendor source repository URL")
 	ref := fs.String("ref", "", "commit, branch or tag")
 	into := fs.String("into", "", "directory to clone into")
+	ignoreEnv := fs.Bool("ignore-env", false, "only warn when this instance's OS/architecture/Go differ from the Vendor's build_env")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -149,6 +150,21 @@ func receive(args []string) error {
 	fmt.Printf("%s %s %s · source %s @ %s\n", c.Service, c.Version, c.Platform, c.Source.Repo, c.Source.Commit[:12])
 	for k, v := range c.TEEInfo {
 		fmt.Printf("  tee_info.%s = %s\n", k, v)
+	}
+	// the Vendor said which environment it built in. this instance must be the same one, or
+	// a rebuild here can't reproduce its measurements — and would look like a lying Vendor.
+	have := tr.CurrentBuildEnv()
+	fmt.Printf("build env: %s (Vendor)\n", c.BuildEnv)
+	fmt.Printf("build env: %s (this instance)\n", have)
+	warnings, err := tr.CheckBuildEnv(c.BuildEnv, have, *ignoreEnv)
+	for _, w := range warnings {
+		cli.Errorf("warning: %s", w)
+	}
+	if err != nil {
+		return fmt.Errorf("%w (rerun with --ignore-env to proceed anyway)", err)
+	}
+	if c.BuildEnv.OS == have.OS && c.BuildEnv.Arch == have.Arch && c.BuildEnv.Go == have.Go {
+		cli.Okln("build env matches the Vendor's")
 	}
 	return nil
 }
