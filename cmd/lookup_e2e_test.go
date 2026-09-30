@@ -44,16 +44,17 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 
 	measurements := "PCR0=" + strings.Repeat("aa", 48) + ",PCR1=" + strings.Repeat("bb", 48) + ",PCR2=" + strings.Repeat("cc", 48)
 	reg := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
-		"--measurements", measurements, "--service", "lookup-e2e", "--version", "2.0.0", "--platform", "aws-nitro")
+		"--measurements", measurements, "--service", "lookup-e2e", "--version", "2.0.0", "--platform", "aws-nitro", "--arch", "arm64")
 	regOut, err := reg.CombinedOutput()
 	if err != nil {
 		t.Fatalf("register: %v\n%s", err, regOut)
 	}
 	key := string(keyLineRe.FindSubmatch(regOut)[1])
 
-	// Vendor 도 같은 측정값을 자기 컨트랙트에 등록 — 컨트랙트가 다르니 조회도 각자 한다.
+	// Vendor 도 같은 측정값을 자기 컨트랙트에 등록 — 컨트랙트가 다르니 조회도 각자 한다. 아키텍처는 일부러 다르게 —
+	// 체인이 등록마다 어느 아키텍처인지 말하는지 조회 출력으로 본다 (키에는 안 들어가니 키는 여전히 서명자로만 갈린다).
 	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
-		"--measurements", measurements, "--service", "lookup-e2e", "--version", "2.0.0", "--platform", "aws-nitro")
+		"--measurements", measurements, "--service", "lookup-e2e", "--version", "2.0.0", "--platform", "aws-nitro", "--arch", "amd64")
 	vRegOut, err := vReg.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor register: %v\n%s", err, vRegOut)
@@ -75,8 +76,8 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	if strings.Contains(string(lmOut), vendorKeyHex) {
 		t.Fatalf("auditor 컨트랙트 조회에 vendor 의 key 가 섞였다:\n%s", lmOut)
 	}
-	if !strings.Contains(string(lmOut), "lookup-e2e 2.0.0 (aws-nitro)") {
-		t.Errorf("서비스 메타데이터가 안 보인다:\n%s", lmOut)
+	if !strings.Contains(string(lmOut), "lookup-e2e 2.0.0 (aws-nitro, arm64)") {
+		t.Errorf("서비스 메타데이터(아키텍처 포함)가 안 보인다:\n%s", lmOut)
 	}
 	// 같은 측정값을 vendor 컨트랙트에서 찾으면 vendor 의 key 하나.
 	vByMeasurements := exec.Command(vendorBin, "lookup", "--rpc", rpc, "--contract", vContract, "--measurements", measurements)
@@ -86,6 +87,9 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	}
 	if !strings.Contains(string(vlmOut), "found 1 key(s)") || !strings.Contains(string(vlmOut), vendorKeyHex) {
 		t.Fatalf("vendor 컨트랙트에선 vendor 의 key 하나가 나와야 한다:\n%s", vlmOut)
+	}
+	if !strings.Contains(string(vlmOut), "lookup-e2e 2.0.0 (aws-nitro, amd64)") {
+		t.Errorf("vendor 등록은 amd64 로 했다 — 조회가 그렇게 말해야 한다:\n%s", vlmOut)
 	}
 
 	// vendor 쪽 key 로 직접 조회 — signer 가 vendor 주소여야 한다.
@@ -106,6 +110,9 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	}
 	if !strings.Contains(string(bkOut), auditorAddr) {
 		t.Errorf("signer 가 auditor 주소가 아니다:\n%s", bkOut)
+	}
+	if !strings.Contains(string(bkOut), "lookup-e2e 2.0.0 (aws-nitro, arm64)") {
+		t.Errorf("user 조회에도 등록의 아키텍처가 보여야 한다:\n%s", bkOut)
 	}
 	hashRe := regexp.MustCompile(`measurement hash\s+([0-9a-f]{64})`)
 	m := hashRe.FindSubmatch(bkOut)

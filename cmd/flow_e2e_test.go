@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -115,10 +116,11 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	}
 
 	// Vendor: 같은 TEE 에서 자기도 RA 요청해서 자기 컨트랙트에 등록 (흐름2). 자기 컨트랙트엔 아직 아무것도
-	// 없으니 service/version 은 직접 준다.
+	// 없으니 service/version 은 직접 준다. --arch 는 일부러 이 기계와 다르게 — User 의 verify 가 체인이 적은
+	// 아키텍처를 그대로 보여 주는지 아래서 본다 (auditor 쪽은 --arch 를 안 줘서 이 기계의 GOARCH 다).
 	vRun := exec.Command(vendorBin, "self-register",
 		"--tee", teeAddr, "--rpc", rpc, "--contract", vendorContract, "--key-file", vendorFile,
-		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
+		"--service", "run-e2e", "--version", "1.0.0", "--arch", "arm64", "--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
 	vOut, err := vRun.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor run: %v\n%s", err, vOut)
@@ -139,8 +141,9 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 		t.Fatalf("Vendor 키는 Auditor 컨트랙트의 승인자가 아니다 — 실패해야 한다:\n%s", out)
 	}
 
-	// User: 처음부터 끝까지 한 번에 — request → parse → lookup → compare. 컨트랙트마다 따로 본다.
-	for _, contract := range []string{auditorContract, vendorContract} {
+	// User: 처음부터 끝까지 한 번에 — request → parse → lookup → compare. 컨트랙트마다 따로 본다. 맞는 등록의
+	// 줄에는 체인이 적은 아키텍처가 보여야 한다 — User 는 arch 를 몰라도 찾고, 찾은 뒤에 읽는다.
+	for contract, arch := range map[string]string{auditorContract: runtime.GOARCH, vendorContract: "arm64"} {
 		uRun := exec.Command(userBin, "verify", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
 			"--nonce", fixtureNonce, "--out", t.TempDir())
 		uOut, err := uRun.CombinedOutput()
@@ -149,6 +152,9 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 		}
 		if !strings.Contains(string(uOut), "trusted —") {
 			t.Fatalf("user run 은 등록된 컨트랙트에선 신뢰할 수 있다고 해야 한다:\n%s", uOut)
+		}
+		if want := "run-e2e 1.0.0 (" + arch + ") by"; !strings.Contains(string(uOut), want) {
+			t.Fatalf("verify must name the architecture the chain recorded, lacks %q:\n%s", want, uOut)
 		}
 	}
 }

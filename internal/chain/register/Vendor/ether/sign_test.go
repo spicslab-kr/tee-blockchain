@@ -20,7 +20,7 @@ func sample() (p.Measurements, reg.Meta) {
 			{Name: "PCR0", Value: bytes.Repeat([]byte{0}, 48)},
 			{Name: "PCR2", Value: bytes.Repeat([]byte{2}, 48)},
 		}, reg.Meta{
-			Meta:    l.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro"},
+			Meta:    l.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro", Arch: "amd64"},
 			Expires: time.Unix(1_800_000_000, 0),
 		}
 }
@@ -65,6 +65,34 @@ func TestDigest_DependsOnChainAndContract(t *testing.T) {
 	}
 }
 
+// TestDigest_IncludesArch — arch 는 서명되는 값이다: 같은 측정값을 다른 아키텍처의 것이라고 적으면 다른 해시가 나온다.
+// 컨트랙트의 digest() 와 같은 값이 나오는지는 chain/register/ether_test.go 가 체인에 물어본다.
+func TestDigest_IncludesArch(t *testing.T) {
+	v, m := sample()
+	amd, err := toEntry(v, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Arch = "arm64"
+	arm, err := toEntry(v, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if arm.Arch != "arm64" || amd.Arch != "amd64" {
+		t.Fatalf("toEntry must carry Meta.Arch into the Entry: %q / %q", amd.Arch, arm.Arch)
+	}
+	c := common.HexToAddress("0x1000000000000000000000000000000000000001")
+	d1, _ := Digest(big.NewInt(31337), c, amd)
+	d2, _ := Digest(big.NewInt(31337), c, arm)
+	if bytes.Equal(d1, d2) {
+		t.Fatal("the arch must be part of the signed digest")
+	}
+	m.Arch = ""
+	if _, err := toEntry(v, m); err == nil {
+		t.Fatal("an entry without an arch must be rejected before signing")
+	}
+}
+
 func TestSign_RecoversToSigner(t *testing.T) {
 	v, m := sample()
 	priv, _ := crypto.GenerateKey()
@@ -101,5 +129,10 @@ func TestMeta_Validate(t *testing.T) {
 	bad.Expires = time.Time{}
 	if err := bad.Validate(); err == nil {
 		t.Fatal("empty expiry must be rejected")
+	}
+	bad = m
+	bad.Arch = ""
+	if err := bad.Validate(); err == nil {
+		t.Fatal("empty arch must be rejected")
 	}
 }

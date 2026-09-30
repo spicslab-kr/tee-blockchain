@@ -86,7 +86,7 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 	}
 	expires := time.Now().Add(time.Hour).Truncate(time.Second)
 	registrar := regether.Registrar{Backend: client, Contract: contract, SenderKey: vendorKey}
-	meta := reg.Meta{Meta: l.Meta{Service: "svc", Version: "1.0.0", Platform: lether.DefaultPlatform}, Expires: expires}
+	meta := reg.Meta{Meta: l.Meta{Service: "svc", Version: "1.0.0", Platform: lether.DefaultPlatform, Arch: "amd64"}, Expires: expires}
 	signed, err := registrar.Sign(values, meta, vendorKey)
 	if err != nil {
 		t.Fatal(err)

@@ -117,7 +117,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 
 	// Auditor — auditor 패키지로, 자기 컨트랙트에
 	auditor := audether.Registrar{Backend: client, Contract: aContract, SenderKey: auditorKey}
-	aMeta := aud.Meta{Meta: al.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro"}, Expires: expires}
+	aMeta := aud.Meta{Meta: al.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro", Arch: "amd64"}, Expires: expires}
 	aSigned, err := auditor.Sign(aValues, aMeta, auditorKey)
 	if err != nil {
 		t.Fatal(err)
@@ -126,9 +126,21 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("signer %s", aSigned.Signer)
 	}
 	h, _ := aud.MeasurementHash(aValues)
-	onchainDigest, err := aRegistry.Digest(call, audether.RegistryEntry{Platform: aMeta.Platform, Service: aMeta.Service, Version: aMeta.Version, Measurement: h, Expires: uint64(expires.Unix())})
+	onchainEntry := audether.RegistryEntry{Platform: aMeta.Platform, Arch: aMeta.Arch, Service: aMeta.Service, Version: aMeta.Version, Measurement: h, Expires: uint64(expires.Unix())}
+	onchainDigest, err := aRegistry.Digest(call, onchainEntry)
 	if err != nil || !bytes.Equal(onchainDigest[:], aSigned.Digest) {
 		t.Fatalf("Go digest differs from the contract's: %x vs %x (%v)", aSigned.Digest, onchainDigest, err)
+	}
+	// arch 가 다르면 컨트랙트의 digest 도 달라야 한다 — 같다면 arch 가 서명에 안 들어간 것.
+	otherArch := onchainEntry
+	otherArch.Arch = "arm64"
+	if d, err := aRegistry.Digest(call, otherArch); err != nil || d == onchainDigest {
+		t.Fatalf("the contract's digest must depend on arch (%v)", err)
+	}
+	// arch 가 빈 Entry — 컨트랙트가 MissingField("arch") 로 거부한다. Go 쪽은 Meta.Validate 가 먼저 막으니
+	// 바인딩으로 직접 보낸다. 필드 검사는 서명 복원보다 앞이라 서명은 아무거나 된다.
+	if field := missingField(t, ctx, client, aRegistry, auditorKey, audether.RegistryEntry{Platform: "aws-nitro", Service: "my-app", Version: "1.0.0", Measurement: h, Expires: uint64(expires.Unix())}, aSigned.Signature); field != "arch" {
+		t.Fatalf("an entry without an arch must be rejected with MissingField(\"arch\"), got %q", field)
 	}
 	aReceipt, err := auditor.Register(ctx, aSigned)
 	if err != nil {
@@ -149,7 +161,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 
 	// Vendor — Vendor 패키지로, 같은 측정값을 자기 컨트랙트에. 서명자가 달라 키도 다르다
 	vendor := venether.Registrar{Backend: client, Contract: vContract, SenderKey: vendorKey}
-	vMeta := ven.Meta{Meta: vl.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro"}, Expires: expires}
+	vMeta := ven.Meta{Meta: vl.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro", Arch: "arm64"}, Expires: expires}
 	vSigned, err := vendor.Sign(vValues, vMeta, vendorKey)
 	if err != nil {
 		t.Fatal(err)
@@ -229,4 +241,59 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if rec, _ := vRegistry.Lookup(call, common.HexToHash(rReceipt.Key)); rec.Signer != vendorAddr {
 		t.Fatalf("signer must be the vendor, not the sender: %s", rec.Signer.Hex())
 	}
+
+	// Registered 이벤트가 arch 를 싣는다 — 조회(chain/lookup)는 여기서 읽는다.
+	iter, err := vRegistry.FilterRegistered(&bind.FilterOpts{Context: ctx}, [][32]byte{common.HexToHash(rReceipt.Key)}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer iter.Close()
+	if !iter.Next() {
+		t.Fatalf("no Registered event for %s (%v)", rReceipt.Key, iter.Error())
+	}
+	if ev := iter.Event; ev.Arch != "arm64" || ev.Service != "my-app" || ev.Signer != vendorAddr {
+		t.Fatalf("Registered event = arch %q service %q signer %s", ev.Arch, ev.Service, ev.Signer.Hex())
+	}
+}
+
+// missingField — Entry 를 바인딩으로 바로 보내서, 컨트랙트가 MissingField 로 거부하면 그 필드 이름을 돌려준다.
+// 다른 에러거나 성공이면 실패.
+func missingField(t *testing.T, ctx context.Context, client simulated.Client, registry *audether.Registry, senderKey []byte, e audether.RegistryEntry, sig []byte) string {
+	t.Helper()
+	chainID, err := client.ChainID(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sender, err := crypto.ToECDSA(senderKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts, err := bind.NewKeyedTransactorWithChainID(sender, chainID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Context = ctx
+	_, err = registry.Register(opts, e, sig)
+	if err == nil {
+		t.Fatal("the contract accepted an entry it must reject")
+	}
+	var de interface{ ErrorData() interface{} }
+	if !errors.As(err, &de) {
+		t.Fatalf("no revert data: %v", err)
+	}
+	data := common.FromHex(de.ErrorData().(string))
+	parsed, err := audether.RegistryMetaData.GetAbi()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mf := parsed.Errors["MissingField"]
+	if len(data) < 4 || [4]byte(data[:4]) != [4]byte(mf.ID[:4]) {
+		t.Fatalf("want MissingField, got revert data %x (%v)", data, err)
+	}
+	args, err := mf.Unpack(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	field, _ := args.([]any)[0].(string)
+	return field
 }

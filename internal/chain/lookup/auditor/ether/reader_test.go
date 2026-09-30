@@ -73,7 +73,7 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 	}
 	expires := time.Now().Add(24 * time.Hour).Truncate(time.Second)
 	registrar := regether.Registrar{Backend: client, Contract: contract, SenderKey: auditorKey}
-	meta := reg.Meta{Meta: l.Meta{Service: "unit-test", Version: "0.1.0", Platform: DefaultPlatform}, Expires: expires}
+	meta := reg.Meta{Meta: l.Meta{Service: "unit-test", Version: "0.1.0", Platform: DefaultPlatform, Arch: "arm64"}, Expires: expires}
 	signed, err := registrar.Sign(values, meta, auditorKey)
 	if err != nil {
 		t.Fatal(err)
@@ -99,6 +99,10 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 	}
 	if got.Signer != auditorAddr.Hex() || got.Meta.Service != "unit-test" || got.Meta.Platform != DefaultPlatform || got.Expires != expires.Unix() {
 		t.Fatalf("Lookup = %+v", got)
+	}
+	// 체인이 어느 아키텍처의 등록인지 말한다 — 이벤트에서 그대로 읽힌다.
+	if got.Meta.Arch != "arm64" {
+		t.Fatalf("Lookup arch = %q, want arm64", got.Meta.Arch)
 	}
 	h, _ := reg.MeasurementHash(values)
 	if !bytes.Equal(got.Values.Get("measurementHash"), h[:]) {
@@ -142,7 +146,7 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 	}
 	values := p.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x44}, 48)}}
 	registrar := regether.Registrar{Backend: client, Contract: contract, SenderKey: auditorKey}
-	meta := reg.Meta{Meta: l.Meta{Service: "chunk-test", Version: "0.1.0", Platform: DefaultPlatform}, Expires: time.Now().Add(time.Hour)}
+	meta := reg.Meta{Meta: l.Meta{Service: "chunk-test", Version: "0.1.0", Platform: DefaultPlatform, Arch: "amd64"}, Expires: time.Now().Add(time.Hour)}
 	signed, err := registrar.Sign(values, meta, auditorKey)
 	if err != nil {
 		t.Fatal(err)

@@ -189,10 +189,10 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	var out []byte
 	var err error
 
-	// 2. Auditor 등록.
+	// 2. Auditor 등록. --arch 는 체인 Entry 에 실린다 — 아래 조회에서 그대로 읽혀야 한다.
 	measurements := "PCR0=" + strings.Repeat("aa", 48) + ",PCR1=" + strings.Repeat("bb", 48) + ",PCR2=" + strings.Repeat("cc", 48)
 	aReg := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
-		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
+		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro", "--arch", "arm64")
 	aOut, err := aReg.CombinedOutput()
 	if err != nil {
 		t.Fatalf("auditor register: %v\n%s", err, aOut)
@@ -204,7 +204,7 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 
 	// 3. 같은 측정값을 Vendor 도 자기 컨트랙트에 등록 — 다른 key 가 나와야 한다 (서명자가 다르므로).
 	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
-		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
+		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro", "--arch", "amd64")
 	vOut, err := vReg.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor register: %v\n%s", err, vOut)
@@ -215,6 +215,22 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	}
 	if string(aKey[1]) == string(vKey[1]) {
 		t.Fatal("auditor 와 vendor 의 등록 key 가 같으면 안 된다 (서명자가 다르다)")
+	}
+
+	// 3b. 체인이 어느 아키텍처의 등록인지 돌려준다 — 등록 때 준 --arch 가 조회 출력에 그대로 보여야 한다.
+	// arch 는 키에 안 들어가니(같은 측정값이면 같은 키) 조회에 arch 를 줄 필요는 없다.
+	for _, c := range []struct{ bin, contract, key, arch string }{
+		{auditorBin, contract, string(aKey[1]), "arm64"},
+		{vendorBin, vContract, string(vKey[1]), "amd64"},
+	} {
+		look := exec.Command(c.bin, "lookup", "--rpc", rpc, "--contract", c.contract, "--key", c.key)
+		out, err := look.CombinedOutput()
+		if err != nil {
+			t.Fatalf("lookup --key %s: %v\n%s", c.key, err, out)
+		}
+		if want := "e2e-svc 1.0.0 (aws-nitro, " + c.arch + ")"; !strings.Contains(string(out), want) {
+			t.Errorf("lookup must print the architecture the chain recorded, lacks %q:\n%s", want, out)
+		}
 	}
 
 	// 4. 같은 것을 auditor 로 다시 — 거부, exit 5.
