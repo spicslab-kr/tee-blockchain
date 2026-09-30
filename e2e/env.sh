@@ -5,10 +5,11 @@
 # 필요는 없다. nitroBanner/localBanner 는 지금 어느 환경에서 실행 중인지 화면에 표시만 하는 용도
 # (2초 멈춤, 보는 사람이 구분하기 쉽게).
 
-VENDOR_HOST=13.61.175.104        # i-01f1ef6b04c10f37f
+VENDOR_HOST=56.228.33.197        # i-01f1ef6b04c10f37f (재시작 후 새 퍼블릭 IP, 2026-09-30)
 AUDITOR_HOST=13.60.50.242        # i-0200ce262d24549ea
+ARM64_HOST=13.60.163.127         # 아키텍처별 측정 비교용 — i-0dcfde4bb82b7f84a (c7g.xlarge, arm64), 비워 두면 스크립트가 안내만 하고 끝난다
 SSH_USER=ec2-user
-PEM=pem2.pem                     # TB-live 기준 상대경로
+PEM=pem2.pem                     # TB-live 기준 상대경로 — pem.pem 은 arm64(ad) 인스턴스 키와 안 맞음 (지문 다름, 실측 확인)
 
 RPC=https://ethereum-sepolia-rpc.publicnode.com
 AUDITOR_KEY=auditor.key          # 0xD2082a2513781b29beeF5DB847b2c85Cbc50ECeE — 흐름 1 의 approver
@@ -29,6 +30,7 @@ SSH="ssh -i $PEM -o StrictHostKeyChecking=no"
 SCP="scp -q -i $PEM -o StrictHostKeyChecking=no"
 V() { $SSH "$SSH_USER@$VENDOR_HOST" "$@"; }
 A() { $SSH "$SSH_USER@$AUDITOR_HOST" "$@"; }
+R() { $SSH "$SSH_USER@$ARM64_HOST" "$@"; }   # arm64 비교용 인스턴스
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
 # step — 지금 무엇을 하고 있는지 초록색 띠로 한 줄 찍고 나서 그 일을 한다. step_start/step_stop 은 같은 배너를
 # 시작/끝에 따로 찍어야 할 때(중간에 다른 명령이 여러 개 끼는 경우)를 위한 것 — 지금은 애니메이션 없이 둘 다
