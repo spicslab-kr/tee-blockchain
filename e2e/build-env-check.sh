@@ -73,7 +73,7 @@ echo "this host: \$(uname -m), tb-auditor built for $arch ($mine), $GOVER"
 
 step "1. VENDOR DECLARES $other — MUST BE REFUSED ($label)"
 push_cfg $other true
-rm -rf src1; ./tb-auditor receive --repo "\$PWD/remote.git" --into src1 > out1.txt 2> err1.txt; rc=\$?
+rm -rf src1; ~/tb-auditor receive --repo "\$PWD/remote.git" --into src1 > out1.txt 2> err1.txt; rc=\$?
 cat out1.txt err1.txt
 if [ \$rc -ne 0 ] && grep -q "$other" err1.txt && grep -q "$mine" err1.txt; then
   echo "✅ refused (exit \$rc), both architectures named"
@@ -82,7 +82,7 @@ else
 fi
 
 step "2. SAME, WITH --ignore-env — WARNING ONLY ($label)"
-rm -rf src2; ./tb-auditor receive --repo "\$PWD/remote.git" --into src2 --ignore-env > out2.txt 2> err2.txt; rc=\$?
+rm -rf src2; ~/tb-auditor receive --repo "\$PWD/remote.git" --into src2 --ignore-env > out2.txt 2> err2.txt; rc=\$?
 cat out2.txt err2.txt
 if [ \$rc -eq 0 ] && grep -q "warning:" err2.txt && grep -q "$other" err2.txt; then
   echo "✅ passed with a warning (exit 0)"
@@ -92,7 +92,7 @@ fi
 
 step "3. VENDOR DECLARES $mine — MUST PASS ($label)"
 push_cfg $mine true
-rm -rf src3; ./tb-auditor receive --repo "\$PWD/remote.git" --into src3 > out3.txt 2> err3.txt; rc=\$?
+rm -rf src3; ~/tb-auditor receive --repo "\$PWD/remote.git" --into src3 > out3.txt 2> err3.txt; rc=\$?
 cat out3.txt err3.txt
 if [ \$rc -eq 0 ] && grep -q "build env matches" out3.txt; then
   echo "✅ matched (exit 0)"

@@ -5,9 +5,9 @@
 # 필요는 없다. nitroBanner/localBanner 는 지금 어느 환경에서 실행 중인지 화면에 표시만 하는 용도
 # (2초 멈춤, 보는 사람이 구분하기 쉽게).
 
-VENDOR_HOST=56.228.33.197        # i-01f1ef6b04c10f37f (재시작 후 새 퍼블릭 IP, 2026-09-30)
+VENDOR_HOST=51.21.198.195        # i-01f1ef6b04c10f37f (재시작 후 새 퍼블릭 IP, 2026-10-01)
 AUDITOR_HOST=13.60.50.242        # i-0200ce262d24549ea
-ARM64_HOST=13.60.163.127         # 아키텍처별 측정 비교용 — i-0dcfde4bb82b7f84a (c7g.xlarge, arm64), 비워 두면 스크립트가 안내만 하고 끝난다
+ARM64_HOST=16.171.8.186         # 아키텍처별 측정 비교용 — i-0dcfde4bb82b7f84a (c7g.xlarge, arm64), 비워 두면 스크립트가 안내만 하고 끝난다
 SSH_USER=ec2-user
 PEM=pem2.pem                     # TB-live 기준 상대경로 — pem.pem 은 arm64(ad) 인스턴스 키와 안 맞음 (지문 다름, 실측 확인)
 
