@@ -36,7 +36,11 @@ different absolute path baked into the binary, and the measurement (PCR) with it
 `tb-ra-responder` is the program that answers attestation requests *inside* the enclave. `build`
 layers it onto the software image, so it must be present next to the role binary. It is one
 shared binary for every role, and both instances must get **the same file** — if Vendor and
-Auditor embed different responders their measurements can never match. `build`, `launch` and
+Auditor embed different responders their measurements can never match. `build` and `pack` do not
+take the file on trust: they read the build info Go leaves inside every binary and refuse a
+responder built with a different Go than the pin, without `-trimpath`, or for another OS or
+architecture than the instance they run on, and they print its sha256 in the build log so both
+sides can compare. `build`, `launch` and
 the responder only work on a Nitro-enabled EC2 instance (Linux); everything else runs anywhere.
 
 ## 1. Vendor

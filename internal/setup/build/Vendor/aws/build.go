@@ -55,10 +55,11 @@ type Build struct {
 // Result — 측정값 기록에 적을 것.
 type Result struct {
 	Name         string
-	Image        string            // 응답기를 얹은 docker 이미지 태그
-	EIF          string            // 이미지 파일
-	Measurements string            // nitro-cli build-enclave 출력 원문 (json)
-	PCR          map[string]string // PCR0 · PCR1 · PCR2
+	Image        string              // 응답기를 얹은 docker 이미지 태그
+	EIF          string              // 이미지 파일
+	Measurements string              // nitro-cli build-enclave 출력 원문 (json)
+	PCR          map[string]string   // PCR0 · PCR1 · PCR2
+	Responder    build.ResponderInfo // 얹은 tb-ra-responder 의 빌드 정보와 sha256 — 기록에 남겨 상대편과 대조한다
 }
 
 var ErrNotLinux = errors.New("build runs on the Nitro parent instance (linux)")
@@ -115,6 +116,18 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if _, err := os.Stat(b.Binary); err != nil {
 		return res, fmt.Errorf("%s: T1 responder not found — build cmd/ra-responder and put it there, or point Binary at it", b.Binary)
 	}
+	// 파일이 있다는 것만으로는 부족하다. 이미지에 얹혀 측정되는 것은 이 파일의 바이트이고, 그 바이트는 응답기를
+	// 빌드한 Go 버전 · -trimpath · GOOS/GOARCH 로 정해진다 (CheckToolchain 은 tb 자신만 본다). 바이너리 안에
+	// Go 가 남긴 빌드 정보를 읽어, 상대편과 같은 바이트가 나올 수 없는 응답기는 여기서 거부한다.
+	responder, err := build.ReadResponder(b.Binary)
+	if err != nil {
+		return res, err
+	}
+	if err := build.CheckResponder(responder, runtime.GOARCH); err != nil {
+		return res, err
+	}
+	res.Responder = responder
+	fmt.Fprintln(log, responder.String())
 	if err := os.MkdirAll(b.Out, 0o755); err != nil {
 		return res, err
 	}
