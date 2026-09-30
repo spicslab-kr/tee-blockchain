@@ -41,7 +41,7 @@ func toEntry(values p.Measurements, meta reg.Meta) (RegistryEntry, error) {
 	if err != nil {
 		return RegistryEntry{}, err
 	}
-	return RegistryEntry{Platform: meta.Platform, Service: meta.Service, Version: meta.Version, Measurement: h, Expires: uint64(meta.Expires.Unix())}, nil
+	return RegistryEntry{Platform: meta.Platform, Arch: meta.Arch, Service: meta.Service, Version: meta.Version, Measurement: h, Expires: uint64(meta.Expires.Unix())}, nil
 }
 
 // Digest 는 서명 대상 해시 — 컨트랙트의 digest(e) 와 같은 값. 체인 ID 와 컨트랙트 주소가 들어가 다른 배포에는 못 쓴다.
@@ -53,8 +53,8 @@ func Digest(chainID *big.Int, contract common.Address, e RegistryEntry) ([]byte,
 				{Name: "chainId", Type: "uint256"}, {Name: "verifyingContract", Type: "address"},
 			},
 			"Entry": {
-				{Name: "platform", Type: "string"}, {Name: "service", Type: "string"}, {Name: "version", Type: "string"},
-				{Name: "measurement", Type: "bytes32"}, {Name: "expires", Type: "uint64"},
+				{Name: "platform", Type: "string"}, {Name: "arch", Type: "string"}, {Name: "service", Type: "string"},
+				{Name: "version", Type: "string"}, {Name: "measurement", Type: "bytes32"}, {Name: "expires", Type: "uint64"},
 			},
 		},
 		PrimaryType: "Entry",
@@ -63,7 +63,7 @@ func Digest(chainID *big.Int, contract common.Address, e RegistryEntry) ([]byte,
 			ChainId: (*math.HexOrDecimal256)(chainID), VerifyingContract: contract.Hex(),
 		},
 		Message: apitypes.TypedDataMessage{
-			"platform": e.Platform, "service": e.Service, "version": e.Version,
+			"platform": e.Platform, "arch": e.Arch, "service": e.Service, "version": e.Version,
 			"measurement": e.Measurement[:], "expires": new(big.Int).SetUint64(e.Expires),
 		},
 	}

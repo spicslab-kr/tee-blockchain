@@ -80,6 +80,8 @@ func (m Meta) Validate() error {
 	switch {
 	case m.Platform == "":
 		return errors.New("meta: platform is empty")
+	case m.Arch == "":
+		return errors.New("meta: arch is empty")
 	case m.Service == "":
 		return errors.New("meta: service is empty")
 	case m.Version == "":

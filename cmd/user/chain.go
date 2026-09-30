@@ -72,7 +72,7 @@ func lookup(args []string) ([]string, error) {
 		}
 		fmt.Printf("key       %s\n", k)
 		fmt.Printf("  signer  %s\n", reg.Signer)
-		fmt.Printf("  service %s %s (%s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform)
+		fmt.Printf("  service %s %s (%s, %s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform, reg.Meta.Arch)
 		fmt.Printf("  expires %s\n", time.Unix(reg.Expires, 0).UTC().Format(time.RFC3339))
 		if h := reg.Values.Get("measurementHash"); h != nil {
 			fmt.Printf("  measurement hash  %s\n", hex.EncodeToString(h))

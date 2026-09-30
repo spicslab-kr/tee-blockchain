@@ -140,7 +140,7 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 	return l.Registration{
 		Address:   address,
 		Values:    p.Measurements{{Name: "measurementHash", Value: ev.Measurement[:]}},
-		Meta:      l.Meta{Service: ev.Service, Version: ev.Version, Platform: ev.Platform},
+		Meta:      l.Meta{Service: ev.Service, Version: ev.Version, Platform: ev.Platform, Arch: ev.Arch},
 		Expires:   int64(rec.Expires),
 		Signer:    rec.Signer.Hex(),
 		Signature: ev.Signature,

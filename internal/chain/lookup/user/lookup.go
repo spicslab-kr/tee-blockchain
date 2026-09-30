@@ -20,6 +20,7 @@ type Meta struct {
 	Service  string
 	Version  string
 	Platform string
+	Arch     string // 이미지를 빌드한 CPU 아키텍처 (amd64 | arm64). 표시용 — 키에는 안 들어간다
 }
 
 type Registration struct {

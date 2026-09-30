@@ -98,7 +98,7 @@ func register(args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	meta := reg.Meta{Meta: l.Meta{Service: *service, Version: *version, Platform: *platform}, Expires: time.Now().Add(*expires).Truncate(time.Second)}
+	meta := reg.Meta{Meta: l.Meta{Service: *service, Version: *version, Platform: *platform, Arch: *arch}, Expires: time.Now().Add(*expires).Truncate(time.Second)}
 	r := ether.Registrar{RPC: *rpc, Contract: common.HexToAddress(*contract), SenderKey: key}
 	signed, err := r.Sign(values, meta, key)
 	if err != nil {
@@ -107,9 +107,9 @@ func register(args []string) (string, error) {
 	// the build environment this registration is for: --arch says which machine the image was built for and measured
 	// on; the Go toolchain is this binary's — it is pinned project-wide (build.CheckToolchain at build start), so it is
 	// the one that compiled tb-ra-responder into the image. with --config it is the config's build_env instead: that
-	// describes the build that was measured, whichever machine runs register. none of it goes into the chain Entry (the
-	// measurement hash already differs per architecture, so the key splits by itself); it is said here and in
-	// measurement-record.json.
+	// describes the build that was measured, whichever machine runs register. of it, only the arch goes into the chain
+	// Entry (meta.Arch above) — display only, so a reader can tell the two architectures' registrations apart; the key
+	// still splits by the measurement hash alone. the rest is said here and in measurement-record.json.
 	env := tr.CurrentBuildEnv()
 	if cfg != nil {
 		env = cfg.BuildEnv
@@ -234,7 +234,7 @@ func lookup(args []string) ([]string, error) {
 		}
 		fmt.Printf("key       %s\n", k)
 		fmt.Printf("  signer  %s\n", reg.Signer)
-		fmt.Printf("  service %s %s (%s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform)
+		fmt.Printf("  service %s %s (%s, %s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform, reg.Meta.Arch)
 		fmt.Printf("  expires %s\n", time.Unix(reg.Expires, 0).UTC().Format(time.RFC3339))
 		if h := reg.Values.Get("measurementHash"); h != nil {
 			fmt.Printf("  measurement hash  %s\n", hex.EncodeToString(h))

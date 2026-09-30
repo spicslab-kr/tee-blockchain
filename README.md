@@ -124,7 +124,9 @@ over the file, with a warning when they differ (`warning: --service nginx2 diffe
 build-config.json (nginx)`); without `--config` they are required as before.
 The confirmation names the CPU architecture and the Go toolchain the enclave was built with
 (`registered nginx 1.31.6 (amd64, go1.26.1 -trimpath)`), since the registered value is only
-reproducible in that environment.
+reproducible in that environment. The architecture also goes on-chain, in the registration's
+`arch` field, so `lookup` prints it back (`service nginx 1.31.6 (aws-nitro, amd64)`); it is
+display only and not part of the lookup key.
 
 What that does, one step at a time.
 
@@ -236,6 +238,8 @@ uses it:
 ```
 tb-auditor registry-deploy --rpc <url> --key-file <deployer.key> --approver <my 0x…>
 ```
+A registry deployed before registrations carried the CPU architecture (`arch`, see 2.4) has no
+such field and does not accept the current `register`; deploy a new one to use it.
 
 ### 2.4 `audit` — attest my enclave, check it against my build, register, self-check
 
@@ -277,7 +281,9 @@ Register the **build value** with my key:
 tb-auditor register --rpc <url> --contract <0x…> --key-file <key> --measurements out/measurements.json --config work/src/build-config.json
 ```
 
-Read it back by measurement:
+Read it back by measurement. The chain says which architecture the registration is for
+(`service nginx 1.31.6 (aws-nitro, amd64)`) — `arch` is in the on-chain entry and signed with
+it, but not in the key, so nobody has to know it to look the value up:
 ```
 tb-auditor lookup --rpc <url> --contract <0x…> --measurements out/measurements.json
 ```
@@ -311,8 +317,9 @@ Or write the record by hand and send that:
 tb-auditor send --repo <git url> --record measurement-record.json --image out/<name>.eif
 ```
 The same source measures differently on x86_64 and on arm64 (and under a different Go), so one
-service/version has one record — and one registration — per CPU architecture; `send` refuses a
-record that does not say which, and warns when the record's Go is not the one this project pins.
+service/version has one record — and one registration — per CPU architecture, and each
+registration says on-chain which one it is; `send` refuses a record that does not say which, and
+warns when the record's Go is not the one this project pins.
 
 ## 3. User
 
@@ -321,7 +328,9 @@ tb-user verify --tee <vendor-public-ip>:5000 --rpc <url> --contract <0x…>
 ```
 Ask the Vendor's enclave to attest → verify the document → find who registered that measurement
 → check each registration. Exit 0 if at least one registration matches (value, expiry, signer);
-exit 1 with the reason if nobody registered it or none check out. No keys, no ETH.
+exit 1 with the reason if nobody registered it or none check out. No keys, no ETH. A matching
+registration is shown with what the chain recorded for it, architecture included
+(`✓ matches  nginx 1.31.6 (amd64) by 0x…, expires …`).
 
 What that does, one step at a time.
 

@@ -15,6 +15,7 @@ contract Registry is EIP712 {
     /// 서명되는 값. 측정값은 이름순으로 묶어 keccak256 한 32바이트(measurement)로 들어간다.
     struct Entry {
         string platform; // 측정값 형식. 예: aws-nitro
+        string arch; // 이미지를 빌드한 CPU 아키텍처. 예: amd64 / arm64 — 표시용, 키에는 안 들어간다
         string service;
         string version;
         bytes32 measurement;
@@ -36,6 +37,7 @@ contract Registry is EIP712 {
         address indexed signer,
         address registrant,
         string platform,
+        string arch,
         string service,
         string version,
         bytes32 measurement,
@@ -49,7 +51,7 @@ contract Registry is EIP712 {
     error ExpiryAlreadyPassed(uint64 expires, uint64 nowTime);
 
     bytes32 internal constant ENTRY_TYPEHASH = keccak256(
-        "Entry(string platform,string service,string version,bytes32 measurement,uint64 expires)"
+        "Entry(string platform,string arch,string service,string version,bytes32 measurement,uint64 expires)"
     );
 
     constructor(address approver) EIP712("Registry", "1") {
@@ -60,6 +62,7 @@ contract Registry is EIP712 {
     /// @notice 서명된 값을 등록한다. 서명자를 복원해 APPROVER 인지 본다.
     function register(Entry calldata e, bytes calldata signature) external returns (bytes32 key) {
         if (bytes(e.platform).length == 0) revert MissingField("platform");
+        if (bytes(e.arch).length == 0) revert MissingField("arch");
         if (bytes(e.service).length == 0) revert MissingField("service");
         if (bytes(e.version).length == 0) revert MissingField("version");
         if (e.measurement == bytes32(0)) revert MissingField("measurement");
@@ -75,13 +78,15 @@ contract Registry is EIP712 {
         key = keyOf(signer, e.platform, e.measurement);
         if (records[key].expires != 0) revert AlreadyRegistered(key, records[key].expires);
         records[key] = Record({signer: signer, expires: e.expires, registeredAt: nowTime});
-        _announce(key, signer, e, signature);
+        _announce(key, e, signature);
     }
 
-    // 이벤트 인자가 많아 register 안에서 바로 emit 하면 스택이 넘친다. 따로 뺀다.
-    function _announce(bytes32 key, address signer, Entry calldata e, bytes calldata signature) private {
+    // 이벤트 인자가 많아 register 안에서 바로 emit 하면 스택이 넘친다. 따로 빼고, 인자는 memory 로 받는다 —
+    // calldata 문자열은 (offset, length) 두 슬롯, memory 문자열은 포인터 한 슬롯이라 arch 까지 실은 이벤트가
+    // 그래야 스택에 들어간다. signer 는 위에서 APPROVER 임을 확인했으니 다시 넘기지 않는다.
+    function _announce(bytes32 key, Entry memory e, bytes memory signature) private {
         emit Registered(
-            key, signer, msg.sender, e.platform, e.service, e.version, e.measurement, e.expires, signature
+            key, APPROVER, msg.sender, e.platform, e.arch, e.service, e.version, e.measurement, e.expires, signature
         );
     }
 
@@ -92,6 +97,7 @@ contract Registry is EIP712 {
                 abi.encode(
                     ENTRY_TYPEHASH,
                     keccak256(bytes(e.platform)),
+                    keccak256(bytes(e.arch)),
                     keccak256(bytes(e.service)),
                     keccak256(bytes(e.version)),
                     e.measurement,
