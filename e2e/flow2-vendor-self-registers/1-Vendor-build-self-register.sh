@@ -44,10 +44,14 @@ CONTRACT=""
 while getopts "c:" o; do case $o in c) CONTRACT=$OPTARG;; esac; done
 
 # 준비 — Vendor 인스턴스에서 방금 만든 측정값 파일을 내 컴퓨터로 가져온다.
+#   그 값이 어느 CPU 아키텍처에서 나왔는지도 같이 가져온다 (같은 소스라도 x86_64 와 arm64 는 PCR 이 다르다).
+#   uname 철자(x86_64 · aarch64)를 tb 가 쓰는 GOARCH 철자(amd64 · arm64)로 바꾼다.
 step_start "FETCHING BUILD VALUE"
 $SCP "$SSH_USER@$VENDOR_HOST:out/measurements.json" "$WORK/vendor-build.json"
+case "$(V 'uname -m' | tr -d '\r\n')" in x86_64) ARCH=amd64;; aarch64|arm64) ARCH=arm64;; *) ARCH="";; esac
+[ -n "$ARCH" ] || { echo "cannot tell the Vendor instance's architecture from uname -m"; exit 1; }
 step_stop "FETCHING BUILD VALUE"
-echo "Vendor's build value:"; cat "$WORK/vendor-build.json"
+echo "Vendor's build value (arch: $ARCH):"; cat "$WORK/vendor-build.json"
 
 if [ -z "$CONTRACT" ]; then
   # ▶ 우리가 만든 tb 명령 — 등록부(레지스트리 컨트랙트)를 체인에 새로 배포한다. 승인자는 Vendor 자기 자신.
@@ -61,7 +65,7 @@ fi
 echo "$CONTRACT" > "$WORK/contract-flow2.txt"  # 준비 — 다음 단계가 읽을 파일에 남기기
 
 # ▶ 우리가 만든 tb 명령 — 내가 빌드한 값을 내 키로 서명해서 그대로 체인에 등록한다 (제3자 대조 없이).
-step "SELF-REGISTERING" "$TBV" self-register --tee "$VENDOR_HOST:5000" --measurements "$WORK/vendor-build.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$VENDOR_KEY" --service "$SERVICE" --version "$VERSION"
+step "SELF-REGISTERING" "$TBV" self-register --tee "$VENDOR_HOST:5000" --measurements "$WORK/vendor-build.json" --arch "$ARCH" --rpc "$RPC" --contract "$CONTRACT" --key-file "$VENDOR_KEY" --service "$SERVICE" --version "$VERSION"
 echo "self-register exit=$?"
 # ▶ 우리가 만든 tb 명령 — User 입장에서 방금 등록한 게 실제로 믿을 만한지 검증해 본다.
 step "VERIFYING" "$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"

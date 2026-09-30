@@ -7,5 +7,6 @@ var quiet bool
 // lastRegistered — register 가 마지막으로 올린 등록. audit / self-register 가 자기 문장으로 찍기 위해 남긴다.
 var lastRegistered struct {
 	Key, Tx, Expires, Signer string
+	Arch                     string // 어느 아키텍처의 측정값인지 — 체인에는 안 올라가고, 화면과 measurement-record.json 에만 적힌다
 	Block                    uint64
 }

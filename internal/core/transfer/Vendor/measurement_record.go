@@ -2,7 +2,9 @@ package vendor
 
 import (
 	"fmt"
+	"strings"
 
+	"tb/internal/setup/build"
 	p "tb/internal/tee/parse/Vendor"
 )
 
@@ -39,6 +41,7 @@ type MeasurementRecord struct {
 	Service      string         `json:"service"`
 	Version      string         `json:"version"`
 	Platform     string         `json:"platform"`
+	Arch         string         `json:"arch"` // GOARCH the image was built for and measured on: amd64 or arm64. Measurements differ per architecture, so one service/version has one record per architecture.
 	Image        Image          `json:"image"`
 	Values       p.Measurements `json:"values"`
 	BuildTool    BuildTool      `json:"build_tool"`
@@ -62,6 +65,9 @@ func (r MeasurementRecord) Validate() error {
 	}
 	switch r.Platform {
 	case "aws":
+		if !validArch(r.Arch) {
+			errs = append(errs, "arch: want one of "+strings.Join(archNames(), "|")+" (GOARCH spelling), got "+quote(r.Arch))
+		}
 		if r.Image.Path == "" {
 			errs = append(errs, "image.path: EIF file required for aws")
 		}
@@ -102,4 +108,13 @@ func (r MeasurementRecord) Validate() error {
 		errs = append(errs, "registration: chain and address required when present")
 	}
 	return join(errs)
+}
+
+// archNames — 이 프로젝트가 빌드하는 아키텍처의 GOARCH 이름. build.ArchTargets 가 유일한 출처다.
+func archNames() []string {
+	out := make([]string, 0, len(build.ArchTargets))
+	for _, t := range build.ArchTargets {
+		out = append(out, t.GOARCH)
+	}
+	return out
 }

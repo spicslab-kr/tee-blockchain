@@ -35,7 +35,7 @@ func cfgAzure() BuildConfig {
 func pcr(fill byte) []byte { return bytes.Repeat([]byte{fill}, 48) }
 
 func recAWS() MeasurementRecord {
-	return MeasurementRecord{Schema: SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws",
+	return MeasurementRecord{Schema: SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", Arch: "amd64",
 		Image:     Image{Path: "svc.eif", SHA256: strings.Repeat("ab", 32)},
 		Values:    p.Measurements{{Name: "PCR0", Value: pcr(1)}, {Name: "PCR1", Value: pcr(2)}, {Name: "PCR2", Value: pcr(3)}},
 		BuildTool: BuildTool{Name: "nitro-cli", Version: "1.3.0"}}

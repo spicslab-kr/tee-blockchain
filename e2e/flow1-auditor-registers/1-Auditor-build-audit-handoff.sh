@@ -50,10 +50,14 @@ shift $((OPTIND - 1))
 KEY=${1:-}
 
 # 준비 — Auditor 인스턴스에서 방금 만든 측정값 파일을 내 컴퓨터로 가져온다.
+#   그 값이 어느 CPU 아키텍처에서 나왔는지도 같이 가져온다 (같은 소스라도 x86_64 와 arm64 는 PCR 이 다르다).
+#   uname 철자(x86_64 · aarch64)를 tb 가 쓰는 GOARCH 철자(amd64 · arm64)로 바꾼다.
 step_start "FETCHING BUILD VALUE"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/measurements.json" "$WORK/auditor-measured.json"
+case "$(A 'uname -m' | tr -d '\r\n')" in x86_64) ARCH=amd64;; aarch64|arm64) ARCH=arm64;; *) ARCH="";; esac
+[ -n "$ARCH" ] || { echo "cannot tell the Auditor instance's architecture from uname -m"; exit 1; }
 step_stop "FETCHING BUILD VALUE"
-echo "Auditor's own value:"; cat "$WORK/auditor-measured.json"
+echo "Auditor's own value (arch: $ARCH):"; cat "$WORK/auditor-measured.json"
 
 if [ -z "$CONTRACT" ]; then
   # ▶ 우리가 만든 tb 명령 — 등록부(레지스트리 컨트랙트)를 체인에 새로 배포한다.
@@ -68,7 +72,7 @@ echo "$CONTRACT" > "$WORK/contract.txt"  # 준비 — 다음 단계가 읽을 �
 
 # ▶ 우리가 만든 tb 명령 — 내 TEE 에 RA 를 보내 받은 값과 위에서 만든 빌드값이 같은지 대조하고, 같을 때만 체인에 등록한다.
 extra=(); [ -n "$CHECK_VENDOR" ] && extra=(--vendor-tee "$VENDOR_HOST:5000")
-step "AUDITING" "$TBA" audit --tee "$AUDITOR_HOST:5000" --measurements "$WORK/auditor-measured.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$AUDITOR_KEY" --service "$SERVICE" --version "$VERSION" "${extra[@]}"
+step "AUDITING" "$TBA" audit --tee "$AUDITOR_HOST:5000" --measurements "$WORK/auditor-measured.json" --arch "$ARCH" --rpc "$RPC" --contract "$CONTRACT" --key-file "$AUDITOR_KEY" --service "$SERVICE" --version "$VERSION" "${extra[@]}"
 rc=$?
 echo "audit exit=$rc   contract=$CONTRACT"
 [ $rc -eq 0 ] || exit $rc
@@ -91,6 +95,7 @@ cat > "$WORK/from-auditor/measurement-record.json" <<EOF
   "service": "$SERVICE",
   "version": "$VERSION",
   "platform": "aws-nitro",
+  "arch": "$ARCH",
   "image": "alpine-slim.eif",
   "measurements": { "PCR0": "$(pcr PCR0)", "PCR1": "$(pcr PCR1)", "PCR2": "$(pcr PCR2)" },
   "registry": { "rpc": "$RPC", "contract": "$CONTRACT", "key": "$KEY", "approver": "$AUDITOR_ADDR" },

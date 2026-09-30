@@ -60,6 +60,7 @@ func register(args []string) (string, error) {
 	platform := fs.String("platform", "aws-nitro", "measurement format")
 	service := fs.String("service", "", "service name")
 	version := fs.String("version", "", "version")
+	arch := fs.String("arch", defaultArch(), "CPU architecture the image was built for and measured on (amd64|arm64). measurements differ per architecture, so one service/version is registered once per architecture. default: this machine's")
 	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
 	if err := fs.Parse(args); err != nil {
 		return "", err
@@ -73,6 +74,9 @@ func register(args []string) (string, error) {
 	ask(version, "version", "")
 	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" || *measurements == "" || *service == "" || *version == "" {
 		return "", errors.New("--rpc, --contract, --key-file, --measurements, --service and --version are required")
+	}
+	if err := checkArch(*arch); err != nil {
+		return "", err
 	}
 	key, err := readKey(*keyFile)
 	if err != nil {
@@ -89,7 +93,8 @@ func register(args []string) (string, error) {
 		return "", err
 	}
 	if !quiet {
-		fmt.Printf("signer %s\n", signed.Signer)
+		// arch 는 체인 Entry 에 들어가지 않는다 — 측정값 해시가 아키텍처마다 이미 다르니 키는 저절로 갈린다. 어느 것인지는 여기와 기록 파일에만 적는다.
+		fmt.Printf("registering %s %s (%s)\nsigner %s\n", *service, *version, *arch, signed.Signer)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -98,9 +103,10 @@ func register(args []string) (string, error) {
 		return "", err
 	}
 	lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block = receipt.Key, receipt.TxHash, receipt.Block
-	lastRegistered.Expires, lastRegistered.Signer = meta.Expires.UTC().Format(time.RFC3339), signed.Signer
+	lastRegistered.Expires, lastRegistered.Signer, lastRegistered.Arch = meta.Expires.UTC().Format(time.RFC3339), signed.Signer, *arch
 	if !quiet {
-		fmt.Printf("registered\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n", receipt.Key, receipt.TxHash, receipt.Block, lastRegistered.Expires)
+		fmt.Printf("registered %s %s (%s)\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n  arch    %s\n", *service, *version, *arch, receipt.Key, receipt.TxHash, receipt.Block, lastRegistered.Expires, *arch)
+		fmt.Printf("  this registration is for %s only — put \"arch\": \"%s\" in measurement-record.json, and register the other architecture's build separately\n", *arch, *arch)
 	}
 	return receipt.Key, nil
 }

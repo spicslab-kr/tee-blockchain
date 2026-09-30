@@ -32,6 +32,7 @@ func selfRegisterCmd(args []string) error {
 	platform := fs.String("platform", "aws-nitro", "measurement format")
 	service := fs.String("service", "", "service name. empty takes it from an existing registration of the same measurements (anyone's)")
 	version := fs.String("version", "", "version. empty takes it from an existing registration, as above")
+	arch := fs.String("arch", defaultArch(), "CPU architecture the image was built for and measured on (amd64|arm64). default: this machine's — give the instance's if --measurements came from elsewhere")
 	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
 	trusted := fs.String("trusted", "", "trusted signer addresses, comma-separated. empty uses the contract's APPROVER")
 	out := fs.String("out", "", "directory for the intermediate files (document, parsed value). empty uses a temporary directory, removed at the end")
@@ -53,6 +54,9 @@ func selfRegisterCmd(args []string) error {
 	}
 	if *tee == "" && *measurements == "" {
 		return errors.New("--tee or --measurements is required")
+	}
+	if err := checkArch(*arch); err != nil {
+		return err
 	}
 	quiet = true // 아래 단계들이 raRequest · raParse · register 를 부르는데, 그들의 출력 대신 여기서 한 줄씩 찍는다
 
@@ -160,10 +164,10 @@ func selfRegisterCmd(args []string) error {
 		}
 	}
 
-	t := cli.Start(fmt.Sprintf("Registering %s %s on the chain, signed with my key", *service, *version))
+	t := cli.Start(fmt.Sprintf("Registering %s %s (%s) on the chain, signed with my key", *service, *version, *arch))
 	key, err := register([]string{
 		"--rpc", *rpc, "--contract", *contract, "--key-file", *keyFile,
-		"--measurements", measPath, "--platform", *platform,
+		"--measurements", measPath, "--platform", *platform, "--arch", *arch,
 		"--service", *service, "--version", *version, "--expires", expires.String(),
 	})
 	if err != nil {
@@ -172,8 +176,8 @@ func selfRegisterCmd(args []string) error {
 	}
 	t.Done("registered")
 	cli.Why("the value now sits on the public registry under my signature; anyone can look it up by measurement alone, without asking me")
-	fmt.Printf("    key     %s\n    tx      %s\n    block   %d\n    expires %s\n    signer  %s\n",
-		lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block, lastRegistered.Expires, lastRegistered.Signer)
+	fmt.Printf("    key     %s\n    tx      %s\n    block   %d\n    expires %s\n    signer  %s\n    arch    %s\n",
+		lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block, lastRegistered.Expires, lastRegistered.Signer, lastRegistered.Arch)
 
 	t = cli.Start("Reading the registration back from the chain and checking it")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

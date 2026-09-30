@@ -254,7 +254,10 @@ step, but flow 1 registers from my own enclave. Same optional flags and prompts 
 
 ### 2.5 Hand the result to the Vendor
 
-`measurement-record.json` carries the service/version, the PCRs and the build tool version;
+`measurement-record.json` carries the service/version, the PCRs, the build tool version and
+the `arch` the image was built on (`amd64` or `arm64`, GOARCH spelling). The same source
+measures differently on x86_64 and on arm64, so one service/version has one record — and one
+registration — per CPU architecture; `send` refuses a record that does not say which.
 `send` fills in the EIF's sha256 and pushes both to the repository:
 ```
 tb-auditor send --repo <git url> --record measurement-record.json --image out/<name>.eif

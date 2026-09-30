@@ -62,7 +62,7 @@ func TestTransfer_AuditorToVendor_MeasurementRecordWithImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := auditor.MeasurementRecord{
-		Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws",
+		Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", Arch: "amd64",
 		Image: auditor.Image{Path: eif},
 		Values: ap.Measurements{
 			{Name: "PCR0", Value: bytes.Repeat([]byte{1}, 48)},
@@ -133,7 +133,7 @@ func TestTransfer_TamperInTransitIsCaught(t *testing.T) {
 	eif := filepath.Join(build, "svc.eif")
 	_ = os.WriteFile(eif, []byte("eif-bytes"), 0o644)
 	rec := auditor.MeasurementRecord{
-		Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws",
+		Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "aws", Arch: "amd64",
 		Image:     auditor.Image{Path: eif},
 		Values:    ap.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{1}, 48)}, {Name: "PCR1", Value: bytes.Repeat([]byte{2}, 48)}, {Name: "PCR2", Value: bytes.Repeat([]byte{3}, 48)}},
 		BuildTool: auditor.BuildTool{Name: "nitro-cli", Version: "1.3.0"},

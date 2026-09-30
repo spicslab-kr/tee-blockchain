@@ -104,7 +104,8 @@ func usage() {
   receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
                    clone the source repository and read the build config. build from that directory
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
-                   commit and push the measurement record and image to the repository
+                   commit and push the measurement record and image to the repository. the record must say which CPU
+                   architecture it is for ("arch": amd64 | arm64) — measurements differ per architecture
   build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>] [--verify]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
               for source that an Auditor will rebuild the same way (Case B)
@@ -192,6 +193,16 @@ func send(args []string) error {
 	if *image != "" {
 		rec.Image.Path = *image
 	}
+	// clone 하고 이미지를 해시하기 전에 기록부터 거른다 (Send 도 다시 검사한다). 이미지 해시는 Send 가 채우니 그 자리만 메워서 본다.
+	// arch 가 빠진 기록은 어느 아키텍처 것인지 알 수 없으니 보내지 않는다.
+	chk := rec
+	if chk.Image.Path != "" && chk.Image.SHA256 == "" {
+		chk.Image.SHA256 = strings.Repeat("0", 64)
+	}
+	if err := chk.Validate(); err != nil {
+		return fmt.Errorf("measurement record: %w", err)
+	}
+	fmt.Printf("record %s %s %s · arch: %s\n", rec.Service, rec.Version, rec.Platform, rec.Arch)
 	res, err := tr.GitTransport{WorkDir: *work}.Send(context.Background(), rec, *repo)
 	if err != nil {
 		return err
