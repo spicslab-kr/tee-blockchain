@@ -11,6 +11,17 @@ cd "$here/.."
 #   -trimpath: 빌드한 폴더의 절대경로를 바이너리 안에 안 남긴다. tb-ra-responder 는 엔클레이브 이미지에
 #   그대로 얹히므로, 이게 없으면 사람마다 소스를 받은 경로가 달라 같은 소스로도 측정값이 갈린다.
 step "BUILDING BINARIES"
+# ▶ Go 툴체인 확인 — 패치 버전만 달라도 tb-ra-responder 의 바이트가, 그래서 측정값(PCR)이 달라진다.
+#   internal/setup/build/GO_TOOLCHAIN 이 유일한 출처이고 tb 자체도 빌드 때 같은 값을 검사한다.
+WANT_GO="$(tr -d '[:space:]' < "$here/../internal/setup/build/GO_TOOLCHAIN")"
+HAVE_GO="$(go version | awk '{print $3}')"
+if [ "$HAVE_GO" != "$WANT_GO" ]; then
+  echo "✗ Go 툴체인이 $HAVE_GO 입니다 — 이 프로젝트는 정확히 $WANT_GO 로 고정돼 있습니다 (internal/setup/build/GO_TOOLCHAIN)." >&2
+  echo "  다른 버전으로 빌드하면 tb-ra-responder 바이트가 달라져 측정값이 안 맞습니다." >&2
+  echo "  bash e2e/0-Setup-local-install.sh 로 맞추거나, GOTOOLCHAIN=$WANT_GO 를 앞에 붙여 다시 실행하세요." >&2
+  exit 1
+fi
+echo "toolchain: $HAVE_GO (pinned)"
 GOOS=linux GOARCH=amd64 go build -trimpath -o tb-vendor ./cmd/vendor
 GOOS=linux GOARCH=amd64 go build -trimpath -o tb-auditor ./cmd/auditor
 GOOS=linux GOARCH=amd64 go build -trimpath -o tb-ra-responder ./cmd/ra-responder

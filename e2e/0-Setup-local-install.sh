@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 내 컴퓨터에 e2e 를 돌리는 데 필요한 것들을 설치한다: git, ssh 클라이언트, Go 1.26+.
+# 내 컴퓨터에 e2e 를 돌리는 데 필요한 것들을 설치한다: git, ssh 클라이언트, Go (internal/setup/build/GO_TOOLCHAIN 에 고정된 버전).
 # 이미 있는 건 다시 안 깐다 — 몇 번 돌려도 안전하다. 아래 것들을 자동으로 구분해서 각자 맞는 방법으로 설치한다:
 #   - Ubuntu/Debian 계열 (apt)
 #   - Fedora/RHEL/Amazon Linux 계열 (dnf)
@@ -8,7 +8,11 @@
 #    실행: bash "e2e/0-Setup-local-install.sh"
 set -euo pipefail
 
-GO_VERSION=1.26.1  # 정확히 이 버전 — 다르면 재현빌드 값이 안 맞는다. 더 낮아도, 더 높아도 다시 이걸로 맞춘다
+# 정확히 이 버전 — 다르면 재현빌드 값이 안 맞는다. 더 낮아도, 더 높아도 다시 이걸로 맞춘다.
+# 버전은 여기 적지 않는다: internal/setup/build/GO_TOOLCHAIN 파일이 유일한 출처다 (tb 바이너리도 같은 파일을
+# 안에 품고 빌드 때 검사한다). 바꾸려면 그 파일만 고친다.
+here="$(cd "$(dirname "$0")" && pwd)"
+GO_VERSION="$(sed 's/^go//' "$here/../internal/setup/build/GO_TOOLCHAIN" | tr -d '[:space:]')"
 
 # -- 환경 구분 --
 OS_KIND=unknown

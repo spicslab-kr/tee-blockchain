@@ -2,7 +2,7 @@
 
 ## Local machine
 
-Go version: **exactly 1.26.1** (not "or newer" — reproducible-build comparisons need the same compiler)
+Go version: **exactly the one pinned in `internal/setup/build/GO_TOOLCHAIN`** (currently go1.26.1; not "or newer" — reproducible-build comparisons need the same compiler, and tb's `build` refuses to run under any other)
 Installed by: `e2e/0-Setup-local-install.sh`
 Tested on: Windows (Git Bash) — real install verified, admin rights required on Windows
 Not yet tested on: Ubuntu, mac (script has apt/dnf/yum/brew branches, unverified on real hardware)

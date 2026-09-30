@@ -22,7 +22,9 @@ go build -trimpath -o tb-auditor ./cmd/auditor
 go build -trimpath -o tb-user    ./cmd/user
 go build -trimpath -o tb-ra-responder ./cmd/ra-responder
 ```
-Requires Go 1.26+. Cross-compile for the Nitro instances (Linux) with `GOOS=linux GOARCH=amd64`.
+The required Go toolchain is pinned to exactly the version in `internal/setup/build/GO_TOOLCHAIN`
+(currently go1.26.1): a different patch version produces different `tb-ra-responder` bytes and so
+different measurements, and `build` refuses to run under a toolchain other than the pinned one. Cross-compile for the Nitro instances (Linux) with `GOOS=linux GOARCH=amd64`.
 `-trimpath` matters for `tb-ra-responder` specifically — it gets layered straight into the enclave
 image, so building the identical source from a different folder path would otherwise leave a
 different absolute path baked into the binary, and the measurement (PCR) with it.

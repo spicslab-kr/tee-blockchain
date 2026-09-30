@@ -19,6 +19,7 @@ import (
 	reg "tb/internal/chain/register/auditor"
 	"tb/internal/cli"
 	tr "tb/internal/core/transfer/auditor"
+	toolchain "tb/internal/setup/build"
 	build "tb/internal/setup/build/auditor/aws"
 	launch "tb/internal/setup/launch/auditor/aws"
 	parse "tb/internal/tee/parse/auditor"
@@ -63,6 +64,9 @@ func main() {
 		err = packCmd(os.Args[2:])
 	case "launch":
 		err = launchCmd(os.Args[2:])
+	case "version":
+		fmt.Println("tb auditor ·", toolchain.ToolchainLine())
+		err = toolchain.CheckToolchain()
 	default:
 		usage()
 		os.Exit(2)
@@ -76,6 +80,8 @@ func main() {
 func usage() {
 	fmt.Fprintln(os.Stderr, `tb auditor
 
+  version          print the pinned Go toolchain (internal/setup/build/GO_TOOLCHAIN) and the one this binary was built with;
+                   exit 1 if they differ — build/pack refuse to run in that case, since the responder's bytes and the measurements depend on it
   registry-deploy  --rpc <url> --key-file <file> --approver <0x…>
                    deploy the Registry contract. one signer per contract, fixed at deploy time
   register         --rpc <url> --contract <0x…> --key-file <file> --measurements <measurements.json | NAME=hex,…>

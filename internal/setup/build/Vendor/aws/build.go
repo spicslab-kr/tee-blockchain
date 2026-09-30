@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"tb/internal/cli"
+	"tb/internal/setup/build"
 )
 
 //go:embed entrypoint.sh
@@ -71,6 +72,9 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	var res Result
 	if runtime.GOOS != "linux" {
 		return res, ErrNotLinux
+	}
+	if err := build.CheckToolchain(); err != nil {
+		return res, err
 	}
 	if (b.AppDir == "") == (b.Image == "") {
 		return res, errors.New("give either an app dir (build) or an image (pack)")
@@ -162,6 +166,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 	fmt.Fprintf(log, "software command: %s\n", strings.Join(appCmd, " "))
+	fmt.Fprintln(log, build.ToolchainLine())
 	if err := b.layerResponder(ctx, r, appImage, res.Image, appCmd); err != nil {
 		return res, err
 	}
