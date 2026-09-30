@@ -115,8 +115,13 @@ tb-vendor launch --eif out/<name>.eif
 In flow 1 (the Auditor audits and registers) the Vendor does **not** register — after 1.1 it is
 done. `self-register` is for flow 2, where the Vendor registers its own enclave:
 ```
-tb-vendor self-register --tee 127.0.0.1:5000 --rpc <url> --contract <0x…> --key-file <key>
+tb-vendor self-register --config build-config.json --tee 127.0.0.1:5000 --rpc <url> --contract <0x…> --key-file <key>
 ```
+`--config` is the same `build-config.json` that `send` pushes (1.3): the service, version and
+build environment (`build_env`: OS, CPU architecture, Go toolchain, `-trimpath`) are taken from
+it, so there is nothing to type twice. `--service`, `--version` and `--arch` still work and win
+over the file, with a warning when they differ (`warning: --service nginx2 differs from
+build-config.json (nginx)`); without `--config` they are required as before.
 The confirmation names the CPU architecture and the Go toolchain the enclave was built with
 (`registered nginx 1.31.6 (amd64, go1.26.1 -trimpath)`), since the registered value is only
 reproducible in that environment.
@@ -136,7 +141,7 @@ tb-vendor ra-parse --doc doc.cbor --out parsed.json
 Sign those measurements with my key and register them on the contract. The `key` it prints
 is the lookup coordinate:
 ```
-tb-vendor register --rpc <url> --contract <0x…> --key-file <key> --measurements parsed.json --service <name> --version <v>
+tb-vendor register --rpc <url> --contract <0x…> --key-file <key> --measurements parsed.json --config build-config.json
 ```
 
 Read the registration back by measurement alone:
@@ -152,8 +157,8 @@ tb-vendor compare --a parsed.json --rpc <url> --contract <0x…> --key <key regi
 
 Options. Add `--measurements out/measurements.json` to `self-register` and it compares the attestation
 against your build value first and refuses to register on a mismatch (exit ≠ 0, the differing
-PCRs are printed). `--service`/`--version` are asked for on the first registration; later ones
-reuse them. Any flag you leave out is asked for interactively — except `--rpc`, which defaults to
+PCRs are printed). Without `--config`, `--service`/`--version` are asked for on the first
+registration; later ones reuse them. Any flag you leave out is asked for interactively — except `--rpc`, which defaults to
 Ethereum **mainnet** and requires typing `y` to accept; any other URL (a testnet) is taken as-is.
 
 ### 1.3 Hand-off with the Auditor
@@ -216,11 +221,19 @@ tb-auditor registry-deploy --rpc <url> --key-file <deployer.key> --approver <my 
 ### 2.4 `audit` — attest my enclave, check it against my build, register, self-check
 
 ```
-tb-auditor audit --tee <my-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
+tb-auditor audit --config work/src/build-config.json --tee <my-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
 ```
 `--tee` is **my own** enclave, running **my own** build of the Vendor's source. That is the
 audit: what goes on-chain is what I built from the source and ran myself, checked against the
 build value, not what the Vendor told me.
+
+`--config` is the Vendor's `build-config.json` — `receive` (2.1) left it in the clone root and
+prints this command with the right path. The service, version and build environment
+(`build_env`: OS, CPU architecture, Go toolchain, `-trimpath`) come from it; the Vendor already
+said them, so they are not typed again. `--service`, `--version` and `--arch` still work and win
+over the file, with a warning when they differ (`warning: --service nginx2 differs from
+build-config.json (nginx)`). Without `--config`, `--service`/`--version` are required (or taken
+from an existing registration of the same value) and `--arch` defaults to this machine's.
 
 What that does, one step at a time.
 
@@ -242,7 +255,7 @@ tb-auditor compare --a parsed.json --b out/measurements.json
 
 Register the **build value** with my key:
 ```
-tb-auditor register --rpc <url> --contract <0x…> --key-file <key> --measurements out/measurements.json --service <name> --version <v>
+tb-auditor register --rpc <url> --contract <0x…> --key-file <key> --measurements out/measurements.json --config work/src/build-config.json
 ```
 
 Read it back by measurement:
@@ -264,13 +277,23 @@ step, but flow 1 registers from my own enclave. Same optional flags and prompts 
 `measurement-record.json` carries the service/version, the PCRs, the build tool version and
 the `build_env` the image was built in — OS, CPU architecture (`amd64` or `arm64`, GOARCH
 spelling), Go toolchain and whether `-trimpath` was on — the same shape as build-config.json's
-`build_env`. The same source measures differently on x86_64 and on arm64 (and under a different
-Go), so one service/version has one record — and one registration — per CPU architecture;
-`send` refuses a record that does not say which, and warns when the record's Go is not the one
-this project pins. `send` fills in the EIF's sha256 and pushes both to the repository:
+`build_env`. Everything but the PCRs and the build tool is already in the Vendor's
+`build-config.json`, and the PCRs are in `out/measurements.json`, so `send` builds the record
+from those two, fills in the EIF's sha256 and pushes record and image to the repository:
+```
+tb-auditor send --repo <git url> --config work/src/build-config.json --measurements out/measurements.json --image out/<name>.eif
+```
+The build tool is nitro-cli; its version is read from `nitro-cli --version` on this instance, or
+given with `--build-tool-version`. The record it built is also left next to the measurements
+(`out/measurement-record.json`).
+
+Or write the record by hand and send that:
 ```
 tb-auditor send --repo <git url> --record measurement-record.json --image out/<name>.eif
 ```
+The same source measures differently on x86_64 and on arm64 (and under a different Go), so one
+service/version has one record — and one registration — per CPU architecture; `send` refuses a
+record that does not say which, and warns when the record's Go is not the one this project pins.
 
 ## 3. User
 

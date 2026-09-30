@@ -18,6 +18,7 @@ import (
 	lether "tb/internal/chain/lookup/Vendor/ether"
 	reg "tb/internal/chain/register/Vendor"
 	"tb/internal/chain/register/Vendor/ether"
+	"tb/internal/cli"
 	tr "tb/internal/core/transfer/Vendor"
 	p "tb/internal/tee/parse/Vendor"
 )
@@ -59,22 +60,32 @@ func register(args []string) (string, error) {
 	keyFile := fs.String("key-file", "", "private key file (hex) that signs and sends the transaction")
 	measurements := fs.String("measurements", "", "measurements: a nitro measurements.json file, or NAME=hex,NAME=hex")
 	platform := fs.String("platform", "aws-nitro", "measurement format")
+	config := fs.String("config", "", "my build-config.json (the one send pushes): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
 	service := fs.String("service", "", "service name")
 	version := fs.String("version", "", "version")
-	arch := fs.String("arch", defaultArch(), "CPU architecture the image was built for and measured on (amd64|arm64). measurements differ per architecture, so one service/version is registered once per architecture. default: this machine's")
+	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). measurements differ per architecture, so one service/version is registered once per architecture. default: build-config.json's with --config, else this machine's")
 	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
 	if err := fs.Parse(args); err != nil {
 		return "", err
 	}
-	// 옵션으로 안 준 값은 차례로 묻는다
+	cfg, err := loadBuildConfig(*config)
+	if err != nil {
+		return "", err
+	}
+	// 옵션으로 안 준 값은 차례로 묻는다 — service · version 은 --config 가 있으면 거기서 오니 안 묻는다
 	askMainnetRPC(rpc)
 	ask(contract, "Registry contract address (0x…)", "")
 	ask(keyFile, "my private key file", "")
 	ask(measurements, "measurements (path to measurements.json, or NAME=hex,…)", "out/measurements.json")
-	ask(service, "service name", "")
-	ask(version, "version", "")
-	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" || *measurements == "" || *service == "" || *version == "" {
-		return "", errors.New("--rpc, --contract, --key-file, --measurements, --service and --version are required")
+	if cfg == nil {
+		ask(service, "service name", "")
+		ask(version, "version", "")
+	}
+	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" || *measurements == "" || (cfg == nil && (*service == "" || *version == "")) {
+		return "", errors.New("--rpc, --contract, --key-file, --measurements, and --service and --version (or --config <build-config.json>, which carries them) are required")
+	}
+	if err := resolveRegistration(cfg, service, version, arch); err != nil {
+		return "", err
 	}
 	if err := checkArch(*arch); err != nil {
 		return "", err
@@ -95,9 +106,14 @@ func register(args []string) (string, error) {
 	}
 	// the build environment this registration is for: --arch says which machine the image was built for and measured
 	// on; the Go toolchain is this binary's — it is pinned project-wide (build.CheckToolchain at build start), so it is
-	// the one that compiled tb-ra-responder into the image. none of it goes into the chain Entry (the measurement hash
-	// already differs per architecture, so the key splits by itself); it is said here and in measurement-record.json.
+	// the one that compiled tb-ra-responder into the image. with --config it is the config's build_env instead: that
+	// describes the build that was measured, whichever machine runs register. none of it goes into the chain Entry (the
+	// measurement hash already differs per architecture, so the key splits by itself); it is said here and in
+	// measurement-record.json.
 	env := tr.CurrentBuildEnv()
+	if cfg != nil {
+		env = cfg.BuildEnv
+	}
 	env.Arch = *arch
 	env.OS = "linux" // the enclave image is Linux whichever machine runs register
 	goVer := env.Go
@@ -120,6 +136,40 @@ func register(args []string) (string, error) {
 		fmt.Printf("  this registration is for %s only — put \"build_env\": %s in measurement-record.json, and register the other architecture's build separately\n", *arch, buildEnvJSON(env))
 	}
 	return receipt.Key, nil
+}
+
+// loadBuildConfig — --config: my build-config.json. Empty path → nil (flags only).
+// DecodeBuildConfig validates it, so a config that lacks service, version or build_env is refused here.
+func loadBuildConfig(path string) (*tr.BuildConfig, error) {
+	if path == "" {
+		return nil, nil
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	c, err := tr.DecodeBuildConfig(b)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return &c, nil
+}
+
+// resolveRegistration — fills service/version/arch in place from the config when the flags are empty; a flag that is
+// given and differs from the config wins, with one warning line. Without a config, --arch defaults to this machine's.
+func resolveRegistration(cfg *tr.BuildConfig, service, version, arch *string) error {
+	if cfg == nil && *arch == "" {
+		*arch = defaultArch()
+	}
+	svc, ver, a, warnings, err := tr.ResolveRegistration(cfg, *service, *version, *arch)
+	if err != nil {
+		return err
+	}
+	for _, w := range warnings {
+		cli.Errorf("warning: %s", w)
+	}
+	*service, *version, *arch = svc, ver, a
+	return nil
 }
 
 // buildEnvJSON — the record's build_env object on one line, as it should be pasted into measurement-record.json.

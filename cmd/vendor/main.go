@@ -85,8 +85,9 @@ func usage() {
   registry-deploy  --rpc <url> --key-file <file> --approver <0x…>
                    deploy the Registry contract. one signer per contract, fixed at deploy time
   register         --rpc <url> --contract <0x…> --key-file <file> --measurements <measurements.json | NAME=hex,…>
-                   --service <name> --version <v> [--platform aws-nitro] [--expires 2160h]
-                   sign the measurements with my key and register them on the contract. the key in the output is the lookup coordinate
+                   (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--platform aws-nitro] [--expires 2160h]
+                   sign the measurements with my key and register them on the contract. the key in the output is the lookup coordinate.
+                   --config takes service, version and the build env from my build-config.json; the flags override it, with a warning
   lookup           --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
                    read one key directly, or find the key(s) for the measurements first and read them all
   compare          --a <measurements.json | NAME=hex,…> --b <same shape>
@@ -94,10 +95,12 @@ func usage() {
   compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
                    read the registration from the chain and check the value, expiry and trusted signer together. exit 1 on failure
   self-register    [--tee <my enclave host:port>] [--measurements <file>] --rpc <url> --contract <0x…> --key-file <file>
-                   --service <name> --version <v>
+                   (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64])
                    flow 2, no Auditor: attest my own enclave (T1·T2), register the value under my key (C1), read it back and
-                   self-check (C2·M2). with --measurements too, registers only if the attested value matches it. --nonce pins
-                   the nonce. with --service/--version empty, takes them from an existing registration on this contract
+                   self-check (C2·M2). with --measurements too, registers only if the attested value matches it. --config takes
+                   service, version and the build env from my build-config.json; the flags override it, with a warning. --nonce
+                   pins the nonce. with --service/--version empty and no --config, takes them from an existing registration on
+                   this contract
   send             --repo <url> --config <build-config.json> [--workdir <clone>]
                    commit and push the build config to the source repository
   receive          --repo <url> [--ref <commit>] --into <dir>

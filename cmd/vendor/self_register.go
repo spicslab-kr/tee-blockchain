@@ -30,14 +30,28 @@ func selfRegisterCmd(args []string) error {
 	contract := fs.String("contract", "", "Registry contract address")
 	keyFile := fs.String("key-file", "", "private key file (hex) that signs and sends the transaction")
 	platform := fs.String("platform", "aws-nitro", "measurement format")
-	service := fs.String("service", "", "service name. empty takes it from an existing registration of the same measurements (anyone's)")
-	version := fs.String("version", "", "version. empty takes it from an existing registration, as above")
-	arch := fs.String("arch", defaultArch(), "CPU architecture the image was built for and measured on (amd64|arm64). default: this machine's — give the instance's if --measurements came from elsewhere")
+	config := fs.String("config", "", "my build-config.json (the one send pushes): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
+	service := fs.String("service", "", "service name. empty takes it from --config, else from an existing registration of the same measurements (anyone's)")
+	version := fs.String("version", "", "version. empty takes it from --config, else from an existing registration, as above")
+	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). default: build-config.json's with --config, else this machine's — give the instance's if --measurements came from elsewhere")
 	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
 	trusted := fs.String("trusted", "", "trusted signer addresses, comma-separated. empty uses the contract's APPROVER")
 	out := fs.String("out", "", "directory for the intermediate files (document, parsed value). empty uses a temporary directory, removed at the end")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	// --config 가 있으면 service · version · arch 는 거기서 온다 (플래그는 덮어쓰기, 경고 한 줄). 없으면 service · version 은
+	// 아래에서 기존 등록에서 찾거나 묻고, arch 는 이 기계의 것.
+	cfg, err := loadBuildConfig(*config)
+	if err != nil {
+		return err
+	}
+	if cfg != nil {
+		if err := resolveRegistration(cfg, service, version, arch); err != nil {
+			return err
+		}
+	} else if *arch == "" {
+		*arch = defaultArch()
 	}
 	// 옵션으로 안 준 값은 register 처럼 차례로 묻는다 — plain 에서 전부 플래그로 줄 필요는 없다.
 	askMainnetRPC(rpc)
@@ -165,11 +179,15 @@ func selfRegisterCmd(args []string) error {
 	}
 
 	t := cli.Start(fmt.Sprintf("Registering %s %s (%s) on the chain, signed with my key", *service, *version, *arch))
-	key, err := register([]string{
+	regArgs := []string{
 		"--rpc", *rpc, "--contract", *contract, "--key-file", *keyFile,
 		"--measurements", measPath, "--platform", *platform, "--arch", *arch,
 		"--service", *service, "--version", *version, "--expires", expires.String(),
-	})
+	}
+	if *config != "" {
+		regArgs = append(regArgs, "--config", *config) // the build env printed and recorded is the config's, as resolved above
+	}
+	key, err := register(regArgs)
 	if err != nil {
 		t.Fail("rejected")
 		return err

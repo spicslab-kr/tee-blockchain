@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -85,8 +87,9 @@ func usage() {
   registry-deploy  --rpc <url> --key-file <file> --approver <0x…>
                    deploy the Registry contract. one signer per contract, fixed at deploy time
   register         --rpc <url> --contract <0x…> --key-file <file> --measurements <measurements.json | NAME=hex,…>
-                   --service <name> --version <v> [--platform aws-nitro] [--expires 2160h]
-                   sign the measurements with my key and register them on the contract. the key in the output is the lookup coordinate
+                   (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--platform aws-nitro] [--expires 2160h]
+                   sign the measurements with my key and register them on the contract. the key in the output is the lookup coordinate.
+                   --config takes service, version and the build env from the Vendor's build-config.json; the flags override it, with a warning
   lookup           --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
                    read one key directly, or find the key(s) for the measurements first and read them all
   compare          --a <measurements.json | NAME=hex,…> --b <same shape>
@@ -94,19 +97,24 @@ func usage() {
   compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
                    read the registration from the chain and check the value, expiry and trusted signer together. exit 1 on failure
   audit            --tee <my enclave host:port> --measurements <my out/measurements.json> --rpc <url> --contract <0x…> --key-file <file>
-                   --service <name> --version <v> [--vendor-tee <the Vendor's enclave host:port>]
+                   (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--vendor-tee <the Vendor's enclave host:port>]
                    flow 1 in one go: attest my own enclave (T1·T2), check the attested value against --measurements (the value I
                    built or measured myself), register that value only if they match (C1), then read it back and self-check (C2·M2).
-                   --nonce pins the nonce. with --service/--version empty, takes them from an existing registration of the same
-                   measurements on this contract. without --tee registers --measurements as is (no audit).
+                   --config takes service, version and the build env from the Vendor's build-config.json (receive put it in the
+                   clone root); the flags override it, with a warning. --nonce pins the nonce. with --service/--version empty and no
+                   --config, takes them from an existing registration of the same measurements on this contract. without --tee
+                   registers --measurements as is (no audit).
                    --vendor-tee also asks the Vendor's running enclave and says whether it runs the same value (flow 2 step 15); what is
                    registered is still my value
   receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
                    clone the source repository and read the build config. build from that directory
+  send             --repo <url> --config <build-config.json> --measurements <out/measurements.json> --image <file> [--build-tool-version <v>] [--workdir <clone>]
+                   build the measurement record from the Vendor's build-config.json (service, version, build_env) and my
+                   measurements.json (PCR0·1·2), write it next to the measurements, then commit and push it with the image.
+                   --build-tool-version is nitro-cli's; without it, what nitro-cli --version says here
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
-                   commit and push the measurement record and image to the repository. the record must say which build
-                   environment it is for ("build_env": os, arch amd64 | arm64, go, trimpath) — measurements differ per
-                   architecture and per Go toolchain
+                   the same with a hand-written record. it must say which build environment it is for ("build_env": os,
+                   arch amd64 | arm64, go, trimpath) — measurements differ per architecture and per Go toolchain
   build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>] [--verify]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
               for source that an Auditor will rebuild the same way (Case B)
@@ -168,28 +176,40 @@ func receive(args []string) error {
 	if c.BuildEnv.OS == have.OS && c.BuildEnv.Arch == have.Arch && c.BuildEnv.Go == have.Go {
 		cli.Okln("build env matches the Vendor's")
 	}
+	// the config carries service, version and build_env, so audit needs none of them typed again
+	fmt.Printf("next: tb-auditor audit --config %s --tee <this-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>\n", got.Path)
 	return nil
 }
 
 func send(args []string) error {
 	fs := flag.NewFlagSet("send", flag.ContinueOnError)
 	repo := fs.String("repo", "", "repository URL to push to")
-	recPath := fs.String("record", "", "path to measurement-record.json")
-	image := fs.String("image", "", "image file (aws: the EIF). overrides image.path in the record")
+	recPath := fs.String("record", "", "path to a hand-written measurement-record.json. instead of it, --config and --measurements build the record here")
+	config := fs.String("config", "", "the Vendor's build-config.json: the record's service, version, platform and build_env are taken from it")
+	measurements := fs.String("measurements", "", "my out/measurements.json (nitro-cli's {\"Measurements\":{\"PCR0\":…}}): the record's values are taken from it")
+	image := fs.String("image", "", "image file (aws: the EIF). overrides image.path in the record; required with --config")
+	buildToolVersion := fs.String("build-tool-version", "", "with --config: nitro-cli's version, for the record's build_tool. default: what `nitro-cli --version` says here")
 	work := fs.String("workdir", "", "an existing clone to work in (default: a temporary clone)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *repo == "" || *recPath == "" {
-		return errors.New("--repo and --record are required")
-	}
-	b, err := os.ReadFile(*recPath)
-	if err != nil {
-		return err
+	if *repo == "" || (*recPath == "" && (*config == "" || *measurements == "")) {
+		return errors.New("--repo and either --record, or --config with --measurements (the record is built from them), are required")
 	}
 	var rec tr.MeasurementRecord
-	if err := json.Unmarshal(b, &rec); err != nil {
-		return fmt.Errorf("measurement record: %w", err)
+	if *recPath != "" {
+		b, err := os.ReadFile(*recPath)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(b, &rec); err != nil {
+			return fmt.Errorf("measurement record: %w", err)
+		}
+	} else {
+		var err error
+		if rec, err = buildRecord(*config, *measurements, *image, *buildToolVersion); err != nil {
+			return err
+		}
 	}
 	if *image != "" {
 		rec.Image.Path = *image
@@ -205,12 +225,91 @@ func send(args []string) error {
 	}
 	fmt.Printf("record %s %s %s · build env: %s\n", rec.Service, rec.Version, rec.Platform, rec.BuildEnv)
 	warnToolchain(rec.BuildEnv)
+	if *recPath == "" {
+		// the record was built here — leave it on disk next to the measurements too, with the image's sha256 filled in,
+		// so the Vendor-side file exists as it does after a hand-written send
+		written, err := writeRecordBeside(rec, *measurements)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("record written to %s\n", written)
+	}
 	res, err := tr.GitTransport{WorkDir: *work}.Send(context.Background(), rec, *repo)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("sent %s → %s @ %s\n", res.Path, res.Repo, res.Commit)
 	return nil
+}
+
+// buildRecord — send --config --measurements: the measurement record from what is already on disk. service, version,
+// platform and build_env are the Vendor's build-config.json (the build that was measured); values are nitro-cli's
+// measurements.json (PCR0·1·2); image.path is --image; build_tool is nitro-cli with --build-tool-version, or the
+// version `nitro-cli --version` reports on this instance. Send fills in image.sha256.
+func buildRecord(configPath, measPath, image, toolVersion string) (tr.MeasurementRecord, error) {
+	cfg, err := loadBuildConfig(configPath)
+	if err != nil {
+		return tr.MeasurementRecord{}, err
+	}
+	if image == "" {
+		return tr.MeasurementRecord{}, errors.New("--image is required with --config: the record names the EIF that was measured")
+	}
+	values, err := readMeasurements(measPath)
+	if err != nil {
+		return tr.MeasurementRecord{}, err
+	}
+	sort.Slice(values, func(i, j int) bool { return values[i].Name < values[j].Name })
+	if toolVersion == "" {
+		toolVersion = nitroCLIVersion()
+	}
+	if toolVersion == "" {
+		return tr.MeasurementRecord{}, errors.New("--build-tool-version is required: nitro-cli is not on PATH here, so give the version of the nitro-cli that built the image (nitro-cli --version on the instance)")
+	}
+	return tr.MeasurementRecord{
+		Schema: tr.SchemaMeasurementRecord, Service: cfg.Service, Version: cfg.Version, Platform: cfg.Platform,
+		BuildEnv:  cfg.BuildEnv,
+		Image:     tr.Image{Path: image},
+		Values:    values,
+		BuildTool: tr.BuildTool{Name: "nitro-cli", Version: toolVersion},
+	}, nil
+}
+
+// nitroCLIVersion — the version number in `nitro-cli --version` ("Amazon Web Services Nitro CLI 1.3.0"). Empty if
+// nitro-cli is not here or says nothing that looks like a version.
+func nitroCLIVersion() string {
+	out, err := exec.Command("nitro-cli", "--version").Output()
+	if err != nil {
+		return ""
+	}
+	for _, f := range strings.Fields(string(out)) {
+		f = strings.TrimPrefix(f, "v")
+		if len(f) > 0 && f[0] >= '0' && f[0] <= '9' && strings.Contains(f, ".") {
+			return f
+		}
+	}
+	return ""
+}
+
+// writeRecordBeside — the built record as a file next to measurements.json (or in the working directory when
+// --measurements was NAME=hex,…), with image.sha256 filled and image.path as the bare file name, as Send pushes it.
+func writeRecordBeside(rec tr.MeasurementRecord, measPath string) (string, error) {
+	if rec.Image.Path != "" {
+		sum, err := tr.FileDigest(rec.Image.Path)
+		if err != nil {
+			return "", fmt.Errorf("image file: %w", err)
+		}
+		rec.Image.SHA256 = sum
+		rec.Image.Path = filepath.Base(rec.Image.Path)
+	}
+	b, err := tr.Encode(rec)
+	if err != nil {
+		return "", err
+	}
+	dst := filepath.Join(filepath.Dir(measPath), tr.MeasurementRecordFile)
+	if err := os.WriteFile(dst, b, 0o644); err != nil {
+		return "", err
+	}
+	return dst, nil
 }
 
 func raRequest(args []string) error {

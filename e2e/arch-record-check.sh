@@ -4,6 +4,7 @@
 #    측정값 해시가 아키텍처마다 이미 다르니 키는 저절로 갈린다. 여기서 보는 것은 세 가지뿐이고, 트랜잭션은 하나도 안 보낸다.
 #      1. 흐름 스크립트가 쓰는 uname -m → GOARCH 매핑이 실제 인스턴스에서 맞게 나오는지 (x86 Vendor → amd64, arm64 호스트 → arm64)
 #      2. tb-auditor send 가 build_env 없는 기록을 거절하고, 있는 기록은 그 빌드 환경을 한 줄로 찍고 (로컬 bare 저장소로) 실제로 보내는지
+#         — 그리고 --record 없이 --config(build-config.json) + --measurements(measurements.json) 로 기록을 직접 만들어 보내는지
 #      3. tb-auditor register 가 uname 철자(x86_64)를 거절하는지 — 거절은 키를 읽기도, 체인에 붙기도 전에 난다
 #    register --arch arm64 가 실제로 등록되는 것은 체인 트랜잭션이라 여기서는 안 본다 (cmd/buildenv_record_e2e_test.go 가 anvil 로 본다).
 #
@@ -88,9 +89,40 @@ else
   fail=1
 fi
 
+# 2b. send --config --measurements — 기록을 손으로 쓰지 않고 build-config.json 과 nitro-cli 의 measurements.json 에서 만든다.
+#     push 된 기록의 service · build_env 는 config 그대로여야 한다.
+step "SEND: RECORD BUILT FROM BUILD-CONFIG AND MEASUREMENTS"
+pcr_hex() { head -c 48 /dev/zero | tr '\0' "$1" | od -An -v -tx1 | tr -d ' \n'; }
+cat > "$WD/build-config.json" <<EOF
+{
+  "schema": "tb.build-config/1",
+  "service": "$SERVICE",
+  "version": "$VERSION",
+  "platform": "aws",
+  "source": { "repo": "https://github.com/qixiangme/docker-nginx", "commit": "ef5a25a6314e652a2dcfbce6074bef729f4d9639", "path": "mainline/alpine-slim" },
+  "tee_info": { "instance_id": "i-0check", "region": "eu-north-1", "ami_id": "ami-0check" },
+  "build_env": { "os": "linux", "arch": "arm64", "go": "$GOVER", "trimpath": true }
+}
+EOF
+cat > "$WD/measurements.json" <<EOF
+{ "Measurements": { "HashAlgorithm": "Sha384 { ... }", "PCR0": "$(pcr_hex 1)", "PCR1": "$(pcr_hex 2)", "PCR2": "$(pcr_hex 3)" } }
+EOF
+git init --quiet --bare --initial-branch=main "$WD/remote-c.git"
+out=$("$TBA" send --repo "$WD/remote-c.git" --config "$WD/build-config.json" --measurements "$WD/measurements.json" --image "$WD/svc.eif" --build-tool-version 1.3.0 2>&1); rc=$?
+echo "$out" | sed 's/^/  /'
+pushed=$(git -C "$WD/remote-c.git" show HEAD:measurement-record.json 2>/dev/null)
+if [ $rc -eq 0 ] && echo "$out" | grep -q "record $SERVICE $VERSION aws · build env: linux/arm64 $GOVER trimpath=true" \
+   && echo "$pushed" | grep -q "\"service\": \"$SERVICE\"" && echo "$pushed" | grep -q '"arch": "arm64"' && echo "$pushed" | grep -q "\"go\": \"$GOVER\"" \
+   && [ -f "$WD/measurement-record.json" ]; then
+  echo "✅ send --config --measurements: 기록을 만들어 보냈고, push 된 기록의 service · build_env 가 build-config.json 그대로다 (measurement-record.json 도 measurements.json 옆에 남는다)"
+else
+  echo "❌ send --config --measurements: exit $rc — 기록이 안 만들어졌거나, push 된 기록의 service · build_env 가 config 와 다르다"
+  fail=1
+fi
+
 # 3. register — uname 철자 거절. 필수 플래그는 다 주되, --arch 검사는 키 파일을 읽기 전·체인에 붙기 전에 나니 아무 데도 안 간다.
 step "REGISTER: --arch x86_64 IS REFUSED BEFORE TOUCHING THE CHAIN"
-pcr_hex() { head -c 48 /dev/zero | tr '\0' "$1" | od -An -tx1 | tr -d ' \n'; }
+pcr_hex() { head -c 48 /dev/zero | tr '\0' "$1" | od -An -v -tx1 | tr -d ' \n'; }
 out=$("$TBA" register --rpc http://127.0.0.1:1 --contract 0x0000000000000000000000000000000000000001 --key-file "$WD/no-such.key" \
   --measurements "PCR0=$(pcr_hex 1),PCR1=$(pcr_hex 2),PCR2=$(pcr_hex 3)" --service "$SERVICE" --version "$VERSION" --arch x86_64 2>&1); rc=$?
 echo "$out" | sed 's/^/  /'
