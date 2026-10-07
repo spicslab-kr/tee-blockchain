@@ -1,18 +1,136 @@
 # tee-blockchain
 
-Remote attestation for software running in a TEE (currently AWS Nitro Enclaves), with the
-attested measurements registered on an Ethereum-compatible chain so anyone can look them up
-and verify them later.
+**Remote attestation you can check against a public ledger.** Software runs in a TEE (AWS Nitro
+Enclaves today); an independent Auditor rebuilds it, confirms the enclave really runs those bytes,
+and registers the measurement on an Ethereum-compatible chain. Anyone can then ask the enclave to
+attest itself and check the answer against what is on-chain — with no key from anyone.
 
-**Vendor** runs the software in an enclave. **Auditor** builds the same source independently,
-runs it in its own enclave, and registers the measurements it vouches for on-chain. **User**
-asks the Vendor's enclave to attest itself, then checks that result against what's on-chain
-before trusting it.
+![Go 1.26.1 pinned](https://img.shields.io/badge/go-1.26.1%20pinned-00ADD8?logo=go&logoColor=white)
+![TEE AWS Nitro Enclaves](https://img.shields.io/badge/TEE-AWS%20Nitro%20Enclaves-FF9900?logo=amazonaws&logoColor=white)
+![Chain Ethereum / Solidity](https://img.shields.io/badge/chain-Ethereum%20%C2%B7%20Solidity-3C3C3D?logo=ethereum&logoColor=white)
 
-Each role gets its own binary (`tb-vendor`, `tb-auditor`, `tb-user`). A role's binary only
-contains that role's commands — User's binary has no `register` at all. The chain-side work of
-each role collapses to one command — `audit` (Auditor), `verify` (User), `self-register` (Vendor, flow 2); the steps it wraps are listed under each role so you
-can see exactly what it does, or drive them by hand.
+[Install](#install) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Operator guide](#operator-guide) · [Contributing](CONTRIBUTING.md)
+
+## Three roles, four binaries
+
+Each role gets its own binary, and a role's binary only contains that role's commands — the
+User's binary has no `register` at all.
+
+| binary | who runs it | where | one-command entry point |
+|---|---|---|---|
+| `tb-vendor` | **Vendor** — runs the service in an enclave | Nitro-enabled EC2 | `build` / `launch`, `self-register` (flow 2) |
+| `tb-auditor` | **Auditor** — rebuilds the same source, vouches on-chain | Nitro-enabled EC2 | `audit` |
+| `tb-user` | **User** — asks the enclave to attest, checks it against the chain | anywhere with network | `verify` |
+| `tb-ra-responder` | the program that answers attestation requests *inside* the enclave | layered into the enclave image by `build` / `pack` | — |
+
+![Three roles and the registry](docs/img/roles.svg)
+
+TEE platform today: AWS Nitro Enclaves.
+
+Flow 1 (default): the Vendor hands the Auditor the source (or the built image), the Auditor
+rebuilds and registers, the User trusts only what the Auditor signed. Flow 2: a Vendor without an
+Auditor registers to its own registry; an Auditor can audit it afterwards and the User can demand
+both registries agree (`--contract` twice).
+
+## Install
+
+Download the four Linux binaries for your architecture from the
+[latest release](../../releases/latest) (`amd64` and `arm64`, built with the pinned toolchain and
+`-trimpath`, with `SHA256SUMS`). Or build from source:
+
+```
+go build -trimpath -o tb-vendor       ./cmd/vendor
+go build -trimpath -o tb-auditor      ./cmd/auditor
+go build -trimpath -o tb-user         ./cmd/user
+go build -trimpath -o tb-ra-responder ./cmd/ra-responder
+```
+
+The toolchain is pinned to exactly go1.26.1 (`internal/setup/build/GO_TOOLCHAIN`); `build`
+refuses any other version because a different patch version produces a different
+`tb-ra-responder` and therefore different measurements. Details in [section 0](#0-build-the-binaries-and-put-them-where-they-run).
+
+## Quick start
+
+As a **User**, with an enclave address and a registry contract address — no keys, no ETH, no Nitro:
+
+```
+tb-user verify --tee <vendor-public-ip>:5000 --rpc <ethereum rpc url> --contract <0x…>
+```
+
+Exit 0 and a line like `✓ matches  nginx 1.31.6 (amd64) by 0x…, expires …` if a registration
+matches; exit 1 with the reason otherwise. Measured end to end against a Nitro enclave in eu-north-1
+and Ethereum mainnet from Korea: about 3 s and 21 MB peak, of which document verification is
+about 12 ms and the rest is network round trips.
+
+As a **Vendor**, on a Nitro instance, with the directory that holds your Dockerfile:
+
+```
+tb-vendor build  --app-dir <dir> --out out                # reproducible enclave image + measurements
+tb-vendor launch --eif out/<name>.eif                     # run it, open the attestation port
+tb-vendor send   --repo <git url> --config build-config.json   # push your build-config.json (source commit, build env) for the Auditor
+```
+
+As an **Auditor**, on a Nitro instance, with the Vendor's repository:
+
+```
+tb-auditor receive --repo <git url> --into work/src       # clone, read build-config.json, check the env matches
+tb-auditor build   --app-dir work/src/<path> --out out    # reproducible EIF + measurements
+tb-auditor launch  --eif out/<name>.eif                   # run it, bridge :5000
+# attest own enclave, compare with the build, register, self-check:
+tb-auditor audit --config work/src/build-config.json --tee <my-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
+```
+
+The full per-role walkthrough is the [Operator guide](#operator-guide) below.
+
+## How it works
+
+![What verify checks](docs/img/verify.svg)
+
+- **Platform: AWS Nitro Enclaves today, by design not only.** Every record carries a `platform`
+  field and the document format is a flag (`--format aws-nitro`), so other TEEs can register and be
+  looked up beside Nitro. What is implemented end to end today is Nitro only: request, document
+  verification against the AWS Nitro root, and the measurement extracted from it. GCP Confidential
+  Space and Azure have request-side scaffolding and no verification; confidential VMs that measure a
+  guest OS (AMD SEV-SNP, Intel TDX) need their own design and are not covered.
+- **The measurement is the identity.** The hash of the enclave image (PCR0·1·2 on Nitro) is what
+  gets registered and what the User looks up — by measurement alone, so no name, version or key has
+  to be known in advance.
+- **Same source ⇒ same bytes.** `build` layers the responder onto the Vendor's Docker image and
+  normalizes everything Docker makes nondeterministic (file order, timestamps, install logs). What
+  it cannot fix (unpinned packages, `date`, random keys) it reports line by line, and `--verify`
+  builds twice and fails unless the measurements are identical. The Vendor writes its build
+  environment to `build-config.json`; the Auditor refuses to build on a different OS, CPU
+  architecture or Go version, because a mismatch would look like a finding.
+- **One architecture, one record.** x86_64 and arm64 builds of the same source measure
+  differently, so each registration says which architecture it is for.
+- **The registry is dumb on purpose.** `Registry.sol` accepts a record only with the approver's
+  EIP-712 signature, never overwrites, never revokes; expiry is the only way a record dies. One
+  contract has exactly one approver, fixed at deployment — changing it means a new address, which
+  cannot be hidden.
+- **The User trusts the approver, not the registrant.** `compare` passes only if the record's
+  measurement equals the enclave's, the record has not expired, and its signer is the contract's
+  approver (or an address you name with `--trusted`). Who vouched for the value is the signer; the
+  Vendor's own word never enters the decision.
+
+## Testing
+
+```
+go test ./...                       # unit tests, run anywhere
+```
+
+`cmd/*_e2e_test.go` build the real binaries and drive them end to end against a local
+[anvil](https://getfoundry.sh) chain and a recorded Nitro attestation document; the chain-backed ones skip themselves
+when `anvil` is not on `PATH`. No Nitro hardware is needed for any test. The scripts under `e2e/`
+are our own runs against real instances (Sepolia by default, mainnet behind a confirmation flag);
+the paper's measurements were taken on Ethereum mainnet.
+
+---
+
+# Operator guide
+
+The chain-side work of each role collapses to one command — `audit` (Auditor), `verify` (User),
+`self-register` (Vendor, flow 2); the steps it wraps are listed under each role so you can see
+exactly what it does, or drive them by hand.
 
 ## 0. Build the binaries and put them where they run
 
@@ -84,8 +202,8 @@ Hand `out/app.eif` and `out/measurements.json` to the Auditor by any means (scp,
 `launch --eif <file> --measurements <file>` measures the EIF itself and launches it only if the
 file measures to what the JSON claims.
 
-To do all of this by hand instead (the responder layer is three files and a six-line Dockerfile,
-then `nitro-cli build-enclave`), see `setup/vendor/build.md`.
+Done by hand, this is the responder layer (three files and a six-line Dockerfile) followed by
+`nitro-cli build-enclave`.
 
 #### Case B — the source, rebuilt by the Auditor
 
@@ -355,6 +473,4 @@ tb-user compare --a parsed.json --rpc <url> --contract <0x…> --key <a key look
 ```
 
 
-- `setup/vendor/`, `setup/auditor/` — build / launch / chain notes per role, including
-  what exactly `build` normalizes and what it cannot fix (unpinned package versions, random state)
-- `docs/` — design notes
+- `CONTRIBUTING.md` — build, test, layout and commit conventions
