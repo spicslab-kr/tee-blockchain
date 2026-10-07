@@ -43,7 +43,6 @@ Files the `e2e/` scripts fetch from instances land in `e2e-work/`, which is igno
 | `internal/chain` | `register` and `lookup` against `Registry.sol` |
 | `internal/core` | `compare` (the trust decision) and `transfer` (hand-off records) |
 | `contracts/evm` | the Registry contract; OpenZeppelin as a submodule |
-| `setup/<role>` | hand-written notes on what `build` / `launch` / chain commands do under the hood |
 
 Role-specific code sits in a sub-package named after the role (`.../Vendor`, `.../auditor`,
 `.../user`). Keep it that way so a role's binary cannot link another role's commands.
@@ -65,8 +64,7 @@ type(scope): what changed, in the imperative
 - `go vet ./...` and `go test ./...` must pass. If you touched `build` or the responder, also
   run the measurement check once on an instance (`e2e/arch-measurement-compare.sh`) — the
   point of this project is that the bytes come out identical.
-- If you changed a command's flags or output, update the README section for that role and the
-  matching note under `setup/`.
+- If you changed a command's flags or output, update the README section for that role.
 
 ## Releases
 
