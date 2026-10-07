@@ -54,7 +54,7 @@ func compareCmd(args []string) error {
 		if err != nil {
 			return err
 		}
-		return printVerdict((cmp.Impl{}).Check(va, reg, time.Now().Unix(), trustedList))
+		return printVerdict((cmp.Impl{}).Check(va, reg, cmp.Clock(reg), trustedList))
 	}
 
 	if *b == "" {

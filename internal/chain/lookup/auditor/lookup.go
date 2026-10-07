@@ -27,6 +27,7 @@ type Registration struct {
 	Values    auditor.Measurements
 	Meta      Meta
 	Expires   int64 // 체인 시계 기준
+	ChainTime int64 // lookup 을 처리한 블록의 시각(unix 초). 만료 판정은 이것과 Expires 를 맞댄다 — 검증자 노트북 시계가 아니라
 	Signer    string
 	Signature []byte
 }

@@ -109,7 +109,8 @@ The full per-role walkthrough is the [Operator guide](#operator-guide) below.
   cannot be hidden.
 - **The User trusts the approver, not the registrant.** `compare` passes only if the record's
   measurement equals the enclave's, the record has not expired, and its signer is the contract's
-  approver (or an address you name with `--trusted`). Who vouched for the value is the signer; the
+  approver (or an address you name with `--trusted`). Expiry is judged against the time of the block
+  that answered the lookup, not this machine's clock — the same clock the contract itself uses. Who vouched for the value is the signer; the
   Vendor's own word never enters the decision.
 
 ## Testing

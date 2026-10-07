@@ -250,7 +250,7 @@ func auditCmd(args []string) error {
 		t.Fail("cannot read the approver")
 		return err
 	}
-	v := (cmp.Impl{}).Check(values, reg, time.Now().Unix(), trustedList)
+	v := (cmp.Impl{}).Check(values, reg, cmp.Clock(reg), trustedList)
 	if !v.Pass {
 		t.Fail("something is off")
 		for _, r := range v.Reason {

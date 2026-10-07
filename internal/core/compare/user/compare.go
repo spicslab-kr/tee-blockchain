@@ -83,5 +83,13 @@ func measurementHash(values p.Measurements) ([32]byte, error) {
 	return out, nil
 }
 
-// Now — 지금 시각을 Check 의 now 로 쓸 수 있는 모양(unix 초)으로.
-func Now() int64 { return time.Now().Unix() }
+// Clock — Check 의 now 로 쓸 시각. 등록을 읽어 온 블록의 시각(Registration.ChainTime)이 있으면 그것,
+// 없으면(옛 조회 결과·테스트 더미) 이 기계의 시계. 만료는 컨트랙트도 block.timestamp 로 판정하므로 검증자
+// 쪽도 같은 시계를 써야 한다 — 폐기가 없는 설계에서 만료가 승인이 죽는 유일한 길인데, 검증자 노트북의
+// 시계가 느리면 죽은 승인을 살아 있다고 보게 된다.
+func Clock(r l.Registration) int64 {
+	if r.ChainTime > 0 {
+		return r.ChainTime
+	}
+	return time.Now().Unix()
+}

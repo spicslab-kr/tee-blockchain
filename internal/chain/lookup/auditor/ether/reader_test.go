@@ -100,6 +100,10 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 	if got.Signer != auditorAddr.Hex() || got.Meta.Service != "unit-test" || got.Meta.Platform != DefaultPlatform || got.Expires != expires.Unix() {
 		t.Fatalf("Lookup = %+v", got)
 	}
+	// 만료 판정에 쓸 체인 시계 — 조회를 처리한 블록의 시각. 0 이면 Check 가 로컬 시계로 떨어진다.
+	if got.ChainTime <= 0 || got.ChainTime > time.Now().Unix()+60 {
+		t.Fatalf("Lookup ChainTime = %d, want the block's unix time", got.ChainTime)
+	}
 	// 체인이 어느 아키텍처의 등록인지 말한다 — 이벤트에서 그대로 읽힌다.
 	if got.Meta.Arch != "arm64" {
 		t.Fatalf("Lookup arch = %q, want arm64", got.Meta.Arch)

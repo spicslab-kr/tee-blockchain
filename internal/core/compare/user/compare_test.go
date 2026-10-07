@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 
 	al "tb/internal/chain/lookup/auditor"
+	l "tb/internal/chain/lookup/user"
 	lether "tb/internal/chain/lookup/user/ether"
 	aud "tb/internal/chain/register/auditor"
 	audether "tb/internal/chain/register/auditor/ether"
@@ -115,7 +116,11 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if v := (Impl{}).Check(values, regInfo, time.Now().Unix(), trusted); !v.Pass {
+	if regInfo.ChainTime <= 0 {
+		t.Fatalf("Lookup 이 ChainTime 을 안 채웠다: %+v", regInfo)
+	}
+	// 실제 호출 경로: now 는 로컬 시계가 아니라 조회 블록의 시각.
+	if v := (Impl{}).Check(values, regInfo, Clock(regInfo), trusted); !v.Pass {
 		t.Fatalf("등록한 값 그대로인데 실패: %+v", v)
 	}
 
@@ -131,5 +136,34 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 
 	if v := (Impl{}).Check(values, regInfo, time.Now().Unix(), []string{"0x0000000000000000000000000000000000000001"}); v.Pass {
 		t.Fatal("신뢰 목록에 없는데 통과함")
+	}
+}
+
+// Clock — 등록을 읽어 온 블록의 시각이 있으면 그것, 없으면 이 기계의 시계.
+func TestClock_PrefersChainTime(t *testing.T) {
+	if got := Clock(l.Registration{ChainTime: 1_700_000_000}); got != 1_700_000_000 {
+		t.Fatalf("Clock = %d, want the chain time", got)
+	}
+	before := time.Now().Unix()
+	got := Clock(l.Registration{})
+	if got < before || got > before+5 {
+		t.Fatalf("Clock without ChainTime = %d, want roughly now (%d)", got, before)
+	}
+}
+
+// 만료는 체인 시계로 판정한다 — 검증자 시계가 아무리 느려도, 조회 블록 시각이 만료를 지났으면 죽은 승인이다.
+func TestCheck_ExpiryUsesChainClockNotLocal(t *testing.T) {
+	reg := l.Registration{Expires: 1_000, ChainTime: 2_000, Signer: "0x0000000000000000000000000000000000000001",
+		Values: p.Measurements{{Name: "measurementHash", Value: make([]byte, 32)}}}
+	// 로컬 시계가 과거(500)에 멈춰 있어도 Clock(reg) 는 2000 을 돌려주고 Check 는 만료로 본다.
+	v := (Impl{}).Check(p.Measurements{{Name: "PCR0", Value: []byte{1}}}, reg, Clock(reg), []string{reg.Signer})
+	found := false
+	for _, r := range v.Reason {
+		if r == "registration expired" {
+			found = true
+		}
+	}
+	if v.Pass || !found {
+		t.Fatalf("체인 시각 2000 > 만료 1000 인데 만료로 안 봄: %+v", v)
 	}
 }

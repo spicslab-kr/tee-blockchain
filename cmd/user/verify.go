@@ -140,7 +140,7 @@ func verifyCmd(args []string) error {
 			if err != nil {
 				return err
 			}
-			v := (cmp.Impl{}).Check(values, reg, time.Now().Unix(), trustedList)
+			v := (cmp.Impl{}).Check(values, reg, cmp.Clock(reg), trustedList)
 			if v.Pass {
 				fmt.Printf("    %s  %s  %s %s (%s) by %s, expires %s\n", k, cli.Green("✓ matches"), reg.Meta.Service, reg.Meta.Version, reg.Meta.Arch, reg.Signer,
 					time.Unix(reg.Expires, 0).UTC().Format(time.RFC3339))
