@@ -12,9 +12,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	lether "tb/internal/chain/lookup/auditor/ether"
-	"tb/internal/cli"
-	cmp "tb/internal/core/compare/auditor"
+	lether "attestamp/internal/chain/lookup/auditor/ether"
+	"attestamp/internal/cli"
+	cmp "attestamp/internal/core/compare/auditor"
 )
 
 // auditCmd runs the Auditor's part in one command: request an attestation document from its own TEE and verify it, compare it with the values I built and measured,
@@ -82,7 +82,7 @@ func auditCmd(args []string) error {
 	if *tee != "" {
 		dir := *out
 		if dir == "" {
-			tmp, err := os.MkdirTemp("", "tb-auditor-audit-*")
+			tmp, err := os.MkdirTemp("", "att-auditor-audit-*")
 			if err != nil {
 				return err
 			}
@@ -148,7 +148,7 @@ func auditCmd(args []string) error {
 	// what goes on the chain must be "what I verified", not "what the Vendor runs".
 	vendorRunsSomethingElse := false
 	if *vendorTee != "" {
-		dir, err := os.MkdirTemp("", "tb-auditor-vendor-*")
+		dir, err := os.MkdirTemp("", "att-auditor-vendor-*")
 		if err != nil {
 			return err
 		}

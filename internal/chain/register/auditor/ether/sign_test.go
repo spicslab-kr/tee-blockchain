@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	l "tb/internal/chain/lookup/auditor"
-	reg "tb/internal/chain/register/auditor"
-	p "tb/internal/tee/parse/auditor"
+	l "attestamp/internal/chain/lookup/auditor"
+	reg "attestamp/internal/chain/register/auditor"
+	p "attestamp/internal/tee/parse/auditor"
 )
 
 func sample() (p.Measurements, reg.Meta) {

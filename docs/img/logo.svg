@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" role="img" aria-labelledby="t d">
-  <title id="t">Teestamp</title>
+  <title id="t">Attestamp</title>
   <desc id="d">A rubber stamp whose handle is two interlocked chain links presses on a processor chip. The chip has pins on all four sides and an isolated region that runs code, marked with a check.</desc>
   <style>
     :root { --ink: #1f2937; --accent: #0d9488; }

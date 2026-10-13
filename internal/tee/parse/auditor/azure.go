@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	r "tb/internal/tee/request/auditor"
+	r "attestamp/internal/tee/request/auditor"
 )
 
 // AzureParser is for Azure Confidential VM (MAA JWT) documents. Not implemented yet.

@@ -5,10 +5,10 @@ import (
 	"runtime"
 	"runtime/debug"
 
-	"tb/internal/setup/build"
+	"attestamp/internal/setup/build"
 )
 
-const SchemaBuildConfig = "tb.build-config/1"
+const SchemaBuildConfig = "attestamp.build-config/1"
 
 // TEEInfoKeys lists the required TEE info keys per platform.
 var TEEInfoKeys = map[string][]string{
@@ -25,12 +25,12 @@ type Source struct {
 
 // BuildEnv — the environment the Vendor built in. The Auditor must rebuild in the same one:
 // the enclave image's measurements change with the CPU architecture (kernel, machine code,
-// base image layers) and with the Go toolchain that compiled tb-ra-responder.
+// base image layers) and with the Go toolchain that compiled att-ra-responder.
 type BuildEnv struct {
 	OS       string `json:"os"`       // GOOS, e.g. linux
 	Arch     string `json:"arch"`     // GOARCH, e.g. amd64 or arm64
-	Go       string `json:"go"`       // runtime.Version() of the tb binary, e.g. go1.26.1
-	Trimpath bool   `json:"trimpath"` // whether the tb binary (and so tb-ra-responder) was built with -trimpath
+	Go       string `json:"go"`       // runtime.Version() of the att binary, e.g. go1.26.1
+	Trimpath bool   `json:"trimpath"` // whether the att binary (and so att-ra-responder) was built with -trimpath
 }
 
 // IsZero — nothing declared (an older build-config.json, or a hand-written one that left it out).
@@ -45,8 +45,8 @@ func (e BuildEnv) String() string {
 	return e.OS + "/" + e.Arch + " " + e.Go + " trimpath=" + tp
 }
 
-// CurrentBuildEnv — the environment this tb binary is running in, which is what its build
-// command uses to compile tb-ra-responder. -trimpath is read from the binary's own build info.
+// CurrentBuildEnv — the environment this att binary is running in, which is what its build
+// command uses to compile att-ra-responder. -trimpath is read from the binary's own build info.
 func CurrentBuildEnv() BuildEnv {
 	e := BuildEnv{OS: runtime.GOOS, Arch: runtime.GOARCH, Go: runtime.Version()}
 	if info, ok := debug.ReadBuildInfo(); ok {

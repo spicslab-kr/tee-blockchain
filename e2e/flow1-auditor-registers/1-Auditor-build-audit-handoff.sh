@@ -12,8 +12,8 @@ cd "$here/../.."
 . "$here/../env.sh"
 need_host VENDOR_HOST; need_host AUDITOR_HOST
 
-# The tb binaries on the instance were cross-built with this machine's Go (0-Setup refuses anything but the pinned Go),
-#   and that Go compiled tb-ra-responder. So the value for build-config.json and the record's build_env.go is this machine's Go version.
+# The att binaries on the instance were cross-built with this machine's Go (0-Setup refuses anything but the pinned Go),
+#   and that Go compiled att-ra-responder. So the value for build-config.json and the record's build_env.go is this machine's Go version.
 GOVER=$(go env GOVERSION)
 
 nitroBanner "Auditor"
@@ -50,7 +50,7 @@ else
   md() { curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOK" "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null || echo unknown; }
   cat > src/docker-nginx/build-config.json <<EOF
 {
-  "schema": "tb.build-config/1",
+  "schema": "attestamp.build-config/1",
   "service": "$SERVICE",
   "version": "$VERSION",
   "platform": "aws",
@@ -63,11 +63,11 @@ fi
 cat src/docker-nginx/build-config.json
 step_stop "WRITING BUILD CONFIG"
 
-# tb command - builds the source with docker into the enclave image (EIF) and the measurements (PCR0/1/2).
-step "BUILDING SOURCE" ./tb-auditor build --app-dir src/docker-nginx/$SRC_DIR --out out
+# att command - builds the source with docker into the enclave image (EIF) and the measurements (PCR0/1/2).
+step "BUILDING SOURCE" ./att-auditor build --app-dir src/docker-nginx/$SRC_DIR --out out
 
-# tb command - actually launches that image in my TEE.
-step "LAUNCHING ENCLAVE" ./tb-auditor launch --eif out/alpine-slim.eif
+# att command - actually launches that image in my TEE.
+step "LAUNCHING ENCLAVE" ./att-auditor launch --eif out/alpine-slim.eif
 
 echo
 cat out/measurements.json
@@ -85,7 +85,7 @@ KEY=${1:-}
 # Fetch the measurements file just made on the Auditor instance and the build-config.json from the clone root to my machine.
 #   audit reads service, version and arch from build-config.json (values the Vendor already handed over are not typed again).
 #   The hand-built record in the handoff below needs the architecture separately, so convert the uname spelling
-#   (x86_64, aarch64) to the GOARCH spelling tb uses (amd64, arm64) (the same source gives different PCRs on x86_64 and arm64).
+#   (x86_64, aarch64) to the GOARCH spelling att uses (amd64, arm64) (the same source gives different PCRs on x86_64 and arm64).
 step_start "FETCHING BUILD VALUE"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/measurements.json" "$WORK/auditor-measured.json"
 $SCP "$SSH_USER@$AUDITOR_HOST:src/docker-nginx/build-config.json" "$WORK/auditor-build-config.json"
@@ -96,9 +96,9 @@ echo "Auditor's own value (arch: $ARCH):"; cat "$WORK/auditor-measured.json"
 echo "build config:"; cat "$WORK/auditor-build-config.json"
 
 if [ -z "$CONTRACT" ]; then
-  # tb command - deploys a new registry (registry contract) on the chain.
+  # att command - deploys a new registry (registry contract) on the chain.
   step_start "DEPLOYING REGISTRY"
-  out=$("$TBA" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$AUDITOR_ADDR" 2>&1)
+  out=$("$AUDITOR_BIN" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$AUDITOR_ADDR" 2>&1)
   step_stop "DEPLOYING REGISTRY"
   echo "$out"
   CONTRACT=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # extract just the address from the output line
@@ -106,25 +106,25 @@ if [ -z "$CONTRACT" ]; then
 fi
 echo "$CONTRACT" > "$WORK/contract.txt"  # save it in the file the next step reads
 
-# tb command - sends an RA request to my TEE, compares the value received with the build value made above, and registers
+# att command - sends an RA request to my TEE, compares the value received with the build value made above, and registers
 #   on the chain only if they match. service, version and arch come from the --config build-config.json - a different value
 #   given as a flag wins, but a warning is printed.
 extra=(); [ -n "$CHECK_VENDOR" ] && extra=(--vendor-tee "$VENDOR_HOST:5000")
-step "AUDITING" "$TBA" audit --config "$WORK/auditor-build-config.json" --tee "$AUDITOR_HOST:5000" --measurements "$WORK/auditor-measured.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$AUDITOR_KEY" "${extra[@]}"
+step "AUDITING" "$AUDITOR_BIN" audit --config "$WORK/auditor-build-config.json" --tee "$AUDITOR_HOST:5000" --measurements "$WORK/auditor-measured.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$AUDITOR_KEY" "${extra[@]}"
 rc=$?
 echo "audit exit=$rc   contract=$CONTRACT"
 [ $rc -eq 0 ] || exit $rc
 
 # From here on it is the handoff: the image and measurements just made, plus a note (record) saying which contract/key they
-# were registered under, are passed to the Vendor as plain files. This is not a tb feature but a transfer procedure we
+# were registered under, are passed to the Vendor as plain files. This is not an att feature but a transfer procedure we
 # assemble by hand.
 step_start "TRANSFERRING TO VENDOR"
 mkdir -p "$WORK/from-auditor"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/alpine-slim.eif" "$WORK/from-auditor/alpine-slim.eif"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/measurements.json" "$WORK/from-auditor/measurements.json"
 if [ -z "$KEY" ]; then
-  # tb command - looks up this measurement's registration key on the chain.
-  out=$("$TBA" lookup --rpc "$RPC" --contract "$CONTRACT" --measurements "$WORK/from-auditor/measurements.json" 2>&1)
+  # att command - looks up this measurement's registration key on the chain.
+  out=$("$AUDITOR_BIN" lookup --rpc "$RPC" --contract "$CONTRACT" --measurements "$WORK/from-auditor/measurements.json" 2>&1)
   KEY=$(echo "$out" | grep -oE 'key +0x[0-9a-fA-F]{64}' | awk '{print $2}' | head -1)  # extract the key from the output
   [ -n "$KEY" ] || { step_stop "TRANSFERRING TO VENDOR"; echo "no registration of this value found on $CONTRACT"; exit 1; }
 fi

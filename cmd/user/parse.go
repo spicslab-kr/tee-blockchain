@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	p "tb/internal/tee/parse/user"
-	ra "tb/internal/tee/request/user"
+	p "attestamp/internal/tee/parse/user"
+	ra "attestamp/internal/tee/request/user"
 )
 
 // raParse reads the document, verifies the signature, chain and nonce, and extracts the measurements. The output file has the same shape as nitro-cli's measurements.json,

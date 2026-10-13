@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 
-	"tb/internal/tee/request/Vendor"
+	"attestamp/internal/tee/request/Vendor"
 )
 
 type Extractor struct {

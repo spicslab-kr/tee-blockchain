@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	vendor "tb/internal/core/transfer/Vendor"
-	auditor "tb/internal/core/transfer/auditor"
-	ap "tb/internal/tee/parse/auditor"
+	vendor "attestamp/internal/core/transfer/Vendor"
+	auditor "attestamp/internal/core/transfer/auditor"
+	ap "attestamp/internal/tee/parse/auditor"
 )
 
 const commit = "0123456789abcdef0123456789abcdef01234567"

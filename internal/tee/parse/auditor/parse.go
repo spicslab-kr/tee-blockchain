@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	r "tb/internal/tee/request/auditor"
+	r "attestamp/internal/tee/request/auditor"
 )
 
 type Measurement struct {

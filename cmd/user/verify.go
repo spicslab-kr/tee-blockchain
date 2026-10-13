@@ -13,9 +13,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	lether "tb/internal/chain/lookup/user/ether"
-	"tb/internal/cli"
-	cmp "tb/internal/core/compare/user"
+	lether "attestamp/internal/chain/lookup/user/ether"
+	"attestamp/internal/cli"
+	cmp "attestamp/internal/core/compare/user"
 )
 
 // verifyCmd runs the User's part in one command: request an attestation document from the enclave and verify it, use its values to find the registration in the registry,
@@ -67,7 +67,7 @@ func verifyCmd(args []string) error {
 
 	dir := *out
 	if dir == "" {
-		tmp, err := os.MkdirTemp("", "tb-user-verify-*")
+		tmp, err := os.MkdirTemp("", "att-user-verify-*")
 		if err != nil {
 			return err
 		}

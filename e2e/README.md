@@ -68,7 +68,7 @@ Run in order. Steps 1 to 3 are the normal path; 4 and 5 show a tampering attempt
 |---|---|---|
 | `flow1-auditor-registers/1-Auditor-build-audit-handoff.sh` | Auditor | rebuilds the source on its instance, launches it, deploys a registry, runs `audit`, hands the image and record to the Vendor. Options `-c 0x...` (use an existing registry), `-v` (also ask the Vendor's enclave) |
 | `flow1-auditor-registers/2-Vendor-launch-check-record.sh` | Vendor | launches the image the Auditor handed over and checks its own enclave against both the received value and the registered one |
-| `flow1-auditor-registers/3-User-verify.sh` | User | `tb-user verify` against the Vendor's enclave and the Auditor's registry. Exit 0 means trusted |
+| `flow1-auditor-registers/3-User-verify.sh` | User | `att-user verify` against the Vendor's enclave and the Auditor's registry. Exit 0 means trusted |
 | `flow1-auditor-registers/4-Vendor-tamper-swap-enclave.sh` | Vendor | quietly runs a different image instead |
 | `flow1-auditor-registers/5-User-tamper-verify.sh` | User | the same `verify` now fails with exit 1: nobody registered what is running |
 
@@ -90,7 +90,7 @@ The Vendor's registry address is saved in `e2e-work/contract-flow2.txt`.
 
 | script | what it checks |
 |---|---|
-| `toolchain-pin-check.sh` | a tb binary built with another Go patch version refuses to `build` |
+| `toolchain-pin-check.sh` | an att binary built with another Go patch version refuses to `build` |
 | `responder-check.sh` | `build --responder` refuses a responder built without `-trimpath`, or for the wrong architecture |
 | `build-env-check.sh` | `receive` rejects a `build-config.json` whose `build_env` does not match the instance, and `--ignore-env` only warns |
 | `arch-record-check.sh` | the architecture in records and registrations; sends no transaction |

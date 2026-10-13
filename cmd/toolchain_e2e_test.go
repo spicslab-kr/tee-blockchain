@@ -1,7 +1,7 @@
-// The toolchain pin (internal/setup/build/GO_TOOLCHAIN) through the real CLI: actually builds and runs tb-vendor.
-//   - tb-vendor built with the pinned toolchain: `version` exits 0 and prints the pinned version
+// The toolchain pin (internal/setup/build/GO_TOOLCHAIN) through the real CLI: actually builds and runs att-vendor.
+//   - att-vendor built with the pinned toolchain: `version` exits 0 and prints the pinned version
 //   - `build --app-dir` hits the GOOS error first off Linux (order: GOOS check, toolchain check)
-//   - tb-vendor built with a newer patch version (GOTOOLCHAIN=go1.26.2): `version` exits 1 and names both versions;
+//   - att-vendor built with a newer patch version (GOTOOLCHAIN=go1.26.2): `version` exits 1 and names both versions;
 //     on Linux, `build --app-dir` refuses with the same message. If that toolchain cannot be fetched (offline), only that half is skipped.
 package cmd_test
 
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	toolchain "tb/internal/setup/build"
+	toolchain "attestamp/internal/setup/build"
 )
 
 // wrongToolchain is a patch version different from the pinned one. go.mod requires go >= 1.26.1 and 1.26.1 is the pin, so the newer 1.26.2 always differs.

@@ -1,11 +1,11 @@
-// tb-ra-responder — the one binary every role's build layers into the enclave image.
+// att-ra-responder — the one binary every role's build layers into the enclave image.
 //
-// tb vendor build and tb auditor build used to embed the CLI that was running the build
-// (tb-vendor or tb-auditor). Those are compiled from different source (cmd/vendor vs
+// att-vendor build and att-auditor build used to embed the CLI that was running the build
+// (att-vendor or att-auditor). Those are compiled from different source (cmd/vendor vs
 // cmd/auditor) and are never byte-identical, so the image PCR0/PCR2 could never match
 // between Vendor's and Auditor's independent builds even after layer normalization —
 // confirmed on two real EC2 Nitro instances (Vendor and Auditor built the same
-// Dockerfile, normalized, and still got different PCR0/PCR2; the embedded /tb-ra files
+// Dockerfile, normalized, and still got different PCR0/PCR2; the embedded /att-ra files
 // were literally different files).
 //
 // Inside the enclave, only two commands ever run (see internal/setup/build's
@@ -13,7 +13,7 @@
 // built the image, so this binary carries just those two, built once from one source,
 // so every role's build embeds the exact same bytes.
 //
-// It imports tb/internal/tee/request/Vendor and its aws package rather than a
+// It imports att/internal/tee/request/Vendor and its aws package rather than a
 // role-neutral one because none exists — Nonce/RADoc/Extractor are duplicated per role
 // the same way as everywhere else in this codebase (distinct named types, see that
 // package's doc comment). Vendor's copy was picked arbitrarily; auditor's or user's
@@ -33,9 +33,9 @@ import (
 	"strings"
 	"syscall"
 
-	"tb/internal/cli"
-	ra "tb/internal/tee/request/Vendor"
-	awsra "tb/internal/tee/request/Vendor/aws"
+	"attestamp/internal/cli"
+	ra "attestamp/internal/tee/request/Vendor"
+	awsra "attestamp/internal/tee/request/Vendor/aws"
 )
 
 func main() {
@@ -54,13 +54,13 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		cli.Errorln("tb-ra-responder: ", err)
+		cli.Errorln("att-ra-responder: ", err)
 		os.Exit(1)
 	}
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `tb-ra-responder — runs only inside the enclave. every role's build layers this one binary as is
+	fmt.Fprintln(os.Stderr, `att-ra-responder — runs only inside the enclave. every role's build layers this one binary as is
 
   ra-serve  --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
             takes a nonce per request and returns an RA document

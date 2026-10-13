@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"tb/internal/tee/request/auditor"
+	"attestamp/internal/tee/request/auditor"
 )
 
 func TestExtractor_PostsNonceAndReturnsToken(t *testing.T) {

@@ -14,8 +14,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	lether "tb/internal/chain/lookup/user/ether"
-	p "tb/internal/tee/parse/user"
+	lether "attestamp/internal/chain/lookup/user/ether"
+	p "attestamp/internal/tee/parse/user"
 )
 
 // lookup: the User does not register, so there is no registry-deploy or register. With --key, reads that key directly.

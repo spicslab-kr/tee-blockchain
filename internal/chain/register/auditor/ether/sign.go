@@ -15,8 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 
-	reg "tb/internal/chain/register/auditor"
-	p "tb/internal/tee/parse/auditor"
+	reg "attestamp/internal/chain/register/auditor"
+	p "attestamp/internal/tee/parse/auditor"
 )
 
 // Registrar talks to a single Registry contract over RPC.

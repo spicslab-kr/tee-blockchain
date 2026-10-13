@@ -12,10 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	l "tb/internal/chain/lookup/Vendor"
-	reg "tb/internal/chain/register/Vendor"
-	regether "tb/internal/chain/register/Vendor/ether"
-	p "tb/internal/tee/parse/Vendor"
+	l "attestamp/internal/chain/lookup/Vendor"
+	reg "attestamp/internal/chain/register/Vendor"
+	regether "attestamp/internal/chain/register/Vendor/ether"
+	p "attestamp/internal/tee/parse/Vendor"
 )
 
 // DefaultPlatform is the only measurement format supported for now. Once registrations start mixing platforms,

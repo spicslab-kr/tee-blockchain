@@ -49,7 +49,7 @@ func (g GitTransport) Send(ctx context.Context, rec MeasurementRecord, repo stri
 	}
 	dir := g.WorkDir
 	if dir == "" {
-		tmp, err := os.MkdirTemp("", "tb-auditor-send-*")
+		tmp, err := os.MkdirTemp("", "att-auditor-send-*")
 		if err != nil {
 			return SendResult{}, err
 		}
@@ -66,7 +66,7 @@ func (g GitTransport) Send(ctx context.Context, rec MeasurementRecord, repo stri
 	if rec.Image.Path != "" {
 		paths = append(paths, filepath.Base(rec.Image.Path))
 	}
-	sha, err := commitAndPush(ctx, dir, "tb: measurement-record for "+rec.Service+" "+rec.Version, paths...)
+	sha, err := commitAndPush(ctx, dir, "att: measurement-record for "+rec.Service+" "+rec.Version, paths...)
 	if err != nil {
 		return SendResult{}, err
 	}

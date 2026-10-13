@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	r "tb/internal/tee/request/Vendor"
+	r "attestamp/internal/tee/request/Vendor"
 )
 
 // GCPParser is for GCP Confidential Space (JWT) documents. Not implemented yet.

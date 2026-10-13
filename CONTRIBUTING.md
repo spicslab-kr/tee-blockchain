@@ -7,13 +7,13 @@ can pick it up without asking.
 
 The Go toolchain is pinned to exactly the version in `internal/setup/build/GO_TOOLCHAIN`
 (currently go1.26.1). `build` refuses to run under any other version, because a different patch
-version produces different `tb-ra-responder` bytes and therefore different measurements.
+version produces different `att-ra-responder` bytes and therefore different measurements.
 
 ```
-go build -trimpath -o tb-vendor       ./cmd/vendor
-go build -trimpath -o tb-auditor      ./cmd/auditor
-go build -trimpath -o tb-user         ./cmd/user
-go build -trimpath -o tb-ra-responder ./cmd/ra-responder
+go build -trimpath -o att-vendor       ./cmd/vendor
+go build -trimpath -o att-auditor      ./cmd/auditor
+go build -trimpath -o att-user         ./cmd/user
+go build -trimpath -o att-ra-responder ./cmd/ra-responder
 ```
 
 For the Nitro instances: `GOOS=linux GOARCH=amd64` (or `arm64`). Always `-trimpath`; the
@@ -70,5 +70,5 @@ type(scope): what changed, in the imperative
 
 Tags are `vMAJOR.MINOR.PATCH`. A release attaches the four Linux binaries for `amd64` and
 `arm64`, built with the pinned toolchain and `-trimpath`, plus a `SHA256SUMS` file. The
-`tb-ra-responder` sha256 in a release is the one both Vendor and Auditor should see in their
+`att-ra-responder` sha256 in a release is the one both Vendor and Auditor should see in their
 build logs.

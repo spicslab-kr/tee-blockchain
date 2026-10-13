@@ -19,28 +19,28 @@ mkdir -p tampered
 # Build a small image of our own for the tamper demo. The Auditor has never seen this image.
 cat > tampered/Dockerfile <<'DOCKER'
 FROM alpine:3.20
-RUN echo "not the audited image" > /etc/tb-tampered
+RUN echo "not the audited image" > /etc/att-tampered
 CMD ["sleep", "1000000"]
 DOCKER
 step "BUILDING TAMPERED IMAGE" sudo docker build -q -t tampered:latest tampered
 
-# tb command - packs this docker image into an enclave image (EIF).
-step "PACKING IMAGE" ./tb-vendor pack --image tampered:latest --name tampered --out out-tampered
+# att command - packs this docker image into an enclave image (EIF).
+step "PACKING IMAGE" ./att-vendor pack --image tampered:latest --name tampered --out out-tampered
 
 # An instance has resources for only one enclave, so stop the old one first and then launch the replacement.
 step_start "STOPPING PREVIOUS ENCLAVE"
 sudo nitro-cli terminate-enclave --all >/dev/null 2>&1 || true
-pkill -x tb-vendor || true
+pkill -x att-vendor || true
 step_stop "STOPPING PREVIOUS ENCLAVE"
 
-# tb command - launches that tampered image in my TEE (instead of the one the Auditor gave).
-step "LAUNCHING TAMPERED ENCLAVE" ./tb-vendor launch --eif out-tampered/tampered.eif
+# att command - launches that tampered image in my TEE (instead of the one the Auditor gave).
+step "LAUNCHING TAMPERED ENCLAVE" ./att-vendor launch --eif out-tampered/tampered.eif
 
 echo
 echo "the enclave on :5000 now runs my own image, not what the Auditor registered."
 echo "audited value:   $(grep PCR0 from-auditor/measurements.json | tr -d ' ,\"' | cut -d: -f2)"
 echo "running value:   $(grep PCR0 out-tampered/measurements.json | tr -d ' ,\"' | cut -d: -f2)"
-echo "to put the audited one back:  ./tb-vendor launch --eif from-auditor/alpine-slim.eif --measurements from-auditor/measurements.json"
+echo "to put the audited one back:  ./att-vendor launch --eif from-auditor/alpine-slim.eif --measurements from-auditor/measurements.json"
 REMOTE
 rc=$?
 localBanner

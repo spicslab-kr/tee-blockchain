@@ -14,13 +14,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	l "tb/internal/chain/lookup/Vendor"
-	lether "tb/internal/chain/lookup/Vendor/ether"
-	reg "tb/internal/chain/register/Vendor"
-	"tb/internal/chain/register/Vendor/ether"
-	"tb/internal/cli"
-	tr "tb/internal/core/transfer/Vendor"
-	p "tb/internal/tee/parse/Vendor"
+	l "attestamp/internal/chain/lookup/Vendor"
+	lether "attestamp/internal/chain/lookup/Vendor/ether"
+	reg "attestamp/internal/chain/register/Vendor"
+	"attestamp/internal/chain/register/Vendor/ether"
+	"attestamp/internal/cli"
+	tr "attestamp/internal/core/transfer/Vendor"
+	p "attestamp/internal/tee/parse/Vendor"
 )
 
 func registryDeploy(args []string) error {
@@ -106,7 +106,7 @@ func register(args []string) (string, error) {
 	}
 	// the build environment this registration is for: --arch says which machine the image was built for and measured
 	// on; the Go toolchain is this binary's — it is pinned project-wide (build.CheckToolchain at build start), so it is
-	// the one that compiled tb-ra-responder into the image. with --config it is the config's build_env instead: that
+	// the one that compiled att-ra-responder into the image. with --config it is the config's build_env instead: that
 	// describes the build that was measured, whichever machine runs register. of it, only the arch goes into the chain
 	// Entry (meta.Arch above) — display only, so a reader can tell the two architectures' registrations apart; the key
 	// still splits by the measurement hash alone. the rest is said here and in measurement-record.json.

@@ -1,8 +1,8 @@
-# Auditor guide (`tb-auditor`)
+# Auditor guide (`att-auditor`)
 
 The Auditor rebuilds the Vendor's software, runs its own copy in an enclave, checks that the
 attested value equals its own build, and only then registers that value on the chain. Binaries and
-toolchain: [Build the binaries](../README.md#build-the-binaries). `tb-auditor` and `tb-ra-responder`
+toolchain: [Build the binaries](../README.md#build-the-binaries). `att-auditor` and `att-ra-responder`
 must sit in the same directory on the Auditor's Nitro instance, and the responder must be the same
 file the Vendor uses.
 
@@ -14,7 +14,7 @@ Or, if the Vendor used `send`, this clones the repository, reads `build-config.j
 that the commit it names is really in the history:
 
 ```
-tb-auditor receive --repo <git url> --into work/src
+att-auditor receive --repo <git url> --into work/src
 ```
 
 `--ref` picks a commit, branch or tag. `receive` also compares the Vendor's `build_env` with this
@@ -26,25 +26,25 @@ built without `-trimpath` gets a warning only.
 ## Build and launch
 
 This is the Vendor's [build and launch](../vendor/README.md#build-pack-and-launch) with
-`tb-auditor` in place of `tb-vendor`; the flags are the same. Reproducibility is the point: the
-same source, the same `tb-ra-responder` and normalized layers give the PCR0, PCR1 and PCR2 the
+`att-auditor` in place of `att-vendor`; the flags are the same. Reproducibility is the point: the
+same source, the same `att-ra-responder` and normalized layers give the PCR0, PCR1 and PCR2 the
 Vendor got. If they differ, that is the finding, and nothing should be registered.
 
 Source rebuilt by the Auditor:
 
 ```
-tb-auditor build --app-dir work/src/<path> --out out
+att-auditor build --app-dir work/src/<path> --out out
 ```
 
 ```
-tb-auditor launch --eif out/<name>.eif
+att-auditor launch --eif out/<name>.eif
 ```
 
 Image handed over as a file: the Vendor sends the image and its measurements, and `launch` measures
 the image itself and refuses it if it does not match.
 
 ```
-tb-auditor launch --eif <received.eif> --measurements <received measurements.json>
+att-auditor launch --eif <received.eif> --measurements <received measurements.json>
 ```
 
 ## Deploy the registry (once, first time only)
@@ -54,7 +54,7 @@ deployer key only pays gas and can be anyone's. The command prints the contract 
 everyone then uses:
 
 ```
-tb-auditor registry-deploy --rpc <url> --key-file <deployer.key> --approver <my 0x...>
+att-auditor registry-deploy --rpc <url> --key-file <deployer.key> --approver <my 0x...>
 ```
 
 A registry deployed before registrations carried the CPU architecture (`arch`) does not accept the
@@ -63,7 +63,7 @@ current `register`; deploy a new one. See the [registry guide](../../contracts/R
 ## Audit
 
 ```
-tb-auditor audit --config work/src/build-config.json --tee <my-instance>:5000 \
+att-auditor audit --config work/src/build-config.json --tee <my-instance>:5000 \
     --measurements out/measurements.json --rpc <url> --contract <0x...> --key-file <key>
 ```
 
@@ -89,26 +89,26 @@ other text is taken as the RPC URL.
 Attestation document from your enclave:
 
 ```
-tb-auditor ra-request --tee <my-instance>:5000 --out doc.cbor
+att-auditor ra-request --tee <my-instance>:5000 --out doc.cbor
 ```
 
 Verify it and extract PCR0, PCR1, PCR2:
 
 ```
-tb-auditor ra-parse --doc doc.cbor --out parsed.json
+att-auditor ra-parse --doc doc.cbor --out parsed.json
 ```
 
 The audit gate: the enclave's attested value must equal your build value. FAIL means the enclave is
 not running what you built, and nothing gets registered:
 
 ```
-tb-auditor compare --a parsed.json --b out/measurements.json
+att-auditor compare --a parsed.json --b out/measurements.json
 ```
 
 Register the **build value** with your key:
 
 ```
-tb-auditor register --rpc <url> --contract <0x...> --key-file <key> \
+att-auditor register --rpc <url> --contract <0x...> --key-file <key> \
     --measurements out/measurements.json --config work/src/build-config.json
 ```
 
@@ -117,13 +117,13 @@ Read it back by measurement. The chain says which architecture the registration 
 nobody needs to know it to look the value up:
 
 ```
-tb-auditor lookup --rpc <url> --contract <0x...> --measurements out/measurements.json
+att-auditor lookup --rpc <url> --contract <0x...> --measurements out/measurements.json
 ```
 
 Self-check against the chain:
 
 ```
-tb-auditor compare --a parsed.json --rpc <url> --contract <0x...> --key <key register printed>
+att-auditor compare --a parsed.json --rpc <url> --contract <0x...> --key <key register printed>
 ```
 
 Pointing `--tee` at the **Vendor's** enclave is the "something looks off" check from flow 2: attest
@@ -140,7 +140,7 @@ so `send` builds the record from those two, fills in the image's sha256 and push
 the image to the repository:
 
 ```
-tb-auditor send --repo <git url> --config work/src/build-config.json \
+att-auditor send --repo <git url> --config work/src/build-config.json \
     --measurements out/measurements.json --image out/<name>.eif
 ```
 
@@ -151,7 +151,7 @@ given with `--build-tool-version`. The record is also left next to the measureme
 Or write the record by hand and send that:
 
 ```
-tb-auditor send --repo <git url> --record measurement-record.json --image out/<name>.eif
+att-auditor send --repo <git url> --record measurement-record.json --image out/<name>.eif
 ```
 
 The same source measures differently on x86_64 and arm64 (and under a different Go), so one

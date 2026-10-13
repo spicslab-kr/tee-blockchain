@@ -13,7 +13,7 @@ package user
 import (
 	"context"
 
-	"tb/internal/tee/parse/user"
+	"attestamp/internal/tee/parse/user"
 )
 
 type Meta struct {

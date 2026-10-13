@@ -7,14 +7,14 @@
 #
 #    Measured on real instances. On each host a local bare repository is created and used as the Vendor repository
 #    (no external git remote needed), and build-config.json is pushed in three variants to see the verdict of
-#    tb-auditor receive:
+#    att-auditor receive:
 #      1. declares another architecture -> must be refused (arm64 on the x86_64 host, amd64 on the arm64 host)
 #      2. same, with --ignore-env       -> only a warning, exit 0
 #      3. declares its own architecture -> passes, "build env matches" is printed
 #    x86_64 runs on VENDOR_HOST (V) and arm64 on ARM64_HOST (R), mirror-style. If ARM64_HOST is empty only the
 #    x86_64 side runs and that is reported.
 #
-#    Go version: the runtime.Version() of the tb-auditor cross-compiled here equals this machine's go, so the config
+#    Go version: the runtime.Version() of the att-auditor cross-compiled here equals this machine's go, so the config
 #    gets `go env GOVERSION` as is. That way only the architecture can be made to differ.
 #    Run from TB-live:  bash "e2e/build-env-check.sh"
 set -uo pipefail
@@ -25,12 +25,12 @@ cd "$here/.."
 need_host VENDOR_HOST
 GOVER=$(go env GOVERSION)
 
-# Cross-compile tb-auditor per architecture. -trimpath: keeps the checkout path out of the binary.
-step "CROSS-BUILDING tb-auditor PER ARCHITECTURE ($GOVER)"
+# Cross-compile att-auditor per architecture. -trimpath: keeps the checkout path out of the binary.
+step "CROSS-BUILDING att-auditor PER ARCHITECTURE ($GOVER)"
 declare -A GOARCH_OF=( [x86_64]=amd64 [arm64]=arm64 )
 mkdir -p "$WORK/arch"
 for arch in x86_64 arm64; do
-  GOOS=linux GOARCH=${GOARCH_OF[$arch]} go build -trimpath -o "$WORK/arch/tb-auditor-$arch" ./cmd/auditor || exit 1
+  GOOS=linux GOARCH=${GOARCH_OF[$arch]} go build -trimpath -o "$WORK/arch/att-auditor-$arch" ./cmd/auditor || exit 1
 done
 
 host_of() { case $1 in V) echo "$VENDOR_HOST";; A) echo "$AUDITOR_HOST";; R) echo "$ARM64_HOST";; esac; }
@@ -42,11 +42,11 @@ check_on() {
   mine=${GOARCH_OF[$arch]}
   if [ "$mine" = amd64 ]; then other=arm64; else other=amd64; fi
   nitroBanner "$label"
-  $SCP "$WORK/arch/tb-auditor-$arch" "$SSH_USER@$(host_of "$sshf"):~/tb-auditor"
+  $SCP "$WORK/arch/att-auditor-$arch" "$SSH_USER@$(host_of "$sshf"):~/att-auditor"
   $sshf 'bash -s' <<REMOTE
 set -uo pipefail
 step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "\$1"; shift; "\$@"; }
-chmod +x tb-auditor
+chmod +x att-auditor
 rm -rf build-env-check && mkdir build-env-check && cd build-env-check
 git init -q --bare --initial-branch=main remote.git
 git clone -q remote.git work
@@ -59,7 +59,7 @@ seed=\$(git -C work rev-parse HEAD)
 push_cfg() {
   cat > work/build-config.json <<CFG
 {
-  "schema": "tb.build-config/1",
+  "schema": "attestamp.build-config/1",
   "service": "svc",
   "version": "1.2.0",
   "platform": "aws",
@@ -72,11 +72,11 @@ CFG
 }
 
 n=0
-echo "this host: \$(uname -m), tb-auditor built for $arch ($mine), $GOVER"
+echo "this host: \$(uname -m), att-auditor built for $arch ($mine), $GOVER"
 
 step "1. VENDOR DECLARES $other — MUST BE REFUSED ($label)"
 push_cfg $other true
-rm -rf src1; ~/tb-auditor receive --repo "\$PWD/remote.git" --into src1 > out1.txt 2> err1.txt; rc=\$?
+rm -rf src1; ~/att-auditor receive --repo "\$PWD/remote.git" --into src1 > out1.txt 2> err1.txt; rc=\$?
 cat out1.txt err1.txt
 if [ \$rc -ne 0 ] && grep -q "$other" err1.txt && grep -q "$mine" err1.txt; then
   echo "✅ refused (exit \$rc), both architectures named"
@@ -85,7 +85,7 @@ else
 fi
 
 step "2. SAME, WITH --ignore-env — WARNING ONLY ($label)"
-rm -rf src2; ~/tb-auditor receive --repo "\$PWD/remote.git" --into src2 --ignore-env > out2.txt 2> err2.txt; rc=\$?
+rm -rf src2; ~/att-auditor receive --repo "\$PWD/remote.git" --into src2 --ignore-env > out2.txt 2> err2.txt; rc=\$?
 cat out2.txt err2.txt
 if [ \$rc -eq 0 ] && grep -q "warning:" err2.txt && grep -q "$other" err2.txt; then
   echo "✅ passed with a warning (exit 0)"
@@ -95,7 +95,7 @@ fi
 
 step "3. VENDOR DECLARES $mine — MUST PASS ($label)"
 push_cfg $mine true
-rm -rf src3; ~/tb-auditor receive --repo "\$PWD/remote.git" --into src3 > out3.txt 2> err3.txt; rc=\$?
+rm -rf src3; ~/att-auditor receive --repo "\$PWD/remote.git" --into src3 > out3.txt 2> err3.txt; rc=\$?
 cat out3.txt err3.txt
 if [ \$rc -eq 0 ] && grep -q "build env matches" out3.txt; then
   echo "✅ matched (exit 0)"

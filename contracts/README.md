@@ -43,7 +43,7 @@ The approver address is fixed in the constructor and cannot change (`APPROVER`, 
 contract recovers the signer from the signature and accepts the registration only if it is the
 approver. Anyone may send the transaction and pay the gas; the signer is the registrant. A Vendor
 and an Auditor who both register each deploy their own contract, and a User compares them by
-passing several `--contract` values to `tb-user verify`.
+passing several `--contract` values to `att-user verify`.
 
 ## Never overwrites, never revokes
 

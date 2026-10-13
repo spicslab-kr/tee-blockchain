@@ -6,7 +6,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	"tb/internal/tee/request/Vendor"
+	"attestamp/internal/tee/request/Vendor"
 )
 
 const Format = "aws-nitro"

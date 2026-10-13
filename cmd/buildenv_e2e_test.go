@@ -1,5 +1,5 @@
-// build_env, end to end on the command line. tb-vendor send writes its own build environment (OS, architecture, Go) into build-config.json,
-// and tb-auditor receive compares it with its own instance and refuses if they differ (with --ignore-env it only warns).
+// build_env, end to end on the command line. att-vendor send writes its own build environment (OS, architecture, Go) into build-config.json,
+// and att-auditor receive compares it with its own instance and refuses if they differ (with --ignore-env it only warns).
 // The remote is a local bare repository and real git runs, the same way as the git tests under internal/core/transfer.
 package cmd_test
 
@@ -56,7 +56,7 @@ func cloneRemote(t *testing.T, remote string) string {
 func buildConfigJSON(t *testing.T, commit string, env map[string]any) []byte {
 	t.Helper()
 	m := map[string]any{
-		"schema": "tb.build-config/1", "service": "svc", "version": "1.2.0", "platform": "aws",
+		"schema": "attestamp.build-config/1", "service": "svc", "version": "1.2.0", "platform": "aws",
 		"source":   map[string]string{"repo": "https://example.com/svc.git", "commit": commit},
 		"tee_info": map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
 	}
@@ -105,7 +105,7 @@ func otherArch() string {
 	return "amd64"
 }
 
-// tb-vendor send records the OS/architecture/Go it runs on as build_env and pushes.
+// att-vendor send records the OS/architecture/Go it runs on as build_env and pushes.
 func TestBuildEnv_SendRecordsRunningEnv(t *testing.T) {
 	dir := t.TempDir()
 	vendor := build(t, dir, "./cmd/vendor")

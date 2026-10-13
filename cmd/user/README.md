@@ -1,12 +1,12 @@
-# User guide (`tb-user`)
+# User guide (`att-user`)
 
-The User needs one binary, `tb-user`, and network access. No key, no ETH, no Nitro, no Docker.
+The User needs one binary, `att-user`, and network access. No key, no ETH, no Nitro, no Docker.
 Build instructions: [Build the binaries](../README.md#build-the-binaries).
 
 ## verify
 
 ```
-tb-user verify --tee <vendor-public-ip>:5000 --rpc <url> --contract <0x...>
+att-user verify --tee <vendor-public-ip>:5000 --rpc <url> --contract <0x...>
 ```
 
 What it does: asks the Vendor's enclave to attest, verifies the document, finds who registered
@@ -36,7 +36,7 @@ Repeat `--contract` (a comma separated list also works) to check several registr
 the Vendor's and the Auditor's:
 
 ```
-tb-user verify --tee <vendor-public-ip>:5000 --rpc <url> \
+att-user verify --tee <vendor-public-ip>:5000 --rpc <url> \
     --contract <vendor registry 0x...> --contract <auditor registry 0x...>
 ```
 
@@ -46,7 +46,7 @@ If the Vendor's registry says yes and the Auditor's says no, the result is `not 
 ### Naming other trusted signers
 
 ```
-tb-user verify --tee <host>:5000 --rpc <url> --contract <0x...> --trusted <0xSigner1>,<0xSigner2>
+att-user verify --tee <host>:5000 --rpc <url> --contract <0x...> --trusted <0xSigner1>,<0xSigner2>
 ```
 
 `--trusted` replaces the default (the contract's approver), and applies to every `--contract`.
@@ -56,25 +56,25 @@ tb-user verify --tee <host>:5000 --rpc <url> --contract <0x...> --trusted <0xSig
 Attestation document from the Vendor's enclave:
 
 ```
-tb-user ra-request --tee <vendor-public-ip>:5000 --out doc.cbor --format aws-nitro
+att-user ra-request --tee <vendor-public-ip>:5000 --out doc.cbor --format aws-nitro
 ```
 
 Verify it and extract PCR0, PCR1, PCR2:
 
 ```
-tb-user ra-parse --doc doc.cbor --out parsed.json
+att-user ra-parse --doc doc.cbor --out parsed.json
 ```
 
 Find the registration by measurement alone. No key from anyone is needed:
 
 ```
-tb-user lookup --rpc <url> --contract <0x...> --measurements parsed.json
+att-user lookup --rpc <url> --contract <0x...> --measurements parsed.json
 ```
 
 The trust decision, for each key `lookup` found:
 
 ```
-tb-user compare --a parsed.json --rpc <url> --contract <0x...> --key <a key lookup found> \
+att-user compare --a parsed.json --rpc <url> --contract <0x...> --key <a key lookup found> \
     [--trusted <0x...,0x...>]
 ```
 

@@ -17,12 +17,12 @@ import (
 	"testing"
 )
 
-// writeBuildConfig writes the build-config.json that the Vendor hands over with send (tb.build-config/1). arch may differ from this machine's,
+// writeBuildConfig writes the build-config.json that the Vendor hands over with send (attestamp.build-config/1). arch may differ from this machine's,
 // so it is visible that the value came from the file and not from the flag default.
 func writeBuildConfig(t *testing.T, dir, service, version, arch, goVer string) string {
 	t.Helper()
 	body := `{
-  "schema": "tb.build-config/1",
+  "schema": "attestamp.build-config/1",
   "service": "` + service + `",
   "version": "` + version + `",
   "platform": "aws",
@@ -203,7 +203,7 @@ func TestConfig_E2E_SendBuildsRecordFromConfig(t *testing.T) {
 		if err := json.Unmarshal(raw, &rec); err != nil {
 			t.Fatalf("%s is not JSON: %v\n%s", where, err, raw)
 		}
-		if rec.Schema != "tb.measurement-record/1" || rec.Service != "cfg-svc" || rec.Version != "2.0.0" || rec.Platform != "aws" {
+		if rec.Schema != "attestamp.measurement-record/1" || rec.Service != "cfg-svc" || rec.Version != "2.0.0" || rec.Platform != "aws" {
 			t.Errorf("%s: header drifted from the config: %+v", where, rec)
 		}
 		if rec.BuildEnv.OS != "linux" || rec.BuildEnv.Arch != arch || rec.BuildEnv.Go != goVer || !rec.BuildEnv.Trimpath {

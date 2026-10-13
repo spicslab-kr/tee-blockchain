@@ -4,5 +4,5 @@ here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
 . "$here/env.sh"
 step "STOPPING ENCLAVES"
-V 'sudo nitro-cli terminate-enclave --all; pkill -x tb-vendor; echo vendor: enclaves $(nitro-cli describe-enclaves | tr -d "\n ")'
-A 'sudo nitro-cli terminate-enclave --all; pkill -x tb-auditor; echo auditor: enclaves $(nitro-cli describe-enclaves | tr -d "\n ")'
+V 'sudo nitro-cli terminate-enclave --all; pkill -x att-vendor; echo vendor: enclaves $(nitro-cli describe-enclaves | tr -d "\n ")'
+A 'sudo nitro-cli terminate-enclave --all; pkill -x att-auditor; echo auditor: enclaves $(nitro-cli describe-enclaves | tr -d "\n ")'

@@ -21,8 +21,8 @@ step_start "CHECKING RECEIVED FILES"
 sha256sum from-auditor/alpine-slim.eif from-auditor/measurements.json  # hashes to check the received files
 step_stop "CHECKING RECEIVED FILES"
 
-# tb command - measures the received image itself and launches it in my TEE only if it equals the measurements the Auditor handed over.
-step "LAUNCHING ENCLAVE" ./tb-vendor launch --eif from-auditor/alpine-slim.eif --measurements from-auditor/measurements.json
+# att command - measures the received image itself and launches it in my TEE only if it equals the measurements the Auditor handed over.
+step "LAUNCHING ENCLAVE" ./att-vendor launch --eif from-auditor/alpine-slim.eif --measurements from-auditor/measurements.json
 REMOTE
 rc=$?
 [ $rc -eq 0 ] || exit $rc
@@ -34,14 +34,14 @@ field() { grep -oE "\"$1\": *\"[^\"]*\"" "$REC" | head -1 | sed -E 's/.*": *"([^
 R_RPC=$(field rpc); R_CONTRACT=$(field contract); R_KEY=$(field key)
 mkdir -p "$WORK/vendor-check"
 
-# tb command - sends an RA request to my enclave and receives the attestation document.
-step "REQUESTING ATTESTATION" "$TBV" ra-request --tee "$VENDOR_HOST:5000" --out "$WORK/vendor-check/doc.cbor" --format aws-nitro || exit 1
-# tb command - verifies that document and extracts the measurements inside.
-step "PARSING ATTESTATION" "$TBV" ra-parse --doc "$WORK/vendor-check/doc.cbor" --out "$WORK/vendor-check/parsed.json" || exit 1
-# tb command - compares my enclave's value with the value in the record the Auditor gave.
-step "COMPARING TO AUDITOR'S RECORD" "$TBV" compare --a "$WORK/vendor-check/parsed.json" --b "$WORK/from-auditor/measurements.json"; a=$?
-# tb command - compares my enclave's value with the actual chain registration (value, expiry, signer).
-step "COMPARING TO CHAIN REGISTRATION" "$TBV" compare --a "$WORK/vendor-check/parsed.json" --rpc "$R_RPC" --contract "$R_CONTRACT" --key "$R_KEY"; b=$?
+# att command - sends an RA request to my enclave and receives the attestation document.
+step "REQUESTING ATTESTATION" "$VENDOR_BIN" ra-request --tee "$VENDOR_HOST:5000" --out "$WORK/vendor-check/doc.cbor" --format aws-nitro || exit 1
+# att command - verifies that document and extracts the measurements inside.
+step "PARSING ATTESTATION" "$VENDOR_BIN" ra-parse --doc "$WORK/vendor-check/doc.cbor" --out "$WORK/vendor-check/parsed.json" || exit 1
+# att command - compares my enclave's value with the value in the record the Auditor gave.
+step "COMPARING TO AUDITOR'S RECORD" "$VENDOR_BIN" compare --a "$WORK/vendor-check/parsed.json" --b "$WORK/from-auditor/measurements.json"; a=$?
+# att command - compares my enclave's value with the actual chain registration (value, expiry, signer).
+step "COMPARING TO CHAIN REGISTRATION" "$VENDOR_BIN" compare --a "$WORK/vendor-check/parsed.json" --rpc "$R_RPC" --contract "$R_CONTRACT" --key "$R_KEY"; b=$?
 if [ $a -eq 0 ] && [ $b -eq 0 ]; then
   echo "OK — what I run is exactly what the Auditor audited and registered. Users will get 'trusted'."
 else

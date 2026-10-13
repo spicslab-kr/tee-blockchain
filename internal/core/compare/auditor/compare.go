@@ -10,11 +10,11 @@ package auditor
 import (
 	"time"
 
-	"tb/internal/core/compare"
+	"attestamp/internal/core/compare"
 
-	l "tb/internal/chain/lookup/auditor"
-	reg "tb/internal/chain/register/auditor"
-	p "tb/internal/tee/parse/auditor"
+	l "attestamp/internal/chain/lookup/auditor"
+	reg "attestamp/internal/chain/register/auditor"
+	p "attestamp/internal/tee/parse/auditor"
 )
 
 type Verdict = compare.Verdict

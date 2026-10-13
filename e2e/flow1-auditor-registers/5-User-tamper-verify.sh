@@ -10,8 +10,8 @@ cd "$here/../.."
 need_host VENDOR_HOST
 echo "the Vendor's enclave now runs something the Auditor never registered — the same verify as step 3 must turn red:"
 CONTRACT=$(cat "$WORK/contract.txt")
-# tb command - confirm the value by RA, look up the registration on the chain, compare, decide whether to trust.
-step "VERIFYING" "$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
+# att command - confirm the value by RA, look up the registration on the chain, compare, decide whether to trust.
+step "VERIFYING" "$USER_BIN" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = nothing registered or nothing matches)"
 exit $rc

@@ -1,8 +1,8 @@
 // Responder build-info check.
 //
-// tb-ra-responder is a separate binary from a separate `go build`: CheckToolchain guards the Go
-// version tb itself was built with, but nothing about tb says how the responder file next to it
-// was built — and it is the responder's bytes, not tb's, that get layered into the enclave image
+// att-ra-responder is a separate binary from a separate `go build`: CheckToolchain guards the Go
+// version att itself was built with, but nothing about att says how the responder file next to it
+// was built — and it is the responder's bytes, not att's, that get layered into the enclave image
 // and measured (PCR0/PCR2). Those bytes depend on the Go patch version, on -trimpath (without it
 // the absolute checkout path is baked in), and on GOOS/GOARCH. Go records all of that inside every
 // binary it produces (debug/buildinfo), so instead of trusting the file name we read the artifact
@@ -16,7 +16,7 @@ import (
 	"os"
 )
 
-// ResponderInfo — what the tb-ra-responder file next to tb was built with, read from the Go
+// ResponderInfo — what the att-ra-responder file next to att was built with, read from the Go
 // build info the compiler leaves inside every binary.
 type ResponderInfo struct {
 	Go       string // GoVersion, e.g. "go1.26.1"
@@ -37,7 +37,7 @@ func (i ResponderInfo) String() string {
 	if len(sum) > 16 {
 		sum = sum[:16]
 	}
-	return fmt.Sprintf("responder: tb-ra-responder sha256 %s · %s %s/%s %s", sum, i.Go, i.GOOS, i.GOARCH, trim)
+	return fmt.Sprintf("responder: att-ra-responder sha256 %s · %s %s/%s %s", sum, i.Go, i.GOOS, i.GOARCH, trim)
 }
 
 // ReadResponder reads the Go build info embedded in the binary at path and hashes the file.
@@ -50,7 +50,7 @@ func ReadResponder(path string) (ResponderInfo, error) {
 		if _, statErr := os.Stat(path); statErr != nil {
 			return info, statErr
 		}
-		return info, fmt.Errorf("%s has no Go build info; is it really tb-ra-responder built from ./cmd/ra-responder? (%v)", path, err)
+		return info, fmt.Errorf("%s has no Go build info; is it really att-ra-responder built from ./cmd/ra-responder? (%v)", path, err)
 	}
 	info.Go = bi.GoVersion
 	for _, s := range bi.Settings {
@@ -75,19 +75,19 @@ func ReadResponder(path string) (ResponderInfo, error) {
 func CheckResponder(info ResponderInfo, hostGOARCH string) error {
 	want := RequiredToolchain()
 	rebuild := func(goarch string) string {
-		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s GOOS=linux GOARCH=%s go build -trimpath -o tb-ra-responder ./cmd/ra-responder", want, goarch)
+		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s GOOS=linux GOARCH=%s go build -trimpath -o att-ra-responder ./cmd/ra-responder", want, goarch)
 	}
 	if info.Go != want {
-		return fmt.Errorf("tb-ra-responder was built with %s but the project pins %s (internal/setup/build/GO_TOOLCHAIN) — its bytes, and so the measurements, depend on the exact toolchain; %s", info.Go, want, rebuild(hostGOARCH))
+		return fmt.Errorf("att-ra-responder was built with %s but the project pins %s (internal/setup/build/GO_TOOLCHAIN) — its bytes, and so the measurements, depend on the exact toolchain; %s", info.Go, want, rebuild(hostGOARCH))
 	}
 	if !info.Trimpath {
-		return fmt.Errorf("tb-ra-responder was built without -trimpath — the absolute checkout path is baked into it, so the same source built from another folder gives different bytes and different measurements; %s", rebuild(hostGOARCH))
+		return fmt.Errorf("att-ra-responder was built without -trimpath — the absolute checkout path is baked into it, so the same source built from another folder gives different bytes and different measurements; %s", rebuild(hostGOARCH))
 	}
 	if info.GOOS != "linux" {
-		return fmt.Errorf("tb-ra-responder was built for GOOS=%s but the enclave runs linux; %s", info.GOOS, rebuild(hostGOARCH))
+		return fmt.Errorf("att-ra-responder was built for GOOS=%s but the enclave runs linux; %s", info.GOOS, rebuild(hostGOARCH))
 	}
 	if info.GOARCH != hostGOARCH {
-		return fmt.Errorf("tb-ra-responder was built for GOARCH=%s but this instance is %s — the enclave runs the parent instance's architecture; %s", info.GOARCH, hostGOARCH, rebuild(hostGOARCH))
+		return fmt.Errorf("att-ra-responder was built for GOARCH=%s but this instance is %s — the enclave runs the parent instance's architecture; %s", info.GOARCH, hostGOARCH, rebuild(hostGOARCH))
 	}
 	return nil
 }

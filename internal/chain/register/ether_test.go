@@ -17,14 +17,14 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 
-	vl "tb/internal/chain/lookup/Vendor"
-	al "tb/internal/chain/lookup/auditor"
-	ven "tb/internal/chain/register/Vendor"
-	venether "tb/internal/chain/register/Vendor/ether"
-	aud "tb/internal/chain/register/auditor"
-	audether "tb/internal/chain/register/auditor/ether"
-	vp "tb/internal/tee/parse/Vendor"
-	ap "tb/internal/tee/parse/auditor"
+	vl "attestamp/internal/chain/lookup/Vendor"
+	al "attestamp/internal/chain/lookup/auditor"
+	ven "attestamp/internal/chain/register/Vendor"
+	venether "attestamp/internal/chain/register/Vendor/ether"
+	aud "attestamp/internal/chain/register/auditor"
+	audether "attestamp/internal/chain/register/auditor/ether"
+	vp "attestamp/internal/tee/parse/Vendor"
+	ap "attestamp/internal/tee/parse/auditor"
 )
 
 func newKey(t *testing.T) ([]byte, common.Address) {

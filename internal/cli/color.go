@@ -1,4 +1,4 @@
-// Package cli holds the few things every tb command line shares: at the moment, painting
+// Package cli holds the few things every att command line shares: at the moment, painting
 // errors and FAIL verdicts red on a terminal.
 //
 // Color is applied only when stderr is a character device and NO_COLOR is unset, so

@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"tb/internal/tee/request/Vendor"
+	"attestamp/internal/tee/request/Vendor"
 )
 
 // Extractor requests a document from /dev/nsm with an ioctl, from inside the enclave.

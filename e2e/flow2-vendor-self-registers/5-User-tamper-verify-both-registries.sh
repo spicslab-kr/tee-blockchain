@@ -11,8 +11,8 @@ step "READING REGISTRIES"
 VREG=$(cat "$WORK/contract-flow2.txt"); AREG=$(cat "$WORK/contract.txt")
 echo "Vendor's registry  $VREG"
 echo "Auditor's registry $AREG"
-# tb command - given two registries separated by a comma, it judges trusted only if both vouch.
-step "VERIFYING (both registries)" "$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$VREG,$AREG"
+# att command - given two registries separated by a comma, it judges trusted only if both vouch.
+step "VERIFYING (both registries)" "$USER_BIN" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$VREG,$AREG"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = nothing registered or nothing matches)"
 exit $rc

@@ -17,11 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 
-	al "tb/internal/chain/lookup/auditor"
-	aud "tb/internal/chain/register/auditor"
-	audether "tb/internal/chain/register/auditor/ether"
-	ap "tb/internal/tee/parse/auditor"
-	up "tb/internal/tee/parse/user"
+	al "attestamp/internal/chain/lookup/auditor"
+	aud "attestamp/internal/chain/register/auditor"
+	audether "attestamp/internal/chain/register/auditor/ether"
+	ap "attestamp/internal/tee/parse/auditor"
+	up "attestamp/internal/tee/parse/user"
 )
 
 func newKey(t *testing.T) ([]byte, common.Address) {

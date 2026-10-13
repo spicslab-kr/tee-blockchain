@@ -8,7 +8,7 @@ This page lists every folder in the repository, then explains the one idea that 
 
 ```
 .
-├── go.mod, go.sum          Go module "tb"; the toolchain is pinned to go1.26.1
+├── go.mod, go.sum          Go module "attestamp"; the toolchain is pinned to go1.26.1
 ├── README.md               overview, install, quick start
 ├── CONTRIBUTING.md         build, test, layout and commit conventions
 ├── STRUCTURE.md            this file
@@ -17,10 +17,10 @@ This page lists every folder in the repository, then explains the one idea that 
 ├── .gitignore              keys, e2e work files, stray build outputs
 │
 ├── cmd/                    one folder per binary, plus the end-to-end Go tests
-│   ├── vendor/             tb-vendor:       build, launch, send, self-register
-│   ├── auditor/            tb-auditor:      receive, build, launch, audit, registry-deploy, send
-│   ├── user/               tb-user:         verify (no key, no register)
-│   ├── ra-responder/       tb-ra-responder: runs inside the enclave and answers attestation requests
+│   ├── vendor/             att-vendor:       build, launch, send, self-register
+│   ├── auditor/            att-auditor:      receive, build, launch, audit, registry-deploy, send
+│   ├── user/               att-user:         verify (no key, no register)
+│   ├── ra-responder/       att-ra-responder: runs inside the enclave and answers attestation requests
 │   └── *_e2e_test.go       build the real binaries and drive them against a local anvil chain
 │
 ├── internal/               all library code; nothing here is importable from outside the module
@@ -179,7 +179,7 @@ Three tests sit directly in a feature folder because they cross roles:
 
 Verified with `go list -deps` on each `cmd/*` package.
 
-| Module | Job | tb-vendor | tb-auditor | tb-user | tb-ra-responder |
+| Module | Job | att-vendor | att-auditor | att-user | att-ra-responder |
 | --- | --- | :-: | :-: | :-: | :-: |
 | `tee/request/<role>` and `<role>/aws` | Request an attestation document; the responder side runs inside the enclave | yes | yes | yes (role only) | yes (Vendor copy, with aws) |
 | `tee/parse/aws` (shared) | Verify a Nitro document and extract measurements | yes | yes | yes | no |
@@ -195,10 +195,10 @@ Verified with `go list -deps` on each `cmd/*` package.
 
 Two details the table hides:
 
-- `tb-user` does not link any role's commands, but it does link `chain/register/auditor/ether`
+- `att-user` does not link any role's commands, but it does link `chain/register/auditor/ether`
   (the generated Registry binding) and, through it, `chain/lookup/auditor`, `tee/parse/auditor` and
   `tee/request/auditor`. `chain/lookup/user/ether/reader.go` imports that binding directly.
-- `tb-ra-responder` is built from the Vendor request package only, and `build` layers it into the
+- `att-ra-responder` is built from the Vendor request package only, and `build` layers it into the
   enclave image.
 
 ## Folder reference

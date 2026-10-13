@@ -12,7 +12,7 @@ package vendor
 import (
 	"context"
 
-	"tb/internal/tee/parse/Vendor"
+	"attestamp/internal/tee/parse/Vendor"
 )
 
 type Meta struct {

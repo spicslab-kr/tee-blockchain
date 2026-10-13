@@ -1,6 +1,6 @@
 package main
 
-import tr "tb/internal/core/transfer/auditor"
+import tr "attestamp/internal/core/transfer/auditor"
 
 // quiet is turned on when a command that bundles several steps (audit, verify) calls raRequest, raParse, register and lookup.
 // Those functions then print nothing themselves, and the caller prints one line saying what it is doing.

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"tb/internal/setup/build"
-	p "tb/internal/tee/parse/Vendor"
+	"attestamp/internal/setup/build"
+	p "attestamp/internal/tee/parse/Vendor"
 )
 
-const SchemaMeasurementRecord = "tb.measurement-record/1"
+const SchemaMeasurementRecord = "attestamp.measurement-record/1"
 
 // MeasurementNames lists the required measurement names per platform.
 var MeasurementNames = map[string][]string{

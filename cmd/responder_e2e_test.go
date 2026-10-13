@@ -1,4 +1,4 @@
-// The responder build-info check (internal/setup/build/responder.go) through the real CLI: actually builds and runs tb-vendor.
+// The responder build-info check (internal/setup/build/responder.go) through the real CLI: actually builds and runs att-vendor.
 //   - Off Linux, `build --responder <unrelated file>` ends first with a GOOS error (order: GOOS check, toolchain check,
 //     responder check). So on Windows/macOS it only confirms that the responder message never appears.
 //   - On Linux, given a responder cross-built for another architecture (an arm64 responder on an amd64 host, or the reverse), it refuses naming both architectures,
@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	setupbuild "tb/internal/setup/build"
+	setupbuild "attestamp/internal/setup/build"
 )
 
 func TestResponderCheck_E2E(t *testing.T) {
@@ -34,7 +34,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 
 	if runtime.GOOS != "linux" {
 		// the responder check comes after the GOOS check: off Linux, even an unrelated file gets the GOOS error first and no mention of the responder.
-		bad := filepath.Join(t.TempDir(), "tb-ra-responder")
+		bad := filepath.Join(t.TempDir(), "att-ra-responder")
 		if err := os.WriteFile(bad, []byte("not a go binary\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -45,7 +45,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 		if !strings.Contains(out, "build runs on the Nitro parent instance (linux)") {
 			t.Fatalf("expected the GOOS error first, got:\n%s", out)
 		}
-		if strings.Contains(out, "Go build info") || strings.Contains(out, "tb-ra-responder was built") {
+		if strings.Contains(out, "Go build info") || strings.Contains(out, "att-ra-responder was built") {
 			t.Fatalf("responder check ran before the GOOS check:\n%s", out)
 		}
 		t.Logf("not linux — the responder refusal itself is exercised on the Nitro host by e2e/responder-check.sh")
@@ -57,7 +57,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 	if runtime.GOARCH == "arm64" {
 		other = "amd64"
 	}
-	wrongArch := filepath.Join(t.TempDir(), "tb-ra-responder-"+other)
+	wrongArch := filepath.Join(t.TempDir(), "att-ra-responder-"+other)
 	if err := setupbuild.BuildResponderForArch(context.Background(), repoRoot(t), setupbuild.ArchTarget{Name: other, GOARCH: other}, wrongArch); err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 	}
 
 	// a responder built without -trimpath: must be refused, naming -trimpath.
-	noTrim := filepath.Join(t.TempDir(), "tb-ra-responder-notrimpath")
+	noTrim := filepath.Join(t.TempDir(), "att-ra-responder-notrimpath")
 	cmd := exec.Command("go", "build", "-o", noTrim, "./cmd/ra-responder")
 	cmd.Dir = repoRoot(t)
 	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+runtime.GOARCH)

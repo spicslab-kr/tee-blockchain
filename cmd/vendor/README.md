@@ -1,8 +1,8 @@
-# Vendor guide (`tb-vendor`)
+# Vendor guide (`att-vendor`)
 
 The Vendor builds or packs the software into an enclave image, launches it, and either hands the
 source to an Auditor or registers the measurement itself (flow 2). Binaries and toolchain:
-[Build the binaries](../README.md#build-the-binaries). `tb-vendor` and `tb-ra-responder` must sit in
+[Build the binaries](../README.md#build-the-binaries). `att-vendor` and `att-ra-responder` must sit in
 the same directory on the Nitro instance.
 
 Both ways of building must end with the same three things, because that is all the rest of the
@@ -33,7 +33,7 @@ docker build -t app:base <dir>
 normalizes the layers, and writes `out/app.eif` and `out/measurements.json`:
 
 ```
-tb-vendor pack --image app:base --out out
+att-vendor pack --image app:base --out out
 ```
 
 Flags: `--image` (required), `--name`, `--port` (default 5000), `--out` (default `out`),
@@ -44,7 +44,7 @@ attestation to prove it answers (`out/selfcheck.cbor`), and opens the security-g
 IAM permission on the instance it prints the one `aws ec2` line to run from your account.
 
 ```
-tb-vendor launch --eif out/app.eif
+att-vendor launch --eif out/app.eif
 ```
 
 Flags: `--eif` (required), `--measurements`, `--name`, `--port` (default 5000, must match the
@@ -65,7 +65,7 @@ normalizes the layers, makes the image and writes the measurements: `out/<name>.
 `out/measurements.json`.
 
 ```
-tb-vendor build --app-dir <dir with Dockerfile> --out out
+att-vendor build --app-dir <dir with Dockerfile> --out out
 ```
 
 It first scans the Dockerfile for things known to break reproducibility (unpinned base image or
@@ -75,7 +75,7 @@ identical, listing the files that differ. It is worth doing the first time a sou
 Auditor.
 
 ```
-tb-vendor launch --eif out/<name>.eif
+att-vendor launch --eif out/<name>.eif
 ```
 
 `build` takes a directory with a Dockerfile and runs `docker build` itself; `pack` takes an image
@@ -87,7 +87,7 @@ In flow 1 the Auditor audits and registers, and the Vendor does not register. `s
 for flow 2, where the Vendor registers its own enclave:
 
 ```
-tb-vendor self-register --config build-config.json --tee 127.0.0.1:5000 \
+att-vendor self-register --config build-config.json --tee 127.0.0.1:5000 \
     --rpc <url> --contract <0x...> --key-file <key>
 ```
 
@@ -114,7 +114,7 @@ example).
 A registry for flow 2 is deployed once with:
 
 ```
-tb-vendor registry-deploy --rpc <url> --key-file <deployer.key> --approver <0x...>
+att-vendor registry-deploy --rpc <url> --key-file <deployer.key> --approver <0x...>
 ```
 
 See the [registry guide](../../contracts/README.md) for what the contract accepts.
@@ -124,34 +124,34 @@ See the [registry guide](../../contracts/README.md) for what the contract accept
 Send a fresh nonce to the enclave and get back the signed attestation document:
 
 ```
-tb-vendor ra-request --tee 127.0.0.1:5000 --out doc.cbor
+att-vendor ra-request --tee 127.0.0.1:5000 --out doc.cbor
 ```
 
 Verify the signature chain up to the platform root and the nonce, and extract PCR0, PCR1, PCR2:
 
 ```
-tb-vendor ra-parse --doc doc.cbor --out parsed.json
+att-vendor ra-parse --doc doc.cbor --out parsed.json
 ```
 
 Sign those measurements with your key and register them. The `key` it prints is the lookup
 coordinate:
 
 ```
-tb-vendor register --rpc <url> --contract <0x...> --key-file <key> \
+att-vendor register --rpc <url> --contract <0x...> --key-file <key> \
     --measurements parsed.json --config build-config.json
 ```
 
 Read the registration back by measurement alone:
 
 ```
-tb-vendor lookup --rpc <url> --contract <0x...> --measurements parsed.json
+att-vendor lookup --rpc <url> --contract <0x...> --measurements parsed.json
 ```
 
 Self-check: does what is on-chain match what the enclave attested, is it unexpired, and is the
 signer the contract's approver:
 
 ```
-tb-vendor compare --a parsed.json --rpc <url> --contract <0x...> --key <key register printed>
+att-vendor compare --a parsed.json --rpc <url> --contract <0x...> --key <key register printed>
 ```
 
 `compare --a <file> --b <file>` instead compares two sets of measurements directly.
@@ -164,12 +164,12 @@ Or hand the build declaration over as a file. You write `build-config.json`; `se
 the root of the repository and pushes:
 
 ```
-tb-vendor send --repo <git url> --config build-config.json
+att-vendor send --repo <git url> --config build-config.json
 ```
 
 ```json
 {
-  "schema": "tb.build-config/1",
+  "schema": "attestamp.build-config/1",
   "service": "nginx",
   "version": "1.31.6",
   "platform": "aws",
@@ -180,13 +180,13 @@ tb-vendor send --repo <git url> --config build-config.json
 ```
 
 `build_env` is the environment the image was built in: OS, CPU architecture (`amd64` or `arm64`),
-Go toolchain, and whether `-trimpath` was used. If you built with tb, leave it out and `send`
-fills it in from the running binary. If you built outside tb, write it yourself. The Auditor
+Go toolchain, and whether `-trimpath` was used. If you built with Attestamp, leave it out and `send`
+fills it in from the running binary. If you built outside Attestamp, write it yourself. The Auditor
 builds to that environment, not to whatever it happens to have, because PCR0, PCR1 and PCR2 differ
 between x86_64 and arm64 and between Go versions.
 
 The Auditor must be able to read the repository. For a private one, give it read access
-(collaborator or deploy key); tb does not manage permissions. `send` and `receive` fail with exit
+(collaborator or deploy key); Attestamp does not manage permissions. `send` and `receive` fail with exit
 code 8 (git not found), 9 (repository unreachable), 10 (commit not found, see `--ref`) or 11 (push
 rejected: write access, or the remote is ahead, so pull first). By hand: commit `build-config.json`
 at the repository root and push; the Auditor clones it and reads the file. `--workdir` makes `send`
@@ -196,14 +196,14 @@ Later, when the Auditor has published its result, fetch it. `measurement-record.
 arrive with their hashes verified:
 
 ```
-tb-vendor receive --repo <git url> --into from-auditor
+att-vendor receive --repo <git url> --into from-auditor
 ```
 
 `--ref` picks a commit, branch or tag; the default is the default branch. A received image is
-launched with `tb-vendor launch --eif <file> --measurements <file>`.
+launched with `att-vendor launch --eif <file> --measurements <file>`.
 
 ## Other commands
 
 `ra-serve`, `lo-up` and `ra-proxy` run the responder and the TCP bridge by hand. `build`, `pack`
-and `launch` already do this for you. `tb-vendor version` prints the pinned and the actual Go
+and `launch` already do this for you. `att-vendor version` prints the pinned and the actual Go
 toolchain.

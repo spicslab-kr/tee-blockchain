@@ -8,8 +8,8 @@ import (
 	"net"
 	"testing"
 
-	vendor "tb/internal/tee/request/Vendor"
-	user "tb/internal/tee/request/user"
+	vendor "attestamp/internal/tee/request/Vendor"
+	user "attestamp/internal/tee/request/user"
 )
 
 type vendorTEE struct{ format string }

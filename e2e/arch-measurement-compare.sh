@@ -11,7 +11,7 @@
 #      - type    c7g.xlarge (Graviton, 4 vCPU) - the arm64 counterpart of the m6i.xlarge (x86) used for VENDOR/AUDITOR
 #      - OS      Amazon Linux 2023 (arm64 AMI - a different image from the x86 one, so set the console architecture filter to arm64)
 #      - options Nitro Enclaves enabled; the rest (region eu-north-1, security group, key pair) same as VENDOR/AUDITOR
-#      - setup   git, docker and nitro-cli are installed by the first run of tb-vendor build, so nothing needs to be
+#      - setup   git, docker and nitro-cli are installed by the first run of att-vendor build, so nothing needs to be
 #                installed on the instance beforehand
 #    Run from TB-live:  bash "e2e/arch-measurement-compare.sh"
 set -uo pipefail
@@ -30,16 +30,16 @@ SRC_REPO=https://github.com/qixiangme/docker-nginx
 SRC_COMMIT=ef5a25a6314e652a2dcfbce6074bef729f4d9639
 SRC_DIR=mainline/alpine-slim
 
-# Build the tb executables - cross-compiled separately for x86_64 (amd64) and arm64.
+# Build the att executables - cross-compiled separately for x86_64 (amd64) and arm64.
 #   -trimpath: keeps the checkout path out of the binary. To add an architecture, add one line to GOARCH_OF.
 step "CROSS-BUILDING PER ARCHITECTURE"
 declare -A GOARCH_OF=( [x86_64]=amd64 [arm64]=arm64 )
 mkdir -p "$WORK/arch"
 for arch in x86_64 arm64; do
   ga=${GOARCH_OF[$arch]}
-  GOOS=linux GOARCH=$ga go build -trimpath -o "$WORK/arch/tb-vendor-$arch"       ./cmd/vendor
-  GOOS=linux GOARCH=$ga go build -trimpath -o "$WORK/arch/tb-ra-responder-$arch" ./cmd/ra-responder
-  echo "  $arch  responder sha256: $(sha256 "$WORK/arch/tb-ra-responder-$arch" | cut -c1-64)"
+  GOOS=linux GOARCH=$ga go build -trimpath -o "$WORK/arch/att-vendor-$arch"       ./cmd/vendor
+  GOOS=linux GOARCH=$ga go build -trimpath -o "$WORK/arch/att-ra-responder-$arch" ./cmd/ra-responder
+  echo "  $arch  responder sha256: $(sha256 "$WORK/arch/att-ra-responder-$arch" | cut -c1-64)"
 done
 
 host_of() { case $1 in V) echo "$VENDOR_HOST";; A) echo "$AUDITOR_HOST";; R) echo "$ARM64_HOST";; esac; }
@@ -49,15 +49,15 @@ host_of() { case $1 in V) echo "$VENDOR_HOST";; A) echo "$AUDITOR_HOST";; R) ech
 measure_on() {
   sshf=$1; key=$2; label=$3; arch=$4
   nitroBanner "$label"
-  $sshf 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x tb-vendor; true'
-  $SCP "$WORK/arch/tb-vendor-$arch" "$SSH_USER@$(host_of "$sshf"):~/tb-vendor"
-  $SCP "$WORK/arch/tb-ra-responder-$arch" "$SSH_USER@$(host_of "$sshf"):~/tb-ra-responder"
+  $sshf 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x att-vendor; true'
+  $SCP "$WORK/arch/att-vendor-$arch" "$SSH_USER@$(host_of "$sshf"):~/att-vendor"
+  $SCP "$WORK/arch/att-ra-responder-$arch" "$SSH_USER@$(host_of "$sshf"):~/att-ra-responder"
   $sshf 'bash -s' <<REMOTE
 set -euo pipefail
 step_start() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "\$1"; }
 step_stop() { :; }
 step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "\$1"; shift; "\$@"; }
-chmod +x tb-vendor tb-ra-responder
+chmod +x att-vendor att-ra-responder
 umask 022
 fix_modes() { (cd "\$1" && git ls-files -s | while read -r mode _ _ path; do case \$mode in 100755) chmod 755 "\$path";; 100644) chmod 644 "\$path";; esac; done && find . -type d -not -path './.git*' -exec chmod 755 {} +); }
 step_start "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
@@ -65,7 +65,7 @@ step_start "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
 git -C src/docker-nginx checkout -q $SRC_COMMIT
 fix_modes src/docker-nginx
 step_stop "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
-step "BUILDING ($label)" ./tb-vendor build --app-dir src/docker-nginx/$SRC_DIR --out out
+step "BUILDING ($label)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out out
 cat out/measurements.json
 REMOTE
   localBanner

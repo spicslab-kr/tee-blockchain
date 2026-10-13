@@ -21,8 +21,8 @@ import (
 	"runtime"
 	"strings"
 
-	"tb/internal/cli"
-	"tb/internal/setup/build"
+	"attestamp/internal/cli"
+	"attestamp/internal/setup/build"
 )
 
 //go:embed entrypoint.sh
@@ -30,22 +30,22 @@ var entrypointScript []byte
 
 // responderBinaryName is the file name cmd/ra-responder produces. Every role must run a file with exactly this
 // name placed next to its executable, so that builds by different roles put the same bytes in the image.
-const responderBinaryName = "tb-ra-responder"
+const responderBinaryName = "att-ra-responder"
 
 // Build is the input to one build. The Dockerfile in AppDir is the software.
 type Build struct {
 	AppDir string // directory holding the software's Dockerfile (build). Exactly one of AppDir and Image
-	Image  string // a docker image the user already built (pack): the user runs docker build, tb does the layering, normalizing and EIF
+	Image  string // a docker image the user already built (pack): the user runs docker build, att does the layering, normalizing and EIF
 	Name   string // image and EIF name. Defaults to the directory name (pack: the image name before the tag)
 	Port   int    // vsock port the responder listens on inside the enclave. 0 means 5000
 
-	// Binary is the responder to layer in. If empty, tb-ra-responder next to the executable is used.
+	// Binary is the responder to layer in. If empty, att-ra-responder next to the executable is used.
 	//
-	// This used to default to the running executable itself (os.Executable(), i.e. tb-vendor or tb-auditor).
+	// This used to default to the running executable itself (os.Executable(), i.e. att-vendor or att-auditor).
 	// That put a different CLI binary into the image for each role, so no amount of layer normalizing could make
 	// the Vendor's and the Auditor's images equal (measured on two real EC2 instances: the Vendor and the
 	// Auditor built the same Dockerfile, normalization included, and still got different PCR0 and PCR2, because
-	// the /tb-ra file itself was two different binaries). Now every role must layer in the identical file
+	// the /att-ra file itself was two different binaries). Now every role must layer in the identical file
 	// built from cmd/ra-responder.
 	Binary string
 	Out    string // result directory. Defaults to out
@@ -59,15 +59,15 @@ type Result struct {
 	EIF          string              // enclave image file
 	Measurements string              // raw nitro-cli build-enclave output (json)
 	PCR          map[string]string   // PCR0, PCR1, PCR2
-	Responder    build.ResponderInfo // build info and sha256 of the layered-in tb-ra-responder, kept in the record so the other side can compare
+	Responder    build.ResponderInfo // build info and sha256 of the layered-in att-ra-responder, kept in the record so the other side can compare
 }
 
 var ErrNotLinux = errors.New("build runs on the Nitro parent instance (linux)")
 
 // Run goes through: tools, software image, responder layering, EIF and PCRs.
 //
-// There are two entry points. AppDir (build): tb starts from docker build, so the Vendor and the Auditor running the
-// same command get the same values. Image (pack): the user hands over an image built their own way and tb only layers,
+// There are two entry points. AppDir (build): att starts from docker build, so the Vendor and the Auditor running the
+// same command get the same values. Image (pack): the user hands over an image built their own way and att only layers,
 // normalizes and makes the EIF; the Auditor measures the received EIF file, so only the Vendor needs to build it.
 func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	var res Result
@@ -117,7 +117,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, fmt.Errorf("%s: attestation responder not found — build cmd/ra-responder and put it there, or point Binary at it", b.Binary)
 	}
 	// A file being there is not enough. What gets layered in and measured is this file's bytes, and those are fixed by
-	// the Go version, -trimpath and GOOS/GOARCH the responder was built with (CheckToolchain only looks at tb itself).
+	// the Go version, -trimpath and GOOS/GOARCH the responder was built with (CheckToolchain only looks at att itself).
 	// Read the build info Go left in the binary and refuse a responder that cannot produce the same bytes as the other side.
 	responder, err := build.ReadResponder(b.Binary)
 	if err != nil {
@@ -162,7 +162,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 
 	appImage := b.Image
-	res.Image = b.Name + ":tb"
+	res.Image = b.Name + ":att"
 	if b.Image == "" {
 		appImage = b.Name + ":app"
 		step(fmt.Sprintf("Building the software image from %s → %s", appDir, appImage), "the software exactly as its own Dockerfile makes it — nothing of ours inside yet. an Auditor runs this same step on the same source")
@@ -215,10 +215,10 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	return res, nil
 }
 
-// layerResponder layers the tb binary and the entrypoint on top of the software image. The original command is passed as a file,
+// layerResponder layers the att binary and the entrypoint on top of the software image. The original command is passed as a file,
 // because nitro-cli does not forward a Docker CMD behind a script entrypoint.
 func (b Build) layerResponder(ctx context.Context, r runner, from, to string, appCmd []string) error {
-	dir, err := os.MkdirTemp("", "tb-ra-image")
+	dir, err := os.MkdirTemp("", "att-ra-image")
 	if err != nil {
 		return err
 	}
@@ -227,21 +227,21 @@ func (b Build) layerResponder(ctx context.Context, r runner, from, to string, ap
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "tb-ra"), bin, 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "att-ra"), bin, 0o755); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "entrypoint.sh"), entrypointScript, 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "tb-app-cmd"), []byte(strings.Join(appCmd, "\n")+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "att-app-cmd"), []byte(strings.Join(appCmd, "\n")+"\n"), 0o644); err != nil {
 		return err
 	}
 	dockerfile := fmt.Sprintf(`FROM %s
-COPY tb-ra /tb-ra
-COPY entrypoint.sh /tb-entrypoint.sh
-COPY tb-app-cmd /tb-app-cmd
-ENV TB_RA_PORT=%d
-ENTRYPOINT ["/tb-entrypoint.sh"]
+COPY att-ra /att-ra
+COPY entrypoint.sh /att-entrypoint.sh
+COPY att-app-cmd /att-app-cmd
+ENV ATT_RA_PORT=%d
+ENTRYPOINT ["/att-entrypoint.sh"]
 `, from, b.Port)
 	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
 		return err
@@ -282,7 +282,7 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	}
 	cfg := v[0].Config
 
-	dir, err := os.MkdirTemp(workDir, "tb-canon-*")
+	dir, err := os.MkdirTemp(workDir, "att-canon-*")
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +293,7 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 		}
 	}()
 
-	container := fmt.Sprintf("tb-canon-%d", os.Getpid())
+	container := fmt.Sprintf("att-canon-%d", os.Getpid())
 	r.cmd(ctx, "docker", "rm", "-f", container).Run() // leftover from an earlier failed run, if any
 	if err := r.run(ctx, "docker", "create", "--name", container, image); err != nil {
 		return nil, err

@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	reg "tb/internal/chain/register/Vendor"
+	reg "attestamp/internal/chain/register/Vendor"
 )
 
 // Backend is what is needed to talk to the chain. Both *ethclient.Client and simulated.Client satisfy it.

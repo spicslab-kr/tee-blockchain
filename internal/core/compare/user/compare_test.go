@@ -15,13 +15,13 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 
-	al "tb/internal/chain/lookup/auditor"
-	l "tb/internal/chain/lookup/user"
-	lether "tb/internal/chain/lookup/user/ether"
-	aud "tb/internal/chain/register/auditor"
-	audether "tb/internal/chain/register/auditor/ether"
-	ap "tb/internal/tee/parse/auditor"
-	p "tb/internal/tee/parse/user"
+	al "attestamp/internal/chain/lookup/auditor"
+	l "attestamp/internal/chain/lookup/user"
+	lether "attestamp/internal/chain/lookup/user/ether"
+	aud "attestamp/internal/chain/register/auditor"
+	audether "attestamp/internal/chain/register/auditor/ether"
+	ap "attestamp/internal/tee/parse/auditor"
+	p "attestamp/internal/tee/parse/user"
 )
 
 func TestCompare_ParsedVsBuild(t *testing.T) {

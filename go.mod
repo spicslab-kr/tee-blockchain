@@ -1,4 +1,4 @@
-module tb
+module attestamp
 
 go 1.26.1
 

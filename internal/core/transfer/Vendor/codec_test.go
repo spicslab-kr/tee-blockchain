@@ -8,7 +8,7 @@ import (
 // Format regression: if the JSON changes it no longer matches this and the test fails. If the change is intended, update the expected value.
 const (
 	wantBuildConfigJSON = `{
-  "schema": "tb.build-config/1",
+  "schema": "attestamp.build-config/1",
   "service": "svc",
   "version": "1.2.0",
   "platform": "aws",
@@ -30,7 +30,7 @@ const (
 }
 `
 	wantMeasurementRecordJSON = `{
-  "schema": "tb.measurement-record/1",
+  "schema": "attestamp.measurement-record/1",
   "service": "svc",
   "version": "1.2.0",
   "platform": "aws",

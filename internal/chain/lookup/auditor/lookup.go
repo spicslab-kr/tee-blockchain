@@ -12,7 +12,7 @@ package auditor
 import (
 	"context"
 
-	"tb/internal/tee/parse/auditor"
+	"attestamp/internal/tee/parse/auditor"
 )
 
 type Meta struct {

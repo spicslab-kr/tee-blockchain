@@ -10,9 +10,9 @@ import (
 	"os"
 	"time"
 
-	"tb/internal/cli"
-	parse "tb/internal/tee/parse/user"
-	ra "tb/internal/tee/request/user"
+	"attestamp/internal/cli"
+	parse "attestamp/internal/tee/parse/user"
+	ra "attestamp/internal/tee/request/user"
 )
 
 func main() {
@@ -37,13 +37,13 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		cli.Errorln("tb user: ", err)
+		cli.Errorln("att-user: ", err)
 		os.Exit(exitCode(err))
 	}
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `tb user — RA request
+	fmt.Fprintln(os.Stderr, `att-user — RA request
 
   ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out <file>] [--at <RFC3339>]
               verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"tb/internal/cli"
+	"attestamp/internal/cli"
 )
 
 // manifest is a per-file summary of the rootfs just before normalization: path -> "mode kind content-hash (or link target)". It is exactly what goes into the measurement
@@ -92,7 +92,7 @@ func short(v string) string {
 // On a difference it returns an error: the EIF and measurements of the first build are already in out/, but handing those values over would not let an Auditor reproduce them.
 func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, first manifest, firstPCR map[string]string) error {
 	checkApp := appImage + "-verify"
-	checkImage := b.Name + ":tb-verify"
+	checkImage := b.Name + ":att-verify"
 	fmt.Fprintf(r.log, "\n[verify 1/3] building %s again from scratch (--no-cache) → %s\n", appDir, checkApp)
 	if err := r.run(ctx, "docker", "build", "-q", "--no-cache", "-t", checkApp, appDir); err != nil {
 		return err

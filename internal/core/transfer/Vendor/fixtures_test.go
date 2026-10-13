@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"strings"
 
-	p "tb/internal/tee/parse/Vendor"
+	p "attestamp/internal/tee/parse/Vendor"
 )
 
 const commit = "0123456789abcdef0123456789abcdef01234567"

@@ -1,11 +1,11 @@
 // Package build holds tooling shared by the Vendor and Auditor build packages (aws.Build lives
 // under Vendor/aws and auditor/aws — this file is the role-agnostic part).
 //
-// Arch cross-builds tb-ra-responder for every CPU architecture this project ships to, so the
+// Arch cross-builds att-ra-responder for every CPU architecture this project ships to, so the
 // per-architecture hash can be produced and compared the same way everywhere instead of each
 // caller re-typing the go build/sha256 incantation.
 //
-// A different architecture is expected to produce a different tb-ra-responder binary, and with
+// A different architecture is expected to produce a different att-ra-responder binary, and with
 // it different PCR0/PCR2 once it's layered into an enclave image — Nitro's kernel, the compiled
 // machine code, and the base image layers all differ per architecture. That is normal, not a
 // bug. What must NOT differ is the hash for one architecture built from
@@ -25,7 +25,7 @@ import (
 	"os/exec"
 )
 
-// ArchTarget is one CPU architecture this project builds tb-ra-responder for.
+// ArchTarget is one CPU architecture this project builds att-ra-responder for.
 type ArchTarget struct {
 	Name   string // human label, e.g. "x86_64" — used in reports and instance-spec docs
 	GOARCH string // Go's GOARCH value for cross-compiling
@@ -69,15 +69,15 @@ func SHA256File(path string) (string, error) {
 }
 
 // ArchReport is one row of a per-architecture comparison: which architecture, and the sha256 of
-// the tb-ra-responder binary BuildResponderAllArches produced for it.
+// the att-ra-responder binary BuildResponderAllArches produced for it.
 type ArchReport struct {
 	Target ArchTarget
 	Path   string
 	SHA256 string
 }
 
-// BuildResponderAllArches cross-builds tb-ra-responder for every entry in ArchTargets, writing
-// each binary to dir/tb-ra-responder-<GOARCH> and hashing it. The returned reports are in
+// BuildResponderAllArches cross-builds att-ra-responder for every entry in ArchTargets, writing
+// each binary to dir/att-ra-responder-<GOARCH> and hashing it. The returned reports are in
 // ArchTargets order.
 func BuildResponderAllArches(ctx context.Context, repoRoot, dir string) ([]ArchReport, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -85,7 +85,7 @@ func BuildResponderAllArches(ctx context.Context, repoRoot, dir string) ([]ArchR
 	}
 	reports := make([]ArchReport, 0, len(ArchTargets))
 	for _, t := range ArchTargets {
-		out := dir + "/tb-ra-responder-" + t.GOARCH
+		out := dir + "/att-ra-responder-" + t.GOARCH
 		if err := BuildResponderForArch(ctx, repoRoot, t, out); err != nil {
 			return nil, err
 		}

@@ -5,9 +5,9 @@ import (
 	"runtime"
 	"strings"
 
-	"tb/internal/cli"
-	tr "tb/internal/core/transfer/auditor"
-	"tb/internal/setup/build"
+	"attestamp/internal/cli"
+	tr "attestamp/internal/core/transfer/auditor"
+	"attestamp/internal/setup/build"
 )
 
 // archNames: the GOARCH names of the architectures this project builds (amd64, arm64). build.ArchTargets is the only source.

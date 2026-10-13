@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"tb/internal/cli"
+	"attestamp/internal/cli"
 )
 
 // Launch is the input to one launch. The EIF is the result of build.
@@ -32,7 +32,7 @@ type Launch struct {
 	CPUs   int    // 0 means 2
 	CID    int    // enclave vsock address. 0 means 16
 	Listen string // address the bridge accepts on. Defaults to 0.0.0.0
-	Binary string // tb binary to start as ra-proxy. Defaults to itself
+	Binary string // att binary to start as ra-proxy. Defaults to itself
 	Out    string // bridge log directory. Defaults to out
 
 	// Measurements is the measurements.json that came with an EIF received from someone else. If measuring the EIF directly gives a different value, it is not launched.
@@ -156,7 +156,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	return res, nil
 }
 
-// startProxy starts the tb binary separately as ra-proxy. It keeps running after launch ends.
+// startProxy starts the att binary separately as ra-proxy. It keeps running after launch ends.
 func (l Launch) startProxy(ctx context.Context, log io.Writer) error {
 	_ = exec.CommandContext(ctx, "pkill", "-f", fmt.Sprintf("^%s ra-proxy --listen %s:%d", l.Binary, l.Listen, l.Port)).Run()
 	logPath := filepath.Join(l.Out, "proxy.log")

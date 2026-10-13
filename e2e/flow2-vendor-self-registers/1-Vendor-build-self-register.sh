@@ -7,8 +7,8 @@ cd "$here/../.."
 . "$here/../env.sh"
 need_host VENDOR_HOST
 
-# The tb binaries on the instance were cross-built with this machine's Go (0-Setup refuses anything but the pinned Go),
-#   and that Go compiled tb-ra-responder. So the value for build_env.go in build-config.json is this machine's Go version.
+# The att binaries on the instance were cross-built with this machine's Go (0-Setup refuses anything but the pinned Go),
+#   and that Go compiled att-ra-responder. So the value for build_env.go in build-config.json is this machine's Go version.
 GOVER=$(go env GOVERSION)
 
 nitroBanner "Vendor"
@@ -42,7 +42,7 @@ else
   md() { curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOK" "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null || echo unknown; }
   cat > src/docker-nginx/build-config.json <<EOF
 {
-  "schema": "tb.build-config/1",
+  "schema": "attestamp.build-config/1",
   "service": "$SERVICE",
   "version": "$VERSION",
   "platform": "aws",
@@ -55,12 +55,12 @@ fi
 cat src/docker-nginx/build-config.json
 step_stop "WRITING BUILD CONFIG"
 
-# tb command - builds the source twice (--verify) to make the image and measurements, and checks for itself that the same value comes out.
+# att command - builds the source twice (--verify) to make the image and measurements, and checks for itself that the same value comes out.
 #   Like the Auditor, the Vendor must confirm its own build is reproducible before registering.
-step "BUILDING SOURCE (checking reproducibility)" ./tb-vendor build --app-dir src/docker-nginx/$SRC_DIR --out out --verify
+step "BUILDING SOURCE (checking reproducibility)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out out --verify
 
-# tb command - launches that image in my TEE.
-step "LAUNCHING ENCLAVE" ./tb-vendor launch --eif out/alpine-slim.eif
+# att command - launches that image in my TEE.
+step "LAUNCHING ENCLAVE" ./att-vendor launch --eif out/alpine-slim.eif
 
 echo
 cat out/measurements.json
@@ -84,9 +84,9 @@ echo "Vendor's build value:"; cat "$WORK/vendor-build.json"
 echo "build config:"; cat "$WORK/vendor-build-config.json"
 
 if [ -z "$CONTRACT" ]; then
-  # tb command - deploys a new registry (registry contract) on the chain. The approver is the Vendor itself.
+  # att command - deploys a new registry (registry contract) on the chain. The approver is the Vendor itself.
   step_start "DEPLOYING REGISTRY"
-  out=$("$TBV" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$VENDOR_ADDR" 2>&1)
+  out=$("$VENDOR_BIN" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$VENDOR_ADDR" 2>&1)
   step_stop "DEPLOYING REGISTRY"
   echo "$out"
   CONTRACT=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # extract the address from the output
@@ -94,11 +94,11 @@ if [ -z "$CONTRACT" ]; then
 fi
 echo "$CONTRACT" > "$WORK/contract-flow2.txt"  # save it in the file the next step reads
 
-# tb command - signs the value I built with my key and registers it on the chain as is (with no third-party comparison).
+# att command - signs the value I built with my key and registers it on the chain as is (with no third-party comparison).
 #   service, version and arch come from the --config build-config.json - a different value given as a flag wins, but a warning is printed.
-step "SELF-REGISTERING" "$TBV" self-register --config "$WORK/vendor-build-config.json" --tee "$VENDOR_HOST:5000" --measurements "$WORK/vendor-build.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$VENDOR_KEY"
+step "SELF-REGISTERING" "$VENDOR_BIN" self-register --config "$WORK/vendor-build-config.json" --tee "$VENDOR_HOST:5000" --measurements "$WORK/vendor-build.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$VENDOR_KEY"
 echo "self-register exit=$?"
-# tb command - verifies, from the User's side, whether what was just registered is actually trustworthy.
-step "VERIFYING" "$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
+# att command - verifies, from the User's side, whether what was just registered is actually trustworthy.
+step "VERIFYING" "$USER_BIN" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
 echo "verify exit=$?"
 echo "next: 2-User-verify"

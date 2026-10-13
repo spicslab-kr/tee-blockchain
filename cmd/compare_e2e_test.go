@@ -1,4 +1,4 @@
-// compare, through the real CLI: deploy and register for real on anvil (a local EVM), then compare with the tb-auditor and tb-user compare binaries.
+// compare, through the real CLI: deploy and register for real on anvil (a local EVM), then compare with the att-auditor and att-user compare binaries.
 // It reuses the helpers of cmd/register_e2e_test.go (findAnvil, buildBin, writeKeyFile, deployedAtRe,
 // keyLineRe, ...) as they are: same package (cmd_test), so they are not rebuilt.
 package cmd_test

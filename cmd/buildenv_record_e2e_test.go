@@ -89,11 +89,11 @@ func pcrB64(fill byte) string {
 	return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{fill}, 48))
 }
 
-// writeRecord writes a measurement-record.json in the Go schema (tb.measurement-record/1). If buildEnvLine is empty, build_env is left out entirely.
+// writeRecord writes a measurement-record.json in the Go schema (attestamp.measurement-record/1). If buildEnvLine is empty, build_env is left out entirely.
 func writeRecord(t *testing.T, dir, name, buildEnvLine string) string {
 	t.Helper()
 	body := `{
-  "schema": "tb.measurement-record/1",
+  "schema": "attestamp.measurement-record/1",
   "service": "svc",
   "version": "1.0.0",
   "platform": "aws",
@@ -129,8 +129,8 @@ func gitBare(t *testing.T) string {
 // gitIdentity passes a name and mail through the environment so commits work on any machine (without relying on the user's git config).
 func gitIdentity(cmd *exec.Cmd) {
 	cmd.Env = append(os.Environ(),
-		"GIT_AUTHOR_NAME=tb-test", "GIT_AUTHOR_EMAIL=tb-test@example.invalid",
-		"GIT_COMMITTER_NAME=tb-test", "GIT_COMMITTER_EMAIL=tb-test@example.invalid")
+		"GIT_AUTHOR_NAME=att-test", "GIT_AUTHOR_EMAIL=att-test@example.invalid",
+		"GIT_COMMITTER_NAME=att-test", "GIT_COMMITTER_EMAIL=att-test@example.invalid")
 }
 
 // TestBuildEnv_E2E_SendRequiresBuildEnv: send --record refuses a record without build_env (naming build_env),

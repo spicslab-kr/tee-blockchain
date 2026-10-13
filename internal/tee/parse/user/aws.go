@@ -1,4 +1,4 @@
-// AWS Nitro parser. It wraps tb/internal/tee/parse/aws (the role-independent logic: CBOR decoding, certificate
+// AWS Nitro parser. It wraps att/internal/tee/parse/aws (the role-independent logic: CBOR decoding, certificate
 // chain and signature verification, PCR extraction) with user's RADoc and Measurements types. The logic is identical
 // for all three roles and lives in one place; this is a thin adapter that only converts types.
 package user
@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	shared "tb/internal/tee/parse/aws"
-	r "tb/internal/tee/request/user"
+	shared "attestamp/internal/tee/parse/aws"
+	r "attestamp/internal/tee/request/user"
 )
 
 // AWSFormat is the document format the AWS Nitro parser reads.

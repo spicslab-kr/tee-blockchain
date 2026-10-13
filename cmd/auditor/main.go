@@ -18,15 +18,15 @@ import (
 	"syscall"
 	"time"
 
-	reg "tb/internal/chain/register/auditor"
-	"tb/internal/cli"
-	tr "tb/internal/core/transfer/auditor"
-	toolchain "tb/internal/setup/build"
-	build "tb/internal/setup/build/auditor/aws"
-	launch "tb/internal/setup/launch/auditor/aws"
-	parse "tb/internal/tee/parse/auditor"
-	ra "tb/internal/tee/request/auditor"
-	awsra "tb/internal/tee/request/auditor/aws"
+	reg "attestamp/internal/chain/register/auditor"
+	"attestamp/internal/cli"
+	tr "attestamp/internal/core/transfer/auditor"
+	toolchain "attestamp/internal/setup/build"
+	build "attestamp/internal/setup/build/auditor/aws"
+	launch "attestamp/internal/setup/launch/auditor/aws"
+	parse "attestamp/internal/tee/parse/auditor"
+	ra "attestamp/internal/tee/request/auditor"
+	awsra "attestamp/internal/tee/request/auditor/aws"
 )
 
 func main() {
@@ -67,20 +67,20 @@ func main() {
 	case "launch":
 		err = launchCmd(os.Args[2:])
 	case "version":
-		fmt.Println("tb auditor ·", toolchain.ToolchainLine())
+		fmt.Println("att-auditor ·", toolchain.ToolchainLine())
 		err = toolchain.CheckToolchain()
 	default:
 		usage()
 		os.Exit(2)
 	}
 	if err != nil {
-		cli.Errorln("tb auditor: ", err)
+		cli.Errorln("att-auditor: ", err)
 		os.Exit(exitCode(err))
 	}
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `tb auditor
+	fmt.Fprintln(os.Stderr, `att-auditor
 
   version          print the pinned Go toolchain (internal/setup/build/GO_TOOLCHAIN) and the one this binary was built with;
                    exit 1 if they differ — build/pack refuse to run in that case, since the responder's bytes and the measurements depend on it
@@ -115,10 +115,10 @@ func usage() {
   send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
                    the same with a hand-written record. it must say which build environment it is for ("build_env": os,
                    arch amd64 | arm64, go, trimpath) — measurements differ per architecture and per Go toolchain
-  build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>] [--verify]
+  build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <att-ra-responder>] [--verify]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
               for source that the Auditor rebuilds
-  pack        --image <docker image you built>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
+  pack        --image <docker image you built>  [--name <n>] [--port 5000] [--out out] [--responder <att-ra-responder>]
               same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
               for an image handed over as a file
   launch      --eif <file>  [--measurements <file>] [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
@@ -177,7 +177,7 @@ func receive(args []string) error {
 		cli.Okln("build env matches the Vendor's")
 	}
 	// the config carries service, version and build_env, so audit needs none of them typed again
-	fmt.Printf("next: tb-auditor audit --config %s --tee <this-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>\n", got.Path)
+	fmt.Printf("next: att-auditor audit --config %s --tee <this-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>\n", got.Path)
 	return nil
 }
 
@@ -399,7 +399,7 @@ func buildCmd(args []string) error {
 	fs.StringVar(&b.Name, "name", "", "image and EIF name (default: the directory name)")
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
 	fs.StringVar(&b.Out, "out", "out", "output directory")
-	fs.StringVar(&b.Binary, "responder", "", "path to the responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	fs.StringVar(&b.Binary, "responder", "", "path to the responder (att-ra-responder). default: att-ra-responder next to this executable")
 	fs.BoolVar(&b.Verify, "verify", false, "build the Dockerfile a second time without cache and fail unless PCR0·1·2 come out the same, listing the files that differed")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -412,7 +412,7 @@ func buildCmd(args []string) error {
 		return err
 	}
 	cli.Okln("\n✓ enclave image ready: ", built.EIF, "   measurements: ", built.Measurements)
-	fmt.Printf("next:  tb auditor launch --eif %s --port %d\n", built.EIF, b.Port)
+	fmt.Printf("next:  att-auditor launch --eif %s --port %d\n", built.EIF, b.Port)
 	return nil
 }
 
@@ -423,7 +423,7 @@ func packCmd(args []string) error {
 	fs.StringVar(&b.Name, "name", "", "EIF name (default: the image name without its tag)")
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
 	fs.StringVar(&b.Out, "out", "out", "output directory")
-	fs.StringVar(&b.Binary, "responder", "", "path to the responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	fs.StringVar(&b.Binary, "responder", "", "path to the responder (att-ra-responder). default: att-ra-responder next to this executable")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -435,7 +435,7 @@ func packCmd(args []string) error {
 		return err
 	}
 	cli.Okln("\n✓ enclave image ready: ", built.EIF, "   measurements: ", built.Measurements)
-	fmt.Printf("next:  tb auditor launch --eif %s --port %d\n", built.EIF, b.Port)
+	fmt.Printf("next:  att-auditor launch --eif %s --port %d\n", built.EIF, b.Port)
 	return nil
 }
 
@@ -486,7 +486,7 @@ func launchCmd(args []string) error {
 	fmt.Printf("Security group: inbound TCP %d\n", l.Port)
 	cmd, group, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
 	if perr == nil {
-		cli.Okln("✓ enclave is up and reachable. anyone can now:  tb user verify --tee <this instance's public IP>:", l.Port, " --rpc … --contract …")
+		cli.Okln("✓ enclave is up and reachable. anyone can now:  att-user verify --tee <this instance's public IP>:", l.Port, " --rpc … --contract …")
 		return nil
 	}
 	// Could not open it here: say what to open, where and how. The permission-denied case and
@@ -503,7 +503,7 @@ Inbound TCP %d must be open on this instance's security group so the Auditor and
 %s
   %s
 or open it in the console: EC2 → Security Groups → %s → Inbound rules → Custom TCP %d, source 0.0.0.0/0.
-Then anyone can:  tb user ra-request --tee <this instance's public IP>:%d --format aws-nitro
+Then anyone can:  att-user ra-request --tee <this instance's public IP>:%d --format aws-nitro
 `, l.Port, why, cmd, group, l.Port, l.Port)
 	return nil
 }

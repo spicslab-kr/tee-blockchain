@@ -15,10 +15,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 
-	l "tb/internal/chain/lookup/Vendor"
-	reg "tb/internal/chain/register/Vendor"
-	regether "tb/internal/chain/register/Vendor/ether"
-	p "tb/internal/tee/parse/Vendor"
+	l "attestamp/internal/chain/lookup/Vendor"
+	reg "attestamp/internal/chain/register/Vendor"
+	regether "attestamp/internal/chain/register/Vendor/ether"
+	p "attestamp/internal/tee/parse/Vendor"
 )
 
 func newKey(t *testing.T) ([]byte, common.Address) {

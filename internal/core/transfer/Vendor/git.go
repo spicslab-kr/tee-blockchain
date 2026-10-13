@@ -32,7 +32,7 @@ func (g GitTransport) Send(ctx context.Context, cfg BuildConfig, repo string) (S
 	}
 	dir := g.WorkDir
 	if dir == "" {
-		tmp, err := os.MkdirTemp("", "tb-vendor-send-*")
+		tmp, err := os.MkdirTemp("", "att-vendor-send-*")
 		if err != nil {
 			return SendResult{}, err
 		}
@@ -63,7 +63,7 @@ func (g GitTransport) Send(ctx context.Context, cfg BuildConfig, repo string) (S
 	if err := writeAtomic(path, b); err != nil {
 		return SendResult{}, err
 	}
-	sha, err := commitAndPush(ctx, dir, "tb: build-config for "+cfg.Service+" "+cfg.Version, BuildConfigFile)
+	sha, err := commitAndPush(ctx, dir, "att: build-config for "+cfg.Service+" "+cfg.Version, BuildConfigFile)
 	if err != nil {
 		return SendResult{}, err
 	}

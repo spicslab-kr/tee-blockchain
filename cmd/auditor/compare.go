@@ -10,9 +10,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	lether "tb/internal/chain/lookup/auditor/ether"
-	"tb/internal/cli"
-	cmp "tb/internal/core/compare/auditor"
+	lether "attestamp/internal/chain/lookup/auditor/ether"
+	"attestamp/internal/cli"
+	cmp "attestamp/internal/core/compare/auditor"
 )
 
 // compareCmd: with --b, compares two sets of measurements directly (Compare). With --key, reads the

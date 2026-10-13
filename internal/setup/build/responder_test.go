@@ -57,7 +57,7 @@ func TestCheckResponder_Rules(t *testing.T) {
 
 func TestResponderInfo_String(t *testing.T) {
 	i := ResponderInfo{Go: "go1.26.1", GOOS: "linux", GOARCH: "amd64", Trimpath: true, SHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
-	if got, want := i.String(), "responder: tb-ra-responder sha256 0123456789abcdef · go1.26.1 linux/amd64 -trimpath"; got != want {
+	if got, want := i.String(), "responder: att-ra-responder sha256 0123456789abcdef · go1.26.1 linux/amd64 -trimpath"; got != want {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
 	i.Trimpath = false
@@ -67,12 +67,12 @@ func TestResponderInfo_String(t *testing.T) {
 }
 
 func TestReadResponder_NotAGoBinary(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "tb-ra-responder")
+	p := filepath.Join(t.TempDir(), "att-ra-responder")
 	if err := os.WriteFile(p, []byte("#!/bin/sh\necho not a go binary\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	_, err := ReadResponder(p)
-	if err == nil || !strings.Contains(err.Error(), "has no Go build info; is it really tb-ra-responder built from ./cmd/ra-responder?") {
+	if err == nil || !strings.Contains(err.Error(), "has no Go build info; is it really att-ra-responder built from ./cmd/ra-responder?") {
 		t.Fatalf("expected the no-build-info error, got: %v", err)
 	}
 	if _, err := ReadResponder(filepath.Join(t.TempDir(), "missing")); err == nil || !os.IsNotExist(err) {

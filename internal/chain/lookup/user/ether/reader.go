@@ -16,9 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"golang.org/x/crypto/sha3"
 
-	l "tb/internal/chain/lookup/user"
-	regether "tb/internal/chain/register/auditor/ether"
-	p "tb/internal/tee/parse/user"
+	l "attestamp/internal/chain/lookup/user"
+	regether "attestamp/internal/chain/register/auditor/ether"
+	p "attestamp/internal/tee/parse/user"
 )
 
 // DefaultPlatform is the only measurement format supported for now.

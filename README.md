@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/img/logo.svg" alt="Teestamp logo" width="160">
+  <img src="docs/img/logo.svg" alt="Attestamp logo" width="160">
 </p>
 
-<h1 align="center">Teestamp</h1>
+<h1 align="center">Attestamp</h1>
 
 <p align="center"><b>Remote attestation you can check against a public ledger.</b></p>
 
@@ -41,14 +41,14 @@ Download the Linux binaries for your architecture (`amd64` or `arm64`) from the
 and `SHA256SUMS` covers every file. Or build from source:
 
 ```
-go build -trimpath -o tb-vendor       ./cmd/vendor
-go build -trimpath -o tb-auditor      ./cmd/auditor
-go build -trimpath -o tb-user         ./cmd/user
-go build -trimpath -o tb-ra-responder ./cmd/ra-responder
+go build -trimpath -o att-vendor       ./cmd/vendor
+go build -trimpath -o att-auditor      ./cmd/auditor
+go build -trimpath -o att-user         ./cmd/user
+go build -trimpath -o att-ra-responder ./cmd/ra-responder
 ```
 
 The toolchain is pinned to exactly go1.26.1. `build` refuses any other version, because a
-different patch version produces a different `tb-ra-responder` and therefore different
+different patch version produces a different `att-ra-responder` and therefore different
 measurements. Details: [Build the binaries](cmd/README.md#build-the-binaries).
 
 ## Quick start
@@ -56,7 +56,7 @@ measurements. Details: [Build the binaries](cmd/README.md#build-the-binaries).
 As a **User**, with an enclave address and a registry contract address. No keys, no ETH, no Nitro:
 
 ```
-tb-user verify --tee <vendor-public-ip>:5000 --rpc <ethereum rpc url> --contract <0x…>
+att-user verify --tee <vendor-public-ip>:5000 --rpc <ethereum rpc url> --contract <0x…>
 ```
 
 Exit 0 and a line like `✓ matches  nginx 1.31.6 (amd64) by 0x…, expires …` means a registration
@@ -66,18 +66,18 @@ Ethereum mainnet: about 3 s and 21 MB peak.
 As a **Vendor**, on a Nitro instance, with the directory that holds your Dockerfile:
 
 ```
-tb-vendor build  --app-dir <dir> --out out      # reproducible enclave image + measurements
-tb-vendor launch --eif out/<name>.eif           # run it, open the attestation port
-tb-vendor send   --repo <git url> --config build-config.json
+att-vendor build  --app-dir <dir> --out out      # reproducible enclave image + measurements
+att-vendor launch --eif out/<name>.eif           # run it, open the attestation port
+att-vendor send   --repo <git url> --config build-config.json
 ```
 
 As an **Auditor**, on a Nitro instance, with the Vendor's repository:
 
 ```
-tb-auditor receive --repo <git url> --into work/src
-tb-auditor build   --app-dir work/src/<path> --out out
-tb-auditor launch  --eif out/<name>.eif
-tb-auditor audit   --config work/src/build-config.json --tee <my-instance>:5000 \
+att-auditor receive --repo <git url> --into work/src
+att-auditor build   --app-dir work/src/<path> --out out
+att-auditor launch  --eif out/<name>.eif
+att-auditor audit   --config work/src/build-config.json --tee <my-instance>:5000 \
                    --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
 ```
 
@@ -89,9 +89,9 @@ tb-auditor audit   --config work/src/build-config.json --tee <my-instance>:5000 
 
 ### Three roles, four binaries
 
-- **One binary per role.** `tb-vendor`, `tb-auditor` and `tb-user` each contain only their own
+- **One binary per role.** `att-vendor`, `att-auditor` and `att-user` each contain only their own
   role's commands. The User's binary has no `register` at all.
-- **A shared in-enclave responder.** `tb-ra-responder` answers attestation requests inside the
+- **A shared in-enclave responder.** `att-ra-responder` answers attestation requests inside the
   enclave. `build` layers it into the image.
 - **Two flows.** Flow 1: the Auditor rebuilds and registers, and the User trusts only what the
   Auditor signed. Flow 2: a Vendor without an Auditor registers to its own registry, and the User

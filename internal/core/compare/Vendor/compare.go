@@ -10,11 +10,11 @@ package vendor
 import (
 	"time"
 
-	"tb/internal/core/compare"
+	"attestamp/internal/core/compare"
 
-	l "tb/internal/chain/lookup/Vendor"
-	reg "tb/internal/chain/register/Vendor"
-	p "tb/internal/tee/parse/Vendor"
+	l "attestamp/internal/chain/lookup/Vendor"
+	reg "attestamp/internal/chain/register/Vendor"
+	p "attestamp/internal/tee/parse/Vendor"
 )
 
 type Verdict = compare.Verdict

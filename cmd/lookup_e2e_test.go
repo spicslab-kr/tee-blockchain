@@ -1,4 +1,4 @@
-// lookup, through the real CLI: deploy and register for real on anvil (a local EVM), then query with the tb-auditor and tb-user lookup binaries.
+// lookup, through the real CLI: deploy and register for real on anvil (a local EVM), then query with the att-auditor and att-user lookup binaries.
 // It reuses the deploy and anvil helpers of cmd/register_e2e_test.go (findAnvil, buildBin, writeKeyFile, ...) as they
 // are: same package (cmd_test), so they are not rebuilt.
 package cmd_test

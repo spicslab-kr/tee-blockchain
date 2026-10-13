@@ -16,10 +16,10 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"tb/internal/core/compare"
+	"attestamp/internal/core/compare"
 
-	l "tb/internal/chain/lookup/user"
-	p "tb/internal/tee/parse/user"
+	l "attestamp/internal/chain/lookup/user"
+	p "attestamp/internal/tee/parse/user"
 )
 
 type Verdict = compare.Verdict

@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # Exactly this version - any other one (lower or higher) breaks the reproducible-build values, so it is forced back here.
-# The version is not written here: the file internal/setup/build/GO_TOOLCHAIN is the only source (the tb binary
+# The version is not written here: the file internal/setup/build/GO_TOOLCHAIN is the only source (the att binary
 # also embeds that file and checks it at build time). To change it, edit only that file.
 here="$(cd "$(dirname "$0")" && pwd)"
 GO_VERSION="$(sed 's/^go//' "$here/../internal/setup/build/GO_TOOLCHAIN" | tr -d '[:space:]')"

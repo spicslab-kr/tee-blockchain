@@ -1,4 +1,4 @@
-// register, through the real CLI: build the tb-auditor and tb-vendor binaries, run them with exec, and send registry-deploy and register
+// register, through the real CLI: build the att-auditor and att-vendor binaries, run them with exec, and send registry-deploy and register
 // over real RPC to anvil (a local EVM). internal/chain/register/ether_test.go calls the simulated backend directly
 // through the Go bindings, but the register command attaches to a real JSON-RPC endpoint with --rpc, so that cannot cover the CLI wiring.
 // Skipped if anvil is not on PATH.

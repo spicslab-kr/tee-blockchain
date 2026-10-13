@@ -8,8 +8,8 @@ cd "$here/../.."
 . "$here/../env.sh"
 need_host VENDOR_HOST
 CONTRACT=$(cat e2e-work/contract-flow2.txt)
-# tb command - confirm the value by RA, look up the registration on the chain, compare, decide whether to trust.
-step "VERIFYING" "$TBU" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
+# att command - confirm the value by RA, look up the registration on the chain, compare, decide whether to trust.
+step "VERIFYING" "$USER_BIN" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = nothing registered or nothing matches)"
 exit $rc

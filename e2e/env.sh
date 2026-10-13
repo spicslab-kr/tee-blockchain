@@ -33,11 +33,11 @@ SERVICE=nginx
 VERSION=1.31.6
 
 # Binaries for your own machine are built here (0-Setup-local-upload.sh). Kept in a separate folder so they do not
-# collide with the Linux tb-vendor/tb-auditor binaries
+# collide with the Linux att-vendor/att-auditor binaries
 BIN=e2e-work/bin
 WORK=e2e-work
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE=.exe;; *) EXE="";; esac   # also works in Git Bash
-TBV="$BIN/tb-vendor$EXE"; TBA="$BIN/tb-auditor$EXE"; TBU="$BIN/tb-user$EXE"
+VENDOR_BIN="$BIN/att-vendor$EXE"; AUDITOR_BIN="$BIN/att-auditor$EXE"; USER_BIN="$BIN/att-user$EXE"
 
 SSH="ssh -i $PEM -o StrictHostKeyChecking=no"
 SCP="scp -q -i $PEM -o StrictHostKeyChecking=no"
@@ -47,7 +47,7 @@ R() { need_host ARM64_HOST; $SSH "$SSH_USER@$ARM64_HOST" "$@"; }   # arm64 compa
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
 # step - print a one-line green banner saying what is being done, then do it. step_start/step_stop are for when the
 # same banner must be printed separately at the start and end (several other commands in between); for now both
-# just print once, with no animation. tb commands usually print their own progress, and animating dots here would
+# just print once, with no animation. att commands usually print their own progress, and animating dots here would
 # collide with that output.
 step_start() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; }
 step_stop() { :; }

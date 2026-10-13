@@ -12,9 +12,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	lether "tb/internal/chain/lookup/Vendor/ether"
-	"tb/internal/cli"
-	cmp "tb/internal/core/compare/Vendor"
+	lether "attestamp/internal/chain/lookup/Vendor/ether"
+	"attestamp/internal/cli"
+	cmp "attestamp/internal/core/compare/Vendor"
 )
 
 // selfRegisterCmd: the Vendor registers its own enclave directly, without an Auditor: request an attestation document from its own TEE and verify it,
@@ -79,7 +79,7 @@ func selfRegisterCmd(args []string) error {
 	if *tee != "" {
 		dir := *out
 		if dir == "" {
-			tmp, err := os.MkdirTemp("", "tb-vendor-self-register-*")
+			tmp, err := os.MkdirTemp("", "att-vendor-self-register-*")
 			if err != nil {
 				return err
 			}

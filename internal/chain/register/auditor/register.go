@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	l "tb/internal/chain/lookup/auditor"
-	p "tb/internal/tee/parse/auditor"
+	l "attestamp/internal/chain/lookup/auditor"
+	p "attestamp/internal/tee/parse/auditor"
 
 	"golang.org/x/crypto/sha3"
 )

@@ -7,7 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	"tb/internal/tee/request/auditor"
+	"attestamp/internal/tee/request/auditor"
 )
 
 func TestNSM_RequestEncoding(t *testing.T) {

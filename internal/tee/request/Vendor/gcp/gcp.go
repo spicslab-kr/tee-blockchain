@@ -10,7 +10,7 @@ import (
 	"net"
 	"net/http"
 
-	"tb/internal/tee/request/Vendor"
+	"attestamp/internal/tee/request/Vendor"
 )
 
 const Format = "gcp-cs-jwt"
@@ -18,7 +18,7 @@ const Format = "gcp-cs-jwt"
 // Extractor asks the Confidential Space launcher socket for a token. The JWT that comes back is the RA document.
 type Extractor struct {
 	Socket   string // default /run/container_launcher/teeserver.sock
-	Audience string // default tb
+	Audience string // default att
 	// If Client is set it is used instead of Socket (for tests)
 	Client *http.Client
 }
@@ -39,7 +39,7 @@ func (e Extractor) Extract(ctx context.Context, nonce vendor.Nonce) (vendor.RADo
 	}
 	aud := e.Audience
 	if aud == "" {
-		aud = "tb"
+		aud = "att"
 	}
 	body, _ := json.Marshal(tokenRequest{Audience: aud, Nonces: []string{base64.StdEncoding.EncodeToString(nonce)}, TokenType: "OIDC"})
 	client := e.Client
