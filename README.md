@@ -8,8 +8,9 @@
 
 <p align="center">
   <sub>CREATED AND MAINTAINED BY</sub><br>
-  <a href="https://github.com/spicslab-kr"><b>SPICS Lab</b></a>, <a href="https://www.khu.ac.kr">Kyung Hee University</a><br>
-  <a href="https://github.com/spicslab-kr/tee-blockchain/issues">GitHub issues</a>
+  <b>SPICS Lab</b>, Kyung Hee University<br>
+  <a href="https://github.com/spicslab-kr/tee-blockchain/issues">GitHub issues</a> &nbsp;·&nbsp;
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 Software runs in a TEE (AWS Nitro Enclaves today). An independent Auditor rebuilds it, confirms the
