@@ -6,6 +6,12 @@
 
 <p align="center"><b>Remote attestation you can check against a public ledger.</b></p>
 
+<p align="center">
+  <sub>CREATED AND MAINTAINED BY</sub><br>
+  <a href="https://github.com/spicslab-kr"><b>SPICS Lab</b></a>, <a href="https://www.khu.ac.kr">Kyung Hee University</a><br>
+  <a href="https://github.com/spicslab-kr/tee-blockchain/issues">GitHub issues</a>
+</p>
+
 Software runs in a TEE (AWS Nitro Enclaves today). An independent Auditor rebuilds it, confirms the
 enclave really runs those bytes, and registers the measurement on an Ethereum-compatible chain.
 Anyone can then ask the enclave to attest itself and compare the answer with what is on-chain,
