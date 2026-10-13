@@ -1,19 +1,27 @@
-# tee-blockchain
+<h1 align="center">tee-blockchain</h1>
 
-**Remote attestation you can check against a public ledger.**
+<p align="center"><b>Remote attestation you can check against a public ledger.</b></p>
 
 Software runs in a TEE (AWS Nitro Enclaves today). An independent Auditor rebuilds it, confirms the
 enclave really runs those bytes, and registers the measurement on an Ethereum-compatible chain.
 Anyone can then ask the enclave to attest itself and compare the answer with what is on-chain,
 without a key from anyone.
 
-![Three roles and the registry](docs/img/roles.svg)
+<p align="center">
+  <img src="https://img.shields.io/badge/go-1.26.1%20pinned-00ADD8?logo=go&logoColor=white" alt="Go 1.26.1 pinned">
+  <img src="https://img.shields.io/badge/TEE-AWS%20Nitro%20Enclaves-FF9900?logo=amazonaws&logoColor=white" alt="TEE AWS Nitro Enclaves">
+  <img src="https://img.shields.io/badge/chain-Ethereum%20%C2%B7%20Solidity-3C3C3D?logo=ethereum&logoColor=white" alt="Chain Ethereum and Solidity">
+</p>
 
-![Go 1.26.1 pinned](https://img.shields.io/badge/go-1.26.1%20pinned-00ADD8?logo=go&logoColor=white)
-![TEE AWS Nitro Enclaves](https://img.shields.io/badge/TEE-AWS%20Nitro%20Enclaves-FF9900?logo=amazonaws&logoColor=white)
-![Chain Ethereum / Solidity](https://img.shields.io/badge/chain-Ethereum%20%C2%B7%20Solidity-3C3C3D?logo=ethereum&logoColor=white)
+<p align="center">
+  <a href="#install">Install</a> &nbsp;·&nbsp;
+  <a href="#quick-start">Quick start</a> &nbsp;·&nbsp;
+  <a href="#features">Features</a> &nbsp;·&nbsp;
+  <a href="#project-resources">Project resources</a> &nbsp;·&nbsp;
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
-[Install](#install) · [Quick start](#quick-start) · [Features](#features) · [Project resources](#project-resources) · [Contributing](CONTRIBUTING.md)
+---
 
 ## Install
 
@@ -63,6 +71,10 @@ tb-auditor audit   --config work/src/build-config.json --tee <my-instance>:5000 
 ```
 
 ## Features
+
+<p align="center">
+  <img src="docs/img/roles.svg" alt="Three roles and the registry">
+</p>
 
 ### Three roles, four binaries
 
