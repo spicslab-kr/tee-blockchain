@@ -42,7 +42,7 @@ Files the `e2e/` scripts fetch from instances land in `e2e-work/`, which is igno
 | `internal/setup` | `build` (image → EIF, normalized layers) and `launch` (enclave + vsock bridge) |
 | `internal/chain` | `register` and `lookup` against `Registry.sol` |
 | `internal/core` | `compare` (the trust decision) and `transfer` (hand-off records) |
-| `contracts/evm` | the Registry contract; OpenZeppelin as a submodule |
+| `contracts/evm` | the Registry contract (`Registry.sol`); OpenZeppelin as a submodule |
 
 Role-specific code sits in a sub-package named after the role (`.../Vendor`, `.../auditor`,
 `.../user`). Keep it that way so a role's binary cannot link another role's commands.

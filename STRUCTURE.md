@@ -31,10 +31,10 @@ This page lists every folder in the repository, then explains the one idea that 
 │   │   ├── build/          reproducible image build, reproducibility scan, toolchain and responder checks
 │   │   └── launch/         start the enclave, bridge the port, measure it
 │   ├── chain/              the Ethereum side: register and look up measurements
-│   │   ├── register/       sign a measurement (EIP-712) and write it to the registry contract
+│   │   ├── register/       sign a measurement (EIP-712) and write it to the registry
 │   │   └── lookup/         read registrations back (read only)
 │   ├── core/               logic that is about measurements, not about a platform or a chain
-│   │   ├── compare/        compare values and judge a registration (match, expiry, signer)
+│   │   ├── compare/        compare values and judge a registration (match, expiry, approver)
 │   │   └── transfer/       the build-config and measurement-record files that travel between Vendor and Auditor
 │   └── cli/                the few things every command line shares (colour, progress lines)
 │
@@ -190,7 +190,7 @@ Verified with `go list -deps` on each `cmd/*` package.
 | `core/transfer/<role>` | Build-config and measurement-record exchange, over git or files | yes | yes | no | no |
 | `chain/register/<role>` and `/ether` | Sign and register a measurement; deploy the registry | yes | yes | no | no |
 | `chain/lookup/<role>` and `/ether` | Read registrations | yes | yes | yes | no |
-| `core/compare` (shared) and `core/compare/<role>` | Compare values, judge expiry and signer | yes | yes | yes | no |
+| `core/compare` (shared) and `core/compare/<role>` | Compare values, judge expiry and approver | yes | yes | yes | no |
 | `cli` | Colour and progress output | yes | yes | yes | yes |
 
 Two details the table hides:

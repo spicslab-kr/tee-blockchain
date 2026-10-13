@@ -65,7 +65,7 @@ step_start "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
 git -C src/docker-nginx checkout -q $SRC_COMMIT
 fix_modes src/docker-nginx
 step_stop "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
-step "BUILDING ($label)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out out
+step "BUILDING ($label)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out-dir out
 cat out/measurements.json
 REMOTE
   localBanner

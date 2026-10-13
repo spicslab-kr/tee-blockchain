@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Build-environment record check. The same source gives different PCRs on x86_64 and arm64 (measured), and a different Go
 #    toolchain changes them too, so this checks that the registration and the handoff record (measurement-record.json) say
-#    which architecture and toolchain they came from (build_env). The on-chain Entry is unchanged - the measurement hash
+#    which architecture and toolchain they came from (build_env). The on-chain registration is unchanged - the measurement hash
 #    already differs per architecture, so the keys separate by themselves. Only three things are checked, and no
 #    transaction is sent:
 #      1. the uname -m -> GOARCH mapping used by the flow scripts comes out right on the real instances (x86 Vendor -> amd64, arm64 host -> arm64)
 #      2. att-auditor send refuses a record without build_env, and for a record with it prints the build environment on one
 #         line and really sends it (to a local bare repository), and also builds the record itself from --config
 #         (build-config.json) + --measurements (measurements.json) without --record
-#      3. att-auditor register refuses the uname spelling (x86_64) - the refusal happens before reading the key or touching the chain
+#      3. att-auditor register refuses the uname spelling (x86_64) - the refusal happens before reading the signing key or touching the chain
 #    That register --arch arm64 really registers is a chain transaction and is not checked here (cmd/buildenv_record_e2e_test.go checks it with anvil).
 #
 #    Needs: ARM64_HOST in e2e/env.local.sh to check item 1 on the arm64 side too. If empty, only x86 is checked and a notice is printed.
@@ -57,7 +57,7 @@ write_record() {  # <path> <build_env-line or empty>
   "schema": "attestamp.measurement-record/1",
   "service": "$SERVICE",
   "version": "$VERSION",
-  "platform": "aws",
+  "platform": "aws-nitro",
 ${2}  "image": { "path": "svc.eif" },
   "values": [
     { "name": "PCR0", "value": "$(pcr_b64 1)" },
@@ -71,7 +71,7 @@ EOF
 export GIT_AUTHOR_NAME=att-e2e GIT_AUTHOR_EMAIL=att-e2e@example.invalid GIT_COMMITTER_NAME=att-e2e GIT_COMMITTER_EMAIL=att-e2e@example.invalid
 write_record "$WD/no-build-env.json" ""
 git init --quiet --bare --initial-branch=main "$WD/remote-a.git"
-out=$("$AUDITOR_BIN" send --repo "$WD/remote-a.git" --record "$WD/no-build-env.json" --image "$WD/svc.eif" 2>&1); rc=$?
+out=$("$AUDITOR_BIN" send --repo "$WD/remote-a.git" --record "$WD/no-build-env.json" --eif "$WD/svc.eif" 2>&1); rc=$?
 echo "$out" | sed 's/^/  /'
 if [ $rc -ne 0 ] && echo "$out" | grep -q 'build_env.arch: want one of amd64|arm64' && echo "$out" | grep -q 'build_env.go'; then
   echo "✅ send: a record without build_env is refused - the message names build_env (exit $rc)"
@@ -84,7 +84,7 @@ step "SEND: RECORD WITH BUILD_ENV IS SENT, BUILD ENV PRINTED"
 write_record "$WD/with-build-env.json" '  "build_env": { "os": "linux", "arch": "amd64", "go": "'"$GOVER"'", "trimpath": true },
 '
 git init --quiet --bare --initial-branch=main "$WD/remote-b.git"
-out=$("$AUDITOR_BIN" send --repo "$WD/remote-b.git" --record "$WD/with-build-env.json" --image "$WD/svc.eif" 2>&1); rc=$?
+out=$("$AUDITOR_BIN" send --repo "$WD/remote-b.git" --record "$WD/with-build-env.json" --eif "$WD/svc.eif" 2>&1); rc=$?
 echo "$out" | sed 's/^/  /'
 if [ $rc -eq 0 ] && echo "$out" | grep -q "build env: linux/amd64 $GOVER trimpath=true" && git -C "$WD/remote-b.git" show HEAD:measurement-record.json 2>/dev/null | grep -q '"build_env"'; then
   echo "✅ send: printed build env: linux/amd64 $GOVER trimpath=true, and the pushed measurement-record.json carries build_env"
@@ -102,7 +102,7 @@ cat > "$WD/build-config.json" <<EOF
   "schema": "attestamp.build-config/1",
   "service": "$SERVICE",
   "version": "$VERSION",
-  "platform": "aws",
+  "platform": "aws-nitro",
   "source": { "repo": "https://github.com/qixiangme/docker-nginx", "commit": "ef5a25a6314e652a2dcfbce6074bef729f4d9639", "path": "mainline/alpine-slim" },
   "tee_info": { "instance_id": "i-0check", "region": "eu-north-1", "ami_id": "ami-0check" },
   "build_env": { "os": "linux", "arch": "arm64", "go": "$GOVER", "trimpath": true }
@@ -112,10 +112,10 @@ cat > "$WD/measurements.json" <<EOF
 { "Measurements": { "HashAlgorithm": "Sha384 { ... }", "PCR0": "$(pcr_hex 1)", "PCR1": "$(pcr_hex 2)", "PCR2": "$(pcr_hex 3)" } }
 EOF
 git init --quiet --bare --initial-branch=main "$WD/remote-c.git"
-out=$("$AUDITOR_BIN" send --repo "$WD/remote-c.git" --config "$WD/build-config.json" --measurements "$WD/measurements.json" --image "$WD/svc.eif" --build-tool-version 1.3.0 2>&1); rc=$?
+out=$("$AUDITOR_BIN" send --repo "$WD/remote-c.git" --config "$WD/build-config.json" --measurements "$WD/measurements.json" --eif "$WD/svc.eif" --build-tool-version 1.3.0 2>&1); rc=$?
 echo "$out" | sed 's/^/  /'
 pushed=$(git -C "$WD/remote-c.git" show HEAD:measurement-record.json 2>/dev/null)
-if [ $rc -eq 0 ] && echo "$out" | grep -q "record $SERVICE $VERSION aws · build env: linux/arm64 $GOVER trimpath=true" \
+if [ $rc -eq 0 ] && echo "$out" | grep -q "record $SERVICE $VERSION aws-nitro · build env: linux/arm64 $GOVER trimpath=true" \
    && echo "$pushed" | grep -q "\"service\": \"$SERVICE\"" && echo "$pushed" | grep -q '"arch": "arm64"' && echo "$pushed" | grep -q "\"go\": \"$GOVER\"" \
    && [ -f "$WD/measurement-record.json" ]; then
   echo "✅ send --config --measurements: built and sent the record; the pushed record's service and build_env are exactly those of build-config.json (measurement-record.json is also left next to measurements.json)"
@@ -124,10 +124,10 @@ else
   fail=1
 fi
 
-# 3. register - the uname spelling is refused. All required flags are given, but the --arch check runs before the key file is read or the chain is touched, so nothing is contacted.
+# 3. register - the uname spelling is refused. All required flags are given, but the --arch check runs before the signing key file is read or the chain is touched, so nothing is contacted.
 step "REGISTER: --arch x86_64 IS REFUSED BEFORE TOUCHING THE CHAIN"
 pcr_hex() { head -c 48 /dev/zero | tr '\0' "$1" | od -An -v -tx1 | tr -d ' \n'; }
-out=$("$AUDITOR_BIN" register --rpc http://127.0.0.1:1 --contract 0x0000000000000000000000000000000000000001 --key-file "$WD/no-such.key" \
+out=$("$AUDITOR_BIN" register --rpc http://127.0.0.1:1 --registry 0x0000000000000000000000000000000000000001 --signing-key-file "$WD/no-such.key" \
   --measurements "PCR0=$(pcr_hex 1),PCR1=$(pcr_hex 2),PCR2=$(pcr_hex 3)" --service "$SERVICE" --version "$VERSION" --arch x86_64 2>&1); rc=$?
 echo "$out" | sed 's/^/  /'
 if [ $rc -ne 0 ] && echo "$out" | grep -q -- '--arch: want one of amd64|arm64'; then

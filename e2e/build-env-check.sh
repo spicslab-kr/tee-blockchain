@@ -62,7 +62,7 @@ push_cfg() {
   "schema": "attestamp.build-config/1",
   "service": "svc",
   "version": "1.2.0",
-  "platform": "aws",
+  "platform": "aws-nitro",
   "source": { "repo": "https://example.com/svc.git", "commit": "\$seed" },
   "tee_info": { "instance_id": "i-0abc", "region": "eu-north-1", "ami_id": "ami-0123" },
   "build_env": { "os": "linux", "arch": "\$1", "go": "$GOVER", "trimpath": \$2 }

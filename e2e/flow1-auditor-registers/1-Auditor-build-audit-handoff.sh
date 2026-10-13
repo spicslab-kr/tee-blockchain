@@ -3,9 +3,9 @@
 #    it on the chain, and hands the image and the record to the Vendor. Run here, on my machine - only the build runs inside
 #    the Auditor instance, connected to automatically.
 #    Run: bash "e2e/flow1-auditor-registers/1-Auditor-build-audit-handoff.sh" [-c 0xCONTRACT] [-v] [0xKEY]
-#      -c  register in an existing registry (the contract address is kept in e2e-work/contract.txt)
+#      -c  register in an existing registry (the registry address is kept in e2e-work/registry.txt)
 #      -v  during audit, also query the Vendor enclave (to catch a Vendor running a different image)
-#      0xKEY  the registration key the handoff uses. If omitted, it is looked up on the chain by measurement
+#      0xRECORD_KEY  the record key the handoff uses. If omitted, it is looked up on the chain by measurement
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
@@ -53,7 +53,7 @@ else
   "schema": "attestamp.build-config/1",
   "service": "$SERVICE",
   "version": "$VERSION",
-  "platform": "aws",
+  "platform": "aws-nitro",
   "source": { "repo": "$SRC_REPO", "commit": "$SRC_COMMIT", "path": "$SRC_DIR" },
   "tee_info": { "instance_id": "$(md instance-id)", "region": "$(md placement/region)", "ami_id": "$(md ami-id)" },
   "build_env": { "os": "linux", "arch": "$GOARCH", "go": "$GOVER", "trimpath": true }
@@ -64,7 +64,7 @@ cat src/docker-nginx/build-config.json
 step_stop "WRITING BUILD CONFIG"
 
 # att command - builds the source with docker into the enclave image (EIF) and the measurements (PCR0/1/2).
-step "BUILDING SOURCE" ./att-auditor build --app-dir src/docker-nginx/$SRC_DIR --out out
+step "BUILDING SOURCE" ./att-auditor build --app-dir src/docker-nginx/$SRC_DIR --out-dir out
 
 # att command - actually launches that image in my TEE.
 step "LAUNCHING ENCLAVE" ./att-auditor launch --eif out/alpine-slim.eif
@@ -77,10 +77,10 @@ rc=$?
 localBanner
 
 # Parse options
-CONTRACT=""; CHECK_VENDOR=""
-while getopts "c:v" o; do case $o in c) CONTRACT=$OPTARG;; v) CHECK_VENDOR=1;; esac; done
+REGISTRY=""; CHECK_VENDOR=""
+while getopts "c:v" o; do case $o in c) REGISTRY=$OPTARG;; v) CHECK_VENDOR=1;; esac; done
 shift $((OPTIND - 1))
-KEY=${1:-}
+RECORD_KEY=${1:-}
 
 # Fetch the measurements file just made on the Auditor instance and the build-config.json from the clone root to my machine.
 #   audit reads service, version and arch from build-config.json (values the Vendor already handed over are not typed again).
@@ -95,38 +95,38 @@ step_stop "FETCHING BUILD VALUE"
 echo "Auditor's own value (arch: $ARCH):"; cat "$WORK/auditor-measured.json"
 echo "build config:"; cat "$WORK/auditor-build-config.json"
 
-if [ -z "$CONTRACT" ]; then
-  # att command - deploys a new registry (registry contract) on the chain.
+if [ -z "$REGISTRY" ]; then
+  # att command - deploys a new registry (the Registry contract) on the chain.
   step_start "DEPLOYING REGISTRY"
-  out=$("$AUDITOR_BIN" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$AUDITOR_ADDR" 2>&1)
+  out=$("$AUDITOR_BIN" registry-deploy --rpc "$RPC" --deployer-key-file "$DEPLOYER_KEY" --approver "$AUDITOR_ADDR" 2>&1)
   step_stop "DEPLOYING REGISTRY"
   echo "$out"
-  CONTRACT=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # extract just the address from the output line
-  [ -n "$CONTRACT" ] || { echo "no contract address in registry-deploy output"; exit 1; }
+  REGISTRY=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # extract just the address from the output line
+  [ -n "$REGISTRY" ] || { echo "no registry address in registry-deploy output"; exit 1; }
 fi
-echo "$CONTRACT" > "$WORK/contract.txt"  # save it in the file the next step reads
+echo "$REGISTRY" > "$WORK/registry.txt"  # save it in the file the next step reads
 
 # att command - sends an RA request to my TEE, compares the value received with the build value made above, and registers
 #   on the chain only if they match. service, version and arch come from the --config build-config.json - a different value
 #   given as a flag wins, but a warning is printed.
 extra=(); [ -n "$CHECK_VENDOR" ] && extra=(--vendor-tee "$VENDOR_HOST:5000")
-step "AUDITING" "$AUDITOR_BIN" audit --config "$WORK/auditor-build-config.json" --tee "$AUDITOR_HOST:5000" --measurements "$WORK/auditor-measured.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$AUDITOR_KEY" "${extra[@]}"
+step "AUDITING" "$AUDITOR_BIN" audit --config "$WORK/auditor-build-config.json" --tee-addr "$AUDITOR_HOST:5000" --build-measurements "$WORK/auditor-measured.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$AUDITOR_SIGNING_KEY" "${extra[@]}"
 rc=$?
-echo "audit exit=$rc   contract=$CONTRACT"
+echo "audit exit=$rc   registry=$REGISTRY"
 [ $rc -eq 0 ] || exit $rc
 
-# From here on it is the handoff: the image and measurements just made, plus a note (record) saying which contract/key they
+# From here on it is the handoff: the image and measurements just made, plus a note (record) saying which registry and record key they
 # were registered under, are passed to the Vendor as plain files. This is not an att feature but a transfer procedure we
 # assemble by hand.
 step_start "TRANSFERRING TO VENDOR"
 mkdir -p "$WORK/from-auditor"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/alpine-slim.eif" "$WORK/from-auditor/alpine-slim.eif"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/measurements.json" "$WORK/from-auditor/measurements.json"
-if [ -z "$KEY" ]; then
-  # att command - looks up this measurement's registration key on the chain.
-  out=$("$AUDITOR_BIN" lookup --rpc "$RPC" --contract "$CONTRACT" --measurements "$WORK/from-auditor/measurements.json" 2>&1)
-  KEY=$(echo "$out" | grep -oE 'key +0x[0-9a-fA-F]{64}' | awk '{print $2}' | head -1)  # extract the key from the output
-  [ -n "$KEY" ] || { step_stop "TRANSFERRING TO VENDOR"; echo "no registration of this value found on $CONTRACT"; exit 1; }
+if [ -z "$RECORD_KEY" ]; then
+  # att command - looks up this measurement's record key on the chain.
+  out=$("$AUDITOR_BIN" lookup --rpc "$RPC" --registry "$REGISTRY" --measurements "$WORK/from-auditor/measurements.json" 2>&1)
+  RECORD_KEY=$(echo "$out" | grep -oE 'record key +0x[0-9a-fA-F]{64}' | awk '{print $3}' | head -1)  # extract the record key from the output
+  [ -n "$RECORD_KEY" ] || { step_stop "TRANSFERRING TO VENDOR"; echo "no registration of this value found on $REGISTRY"; exit 1; }
 fi
 pcr() { grep -oE "\"$1\": *\"[0-9a-fA-F]+\"" "$WORK/from-auditor/measurements.json" | sed -E 's/.*"([0-9a-fA-F]+)"$/\1/'; }  # helper to pull a PCR value out of the JSON
 cat > "$WORK/from-auditor/measurement-record.json" <<EOF
@@ -137,7 +137,7 @@ cat > "$WORK/from-auditor/measurement-record.json" <<EOF
   "build_env": { "os": "linux", "arch": "$ARCH", "go": "$GOVER", "trimpath": true },
   "image": "alpine-slim.eif",
   "measurements": { "PCR0": "$(pcr PCR0)", "PCR1": "$(pcr PCR1)", "PCR2": "$(pcr PCR2)" },
-  "registry": { "rpc": "$RPC", "contract": "$CONTRACT", "key": "$KEY", "approver": "$AUDITOR_ADDR" },
+  "registry": { "rpc": "$RPC", "address": "$REGISTRY", "record_key": "$RECORD_KEY", "approver": "$AUDITOR_ADDR" },
   "issued_by": "$AUDITOR_ADDR",
   "issued_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }

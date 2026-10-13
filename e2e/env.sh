@@ -24,8 +24,8 @@ case "$NET" in
            [ "${CONFIRM_MAINNET:-}" = 1 ] || { echo "NET=mainnet spends real ETH. If you are sure, also pass CONFIRM_MAINNET=1."; exit 1; };;
   *) echo "NET must be sepolia or mainnet"; exit 1;;
 esac
-AUDITOR_KEY=auditor.key          # 0xD2082a2513781b29beeF5DB847b2c85Cbc50ECeE - approver in flow 1
-VENDOR_KEY=deployer.key          # 0xAf48305C64683eB72C28be61dD0E41478A2a0Df5 - pays gas, approver in flow 2
+AUDITOR_SIGNING_KEY=auditor.key   # 0xD2082a2513781b29beeF5DB847b2c85Cbc50ECeE - approver in flow 1
+DEPLOYER_KEY=deployer.key; VENDOR_SIGNING_KEY=$DEPLOYER_KEY   # 0xAf48305C64683eB72C28be61dD0E41478A2a0Df5 - pays gas, approver in flow 2
 AUDITOR_ADDR=0xD2082a2513781b29beeF5DB847b2c85Cbc50ECeE
 VENDOR_ADDR=0xAf48305C64683eB72C28be61dD0E41478A2a0Df5
 

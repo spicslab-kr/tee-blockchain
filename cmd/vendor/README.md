@@ -11,8 +11,8 @@ system uses:
 | what | where it goes |
 |---|---|
 | the enclave image (`.eif`) | `launch`, and the hand-off |
-| the measurements, nitro-cli's JSON (`{"Measurements":{"PCR0":...,"PCR1":...,"PCR2":...}}`) | `launch --measurements`, `register --measurements`, `compare --b` |
-| the address `host:port` the enclave answers on | `--tee` for the Auditor and the User |
+| the measurements, nitro-cli's JSON (`{"Measurements":{"PCR0":...,"PCR1":...,"PCR2":...}}`) | `launch --build-measurements`, `register --measurements`, `compare --expected` |
+| the address `host:port` the enclave answers on | `--tee-addr` for the Auditor and the User |
 
 Building is optional: an image received from the Auditor can be launched directly (see
 [Hand-off](#hand-off-with-the-auditor)).
@@ -33,10 +33,10 @@ docker build -t app:base <dir>
 normalizes the layers, and writes `out/app.eif` and `out/measurements.json`:
 
 ```
-att-vendor pack --image app:base --out out
+att-vendor pack --docker-image app:base --out-dir out
 ```
 
-Flags: `--image` (required), `--name`, `--port` (default 5000), `--out` (default `out`),
+Flags: `--docker-image` (required), `--image-name`, `--port` (default 5000), `--out-dir` (default `out`),
 `--responder`.
 
 `launch` starts the enclave, bridges TCP 5000 to the enclave's vsock, asks the new enclave for an
@@ -47,12 +47,12 @@ IAM permission on the instance it prints the one `aws ec2` line to run from your
 att-vendor launch --eif out/app.eif
 ```
 
-Flags: `--eif` (required), `--measurements`, `--name`, `--port` (default 5000, must match the
+Flags: `--eif` (required), `--build-measurements`, `--enclave-name`, `--port` (default 5000, must match the
 build), `--memory` (MiB, default sized from the image), `--cpus` (2), `--cid` (16), `--listen`
-(0.0.0.0), `--out`.
+(0.0.0.0), `--out-dir`.
 
 Hand `out/app.eif` and `out/measurements.json` to the Auditor by any means (scp, mail). Its
-`launch --eif <file> --measurements <file>` measures the image itself and launches it only if the
+`launch --eif <file> --build-measurements <file>` measures the image itself and launches it only if the
 file measures to what the JSON claims.
 
 ### Source rebuilt by the Auditor
@@ -65,7 +65,7 @@ normalizes the layers, makes the image and writes the measurements: `out/<name>.
 `out/measurements.json`.
 
 ```
-att-vendor build --app-dir <dir with Dockerfile> --out out
+att-vendor build --app-dir <dir with Dockerfile> --out-dir out
 ```
 
 It first scans the Dockerfile for things known to break reproducibility (unpinned base image or
@@ -79,7 +79,7 @@ att-vendor launch --eif out/<name>.eif
 ```
 
 `build` takes a directory with a Dockerfile and runs `docker build` itself; `pack` takes an image
-you already built. They share `--name`, `--port`, `--out` and `--responder`.
+you already built. They share `--image-name`, `--port`, `--out-dir` and `--responder`.
 
 ## Self-register (flow 2)
 
@@ -87,8 +87,8 @@ In flow 1 the Auditor audits and registers, and the Vendor does not register. `s
 for flow 2, where the Vendor registers its own enclave:
 
 ```
-att-vendor self-register --config build-config.json --tee 127.0.0.1:5000 \
-    --rpc <url> --contract <0x...> --key-file <key>
+att-vendor self-register --config build-config.json --tee-addr 127.0.0.1:5000 \
+    --rpc <url> --registry <0x...> --signing-key-file <key>
 ```
 
 `--config` is the same `build-config.json` that `send` pushes: service, version and the build
@@ -96,16 +96,16 @@ environment (`build_env`: OS, CPU architecture, Go toolchain, `-trimpath`) are t
 `--service`, `--version` and `--arch` still work and override the file, with a warning when they
 differ (`warning: --service nginx2 differs from build-config.json (nginx)`). Without `--config`,
 `--service` and `--version` are needed, or are taken from an existing registration of the same
-value on that contract.
+value on that registry.
 
 The confirmation names the CPU architecture and Go toolchain the enclave was built with
 (`registered nginx 1.31.6 (amd64, go1.26.1 -trimpath)`). The architecture also goes on-chain in the
-entry's `arch` field, so `lookup` prints it back. It is display only and not part of the lookup key.
+registration's `arch` field, so `lookup` prints it back. It is display only and not part of the record key.
 
-Further flags: `--measurements <file>` (compare the attestation to your build value first and
+Further flags: `--build-measurements <file>` (compare the attestation to your build value first and
 refuse to register on a mismatch, printing the differing PCRs), `--expires` (default 2160h, that
-is 90 days), `--platform` (default `aws-nitro`), `--format`, `--timeout`, `--nonce`, `--trusted`,
-`--out`.
+is 90 days), `--platform` (default `aws-nitro`), `--format`, `--timeout`, `--nonce`, `--trusted-approvers`,
+`--out-dir`.
 
 Any value you leave out is asked for interactively. `--rpc` is special: when empty, it asks for
 `y` to use Ethereum **mainnet**, and any other text is taken as the RPC URL (a testnet, for
@@ -114,7 +114,7 @@ example).
 A registry for flow 2 is deployed once with:
 
 ```
-att-vendor registry-deploy --rpc <url> --key-file <deployer.key> --approver <0x...>
+att-vendor registry-deploy --rpc <url> --deployer-key-file <deployer.key> --approver <0x...>
 ```
 
 See the [registry guide](../../contracts/README.md) for what the contract accepts.
@@ -124,37 +124,37 @@ See the [registry guide](../../contracts/README.md) for what the contract accept
 Send a fresh nonce to the enclave and get back the signed attestation document:
 
 ```
-att-vendor ra-request --tee 127.0.0.1:5000 --out doc.cbor
+att-vendor ra-request --tee-addr 127.0.0.1:5000 --out-file doc.cbor
 ```
 
 Verify the signature chain up to the platform root and the nonce, and extract PCR0, PCR1, PCR2:
 
 ```
-att-vendor ra-parse --doc doc.cbor --out parsed.json
+att-vendor ra-parse --doc doc.cbor --out-file parsed.json
 ```
 
-Sign those measurements with your key and register them. The `key` it prints is the lookup
+Sign those measurements with your signing key and register them. The `record key` it prints is the lookup
 coordinate:
 
 ```
-att-vendor register --rpc <url> --contract <0x...> --key-file <key> \
+att-vendor register --rpc <url> --registry <0x...> --signing-key-file <key> \
     --measurements parsed.json --config build-config.json
 ```
 
 Read the registration back by measurement alone:
 
 ```
-att-vendor lookup --rpc <url> --contract <0x...> --measurements parsed.json
+att-vendor lookup --rpc <url> --registry <0x...> --measurements parsed.json
 ```
 
 Self-check: does what is on-chain match what the enclave attested, is it unexpired, and is the
-signer the contract's approver:
+approver the registry's approver:
 
 ```
-att-vendor compare --a parsed.json --rpc <url> --contract <0x...> --key <key register printed>
+att-vendor compare --attested parsed.json --rpc <url> --registry <0x...> --record-key <record key register printed>
 ```
 
-`compare --a <file> --b <file>` instead compares two sets of measurements directly.
+`compare --attested <file> --expected <file>` instead compares two sets of measurements directly.
 
 ## Hand-off with the Auditor
 
@@ -172,7 +172,7 @@ att-vendor send --repo <git url> --config build-config.json
   "schema": "attestamp.build-config/1",
   "service": "nginx",
   "version": "1.31.6",
-  "platform": "aws",
+  "platform": "aws-nitro",
   "source":   { "repo": "https://github.com/<you>/<app>", "commit": "<git commit>", "path": "mainline/alpine-slim" },
   "tee_info": { "instance_id": "i-...", "region": "eu-north-1", "ami_id": "ami-..." },
   "build_env": { "os": "linux", "arch": "amd64", "go": "go1.26.1", "trimpath": true }
@@ -200,7 +200,7 @@ att-vendor receive --repo <git url> --into from-auditor
 ```
 
 `--ref` picks a commit, branch or tag; the default is the default branch. A received image is
-launched with `att-vendor launch --eif <file> --measurements <file>`.
+launched with `att-vendor launch --eif <file> --build-measurements <file>`.
 
 ## Other commands
 

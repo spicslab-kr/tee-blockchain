@@ -45,7 +45,7 @@ else
   "schema": "attestamp.build-config/1",
   "service": "$SERVICE",
   "version": "$VERSION",
-  "platform": "aws",
+  "platform": "aws-nitro",
   "source": { "repo": "$SRC_REPO", "commit": "$SRC_COMMIT", "path": "$SRC_DIR" },
   "tee_info": { "instance_id": "$(md instance-id)", "region": "$(md placement/region)", "ami_id": "$(md ami-id)" },
   "build_env": { "os": "linux", "arch": "$GOARCH", "go": "$GOVER", "trimpath": true }
@@ -57,7 +57,7 @@ step_stop "WRITING BUILD CONFIG"
 
 # att command - builds the source twice (--verify) to make the image and measurements, and checks for itself that the same value comes out.
 #   Like the Auditor, the Vendor must confirm its own build is reproducible before registering.
-step "BUILDING SOURCE (checking reproducibility)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out out --verify
+step "BUILDING SOURCE (checking reproducibility)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out-dir out --verify
 
 # att command - launches that image in my TEE.
 step "LAUNCHING ENCLAVE" ./att-vendor launch --eif out/alpine-slim.eif
@@ -70,8 +70,8 @@ rc=$?
 localBanner
 
 # Parse options
-CONTRACT=""
-while getopts "c:" o; do case $o in c) CONTRACT=$OPTARG;; esac; done
+REGISTRY=""
+while getopts "c:" o; do case $o in c) REGISTRY=$OPTARG;; esac; done
 
 # Fetch the measurements file just made on the Vendor instance and the build-config.json from the clone root to my machine.
 #   self-register reads service, version and arch from build-config.json (the same source gives different PCRs on x86_64 and
@@ -83,22 +83,22 @@ step_stop "FETCHING BUILD VALUE"
 echo "Vendor's build value:"; cat "$WORK/vendor-build.json"
 echo "build config:"; cat "$WORK/vendor-build-config.json"
 
-if [ -z "$CONTRACT" ]; then
-  # att command - deploys a new registry (registry contract) on the chain. The approver is the Vendor itself.
+if [ -z "$REGISTRY" ]; then
+  # att command - deploys a new registry (the Registry contract) on the chain. The approver is the Vendor itself.
   step_start "DEPLOYING REGISTRY"
-  out=$("$VENDOR_BIN" registry-deploy --rpc "$RPC" --key-file "$VENDOR_KEY" --approver "$VENDOR_ADDR" 2>&1)
+  out=$("$VENDOR_BIN" registry-deploy --rpc "$RPC" --deployer-key-file "$DEPLOYER_KEY" --approver "$VENDOR_ADDR" 2>&1)
   step_stop "DEPLOYING REGISTRY"
   echo "$out"
-  CONTRACT=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # extract the address from the output
-  [ -n "$CONTRACT" ] || { echo "no contract address in registry-deploy output"; exit 1; }
+  REGISTRY=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # extract the address from the output
+  [ -n "$REGISTRY" ] || { echo "no registry address in registry-deploy output"; exit 1; }
 fi
-echo "$CONTRACT" > "$WORK/contract-flow2.txt"  # save it in the file the next step reads
+echo "$REGISTRY" > "$WORK/registry-flow2.txt"  # save it in the file the next step reads
 
 # att command - signs the value I built with my key and registers it on the chain as is (with no third-party comparison).
 #   service, version and arch come from the --config build-config.json - a different value given as a flag wins, but a warning is printed.
-step "SELF-REGISTERING" "$VENDOR_BIN" self-register --config "$WORK/vendor-build-config.json" --tee "$VENDOR_HOST:5000" --measurements "$WORK/vendor-build.json" --rpc "$RPC" --contract "$CONTRACT" --key-file "$VENDOR_KEY"
+step "SELF-REGISTERING" "$VENDOR_BIN" self-register --config "$WORK/vendor-build-config.json" --tee-addr "$VENDOR_HOST:5000" --build-measurements "$WORK/vendor-build.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$VENDOR_SIGNING_KEY"
 echo "self-register exit=$?"
 # att command - verifies, from the User's side, whether what was just registered is actually trustworthy.
-step "VERIFYING" "$USER_BIN" verify --tee "$VENDOR_HOST:5000" --rpc "$RPC" --contract "$CONTRACT"
+step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"
 echo "verify exit=$?"
 echo "next: 2-User-verify"

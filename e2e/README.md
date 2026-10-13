@@ -14,13 +14,13 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
 - `git`, an `ssh` client and the pinned Go version on your machine. `0-Setup-local-install.sh`
   installs what is missing.
 - The SSH key (`PEM` in `env.sh`, default `pem2.pem`) in the repository root, and two funded key
-  files in the repository root: `auditor.key` (approver in flow 1) and `deployer.key` (pays gas,
-  approver in flow 2). Key files are gitignored. Never commit them.
+  files in the repository root: `auditor.key` (signing key, approver in flow 1) and `deployer.key` (deployer key, pays gas,
+  signing key and approver in flow 2). Key files are gitignored. Never commit them.
 - Test ETH on the chosen network for both keys.
 
 ## env.sh and env.local.sh
 
-`e2e/env.sh` holds the shared settings: SSH user and key, chain and RPC, key files, service name and
+`e2e/env.sh` holds the shared settings: SSH user and key, chain and RPC, signing and deployer key files, service name and
 version, and the helper functions the scripts use. It does not hold instance addresses. Those go in
 `e2e/env.local.sh`, which is gitignored: copy `e2e/env.local.example.sh` to `e2e/env.local.sh` and
 fill in
@@ -72,19 +72,19 @@ Run in order. Steps 1 to 3 are the normal path; 4 and 5 show a tampering attempt
 | `flow1-auditor-registers/4-Vendor-tamper-swap-enclave.sh` | Vendor | quietly runs a different image instead |
 | `flow1-auditor-registers/5-User-tamper-verify.sh` | User | the same `verify` now fails with exit 1: nobody registered what is running |
 
-The registry address is saved in `e2e-work/contract.txt` for the later steps.
+The registry address is saved in `e2e-work/registry.txt` for the later steps.
 
 ## Flow 2: the Vendor registers its own enclave
 
 | script | who | what it does |
 |---|---|---|
 | `flow2-vendor-self-registers/1-Vendor-build-self-register.sh` | Vendor | builds and launches, deploys its own registry, runs `self-register`. Option `-c 0x...` |
-| `flow2-vendor-self-registers/2-User-verify.sh` | User | verifies against the Vendor's registry. It passes, but the signer is the Vendor itself |
+| `flow2-vendor-self-registers/2-User-verify.sh` | User | verifies against the Vendor's registry. It passes, but the approver is the Vendor itself |
 | `flow2-vendor-self-registers/3-Vendor-tamper-swap-self-register.sh` | Vendor | runs a different image and registers that value in its own registry |
 | `flow2-vendor-self-registers/4-Auditor-tamper-audit-check-vendor.sh` | Auditor | audits with `--vendor-tee`, so it reports that the Vendor's enclave runs something else. Needs the Auditor's build value from flow 1 step 1 |
 | `flow2-vendor-self-registers/5-User-tamper-verify-both-registries.sh` | User | verifies against both registries. The Vendor's says yes, the Auditor's says no, so the result is not trusted |
 
-The Vendor's registry address is saved in `e2e-work/contract-flow2.txt`.
+The Vendor's registry address is saved in `e2e-work/registry-flow2.txt`.
 
 ## Checks outside the two flows
 

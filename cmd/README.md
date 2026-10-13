@@ -66,7 +66,7 @@ the codes below. Codes 4 to 6 mean different things depending on where the error
 |---|---|
 | 1 | any other error, including a failed `compare` and a `verify` that does not trust the enclave |
 | 3 | network error |
-| 4 | attestation in the wrong format; from `register`: the signer is not the contract's approver |
+| 4 | attestation in the wrong format; from `register`: the signing key's address is not the registry's approver |
 | 5 | attestation signature or certificate chain invalid, or no document could be extracted; from `register`: already registered |
 | 6 | nonce mismatch, or a bad or oversized response; from `register`: the expiry is already in the past |
 | 7 | attestation document malformed |

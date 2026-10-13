@@ -47,7 +47,7 @@ $SCP "$WORK/responder/att-vendor" "$WORK/responder/att-ra-responder-ok" "$WORK/r
 
 # remote_build <responder file> - run `build` with that responder on the Vendor host and return stderr+stdout. The exit code is carried in an __EXIT= line.
 remote_build() {
-  V "chmod +x att-vendor $1; mkdir -p /tmp/rc-app; printf 'FROM scratch\n' > /tmp/rc-app/Dockerfile; ./att-vendor build --app-dir /tmp/rc-app --out /tmp/rc-out --responder $1 2>&1; echo \"__EXIT=\$?\""
+  V "chmod +x att-vendor $1; mkdir -p /tmp/rc-app; printf 'FROM scratch\n' > /tmp/rc-app/Dockerfile; ./att-vendor build --app-dir /tmp/rc-app --out-dir /tmp/rc-out --responder $1 2>&1; echo \"__EXIT=\$?\""
 }
 exit_of() { echo "$1" | sed -n 's/^__EXIT=//p' | tail -1; }
 

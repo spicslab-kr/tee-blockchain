@@ -22,26 +22,26 @@ sha256sum from-auditor/alpine-slim.eif from-auditor/measurements.json  # hashes 
 step_stop "CHECKING RECEIVED FILES"
 
 # att command - measures the received image itself and launches it in my TEE only if it equals the measurements the Auditor handed over.
-step "LAUNCHING ENCLAVE" ./att-vendor launch --eif from-auditor/alpine-slim.eif --measurements from-auditor/measurements.json
+step "LAUNCHING ENCLAVE" ./att-vendor launch --eif from-auditor/alpine-slim.eif --build-measurements from-auditor/measurements.json
 REMOTE
 rc=$?
 [ $rc -eq 0 ] || exit $rc
 localBanner
 
-# Read the registration coordinates the Auditor left (which contract, which key) from that record file.
+# Read the registration coordinates the Auditor left (which registry, which record key) from that record file.
 REC="$WORK/from-auditor/measurement-record.json"
 field() { grep -oE "\"$1\": *\"[^\"]*\"" "$REC" | head -1 | sed -E 's/.*": *"([^"]*)"$/\1/'; }
-R_RPC=$(field rpc); R_CONTRACT=$(field contract); R_KEY=$(field key)
+R_RPC=$(field rpc); R_REGISTRY=$(field address); R_RECORD_KEY=$(field record_key)
 mkdir -p "$WORK/vendor-check"
 
 # att command - sends an RA request to my enclave and receives the attestation document.
-step "REQUESTING ATTESTATION" "$VENDOR_BIN" ra-request --tee "$VENDOR_HOST:5000" --out "$WORK/vendor-check/doc.cbor" --format aws-nitro || exit 1
+step "REQUESTING ATTESTATION" "$VENDOR_BIN" ra-request --tee-addr "$VENDOR_HOST:5000" --out-file "$WORK/vendor-check/doc.cbor" --format aws-nitro || exit 1
 # att command - verifies that document and extracts the measurements inside.
-step "PARSING ATTESTATION" "$VENDOR_BIN" ra-parse --doc "$WORK/vendor-check/doc.cbor" --out "$WORK/vendor-check/parsed.json" || exit 1
+step "PARSING ATTESTATION" "$VENDOR_BIN" ra-parse --doc "$WORK/vendor-check/doc.cbor" --out-file "$WORK/vendor-check/parsed.json" || exit 1
 # att command - compares my enclave's value with the value in the record the Auditor gave.
-step "COMPARING TO AUDITOR'S RECORD" "$VENDOR_BIN" compare --a "$WORK/vendor-check/parsed.json" --b "$WORK/from-auditor/measurements.json"; a=$?
-# att command - compares my enclave's value with the actual chain registration (value, expiry, signer).
-step "COMPARING TO CHAIN REGISTRATION" "$VENDOR_BIN" compare --a "$WORK/vendor-check/parsed.json" --rpc "$R_RPC" --contract "$R_CONTRACT" --key "$R_KEY"; b=$?
+step "COMPARING TO AUDITOR'S RECORD" "$VENDOR_BIN" compare --attested "$WORK/vendor-check/parsed.json" --expected "$WORK/from-auditor/measurements.json"; a=$?
+# att command - compares my enclave's value with the actual chain registration (value, expiry, approver).
+step "COMPARING TO CHAIN REGISTRATION" "$VENDOR_BIN" compare --attested "$WORK/vendor-check/parsed.json" --rpc "$R_RPC" --registry "$R_REGISTRY" --record-key "$R_RECORD_KEY"; b=$?
 if [ $a -eq 0 ] && [ $b -eq 0 ]; then
   echo "OK — what I run is exactly what the Auditor audited and registered. Users will get 'trusted'."
 else

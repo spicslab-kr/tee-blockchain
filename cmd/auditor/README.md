@@ -33,7 +33,7 @@ Vendor got. If they differ, that is the finding, and nothing should be registere
 Source rebuilt by the Auditor:
 
 ```
-att-auditor build --app-dir work/src/<path> --out out
+att-auditor build --app-dir work/src/<path> --out-dir out
 ```
 
 ```
@@ -44,17 +44,17 @@ Image handed over as a file: the Vendor sends the image and its measurements, an
 the image itself and refuses it if it does not match.
 
 ```
-att-auditor launch --eif <received.eif> --measurements <received measurements.json>
+att-auditor launch --eif <received.eif> --build-measurements <received measurements.json>
 ```
 
 ## Deploy the registry (once, first time only)
 
-One contract has one approver: only registrations signed by that address are accepted, forever. The
-deployer key only pays gas and can be anyone's. The command prints the contract address, which
+One registry has one approver: only registrations signed by that address are accepted, forever. The
+deployer key only pays gas and can be anyone's. The command prints the registry address, which
 everyone then uses:
 
 ```
-att-auditor registry-deploy --rpc <url> --key-file <deployer.key> --approver <my 0x...>
+att-auditor registry-deploy --rpc <url> --deployer-key-file <deployer.key> --approver <my 0x...>
 ```
 
 A registry deployed before registrations carried the CPU architecture (`arch`) does not accept the
@@ -63,11 +63,11 @@ current `register`; deploy a new one. See the [registry guide](../../contracts/R
 ## Audit
 
 ```
-att-auditor audit --config work/src/build-config.json --tee <my-instance>:5000 \
-    --measurements out/measurements.json --rpc <url> --contract <0x...> --key-file <key>
+att-auditor audit --config work/src/build-config.json --tee-addr <my-instance>:5000 \
+    --build-measurements out/measurements.json --rpc <url> --registry <0x...> --signing-key-file <key>
 ```
 
-`--tee` is **your own** enclave, running **your own** build of the Vendor's source. What goes
+`--tee-addr` is **your own** enclave, running **your own** build of the Vendor's source. What goes
 on-chain is what you built from the source and ran yourself, checked against your build value, and
 not what the Vendor told you.
 
@@ -79,8 +79,8 @@ registration of the same value) and `--arch` defaults to this machine's.
 
 Further flags: `--vendor-tee <host:port>` (also ask the Vendor's running enclave and report whether
 it runs the same value; what is registered is still your value), `--expires` (default 2160h, that
-is 90 days), `--platform` (default `aws-nitro`), `--format`, `--timeout`, `--nonce`, `--trusted`,
-`--out`. Without `--tee`, `audit` registers `--measurements` as is, with no audit. Values you leave
+is 90 days), `--platform` (default `aws-nitro`), `--format`, `--timeout`, `--nonce`, `--trusted-approvers`,
+`--out-dir`. Without `--tee-addr`, `audit` registers `--build-measurements` as is, with no audit. Values you leave
 out are asked for interactively; an empty `--rpc` asks for `y` to use Ethereum mainnet, and any
 other text is taken as the RPC URL.
 
@@ -89,44 +89,44 @@ other text is taken as the RPC URL.
 Attestation document from your enclave:
 
 ```
-att-auditor ra-request --tee <my-instance>:5000 --out doc.cbor
+att-auditor ra-request --tee-addr <my-instance>:5000 --out-file doc.cbor
 ```
 
 Verify it and extract PCR0, PCR1, PCR2:
 
 ```
-att-auditor ra-parse --doc doc.cbor --out parsed.json
+att-auditor ra-parse --doc doc.cbor --out-file parsed.json
 ```
 
 The audit gate: the enclave's attested value must equal your build value. FAIL means the enclave is
 not running what you built, and nothing gets registered:
 
 ```
-att-auditor compare --a parsed.json --b out/measurements.json
+att-auditor compare --attested parsed.json --expected out/measurements.json
 ```
 
-Register the **build value** with your key:
+Register the **build value** with your signing key:
 
 ```
-att-auditor register --rpc <url> --contract <0x...> --key-file <key> \
+att-auditor register --rpc <url> --registry <0x...> --signing-key-file <key> \
     --measurements out/measurements.json --config work/src/build-config.json
 ```
 
 Read it back by measurement. The chain says which architecture the registration is for
-(`service nginx 1.31.6 (aws-nitro, amd64)`). `arch` is in the signed entry but not in the key, so
+(`service nginx 1.31.6 (aws-nitro, amd64)`). `arch` is in the signed registration but not in the record key, so
 nobody needs to know it to look the value up:
 
 ```
-att-auditor lookup --rpc <url> --contract <0x...> --measurements out/measurements.json
+att-auditor lookup --rpc <url> --registry <0x...> --measurements out/measurements.json
 ```
 
 Self-check against the chain:
 
 ```
-att-auditor compare --a parsed.json --rpc <url> --contract <0x...> --key <key register printed>
+att-auditor compare --attested parsed.json --rpc <url> --registry <0x...> --record-key <record key register printed>
 ```
 
-Pointing `--tee` at the **Vendor's** enclave is the "something looks off" check from flow 2: attest
+Pointing `--tee-addr` at the **Vendor's** enclave is the "something looks off" check from flow 2: attest
 what the Vendor is really running and compare it to your build. `--vendor-tee` does that as an
 extra step, but registration always comes from your own enclave.
 
@@ -141,7 +141,7 @@ the image to the repository:
 
 ```
 att-auditor send --repo <git url> --config work/src/build-config.json \
-    --measurements out/measurements.json --image out/<name>.eif
+    --measurements out/measurements.json --eif out/<name>.eif
 ```
 
 The build tool is nitro-cli. Its version is read from `nitro-cli --version` on this instance, or
@@ -151,7 +151,7 @@ given with `--build-tool-version`. The record is also left next to the measureme
 Or write the record by hand and send that:
 
 ```
-att-auditor send --repo <git url> --record measurement-record.json --image out/<name>.eif
+att-auditor send --repo <git url> --record measurement-record.json --eif out/<name>.eif
 ```
 
 The same source measures differently on x86_64 and arm64 (and under a different Go), so one

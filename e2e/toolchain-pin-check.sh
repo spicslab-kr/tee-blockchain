@@ -48,7 +48,7 @@ $SCP "$WORK/toolchain/att-vendor" "$SSH_USER@$VENDOR_HOST:~/att-vendor"
 
 # remote_build <binary> - run `build` on the Vendor host and return stderr+stdout. The exit code is carried in an __EXIT= line.
 remote_build() {
-  V "chmod +x $1; mkdir -p /tmp/tc-app; printf 'FROM scratch\n' > /tmp/tc-app/Dockerfile; ./$1 build --app-dir /tmp/tc-app --out /tmp/tc-out 2>&1; echo \"__EXIT=\$?\""
+  V "chmod +x $1; mkdir -p /tmp/tc-app; printf 'FROM scratch\n' > /tmp/tc-app/Dockerfile; ./$1 build --app-dir /tmp/tc-app --out-dir /tmp/tc-out 2>&1; echo \"__EXIT=\$?\""
 }
 
 if [ $HAVE_WRONG = 1 ]; then

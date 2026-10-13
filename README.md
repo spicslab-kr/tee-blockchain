@@ -53,10 +53,10 @@ measurements. Details: [Build the binaries](cmd/README.md#build-the-binaries).
 
 ## Quick start
 
-As a **User**, with an enclave address and a registry contract address. No keys, no ETH, no Nitro:
+As a **User**, with an enclave address and a registry address. No keys, no ETH, no Nitro:
 
 ```
-att-user verify --tee <vendor-public-ip>:5000 --rpc <ethereum rpc url> --contract <0x…>
+att-user verify --tee-addr <vendor-public-ip>:5000 --rpc <ethereum rpc url> --registry <0x…>
 ```
 
 Exit 0 and a line like `✓ matches  nginx 1.31.6 (amd64) by 0x…, expires …` means a registration
@@ -66,7 +66,7 @@ Ethereum mainnet: about 3 s and 21 MB peak.
 As a **Vendor**, on a Nitro instance, with the directory that holds your Dockerfile:
 
 ```
-att-vendor build  --app-dir <dir> --out out      # reproducible enclave image + measurements
+att-vendor build  --app-dir <dir> --out-dir out  # reproducible enclave image + measurements
 att-vendor launch --eif out/<name>.eif           # run it, open the attestation port
 att-vendor send   --repo <git url> --config build-config.json
 ```
@@ -75,10 +75,10 @@ As an **Auditor**, on a Nitro instance, with the Vendor's repository:
 
 ```
 att-auditor receive --repo <git url> --into work/src
-att-auditor build   --app-dir work/src/<path> --out out
+att-auditor build   --app-dir work/src/<path> --out-dir out
 att-auditor launch  --eif out/<name>.eif
-att-auditor audit   --config work/src/build-config.json --tee <my-instance>:5000 \
-                   --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>
+att-auditor audit   --config work/src/build-config.json --tee-addr <my-instance>:5000 \
+                   --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>
 ```
 
 ## Features
@@ -116,7 +116,7 @@ att-auditor audit   --config work/src/build-config.json --tee <my-instance>:5000
   OS, CPU architecture or Go version, because a mismatch would look like a finding.
 - **Same bytes or no registration.** `audit` registers only if the enclave's attested value equals
   the Auditor's own build.
-- **One registry, one approver.** `registry-deploy` creates a contract that accepts only that
+- **One registry, one approver.** `registry-deploy` creates a registry that accepts only that
   approver's EIP-712 signature.
 - **Hand-back.** `send` publishes the measurement record and image to the Vendor.
 
@@ -128,8 +128,8 @@ att-auditor audit   --config work/src/build-config.json --tee <my-instance>:5000
   root, finds who registered that measurement, and checks every registration.
 - **No secrets.** No key, no ETH, no Nitro, no Docker.
 - **Trust decision.** A registration passes only if the measurement matches, it has not expired
-  (judged on the chain's clock), and its signer is the contract's approver or an address you name.
-- **Several registries.** Repeat `--contract` to require the Vendor's and the Auditor's registry to
+  (judged on the chain's clock), and its approver is the registry's own approver or an address you name (`--trusted-approvers`).
+- **Several registries.** Repeat `--registry` to require the Vendor's and the Auditor's registry to
   agree.
 
 → [User guide](cmd/user/README.md)
@@ -141,10 +141,10 @@ att-auditor audit   --config work/src/build-config.json --tee <my-instance>:5000
   only. Confidential VMs that measure a guest OS (AMD SEV-SNP, Intel TDX) are not covered.
 - **The measurement is the identity.** The enclave image hash (PCR0·1·2) is what gets registered
   and looked up, so no name, version or key has to be known in advance.
-- **One architecture, one record.** x86_64 and arm64 builds measure differently, so each
+- **One architecture, one registration.** x86_64 and arm64 builds measure differently, so each
   registration says which architecture it is for.
 - **A deliberately simple contract.** `Registry.sol` never overwrites and never revokes. Expiry is
-  the only way a record ends.
+  the only way a registration ends.
 
 → [Registry contract](contracts/README.md)
 

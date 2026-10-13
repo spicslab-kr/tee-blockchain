@@ -25,7 +25,7 @@ DOCKER
 step "BUILDING TAMPERED IMAGE" sudo docker build -q -t tampered:latest tampered
 
 # att command - packs this docker image into an enclave image (EIF).
-step "PACKING IMAGE" ./att-vendor pack --image tampered:latest --name tampered --out out-tampered
+step "PACKING IMAGE" ./att-vendor pack --docker-image tampered:latest --image-name tampered --out-dir out-tampered
 
 # An instance has resources for only one enclave, so stop the old one first and then launch the replacement.
 step_start "STOPPING PREVIOUS ENCLAVE"
@@ -40,7 +40,7 @@ echo
 echo "the enclave on :5000 now runs my own image, not what the Auditor registered."
 echo "audited value:   $(grep PCR0 from-auditor/measurements.json | tr -d ' ,\"' | cut -d: -f2)"
 echo "running value:   $(grep PCR0 out-tampered/measurements.json | tr -d ' ,\"' | cut -d: -f2)"
-echo "to put the audited one back:  ./att-vendor launch --eif from-auditor/alpine-slim.eif --measurements from-auditor/measurements.json"
+echo "to put the audited one back:  ./att-vendor launch --eif from-auditor/alpine-slim.eif --build-measurements from-auditor/measurements.json"
 REMOTE
 rc=$?
 localBanner
