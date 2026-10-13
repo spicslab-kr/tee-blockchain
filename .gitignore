@@ -1,5 +1,4 @@
 dist/
-setup/vendor/nitro/tb-*-linux-amd64
 
 # `go build ./cmd/<role>/...` without -o drops a binary named after the package into the repo root.
 /auditor
