@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// 로컬 bare 저장소 = 원격. 실제 git 이 돈다.
+// A local bare repository serves as the remote. Real git runs.
 func newRemote(t *testing.T) (remote string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {

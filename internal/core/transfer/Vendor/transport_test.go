@@ -25,7 +25,7 @@ func TestSend_BuildConfig_FileAndSidecar(t *testing.T) {
 	if _, err := os.Stat(path + ".tmp"); !os.IsNotExist(err) {
 		t.Fatal("temp file must not remain")
 	}
-	// 파일 경로를 직접 주면 그 이름으로
+	// If given a file path directly, use that name
 	p2, err := (FileTransport{}).Send(context.Background(), cfgGCP(), filepath.Join(dir, "out", "cfg.json"))
 	if err != nil || filepath.Base(p2) != "cfg.json" {
 		t.Fatalf("explicit path: %s %v", p2, err)

@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// FixtureExtractor 는 저장된 문서를 그대로 돌려준다. 난수와 묶이지 않으므로 실제 증명이 아니다 — 테스트 · 드라이런 전용.
+// FixtureExtractor returns a stored document as is. It is not bound to the nonce, so it is not a real attestation; for tests and dry runs only.
 type FixtureExtractor struct {
 	Format string
 	Doc    []byte

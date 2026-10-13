@@ -9,7 +9,7 @@ import (
 
 const Format = "azure-maa-jwt"
 
-// Extractor — vTPM 에서 HCL 리포트를 읽어 MAA 에 보내고 JWT 를 받는다. go-tpm 이 필요해 아직 비어 있다.
+// Extractor reads the HCL report from the vTPM, sends it to MAA and receives a JWT. It needs go-tpm and is still empty.
 type Extractor struct {
 	MAAEndpoint string
 }

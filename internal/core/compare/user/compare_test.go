@@ -1,6 +1,6 @@
-// Compare 는 순수 함수라 그대로 테스트하고, Check 는 실제로 시뮬레이션 체인에 register 해 둔 걸
-// chain/lookup 으로 읽어서 맞대본다. User 는 등록을 안 해서 register/user 가 없다 — auditor 패키지로
-// 등록해 두고 user 의 Reader(= auditor 바인딩을 빌려 씀)로 읽는다.
+// Compare is a pure function and is tested directly. Check is tested against a registration actually made on the
+// simulated chain and read back with chain/lookup. The User never registers, so there is no register/user:
+// the test registers through the auditor package and reads with the user's Reader (which borrows the auditor binding).
 package user
 
 import (
@@ -29,13 +29,13 @@ func TestCompare_ParsedVsBuild(t *testing.T) {
 	build := p.Measurements{{Name: "PCR0", Value: []byte{1, 2, 3}}}
 	v := (Impl{}).Compare(parsed, build)
 	if !v.Pass {
-		t.Fatalf("같은 값인데 불일치: %+v", v)
+		t.Fatalf("same values reported as a mismatch: %+v", v)
 	}
 
 	tampered := p.Measurements{{Name: "PCR0", Value: []byte{9, 9, 9}}}
 	v = (Impl{}).Compare(parsed, tampered)
 	if v.Pass {
-		t.Fatal("값이 다른데 일치로 나옴")
+		t.Fatal("different values reported as a match")
 	}
 }
 
@@ -72,7 +72,7 @@ func chain(t *testing.T, funded ...common.Address) *simulated.Backend {
 	return b
 }
 
-// User — 흐름의 마지막 확인: 실제 배포된 서비스에서 새로 받은 RA 값을 체인 등록 정보와 대조한다.
+// The User's final check: compare freshly received RA values from the deployed service against the on-chain registration.
 func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	auditorKey, auditorAddr := newKey(t)
@@ -100,7 +100,7 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// User 는 자기 타입으로 방금 파싱했다고 치고 — 같은 값을 user.Measurements 로 다시 만든다.
+	// Pretend the User just parsed it in its own type: rebuild the same values as user.Measurements.
 	values := make(p.Measurements, len(aValues))
 	for i, m := range aValues {
 		values[i] = p.Measurement{Name: m.Name, Value: m.Value}
@@ -117,29 +117,29 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 	}
 
 	if regInfo.ChainTime <= 0 {
-		t.Fatalf("Lookup 이 ChainTime 을 안 채웠다: %+v", regInfo)
+		t.Fatalf("Lookup did not fill in ChainTime: %+v", regInfo)
 	}
-	// 실제 호출 경로: now 는 로컬 시계가 아니라 조회 블록의 시각.
+	// The real call path: now is the lookup block's time, not the local clock.
 	if v := (Impl{}).Check(values, regInfo, Clock(regInfo), trusted); !v.Pass {
-		t.Fatalf("등록한 값 그대로인데 실패: %+v", v)
+		t.Fatalf("exactly the registered value failed: %+v", v)
 	}
 
 	other := p.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x99}, 48)}}
 	if v := (Impl{}).Check(other, regInfo, time.Now().Unix(), trusted); v.Pass {
-		t.Fatal("다른 측정값인데 통과함")
+		t.Fatal("a different measurement passed")
 	}
 
 	future := expires.Add(time.Hour).Unix()
 	if v := (Impl{}).Check(values, regInfo, future, trusted); v.Pass {
-		t.Fatal("만료 지난 시각인데 통과함")
+		t.Fatal("a time past expiry passed")
 	}
 
 	if v := (Impl{}).Check(values, regInfo, time.Now().Unix(), []string{"0x0000000000000000000000000000000000000001"}); v.Pass {
-		t.Fatal("신뢰 목록에 없는데 통과함")
+		t.Fatal("a signer outside the trusted list passed")
 	}
 }
 
-// Clock — 등록을 읽어 온 블록의 시각이 있으면 그것, 없으면 이 기계의 시계.
+// Clock uses the registration block's time if present, otherwise this machine's clock.
 func TestClock_PrefersChainTime(t *testing.T) {
 	if got := Clock(l.Registration{ChainTime: 1_700_000_000}); got != 1_700_000_000 {
 		t.Fatalf("Clock = %d, want the chain time", got)
@@ -151,11 +151,11 @@ func TestClock_PrefersChainTime(t *testing.T) {
 	}
 }
 
-// 만료는 체인 시계로 판정한다 — 검증자 시계가 아무리 느려도, 조회 블록 시각이 만료를 지났으면 죽은 승인이다.
+// Expiry is judged on the chain clock: however slow the verifier's clock is, if the lookup block's time is past expiry the approval is dead.
 func TestCheck_ExpiryUsesChainClockNotLocal(t *testing.T) {
 	reg := l.Registration{Expires: 1_000, ChainTime: 2_000, Signer: "0x0000000000000000000000000000000000000001",
 		Values: p.Measurements{{Name: "measurementHash", Value: make([]byte, 32)}}}
-	// 로컬 시계가 과거(500)에 멈춰 있어도 Clock(reg) 는 2000 을 돌려주고 Check 는 만료로 본다.
+	// Even if the local clock is stuck in the past (500), Clock(reg) returns 2000 and Check treats the registration as expired.
 	v := (Impl{}).Check(p.Measurements{{Name: "PCR0", Value: []byte{1}}}, reg, Clock(reg), []string{reg.Signer})
 	found := false
 	for _, r := range v.Reason {
@@ -164,6 +164,6 @@ func TestCheck_ExpiryUsesChainClockNotLocal(t *testing.T) {
 		}
 	}
 	if v.Pass || !found {
-		t.Fatalf("체인 시각 2000 > 만료 1000 인데 만료로 안 봄: %+v", v)
+		t.Fatalf("chain time 2000 > expiry 1000 but not treated as expired: %+v", v)
 	}
 }

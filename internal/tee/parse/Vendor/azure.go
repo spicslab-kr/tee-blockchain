@@ -7,7 +7,7 @@ import (
 	r "tb/internal/tee/request/Vendor"
 )
 
-// AzureParser — Azure Confidential VM (MAA JWT) 문서용. 아직 구현되지 않았다.
+// AzureParser is for Azure Confidential VM (MAA JWT) documents. Not implemented yet.
 type AzureParser struct{}
 
 var _ Parser = (*AzureParser)(nil)

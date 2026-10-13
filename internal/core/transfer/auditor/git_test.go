@@ -39,7 +39,7 @@ func TestGitSend_PushesRecordAndImage(t *testing.T) {
 
 func TestGitReceive_ClonesAndChecksSourceCommit(t *testing.T) {
 	remote := newRemote(t)
-	// Vendor 역할을 흉내: build-config.json 을 커밋 · push (source.commit = 이전 HEAD)
+	// Act as the Vendor: commit and push build-config.json (source.commit = previous HEAD)
 	work := clientDir(t, remote)
 	prev := strings.TrimSpace(run(t, work, "rev-parse", "HEAD"))
 	cfg := cfgAWS()

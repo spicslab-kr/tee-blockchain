@@ -2,8 +2,9 @@ package compare
 
 import "bytes"
 
-// Compare — 체인이 안 낀 비교. a, b 를 이름별로 맞대본다. 한쪽에만 있거나 값이 다르면 그 이름을 근거로
-// 남기고 불일치. 설계문서 M2 — 파싱값 vs 빌드값, 파싱값 vs 측정값 기록(또는 다른 TEE 값)이 여기.
+// Compare is the comparison with no chain value involved. It matches a and b by name; a name present on only
+// one side, or with different values, is recorded as a reason and the result is a mismatch. This covers parsed
+// values vs build values, and parsed values vs a measurement record (or another TEE's values).
 func Compare(a, b Items) Verdict {
 	av := map[string][]byte{}
 	for _, it := range a {

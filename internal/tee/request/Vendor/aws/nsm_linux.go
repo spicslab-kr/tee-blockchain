@@ -12,10 +12,10 @@ import (
 	"tb/internal/tee/request/Vendor"
 )
 
-// Extractor 는 엔클레이브 안에서 /dev/nsm 에 ioctl 로 문서를 요청한다.
+// Extractor requests a document from /dev/nsm with an ioctl, from inside the enclave.
 type Extractor struct {
-	Device   string // 기본 /dev/nsm
-	UserData []byte // 문서에 묶을 값. 없으면 nil
+	Device   string // default /dev/nsm
+	UserData []byte // value to bind into the document; nil if none
 }
 
 var _ vendor.Extractor = (*Extractor)(nil)

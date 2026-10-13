@@ -15,11 +15,11 @@ import (
 
 const Format = "gcp-cs-jwt"
 
-// Extractor 는 Confidential Space 런처 소켓에 토큰을 요청한다. 돌아오는 JWT 가 RA 문서다.
+// Extractor asks the Confidential Space launcher socket for a token. The JWT that comes back is the RA document.
 type Extractor struct {
-	Socket   string // 기본 /run/container_launcher/teeserver.sock
-	Audience string // 기본 tb
-	// Client 가 있으면 Socket 대신 쓴다 (테스트용)
+	Socket   string // default /run/container_launcher/teeserver.sock
+	Audience string // default tb
+	// If Client is set it is used instead of Socket (for tests)
 	Client *http.Client
 }
 

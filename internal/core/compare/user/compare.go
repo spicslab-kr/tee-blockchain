@@ -1,11 +1,11 @@
-// Package user 는 M2 대조·판정 — 값 두 개를 받아 일치/불일치와 근거를 낸다.
+// Package user compares two sets of values and reports match or mismatch with reasons.
 //
-// 실제 로직은 internal/core/compare 에 역할 무관하게 한 벌만 있다. 여기는 이 역할의
-// tee/parse/user.Measurements 를 그 로직이 받는 모양으로 바꿔주는 델리게이트다 — 자세한 이유는
-// auditor 쪽 compare.go 의 주석 참고.
+// The actual logic lives once, role-independent, in internal/core/compare. This package is a delegate that
+// converts this role's tee/parse/user.Measurements into the shape that logic takes; see the comment in the
+// auditor package's compare.go for the reason.
 //
-// measurementHash 는 User 가 등록을 안 해서 chain/register/user 가 없어 여기서 다시 적는다 — 계산 방식은
-// chain/register 의 MeasurementHash 와 반드시 같아야 한다 (chain/lookup/user/ether 의 것과도 같다).
+// measurementHash is repeated here because the User never registers, so there is no chain/register/user. The
+// computation must be identical to MeasurementHash in chain/register (and to the one in chain/lookup/user/ether).
 package user
 
 import (
@@ -57,7 +57,7 @@ func (Impl) Check(a p.Measurements, r l.Registration, now int64, trusted []strin
 	}, now, trusted)
 }
 
-// measurementHash — chain/register 의 MeasurementHash 와 같은 계산(이름순 "이름=값(hex)\n" 을 keccak256).
+// measurementHash is the same computation as MeasurementHash in chain/register: keccak256 of "name=value(hex)\n" lines in name order.
 func measurementHash(values p.Measurements) ([32]byte, error) {
 	var out [32]byte
 	if len(values) == 0 {
@@ -83,10 +83,11 @@ func measurementHash(values p.Measurements) ([32]byte, error) {
 	return out, nil
 }
 
-// Clock — Check 의 now 로 쓸 시각. 등록을 읽어 온 블록의 시각(Registration.ChainTime)이 있으면 그것,
-// 없으면(옛 조회 결과·테스트 더미) 이 기계의 시계. 만료는 컨트랙트도 block.timestamp 로 판정하므로 검증자
-// 쪽도 같은 시계를 써야 한다 — 폐기가 없는 설계에서 만료가 승인이 죽는 유일한 길인데, 검증자 노트북의
-// 시계가 느리면 죽은 승인을 살아 있다고 보게 된다.
+// Clock returns the time to use as Check's now: the time of the block the registration was read from
+// (Registration.ChainTime) if present, otherwise (old lookup results, test stubs) this machine's clock. The
+// contract judges expiry by block.timestamp, so the verifier must use the same clock. With no revocation,
+// expiry is the only way an approval dies, and a slow clock on the verifier's laptop would make a dead
+// approval look alive.
 func Clock(r l.Registration) int64 {
 	if r.ChainTime > 0 {
 		return r.ChainTime

@@ -12,7 +12,7 @@ func TestMeasurementRecord_PerPlatform(t *testing.T) {
 			t.Errorf("%s: complete record must validate: %v", r.Platform, err)
 		}
 	}
-	// aws: EIF 파일 · PCR0·1·2 · 도구와 버전
+	// aws: EIF file, PCR0/1/2, tool and version
 	r := recAWS()
 	r.Image.Path = ""
 	mustErr(t, r, "image.path")
@@ -20,12 +20,12 @@ func TestMeasurementRecord_PerPlatform(t *testing.T) {
 	r.Image.SHA256 = "zz"
 	mustErr(t, r, "image.sha256")
 	r = recAWS()
-	r.Values = r.Values[:2] // PCR2 빠짐
+	r.Values = r.Values[:2] // PCR2 missing
 	mustErr(t, r, "missing PCR2")
 	r = recAWS()
 	r.BuildTool.Version = ""
 	mustErr(t, r, "build_tool.version")
-	// gcp: digest (태그 아님) · 도구
+	// gcp: digest (not a tag), tool
 	r = recGCP()
 	r.Image.Digest = "gcr.io/proj/svc:latest"
 	mustErr(t, r, "image.digest")
@@ -35,7 +35,7 @@ func TestMeasurementRecord_PerPlatform(t *testing.T) {
 	r = recGCP()
 	r.BuildTool.Name = ""
 	mustErr(t, r, "build_tool.name")
-	// azure: digest 또는 image_id
+	// azure: digest or image_id
 	r = recAzure()
 	r.Image.ImageID = ""
 	mustErr(t, r, "digest (container) or image_id")
@@ -44,7 +44,7 @@ func TestMeasurementRecord_PerPlatform(t *testing.T) {
 	if err := r.Validate(); err != nil {
 		t.Errorf("azure container digest must validate: %v", err)
 	}
-	// 공통
+	// common
 	r = recAWS()
 	r.Values = append(r.Values, struct {
 		Name  string `json:"name"`
@@ -53,7 +53,7 @@ func TestMeasurementRecord_PerPlatform(t *testing.T) {
 	mustErr(t, r, "values[3]")
 }
 
-// 시퀀스 9 — "이미지 파일 및 등록값 제공". 등록값은 선택이지만 있으면 둘 다 채워야 한다.
+// Providing the image file and the registration. The registration is optional, but if present both of its fields must be filled.
 func TestMeasurementRecord_Registration(t *testing.T) {
 	r := recAWS()
 	r.Registration = &Registration{Chain: "ether", Address: "0xabc"}
@@ -76,9 +76,9 @@ func TestMeasurementRecord_Registration(t *testing.T) {
 	}
 }
 
-// 같은 소스도 x86_64 와 arm64 에서, 그리고 Go 툴체인이 다르면 PCR 이 다르다. 그래서 aws 기록은 어느 빌드 환경 것인지
-// (build_env: os · arch · go · trimpath) 반드시 적는다 — build-config.json 의 build_env 와 같은 모양이다.
-// arch 철자는 GOARCH(amd64 · arm64) 하나로 — uname 이 내는 x86_64 · aarch64 는 거절한다. 출처는 build.ArchTargets.
+// The same source gives different PCRs on x86_64 and arm64, and under a different Go toolchain. So an aws record must say which build environment it comes from
+// (build_env: os, arch, go, trimpath) must be recorded; it has the same shape as build_env in build-config.json.
+// The arch spelling is GOARCH only (amd64, arm64); uname spellings such as x86_64 and aarch64 are rejected. The source is build.ArchTargets.
 func TestMeasurementRecord_BuildEnvArch(t *testing.T) {
 	for _, ok := range []string{"amd64", "arm64"} {
 		r := recAWS()
@@ -92,19 +92,19 @@ func TestMeasurementRecord_BuildEnvArch(t *testing.T) {
 		r.BuildEnv.Arch = bad
 		mustErr(t, r, "build_env.arch: want one of amd64|arm64")
 	}
-	// gcp · azure 는 아직 build_env 를 요구하지 않는다 (측정값이 이미지 digest 라 아키텍처가 따로 갈리지 않는다).
+	// gcp and azure do not require build_env yet (the measurement is an image digest, so there is no separate architecture).
 	for _, r := range []MeasurementRecord{recGCP(), recAzure()} {
 		if err := r.Validate(); err != nil {
 			t.Errorf("%s without build_env must still validate: %v", r.Platform, err)
 		}
 	}
-	// 다만 적혀 있다면 이 프로젝트가 빌드하는 아키텍처여야 한다 — 어느 플랫폼이든.
+	// If it is present, though, it must be an architecture this project builds, on any platform.
 	r := recGCP()
 	r.BuildEnv.Arch = "mips"
 	mustErr(t, r, "build_env.arch: unknown")
 }
 
-// aws 기록은 OS 와 Go 툴체인도 비워 둘 수 없다 — Vendor 가 이 기록으로 어느 툴체인이 이미지를 만들었는지 안다.
+// An aws record cannot leave the OS or Go toolchain empty either; the Vendor uses the record to learn which toolchain built the image.
 func TestMeasurementRecord_BuildEnvRequiresOSAndGoOnAWS(t *testing.T) {
 	r := recAWS()
 	r.BuildEnv.OS = ""
@@ -112,13 +112,13 @@ func TestMeasurementRecord_BuildEnvRequiresOSAndGoOnAWS(t *testing.T) {
 	r = recAWS()
 	r.BuildEnv.Go = ""
 	mustErr(t, r, "build_env.go: required for aws")
-	// trimpath=false 는 허용한다 — 사실을 적는 것이지 요구 조건이 아니다.
+	// trimpath=false is allowed: it records a fact, not a requirement.
 	r = recAWS()
 	r.BuildEnv.Trimpath = false
 	if err := r.Validate(); err != nil {
 		t.Errorf("trimpath=false must validate: %v", err)
 	}
-	// 통째로 빠진 build_env 는 세 필드를 모두 지목한다.
+	// A build_env missing entirely names all three fields.
 	r = recAWS()
 	r.BuildEnv = BuildEnv{}
 	for _, want := range []string{"build_env.os", "build_env.arch", "build_env.go"} {
@@ -126,7 +126,7 @@ func TestMeasurementRecord_BuildEnvRequiresOSAndGoOnAWS(t *testing.T) {
 	}
 }
 
-// build_env 는 파일에 그대로 실려 왕복해야 한다 — 받는 쪽(Vendor)이 어느 아키텍처·어느 툴체인의 기록인지 알 수 있게.
+// build_env must round-trip through the file unchanged, so the receiver (Vendor) can tell which architecture and toolchain the record is for.
 func TestMeasurementRecord_BuildEnvRoundTrip(t *testing.T) {
 	r := recAWS()
 	r.BuildEnv = BuildEnv{OS: "linux", Arch: "arm64", Go: "go1.26.1", Trimpath: true}
@@ -144,7 +144,7 @@ func TestMeasurementRecord_BuildEnvRoundTrip(t *testing.T) {
 	if got.BuildEnv != r.BuildEnv {
 		t.Fatalf("build_env lost in round trip: %+v", got.BuildEnv)
 	}
-	// build_env 가 빠진 파일은 받는 쪽에서 거절한다 — 메시지가 build_env 를 지목한다.
+	// A file without build_env is rejected by the receiver, and the message names build_env.
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)

@@ -1,4 +1,4 @@
-// User 요청기 → Vendor TEE 추출기. 서로 다른 역할 패키지가 하나의 연결선 위에서 맞물리는지 본다.
+// User requester to Vendor TEE extractor: checks that packages for different roles interlock over a single connection.
 package request_test
 
 import (

@@ -21,9 +21,9 @@ func Okln(a ...any) {
 	fmt.Println(Green(fmt.Sprint(a...)))
 }
 
-// Task — 진행 중인 한 단계. Start 가 "메시지" 를 찍고, 터미널이면 뒤에 점을 하나씩 늘려 가며(. .. ...) 기다리는 중임을
-// 보이고, Done/Fail 이 같은 줄을 "메시지... ✓ 결과" 또는 "메시지... ✗ 이유" 로 마감한다. 파이프로 받는 쪽(테스트·스크립트)은
-// 애니메이션 없이 "메시지... ✓ 결과" 한 줄만 본다.
+// Task is one step in progress. Start prints "message"; on a terminal it then adds dots (. .. ...) to show it is
+// waiting, and Done/Fail finish the same line as "message... ✓ result" or "message... ✗ reason". When output is piped
+// (tests, scripts) there is no animation, only the single line "message... ✓ result".
 type Task struct {
 	msg  string
 	tty  bool
@@ -82,7 +82,8 @@ func (t *Task) Done(detail string) { t.end(Green("✓"), detail) }
 // Fail closes the step as a failure: "msg... ✗ detail" (red).
 func (t *Task) Fail(detail string) { t.end(Red("✗"), detail) }
 
-// Why — 방금 끝난 단계가 왜 필요한지 한 문장. 들여쓴 보조 줄로 찍어, 우리 용어를 모르는 사람도 따라오게 한다.
+// Why prints one sentence on why the step that just finished is needed, as an indented line, so readers who do not
+// know our terms can still follow.
 func Why(s string) {
 	fmt.Println("      · " + s)
 }

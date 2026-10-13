@@ -1,4 +1,4 @@
-// Package vendor 는 RA 파싱 — 서명과 난수를 확인하고 측정값만 꺼낸다.
+// Package vendor parses RA documents: it verifies the signature and nonce and extracts only the measurements.
 package vendor
 
 import (
@@ -16,7 +16,7 @@ type Measurement struct {
 
 type Measurements []Measurement
 
-// Get 은 이름으로 값을 찾는다. 없으면 nil.
+// Get finds a value by name, or returns nil.
 func (ms Measurements) Get(name string) []byte {
 	for _, m := range ms {
 		if m.Name == name {
@@ -26,23 +26,23 @@ func (ms Measurements) Get(name string) []byte {
 	return nil
 }
 
-// Parser 는 플랫폼마다 하나. key 는 그 플랫폼의 검증 키(예: Nitro 루트 인증서 PEM). 비우면 내장된 것.
+// There is one Parser per platform. key is that platform's verification key (e.g. the Nitro root certificate PEM); if empty, the built-in one is used.
 type Parser interface {
-	// VerifySig 는 문서가 그 플랫폼이 서명한 것인지 본다. 서명과 인증서 체인.
+	// VerifySig checks that the platform signed the document: the signature and the certificate chain.
 	VerifySig(ctx context.Context, ra r.RADoc, key []byte) error
-	// CheckNonce 는 문서 안의 난수가 내가 보낸 것인지 본다.
+	// CheckNonce checks that the nonce inside the document is the one I sent.
 	CheckNonce(ra r.RADoc, nonce r.Nonce) error
-	// Parse 는 측정값을 꺼낸다. 서명은 보지 않는다 — VerifySig 를 먼저 통과시켜야 한다.
+	// Parse extracts the measurements. It does not check the signature; run VerifySig first.
 	Parse(ra r.RADoc) (Measurements, error)
 }
 
-// Info 는 측정값 말고 문서가 말하는 것들. 대조 · 판정에서 만료 · 신선도 · 디버그 여부를 볼 때 쓴다.
+// Info is what the document says besides the measurements. Comparison uses it to check expiry, freshness and debug mode.
 type Info struct {
 	Format    string
-	Timestamp time.Time // 문서가 만들어진 시각. 이 시각에 인증서가 유효했는지로 판단한다
+	Timestamp time.Time // when the document was created; certificates are judged valid as of this time
 	Nonce     []byte
 	UserData  []byte
-	Debug     bool // 디버그 모드 TEE — 측정값이 의미가 없다
+	Debug     bool // debug-mode TEE: the measurements are meaningless
 	Module    string
 }
 

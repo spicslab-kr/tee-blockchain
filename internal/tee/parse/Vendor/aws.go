@@ -1,6 +1,6 @@
-// AWS Nitro 파서. Vendor 의 RADoc · Measurements 타입으로 tb/internal/tee/parse/aws (역할과 무관한 실제
-// 로직 — CBOR 디코딩, 인증서 체인 · 서명 확인, PCR 추출) 를 감싼다. 로직 자체는 세 역할이 완전히 같아서
-// 한 곳에만 있고, 여기는 타입을 맞바꾸는 얇은 어댑터다.
+// AWS Nitro parser. It wraps tb/internal/tee/parse/aws (the role-independent logic: CBOR decoding, certificate
+// chain and signature verification, PCR extraction) with Vendor's RADoc and Measurements types. The logic is identical
+// for all three roles and lives in one place; this is a thin adapter that only converts types.
 package vendor
 
 import (
@@ -13,13 +13,13 @@ import (
 	r "tb/internal/tee/request/Vendor"
 )
 
-// AWSFormat 은 AWS Nitro 파서가 읽는 문서 형식.
+// AWSFormat is the document format the AWS Nitro parser reads.
 const AWSFormat = shared.Format
 
-// AWSRootPEM 은 내장된 AWS Nitro Enclaves 루트 인증서. AWSParser.VerifySig 의 key 를 비우면 이것을 쓴다.
+// AWSRootPEM is the built-in AWS Nitro Enclaves root certificate. It is used when AWSParser.VerifySig is given an empty key.
 func AWSRootPEM() []byte { return shared.RootPEM() }
 
-// AWSParser — Now 가 0 이면 인증서 체인을 문서의 시각에서 판단한다.
+// AWSParser: if Now is zero, the certificate chain is judged at the document's own time.
 type AWSParser struct {
 	Now time.Time
 }
@@ -61,7 +61,7 @@ func (a AWSParser) Info(ra r.RADoc) (Info, error) {
 	}, nil
 }
 
-// awsTranslate — 공통 패키지의 에러를 이 역할의 에러 값으로 바꿔, errors.Is(err, ErrXxx) 가 그대로 통하게 한다.
+// awsTranslate converts the shared package's errors into this role's error values, so errors.Is(err, ErrXxx) keeps working.
 func awsTranslate(err error) error {
 	switch {
 	case err == nil:

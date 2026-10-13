@@ -11,7 +11,7 @@ import (
 	"unsafe"
 )
 
-// AF_VSOCK 은 Go 의 net 패키지가 모르는 주소 체계라 소켓을 직접 다룬다.
+// AF_VSOCK is an address family Go's net package does not know, so the socket is handled directly.
 const (
 	afVsock      = 40
 	vmaddrCIDAny = 0xffffffff
@@ -32,7 +32,7 @@ func (a vsockAddr) String() string {
 	return strconv.FormatUint(uint64(a.cid), 10) + ":" + strconv.FormatUint(uint64(a.port), 10)
 }
 
-// ListenVsock 은 엔클레이브 안에서 vsock 포트를 연다. 부모 인스턴스가 여기로 이어 준다.
+// ListenVsock opens a vsock port inside the enclave. The parent instance connects to it.
 func ListenVsock(port uint32) (net.Listener, error) {
 	fd, err := syscall.Socket(afVsock, syscall.SOCK_STREAM|syscall.SOCK_CLOEXEC, 0)
 	if err != nil {
@@ -54,7 +54,7 @@ func ListenVsock(port uint32) (net.Listener, error) {
 	return &vsockListener{f: os.NewFile(uintptr(fd), "vsock"), addr: vsockAddr{vmaddrCIDAny, port}}, nil
 }
 
-// DialVsock 은 부모 인스턴스에서 엔클레이브(cid)의 포트로 연결한다.
+// DialVsock connects from the parent instance to a port of the enclave (cid).
 func DialVsock(cid, port uint32) (net.Conn, error) {
 	fd, err := syscall.Socket(afVsock, syscall.SOCK_STREAM|syscall.SOCK_CLOEXEC, 0)
 	if err != nil {
@@ -116,7 +116,7 @@ func (l *vsockListener) closed() bool {
 	return err != nil
 }
 
-// vsockConn 은 받은 연결을 net.Conn 으로 감싼다. 마감은 os.File 이 처리한다.
+// vsockConn wraps an accepted connection as a net.Conn. Deadlines are handled by os.File.
 type vsockConn struct {
 	f             *os.File
 	local, remote vsockAddr
@@ -131,7 +131,7 @@ func (c *vsockConn) SetDeadline(t time.Time) error      { return c.f.SetDeadline
 func (c *vsockConn) SetReadDeadline(t time.Time) error  { return c.f.SetReadDeadline(t) }
 func (c *vsockConn) SetWriteDeadline(t time.Time) error { return c.f.SetWriteDeadline(t) }
 
-// CloseWrite 는 보내는 방향만 닫는다. 상대는 EOF 를 읽고, 우리는 남은 응답을 계속 받을 수 있다.
+// CloseWrite closes only the sending direction. The peer reads EOF, and we can keep receiving the rest of the response.
 func (c *vsockConn) CloseWrite() error {
 	rc, err := c.f.SyscallConn()
 	if err != nil {

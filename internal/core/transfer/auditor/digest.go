@@ -13,7 +13,7 @@ func Digest(b []byte) string {
 	return hex.EncodeToString(s[:])
 }
 
-// FileDigest — 파일의 SHA-256.
+// FileDigest returns the SHA-256 of a file.
 func FileDigest(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {

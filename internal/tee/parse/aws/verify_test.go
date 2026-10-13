@@ -25,7 +25,7 @@ func TestVerifySig_RealDocumentWithEmbeddedRoot(t *testing.T) {
 
 func TestVerifySig_ChainIsJudgedAtDocumentTime(t *testing.T) {
 	raw, _ := realDoc(t)
-	// 잎 인증서는 몇 시간짜리라 오늘 기준으로는 만료됐다. 문서 시각 기준(기본)으로는 유효.
+	// The leaf certificate lasts only a few hours, so it has expired as of today. As of the document time (the default) it is valid.
 	err := (Parser{Now: time.Now().Add(365 * 24 * time.Hour)}).VerifySig(context.Background(), Format, raw, nil)
 	if !errors.Is(err, ErrChain) {
 		t.Fatalf("a year later the chain must have lapsed: %v", err)
@@ -34,7 +34,7 @@ func TestVerifySig_ChainIsJudgedAtDocumentTime(t *testing.T) {
 
 func TestVerifySig_WrongRootIsRefused(t *testing.T) {
 	raw, _ := realDoc(t)
-	// 우리가 방금 만든, AWS 와 무관한 루트
+	// A root we just created, unrelated to AWS
 	key, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "other root"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(24 * time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
 	der, _ := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
@@ -55,7 +55,7 @@ func TestVerifySig_TamperedPayloadFailsSignature(t *testing.T) {
 	if err := cbor.Unmarshal(cose.Payload, &d); err != nil {
 		t.Fatal(err)
 	}
-	d.PCRs[0][0] ^= 0xff // 측정값 한 바이트를 바꾼다
+	d.PCRs[0][0] ^= 0xff // change one byte of the measurement
 	payload, _ := cbor.Marshal(d)
 	cose.Payload = payload
 	tampered, _ := cbor.Marshal(cose)

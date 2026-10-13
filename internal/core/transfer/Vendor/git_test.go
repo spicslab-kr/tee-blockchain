@@ -15,12 +15,12 @@ func TestGitSend_PushesBuildConfig(t *testing.T) {
 	remote := newRemote(t)
 	work := clientDir(t, remote)
 	cfg := cfgAWS()
-	cfg.Source = Source{Repo: "", Commit: ""} // Send 가 채운다
+	cfg.Source = Source{Repo: "", Commit: ""} // filled in by Send
 	res, err := GitTransport{WorkDir: work}.Send(context.Background(), cfg, remote)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 원격에 올라갔는지 다른 clone 으로 확인
+	// Check with another clone that it reached the remote
 	check := filepath.Join(t.TempDir(), "check")
 	run(t, "", "clone", "--quiet", remote, check)
 	if head := strings.TrimSpace(run(t, check, "rev-parse", "HEAD")); head != res.Commit {

@@ -8,14 +8,14 @@ import (
 	"time"
 )
 
-// TCPRequester 는 teeAddr(host:port)로 접속해 난수를 보내고 RA 문서를 받는다.
-// Nitro 는 부모 인스턴스가 TCP↔vsock 을 이어 주므로 어느 플랫폼이든 TCP 로 부른다.
+// TCPRequester connects to teeAddr (host:port), sends a nonce and receives the RA document.
+// On Nitro the parent instance bridges TCP and vsock, so every platform is reached over TCP.
 type TCPRequester struct {
-	Timeout time.Duration // 0 이면 30s
-	Nonces  NonceSource   // nil 이면 DefaultNonceSource
+	Timeout time.Duration // 30s if 0
+	Nonces  NonceSource   // DefaultNonceSource if nil
 }
 
-// RequestFresh 는 난수를 새로 만들어 보내고, 문서와 함께 그 난수를 돌려준다.
+// RequestFresh generates and sends a new nonce, and returns that nonce together with the document.
 func (q TCPRequester) RequestFresh(ctx context.Context, teeAddr string) (Nonce, RADoc, error) {
 	src := q.Nonces
 	if src == nil {
@@ -59,7 +59,7 @@ func (q TCPRequester) Request(ctx context.Context, nonce Nonce, teeAddr string) 
 	return readResponse(conn)
 }
 
-// Serve 는 TEE 안에서 돈다. 연결마다 난수를 읽어 ex 로 문서를 뽑고 돌려준다. ctx 가 끝나면 멈춘다.
+// Serve runs inside the TEE. For each connection it reads a nonce, extracts a document with ex and sends it back. It stops when ctx ends.
 func Serve(ctx context.Context, ln net.Listener, ex Extractor) error {
 	go func() {
 		<-ctx.Done()
@@ -91,7 +91,7 @@ func handle(ctx context.Context, conn net.Conn, ex Extractor) {
 	drain(conn)
 }
 
-// drain — 남은 입력을 비운다. 읽지 않은 바이트가 있는 채로 닫으면 응답이 RST 로 버려질 수 있다.
+// drain discards the remaining input. Closing with unread bytes can make the response be dropped by an RST.
 func drain(conn net.Conn) {
 	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 	_, _ = io.Copy(io.Discard, conn)

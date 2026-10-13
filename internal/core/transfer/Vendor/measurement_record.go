@@ -10,18 +10,18 @@ import (
 
 const SchemaMeasurementRecord = "tb.measurement-record/1"
 
-// MeasurementNames — 플랫폼별 필수 측정값 이름.
+// MeasurementNames lists the required measurement names per platform.
 var MeasurementNames = map[string][]string{
 	"aws":   {"PCR0", "PCR1", "PCR2"},
 	"gcp":   {"image_digest"},
-	"azure": {}, // digest(컨테이너) 또는 image_id(VM) — Image 에서 본다
+	"azure": {}, // digest (container) or image_id (VM); see Image
 }
 
-// Image — aws 는 파일+sha256, gcp 는 digest, azure 는 digest 또는 image_id.
+// Image: aws is a file plus sha256, gcp is a digest, azure is a digest or an image_id.
 type Image struct {
 	Path    string `json:"path,omitempty"`
 	SHA256  string `json:"sha256,omitempty"`
-	Digest  string `json:"digest,omitempty"` // "sha256:<hex>" — 태그 아님
+	Digest  string `json:"digest,omitempty"` // "sha256:<hex>", not a tag
 	ImageID string `json:"image_id,omitempty"`
 }
 
@@ -30,7 +30,7 @@ type BuildTool struct {
 	Version string `json:"version,omitempty"`
 }
 
-// Registration — 체인에 등록된 위치. 선택.
+// Registration is where it was registered on the chain. Optional.
 type Registration struct {
 	Chain   string `json:"chain"`
 	Address string `json:"address"`
@@ -122,7 +122,7 @@ func (r MeasurementRecord) Validate() error {
 	return join(errs)
 }
 
-// archNames — 이 프로젝트가 빌드하는 아키텍처의 GOARCH 이름. build.ArchTargets 가 유일한 출처다.
+// archNames are the GOARCH names of the architectures this project builds. build.ArchTargets is the only source.
 func archNames() []string {
 	out := make([]string, 0, len(build.ArchTargets))
 	for _, t := range build.ArchTargets {

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Encode — 들여쓰기 고정.
+// Encode uses fixed indentation.
 func Encode(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -42,7 +42,7 @@ func DecodeMeasurementRecord(b []byte) (MeasurementRecord, error) {
 	return r, nil
 }
 
-// decodeStrict — 모르는 필드는 거절한다.
+// decodeStrict rejects unknown fields.
 func decodeStrict(b []byte, v any) error {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()

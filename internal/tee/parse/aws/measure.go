@@ -13,7 +13,7 @@ type Measurement struct {
 
 type Measurements []Measurement
 
-// Get 은 이름으로 값을 찾는다. 없으면 nil.
+// Get finds a value by name, or returns nil.
 func (ms Measurements) Get(name string) []byte {
 	for _, m := range ms {
 		if m.Name == name {
@@ -23,22 +23,23 @@ func (ms Measurements) Get(name string) []byte {
 	return nil
 }
 
-// Info 는 측정값 말고 문서가 말하는 것들. 대조 · 판정에서 만료 · 신선도 · 디버그 여부를 볼 때 쓴다.
+// Info is what the document says besides the measurements. Comparison uses it to check expiry, freshness and debug mode.
 type Info struct {
 	Format    string
-	Timestamp time.Time // 문서가 만들어진 시각. 이 시각에 인증서가 유효했는지로 판단한다
+	Timestamp time.Time // when the document was created; certificates are judged valid as of this time
 	Nonce     []byte
 	UserData  []byte
-	Debug     bool // 디버그 모드 TEE — 측정값이 의미가 없다
+	Debug     bool // debug-mode TEE: the measurements are meaningless
 	Module    string
 }
 
-// imagePCRs — 이미지(코드)를 말하는 레지스터. nitro-cli build-enclave 가 내는 것과 같은 셋이라, 여기서 나온
-// 값이 빌드값 · 측정값 기록 · 체인 등록값과 그대로 맞대진다. PCR3(IAM 역할) · PCR4(부모 인스턴스 ID) ·
-// PCR8(서명 인증서)은 어느 기계에서 돌았나이지 무엇이 돌았나가 아니라서 뺀다 — 인스턴스는 Info.Module 로 본다.
+// imagePCRs are the registers that describe the image (the code). They are the same three that nitro-cli
+// build-enclave outputs, so values from here compare directly against the build values, the measurement record
+// and the on-chain registration. PCR3 (IAM role), PCR4 (parent instance ID) and PCR8 (signing certificate) say
+// which machine it ran on, not what ran, so they are left out; the instance is available as Info.Module.
 var imagePCRs = []uint{0, 1, 2}
 
-// Parse — PCR0 · 1 · 2 를 PCR<n> 이름으로. 전부 0 인 레지스터(디버그 모드)는 뺀다.
+// Parse returns PCR0, 1 and 2 under the names PCR<n>. An all-zero register (debug mode) is left out.
 func (a Parser) Parse(format string, raw []byte) (Measurements, error) {
 	_, doc, err := decode(format, raw)
 	if err != nil {
@@ -58,7 +59,7 @@ func (a Parser) Parse(format string, raw []byte) (Measurements, error) {
 	return out, nil
 }
 
-// Info — 시각 · 난수 · 디버그 여부. 디버그 모드 엔클레이브는 PCR0 이 전부 0 이다.
+// Info returns the time, nonce and debug flag. A debug-mode enclave has an all-zero PCR0.
 func (a Parser) Info(format string, raw []byte) (Info, error) {
 	_, doc, err := decode(format, raw)
 	if err != nil {

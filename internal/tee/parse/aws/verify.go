@@ -14,13 +14,14 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
-// Parser — Now 가 0 이면 인증서 체인을 문서의 시각에서 판단한다. Nitro 잎 인증서는 세 시간쯤 살아서,
-// 나중에 다시 열어 보는 문서는 "만들어졌을 때 유효했나" 로 봐야 한다. 신선도는 따로 본다.
+// Parser: if Now is zero, the certificate chain is judged at the document's own time. A Nitro leaf certificate
+// lives only about three hours, so a document opened later must be judged by whether it was valid when it was
+// created. Freshness is checked separately.
 type Parser struct {
 	Now time.Time
 }
 
-// VerifySig — 순서: 문서 해석 → 잎 인증서가 루트(key)까지 이어지는지(문서 시각 기준) → COSE 서명이 잎 인증서 키로 맞는지.
+// VerifySig runs in this order: decode the document, check that the leaf certificate chains to the root (key) as of the document time, then check the COSE signature against the leaf certificate key.
 func (a Parser) VerifySig(ctx context.Context, format string, raw []byte, key []byte) error {
 	cose, doc, err := decode(format, raw)
 	if err != nil {
@@ -76,7 +77,7 @@ func (a Parser) VerifySig(ctx context.Context, format string, raw []byte, key []
 	return nil
 }
 
-// checkAlg — protected header 는 {1: -35} (ES384) 여야 한다.
+// checkAlg requires the protected header to be {1: -35} (ES384).
 func checkAlg(protected []byte) error {
 	var hdr map[int]int
 	if err := cbor.Unmarshal(protected, &hdr); err != nil {

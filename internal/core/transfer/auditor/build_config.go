@@ -1,4 +1,4 @@
-// Package auditor 는 파일 전달 — 빌드 설정값과 측정값 기록을 보내고 받는다.
+// Package auditor transfers files: it sends and receives the build config and the measurement record.
 package auditor
 
 import (
@@ -10,7 +10,7 @@ import (
 
 const SchemaBuildConfig = "tb.build-config/1"
 
-// TEEInfoKeys — 플랫폼별 필수 TEE 정보 키.
+// TEEInfoKeys lists the required TEE info keys per platform.
 var TEEInfoKeys = map[string][]string{
 	"aws":   {"instance_id", "region", "ami_id"},
 	"gcp":   {"instance_name", "project_id", "container_image"},

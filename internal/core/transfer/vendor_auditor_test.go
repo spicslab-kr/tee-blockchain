@@ -1,4 +1,4 @@
-// Vendor ↔ Auditor 전달 — 한쪽이 Send 한 것을 다른 쪽이 Receive 한다. 시퀀스 1 · 9, 흐름 2 의 10 을 그대로 돈다.
+// Vendor <-> Auditor transfer: what one side Sends the other Receives. This runs the Vendor-to-Auditor source handoff and the Auditor-to-Vendor image handoff as they happen in practice.
 package transfer_test
 
 import (
@@ -16,7 +16,7 @@ import (
 
 const commit = "0123456789abcdef0123456789abcdef01234567"
 
-// 시퀀스 1 — Vendor 가 소스 + TEE 정보를 보내고 Auditor 가 받는다. 세 플랫폼 모두.
+// The Vendor sends source plus TEE info and the Auditor receives it, on all three platforms.
 func TestTransfer_VendorToAuditor_BuildConfig(t *testing.T) {
 	cases := []vendor.BuildConfig{
 		{Schema: vendor.SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "aws",
@@ -53,8 +53,8 @@ func TestTransfer_VendorToAuditor_BuildConfig(t *testing.T) {
 	}
 }
 
-// 시퀀스 9 — Auditor 가 빌드한 이미지 파일 + 측정값 + 등록값을 보내고 Vendor 가 받는다.
-// Vendor 는 받은 원본을 그대로 보관한다(M2 기준값). 이미지 해시가 기록과 맞아야 한다.
+// The Auditor sends the image file it built, the measurements and the registration, and the Vendor receives them.
+// The Vendor keeps the received original as is (the reference value for comparison). The image hash must match the record.
 func TestTransfer_AuditorToVendor_MeasurementRecordWithImage(t *testing.T) {
 	build := t.TempDir()
 	eif := filepath.Join(build, "svc.eif")
@@ -93,14 +93,14 @@ func TestTransfer_AuditorToVendor_MeasurementRecordWithImage(t *testing.T) {
 	if got.Value.Registration == nil || got.Value.Registration.Address != "0xabc" {
 		t.Errorf("registration lost: %+v", got.Value.Registration)
 	}
-	// 원본 보관: Raw 가 파일 바이트와 같고, 사이드카 해시와 일치
+	// Original kept: Raw equals the file bytes and matches the sidecar hash
 	disk, _ := os.ReadFile(got.Path)
 	if !bytes.Equal(got.Raw, disk) {
 		t.Error("Raw must equal the file on disk")
 	}
 }
 
-// 시퀀스 9 — GCP · Azure 는 이미지가 digest / ID 라 파일 없이 기록만 간다.
+// On GCP and Azure the image is a digest / ID, so only the record is sent, with no file.
 func TestTransfer_AuditorToVendor_DigestOnlyPlatforms(t *testing.T) {
 	recs := []auditor.MeasurementRecord{
 		{Schema: auditor.SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "gcp",
@@ -127,7 +127,7 @@ func TestTransfer_AuditorToVendor_DigestOnlyPlatforms(t *testing.T) {
 	}
 }
 
-// 전달 중 바뀌면 받는 쪽이 거절한다 — 기록 파일과 이미지 파일 둘 다.
+// If it changes in transit the receiver rejects it, for both the record file and the image file.
 func TestTransfer_TamperInTransitIsCaught(t *testing.T) {
 	build := t.TempDir()
 	eif := filepath.Join(build, "svc.eif")
@@ -138,14 +138,14 @@ func TestTransfer_TamperInTransitIsCaught(t *testing.T) {
 		Values:    ap.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{1}, 48)}, {Name: "PCR1", Value: bytes.Repeat([]byte{2}, 48)}, {Name: "PCR2", Value: bytes.Repeat([]byte{3}, 48)}},
 		BuildTool: auditor.BuildTool{Name: "nitro-cli", Version: "1.3.0"},
 	}
-	// 이미지 바꿔치기
+	// Swap the image
 	dir := t.TempDir()
 	_, _ = (auditor.FileTransport{}).Send(context.Background(), rec, dir)
 	_ = os.WriteFile(filepath.Join(dir, "svc.eif"), []byte("evil"), 0o644)
 	if _, err := (vendor.FileTransport{}).Receive(context.Background(), dir); err == nil || !strings.Contains(err.Error(), "image file") {
 		t.Fatalf("swapped image must be caught, got %v", err)
 	}
-	// 기록 바꿔치기 (PCR 값 한 글자)
+	// Tamper with the record (one character of a PCR value)
 	dir = t.TempDir()
 	path, _ := (auditor.FileTransport{}).Send(context.Background(), rec, dir)
 	raw, _ := os.ReadFile(path)

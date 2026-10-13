@@ -11,7 +11,7 @@ import (
 
 const Format = "aws-nitro"
 
-// NSM 요청 — {"Attestation": {"user_data": .., "nonce": .., "public_key": ..}}
+// NSM request: {"Attestation": {"user_data": .., "nonce": .., "public_key": ..}}
 type nsmRequest struct {
 	Attestation nsmAttestationReq `cbor:"Attestation"`
 }
@@ -22,7 +22,7 @@ type nsmAttestationReq struct {
 	PublicKey []byte `cbor:"public_key"`
 }
 
-// NSM 응답 — {"Attestation": {"document": ..}} 또는 {"Error": "..."}
+// NSM response: {"Attestation": {"document": ..}} or {"Error": "..."}
 type nsmResponse struct {
 	Attestation *struct {
 		Document []byte `cbor:"document"`

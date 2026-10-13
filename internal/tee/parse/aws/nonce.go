@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-// CheckNonce — 문서의 nonce 가 내가 보낸 것과 같은지.
+// CheckNonce checks that the document's nonce equals the one I sent.
 func (a Parser) CheckNonce(format string, raw []byte, nonce []byte) error {
 	_, doc, err := decode(format, raw)
 	if err != nil {

@@ -65,7 +65,7 @@ func TestSend_AWS_CopiesImageAndFillsHash(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := recAWS()
-	r.Image = Image{Path: eif} // 해시는 Send 가 채운다
+	r.Image = Image{Path: eif} // the hash is filled in by Send
 	dst := t.TempDir()
 	path, err := (FileTransport{}).Send(context.Background(), r, dst)
 	if err != nil {

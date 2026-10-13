@@ -10,13 +10,13 @@ import (
 	"strings"
 )
 
-// Transport — 빌드 설정값을 받고 측정값 기록과 이미지를 보낸다.
+// Transport receives the build config and sends the measurement record and image.
 type Transport interface {
 	Receive(ctx context.Context, from string) (Received, error)
 	Send(ctx context.Context, rec MeasurementRecord, to string) (path string, err error)
 }
 
-// Received — 해석한 값과 원본 바이트.
+// Received holds the parsed value and the original bytes.
 type Received struct {
 	Value  BuildConfig
 	Raw    []byte
@@ -28,7 +28,7 @@ type FileTransport struct{}
 
 var _ Transport = (*FileTransport)(nil)
 
-// Receive — 해시를 확인하고 읽는다.
+// Receive checks the hash, then reads.
 func (FileTransport) Receive(ctx context.Context, from string) (Received, error) {
 	if err := ctx.Err(); err != nil {
 		return Received{}, err
@@ -49,7 +49,7 @@ func (FileTransport) Receive(ctx context.Context, from string) (Received, error)
 	return Received{Value: cfg, Raw: raw, Path: src, SHA256: sum}, nil
 }
 
-// Send — 기록을 쓰고, 이미지 파일이 있으면 같은 디렉터리로 복사한다. 기록의 sha256 은 파일과 맞아야 한다.
+// Send writes the record and, if there is an image file, copies it into the same directory. The record's sha256 must match the file.
 func (FileTransport) Send(ctx context.Context, rec MeasurementRecord, to string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err

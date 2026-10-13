@@ -16,7 +16,7 @@ func TestParse_RealDocumentPCRs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// nitro-cli build-enclave 가 그때 낸 값
+	// The values nitro-cli build-enclave produced at the time
 	want := map[string]string{
 		"PCR0": "a0099c1cd2af380adf19601ad09aa49380fc8c3c78e875ac9fe958fc6a836a8d3c30ca5ff5d66c9dc7293cd30ce67fb1",
 		"PCR1": "4b4d5b3661b3efc12920900c80e126e4ce783c522de6c02a2a5bf7af3a2b9327b86776f188e4be1c1c404a129dbda493",
@@ -56,7 +56,7 @@ func TestInfo(t *testing.T) {
 	}
 }
 
-// hf/nitrite 를 정답으로 두고 우리 해석과 맞춰 본다. 라이브러리는 테스트에서만 쓴다.
+// Use hf/nitrite as the reference and compare our interpretation against it. The library is used in tests only.
 func TestAgainstNitrite(t *testing.T) {
 	raw, _ := realDoc(t)
 	info, _ := (Parser{}).Info(Format, raw)

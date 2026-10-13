@@ -12,9 +12,9 @@ const (
 	MeasurementRecordFile = "measurement-record.json"
 )
 
-// GitTransport — Receive 는 소스 저장소를 clone 해 빌드 설정값을 받고, Send 는 측정값 기록과 이미지를 커밋 · push 한다.
+// GitTransport: Receive clones the source repository and reads the build config; Send commits and pushes the measurement record and image.
 type GitTransport struct {
-	WorkDir string // 비어 있으면 Send 가 임시로 clone 한다
+	WorkDir string // if empty, Send clones into a temporary directory
 }
 
 type SendResult struct {
@@ -23,7 +23,7 @@ type SendResult struct {
 	Path   string
 }
 
-// Receive — repo 를 into 로 clone 하고 빌드 설정값을 읽는다. source.commit 이 checkout 이력에 있어야 한다.
+// Receive clones repo into into and reads the build config. source.commit must be in the checked-out history.
 func (g GitTransport) Receive(ctx context.Context, repo, ref, into string) (Received, error) {
 	if err := ctx.Err(); err != nil {
 		return Received{}, err
@@ -42,7 +42,7 @@ func (g GitTransport) Receive(ctx context.Context, repo, ref, into string) (Rece
 	return got, nil
 }
 
-// Send — 측정값 기록과 이미지 파일을 커밋 · push 한다.
+// Send commits and pushes the measurement record and image file.
 func (g GitTransport) Send(ctx context.Context, rec MeasurementRecord, repo string) (SendResult, error) {
 	if err := ctx.Err(); err != nil {
 		return SendResult{}, err

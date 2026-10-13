@@ -42,7 +42,7 @@ func TestNonceSource_Injected(t *testing.T) {
 	if !bytes.HasSuffix(doc.Raw, want) {
 		t.Fatal("document must be bound to that nonce")
 	}
-	// 기본은 CryptoRand
+	// The default is CryptoRand
 	if _, ok := DefaultNonceSource.(CryptoRand); !ok {
 		t.Fatalf("default source = %T", DefaultNonceSource)
 	}
@@ -89,7 +89,7 @@ func TestWire_Rejects(t *testing.T) {
 	if err := writeResponse(&buf, RADoc{Format: "aws-nitro", Raw: make([]byte, MaxDocSize+1)}, nil); !errors.Is(err, ErrTooLarge) {
 		t.Errorf("oversize write: %v", err)
 	}
-	// 길이 필드만 크게 조작
+	// Tamper with only the length field, making it large
 	hdr := append([]byte("TBRA\x01\x00\x03aws"), 0xff, 0xff, 0xff, 0xff)
 	if _, err := readResponse(bytes.NewReader(hdr)); !errors.Is(err, ErrTooLarge) {
 		t.Errorf("oversize read: %v", err)

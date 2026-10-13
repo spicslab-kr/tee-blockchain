@@ -60,7 +60,7 @@ func TestExtractor_ShortNonce(t *testing.T) {
 	}
 }
 
-// 테스트 서버 주소로 바꿔 보내는 RoundTripper
+// A RoundTripper that redirects requests to the test server address
 type rewrite struct {
 	base string
 	rt   http.RoundTripper

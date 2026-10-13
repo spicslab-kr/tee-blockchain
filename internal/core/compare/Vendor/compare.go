@@ -1,9 +1,10 @@
-// Package vendor 는 M2 대조·판정 — 값 두 개를 받아 일치/불일치와 근거를 낸다.
+// Package vendor compares two sets of values and reports match or mismatch with reasons.
 //
-// 실제 로직(항목별 대조, 만료 · 신뢰 서명자 확인)은 internal/core/compare 에 역할 무관하게 한 벌만 있다.
-// 여기는 이 역할의 tee/parse/auditor.Measurements 를 그 로직이 받는 모양(compare.Items)으로 바꿔주는
-// 얇은 델리게이트다. auditor · Vendor · user 세 곳에 똑같이 있다 — Comparer 인터페이스 자체가
-// Measurements 타입을 받아서, Go 에서는 역할마다 다른 타입이라 인터페이스를 셋이 같이 쓸 수 없다.
+// The actual logic (per-item comparison, expiry and trusted-signer checks) lives once, role-independent, in
+// internal/core/compare. This package is a thin delegate that converts this role's tee/parse/auditor.Measurements
+// into the shape that logic takes (compare.Items). The same delegate exists for auditor, Vendor and user,
+// because the Comparer interface takes a Measurements type and Go cannot share one interface across the
+// three per-role types.
 package vendor
 
 import (
@@ -19,9 +20,9 @@ import (
 type Verdict = compare.Verdict
 
 type Comparer interface {
-	// Compare — 파싱값 vs 빌드값, 조회값 vs 등록값처럼 측정값 묶음 두 개를 그대로 맞대본다.
+	// Compare matches two sets of measurements directly, e.g. parsed vs build values, or lookup vs registered values.
 	Compare(a, b p.Measurements) Verdict
-	// Check — 체인 등록 정보가 낀 대조. 값이 같은지뿐 아니라 만료 · 승인 서명자(trusted)까지 본다.
+	// Check compares against an on-chain registration. Besides equal values it checks expiry and the approving signer (trusted).
 	Check(a p.Measurements, reg l.Registration, now int64, trusted []string) Verdict
 }
 
@@ -53,10 +54,11 @@ func (Impl) Check(a p.Measurements, r l.Registration, now int64, trusted []strin
 	}, now, trusted)
 }
 
-// Clock — Check 의 now 로 쓸 시각. 등록을 읽어 온 블록의 시각(Registration.ChainTime)이 있으면 그것,
-// 없으면(옛 조회 결과·테스트 더미) 이 기계의 시계. 만료는 컨트랙트도 block.timestamp 로 판정하므로 검증자
-// 쪽도 같은 시계를 써야 한다 — 폐기가 없는 설계에서 만료가 승인이 죽는 유일한 길인데, 검증자 노트북의
-// 시계가 느리면 죽은 승인을 살아 있다고 보게 된다.
+// Clock returns the time to use as Check's now: the time of the block the registration was read from
+// (Registration.ChainTime) if present, otherwise (old lookup results, test stubs) this machine's clock. The
+// contract judges expiry by block.timestamp, so the verifier must use the same clock. With no revocation,
+// expiry is the only way an approval dies, and a slow clock on the verifier's laptop would make a dead
+// approval look alive.
 func Clock(r l.Registration) int64 {
 	if r.ChainTime > 0 {
 		return r.ChainTime

@@ -7,7 +7,7 @@ import (
 	r "tb/internal/tee/request/auditor"
 )
 
-// GCPParser — GCP Confidential Space (JWT) 문서용. 아직 구현되지 않았다.
+// GCPParser is for GCP Confidential Space (JWT) documents. Not implemented yet.
 type GCPParser struct{}
 
 var _ Parser = (*GCPParser)(nil)

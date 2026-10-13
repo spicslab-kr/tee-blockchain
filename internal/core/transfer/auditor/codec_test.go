@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// 규격 회귀 — JSON 이 바뀌면 여기와 달라져 실패한다. 의도한 변경이면 기대값을 고친다.
+// Format regression: if the JSON changes it no longer matches this and the test fails. If the change is intended, update the expected value.
 const (
 	wantBuildConfigJSON = `{
   "schema": "tb.build-config/1",
@@ -125,4 +125,4 @@ func TestDecode_WrongSchemaRejected(t *testing.T) {
 	}
 }
 
-// launch.md — 플랫폼마다 설정값에 넣어야 하는 키가 빠지면 거절.
+// A config missing the keys required for its platform is rejected.

@@ -47,4 +47,4 @@ func TestBuildConfig_TEEInfoKeysPerPlatform(t *testing.T) {
 	}
 }
 
-// build.md — 플랫폼마다 측정값 기록에 넣어야 하는 것.
+// What the measurement record must contain for each platform.

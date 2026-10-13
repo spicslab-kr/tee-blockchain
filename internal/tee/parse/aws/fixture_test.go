@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// 실제 Nitro 엔클레이브(nginx, my-web)에서 받은 문서와 그때 보낸 난수.
+// A document received from a real Nitro enclave (nginx, my-web) and the nonce sent with it.
 //
 //go:embed testdata/fixture-my-web.cbor
 var myWebDoc []byte
