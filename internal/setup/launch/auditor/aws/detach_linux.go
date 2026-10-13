@@ -4,5 +4,5 @@ package aws
 
 import "syscall"
 
-// detached — 부모가 끝나도 살아 있게 새 세션으로 띄운다.
+// detached starts the process in a new session so it stays alive after the parent exits.
 func detached() *syscall.SysProcAttr { return &syscall.SysProcAttr{Setsid: true} }

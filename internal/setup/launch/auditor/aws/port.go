@@ -13,9 +13,9 @@ import (
 	"time"
 )
 
-// OpenPort 는 이 인스턴스의 보안 그룹에 TCP port 인바운드를 연다. 인스턴스 메타데이터로 자기 ID 와 리전을 알아내고
-// aws CLI 를 부른다. 인스턴스에 EC2 쓰기 권한(IAM 역할)이 없으면 ErrNoPermission 과 함께 손으로 칠 명령을 돌려준다.
-// group 은 그 보안 그룹 ID — 콘솔에서 직접 열 때 찾아갈 곳. 메타데이터를 못 읽으면 비어 있고 command 는 자리표시자로 채운다.
+// OpenPort opens TCP port inbound on this instance's security group. It finds its own ID and region from the instance metadata
+// and calls the aws CLI. If the instance has no EC2 write permission (IAM role), it returns ErrNoPermission along with the command to type by hand.
+// group is that security group's ID, where to look when opening it in the console. If the metadata cannot be read it is empty and command is filled with a placeholder.
 func OpenPort(ctx context.Context, port int, log io.Writer) (command, group string, err error) {
 	region, sg, err := identity(ctx)
 	if err != nil {
@@ -60,7 +60,7 @@ func OpenPort(ctx context.Context, port int, log io.Writer) (command, group stri
 
 var ErrNoPermission = errors.New("this instance has no permission to change its security group")
 
-// identity — IMDSv2 로 리전과 첫 보안 그룹 ID. IAM 권한 없이 읽을 수 있다.
+// identity returns the region and first security group ID via IMDSv2. It can be read without IAM permissions.
 func identity(ctx context.Context) (region, sg string, err error) {
 	client := &http.Client{Timeout: 3 * time.Second}
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPut, "http://169.254.169.254/latest/api/token", nil)

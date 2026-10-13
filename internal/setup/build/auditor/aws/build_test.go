@@ -21,8 +21,8 @@ func TestStripBuildLogs(t *testing.T) {
 	}
 	mk("var/log/apk.log")
 	mk("var/log/apt/history.log")
-	mk("var/log/nginx/access.log") // 소프트웨어 자체의 로그 — 남아야 한다
-	mk("etc/apk/world")            // 무엇을 깔았나 — 남아야 한다
+	mk("var/log/nginx/access.log") // the software's own log: must stay
+	mk("etc/apk/world")            // what was installed: must stay
 
 	r := runner{log: io.Discard}
 	removed := stripBuildLogs(context.Background(), r, root)

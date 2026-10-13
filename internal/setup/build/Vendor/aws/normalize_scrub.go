@@ -12,12 +12,12 @@ import (
 	"strings"
 )
 
-// scratchDirs — 실행 시점엔 어차피 비어 있어야 하는 스크래치. 빌드 중 mktemp 등이 남긴 파일은 이름이 랜덤이라 매 빌드
-// 다르다(실측: memcached 공식 alpine Dockerfile 이 /tmp/<랜덤> 파일 하나를 남겨, 바이너리는 모두 같은데 PCR0·PCR2 가
-// 갈렸다). 디렉터리는 두고 안만 비운다.
+// scratchDirs are scratch directories that should be empty at run time anyway. Files left by mktemp and the like during the build have random
+// names and differ on every build (measured: the official memcached alpine Dockerfile left one /tmp/<random> file, and PCR0 and PCR2
+// diverged although all binaries were identical). The directory stays; only its contents are emptied.
 var scratchDirs = []string{"tmp", "var/tmp"}
 
-// scrubBuildScratch — scratchDirs 안을 비우고, 실제로 비운 디렉터리의 상대 경로를 돌려준다.
+// scrubBuildScratch empties scratchDirs and returns the relative paths of the directories it actually emptied.
 func scrubBuildScratch(ctx context.Context, r runner, root string) []string {
 	var scrubbed []string
 	for _, d := range scratchDirs {
@@ -39,16 +39,17 @@ func scrubBuildScratch(ctx context.Context, r runner, root string) []string {
 	return scrubbed
 }
 
-// apkVirtualVersion — apk add --virtual 이 붙이는 기본 버전: 설치 시각 YYYYMMDD.HHMMSS.
+// apkVirtualVersion is the default version apk add --virtual assigns: the install time, YYYYMMDD.HHMMSS.
 var apkVirtualVersion = regexp.MustCompile(`^[0-9]{8}\.[0-9]{6}$`)
 
-// apkFixedIdentity — 고정한 버전에 맞춰 넣는 자리표시 식별자. apk 는 엔클레이브 안에서 다시 돌지 않으니 형식만 지킨다.
+// apkFixedIdentity is the placeholder identifier written to match the pinned version. apk does not run again inside the enclave, so only the format matters.
 const apkFixedIdentity = "C:Q10000000000000000000000000000="
 
-// fixApkVirtualVersions — apk 의 가상 패키지(--virtual, 이름이 . 으로 시작, 파일 없이 의존성만 묶는 것)는 버전이 기본으로
-// 설치 시각이라 /etc/apk/world 와 /lib/apk/db/installed 에 빌드 시각이 박힌다(실측: haproxy · memcached 공식 alpine —
-// 파일 수백 개 중 이 둘만 달라 PCR0·PCR2 가 갈렸다). 무엇을 깔았나가 아니라 언제 깔았나이므로 버전을 0 으로 고정하고,
-// 그 버전에서 나온 식별자(C:)는 자리표시로 바꾼다. 돌려주는 것은 고친 파일들의 상대 경로.
+// fixApkVirtualVersions handles apk virtual packages (--virtual, name starting with ".", bundling dependencies without files).
+// Their version defaults to the install time, so the build time is embedded in /etc/apk/world and /lib/apk/db/installed
+// (measured: official haproxy and memcached alpine; of several hundred files only these two differed, and PCR0 and PCR2
+// diverged). That records when it was installed, not what, so the version is pinned to 0 and the identifier (C:)
+// derived from that version is replaced by a placeholder. It returns the relative paths of the files it fixed.
 func fixApkVirtualVersions(ctx context.Context, r runner, root string) []string {
 	var fixed []string
 
@@ -102,18 +103,18 @@ func fixApkVirtualVersions(ctx context.Context, r runner, root string) []string 
 	return fixed
 }
 
-// buildCaches — 빌드 중 도구가 남기는 캐시. 내용이 파일 내용이 아니라 시각·inode 같은 그때의 상태라 같은 소스를 빌드해도
-// 매번 다르고, 엔클레이브 안에서 다시 쓰이지 않는다(실측: 두 인스턴스에서 mariadb 공식 Dockerfile — 13,063 항목 중
-// root/.wget-hsts(wget 의 HSTS 저장소, 방문 시각) 와 var/cache/ldconfig/aux-cache(ldconfig 가 라이브러리 stat 을 적어 둔
-// 캐시) 둘만 달라 PCR0·PCR2 가 갈렸다. tomcat 도 aux-cache 가 달랐다). 지운다.
+// buildCaches are caches tools leave during the build. Their content is the state of that moment, such as times and inodes, not file
+// content, so it differs on every build of the same source, and nothing inside the enclave uses it again (measured: the official
+// mariadb Dockerfile on two instances; of 13,063 entries only root/.wget-hsts (wget's HSTS store, with visit times) and
+// var/cache/ldconfig/aux-cache (ldconfig's cache of library stat data) differed, and PCR0 and PCR2 diverged. tomcat's aux-cache differed too). They are removed.
 var buildCaches = []string{
-	"var/cache/ldconfig/aux-cache", // glibc ldconfig: 라이브러리의 inode·mtime 을 적는다. ld.so.cache 는 내용 기반이라 둔다
-	"root/.wget-hsts",              // wget: 방문한 HSTS 호스트와 시각
-	"root/.gnupg/random_seed",      // gnupg: 난수 시드
-	"root/.cache",                  // pip · go · npm 등이 두는 캐시 트리
+	"var/cache/ldconfig/aux-cache", // glibc ldconfig: records library inodes and mtimes. ld.so.cache is content-based, so it stays
+	"root/.wget-hsts",              // wget: visited HSTS hosts and times
+	"root/.gnupg/random_seed",      // gnupg: random seed
+	"root/.cache",                  // cache tree used by pip, go, npm and others
 }
 
-// stripBuildCaches — 풀어낸 rootfs 에서 buildCaches 를 지우고, 실제로 지운 것의 상대 경로를 돌려준다.
+// stripBuildCaches removes buildCaches from the extracted rootfs and returns the relative paths it actually removed.
 func stripBuildCaches(ctx context.Context, r runner, root string) []string {
 	var removed []string
 	for _, p := range buildCaches {
@@ -132,8 +133,8 @@ func stripBuildCaches(ctx context.Context, r runner, root string) []string {
 	return removed
 }
 
-// exists — 풀어낸 트리에서 경로가 있는지. /root(700) · /var/cache/ldconfig(700) 처럼 root 만 들여다볼 수 있는 디렉터리 안은
-// os.Lstat 이 권한 오류를 내므로(실측: mariadb 의 root/.wget-hsts 가 그래서 안 지워졌다) 그때는 runner(sudo)의 test -e 로 본다.
+// exists reports whether a path is present in the extracted tree. Inside directories only root can look into, such as /root (700) and /var/cache/ldconfig (700),
+// os.Lstat fails with a permission error (measured: that is why mariadb's root/.wget-hsts was not removed), so then the runner's (sudo) test -e is used.
 func exists(ctx context.Context, r runner, path string) bool {
 	_, err := os.Lstat(path)
 	if err == nil {
@@ -145,7 +146,7 @@ func exists(ctx context.Context, r runner, path string) bool {
 	return r.cmd(ctx, "test", "-e", path).Run() == nil
 }
 
-// readRoot · writeRoot — 풀어낸 rootfs 는 tar 가 sudo 로 풀어 root 소유다. 직접 안 되면 runner(sudo)로 읽고 쓴다.
+// readRoot and writeRoot: the extracted rootfs is root-owned because tar extracted it with sudo. If direct access fails, read and write through the runner (sudo).
 func readRoot(ctx context.Context, r runner, path string) ([]byte, error) {
 	if b, err := os.ReadFile(path); err == nil {
 		return b, nil

@@ -26,7 +26,7 @@ func TestScrubBuildScratch(t *testing.T) {
 	writeAt(t, root, "tmp/MjFVGt80Zx", "2797\n")
 	writeAt(t, root, "tmp/sub/deeper", "x")
 	writeAt(t, root, "var/tmp/leftover", "x")
-	writeAt(t, root, "etc/nginx/nginx.conf", "keep") // 스크래치가 아닌 곳은 손대지 않는다
+	writeAt(t, root, "etc/nginx/nginx.conf", "keep") // places that are not scratch are left alone
 	if err := os.MkdirAll(filepath.Join(root, "run"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestFixApkVirtualVersions(t *testing.T) {
 	if !strings.Contains(s, "P:.haproxy-rundeps\nV:0\n") || !strings.Contains(s, apkFixedIdentity+"\nP:.haproxy-rundeps") {
 		t.Errorf("virtual package must get V:0 and the fixed identity:\n%s", s)
 	}
-	// 진짜 패키지는 건드리지 않는다.
+	// Real packages are left alone.
 	if !strings.Contains(s, "C:Q1abcabcabcabcabcabcabcabcabcabc=\nP:musl\nV:1.2.5-r10") || !strings.Contains(s, "C:Q1zzzzzzzzzzzzzzzzzzzzzzzzzzzz=\nP:pcre2\nV:10.43-r1") {
 		t.Errorf("real packages must be untouched:\n%s", s)
 	}
@@ -108,7 +108,7 @@ func TestFixApkVirtualVersions(t *testing.T) {
 }
 
 func TestFixApkVirtualVersions_NoApk(t *testing.T) {
-	root := t.TempDir() // debian 이미지처럼 apk 가 없으면 아무것도 안 한다
+	root := t.TempDir() // without apk, as on a debian image, nothing is done
 	if got := fixApkVirtualVersions(context.Background(), runner{log: io.Discard}, root); len(got) != 0 {
 		t.Fatalf("fixed = %v, want nothing", got)
 	}
@@ -119,7 +119,7 @@ func TestStripBuildCaches(t *testing.T) {
 	writeAt(t, root, "var/cache/ldconfig/aux-cache", "x")
 	writeAt(t, root, "root/.wget-hsts", "x")
 	writeAt(t, root, "root/.cache/pip/http/abc", "x")
-	writeAt(t, root, "etc/ld.so.cache", "keep") // 내용 기반 캐시는 둔다
+	writeAt(t, root, "etc/ld.so.cache", "keep") // content-based cache stays
 	got := stripBuildCaches(context.Background(), runner{log: io.Discard}, root)
 	if len(got) != 3 {
 		t.Fatalf("removed = %v", got)

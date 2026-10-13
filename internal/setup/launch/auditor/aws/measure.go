@@ -9,11 +9,11 @@ import (
 	"strings"
 )
 
-// imagePCRs — 이미지에서 나오는 것. PCR3·4·8 은 어디서 돌았느냐지 무엇이냐가 아니다.
+// imagePCRs are the values that come from the image. PCR3, 4 and 8 say where it ran, not what it is.
 var imagePCRs = []string{"PCR0", "PCR1", "PCR2"}
 
-// measureEIF — EIF 파일을 nitro-cli 로 직접 잰다. Case A(이미지를 파일로 넘겨받는 흐름)에서 Auditor 가 Vendor 의
-// measurements.json 을 믿는 대신 파일 자체를 재는 단계. Case B 에서는 build 가 잰 값과 같은 값이 나온다.
+// measureEIF measures the EIF file directly with nitro-cli. When the image arrives as a file (pack), this is the step where the
+// Auditor measures the file itself instead of trusting the Vendor's measurements.json. For an EIF built here, it gives the same values build measured.
 func measureEIF(ctx context.Context, r runner, eif string) (map[string]string, error) {
 	out, err := r.output(ctx, "nitro-cli", "describe-eif", "--eif-path", eif)
 	if err != nil {
@@ -22,7 +22,7 @@ func measureEIF(ctx context.Context, r runner, eif string) (map[string]string, e
 	return readPCR(out)
 }
 
-// readPCR — nitro-cli 출력(build-enclave · describe-eif 모두 {"Measurements":{"PCR0":…}})에서 PCR0·1·2 를 꺼낸다.
+// readPCR extracts PCR0, PCR1 and PCR2 from nitro-cli output (both build-enclave and describe-eif give {"Measurements":{"PCR0":...}}).
 func readPCR(b []byte) (map[string]string, error) {
 	var v struct {
 		Measurements map[string]string
@@ -40,8 +40,8 @@ func readPCR(b []byte) (map[string]string, error) {
 	return pcr, nil
 }
 
-// writeMeasurements — 잰 값을 build 가 내는 measurements.json 과 같은 모양으로 쓴다. 이미 같은 값을 담은 파일이
-// 있으면(Case B: build 가 쓴 것) 건드리지 않는다.
+// writeMeasurements writes the measured values in the same shape as the measurements.json that build produces. If a file already holding the same values
+// exists (one build wrote), it is left alone.
 func writeMeasurements(path string, pcr map[string]string) (bool, error) {
 	if b, err := os.ReadFile(path); err == nil {
 		if have, err := readPCR(b); err == nil && samePCR(have, pcr) {
@@ -63,7 +63,7 @@ func samePCR(a, b map[string]string) bool {
 	return true
 }
 
-// checkAgainst — 파일을 잰 값 vs 보내온 measurements.json. 다르면 어느 PCR 인지 돌려준다.
+// checkAgainst compares the values measured from the file with the received measurements.json. If they differ, it says which PCR.
 func checkAgainst(measured map[string]string, claimedPath string) ([]string, error) {
 	b, err := os.ReadFile(claimedPath)
 	if err != nil {

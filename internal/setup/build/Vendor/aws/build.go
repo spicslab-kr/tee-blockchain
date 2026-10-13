@@ -1,10 +1,10 @@
-// Package aws 는 B 빌드, AWS Nitro, Case 2(자동화): 소프트웨어의 Dockerfile 을 받아 EIF 와 측정값(PCR0·1·2)을 낸다.
-// 설계서(9·11쪽)가 "측정값 기록에 적으라"는 값이 Result 다. 도구(docker · nitro-cli)는 라이브러리가 아니라 exec 로 부른다.
+// Package aws builds a software Dockerfile into an enclave image (EIF) and its measurements (PCR0, PCR1, PCR2) for AWS Nitro.
+// Result holds the values to write into the measurement record. The tools (docker, nitro-cli) are run through exec, not linked as libraries.
 //
-// 설계서에 없던 한 단계가 여기 들어간다 — T1 응답기 얹기. Nitro 엔클레이브는 안에서만 /dev/nsm 을 열 수 있고
-// 네트워크가 없다. 그래서 제3자가 RA 를 요청하려면 응답기가 이미지 안에 들어가 있어야 한다. 응답기 구현은
-// tee/request/Vendor/aws (Extractor · vsock) 에 그대로 있고, 이 바이너리의 ra-serve 가 그것을 띄운다.
-// 빌드는 소프트웨어 이미지 위에 이 바이너리와 진입점 한 장을 얹기만 한다. 소프트웨어 이미지는 고치지 않는다.
+// One step goes in here beyond building the software: layering in the attestation responder. A Nitro enclave can open
+// /dev/nsm only from inside and has no network, so for a third party to request attestation the responder has to be
+// inside the image. The responder itself lives in internal/tee/request/Vendor/aws (Extractor, vsock), and this binary's ra-serve starts it.
+// The build only adds this binary and one entrypoint script on top of the software image. It never modifies the software image.
 package aws
 
 import (
@@ -28,47 +28,47 @@ import (
 //go:embed entrypoint.sh
 var entrypointScript []byte
 
-// responderBinaryName — cmd/ra-responder 가 만드는 파일 이름. 모든 역할이 정확히 이 이름의
-// 파일을 실행파일 옆에 두고 써야, 서로 다른 역할이 빌드해도 이미지에 같은 바이트가 얹힌다.
+// responderBinaryName is the file name cmd/ra-responder produces. Every role must run a file with exactly this
+// name placed next to its executable, so that builds by different roles put the same bytes in the image.
 const responderBinaryName = "tb-ra-responder"
 
-// Build 는 한 번의 빌드 입력. AppDir 의 Dockerfile 이 소프트웨어다.
+// Build is the input to one build. The Dockerfile in AppDir is the software.
 type Build struct {
-	AppDir string // 소프트웨어 Dockerfile 이 있는 디렉터리 (build). Image 와 둘 중 하나
-	Image  string // 사용자가 이미 만든 docker 이미지 (pack): docker build 는 사용자가, 얹기·정규화·EIF 는 tb 가
-	Name   string // 이미지 · EIF 이름. 비우면 디렉터리 이름 (pack: 이미지 이름의 태그 앞부분)
-	Port   int    // 응답기가 엔클레이브 안에서 들을 vsock 포트. 0 이면 5000
+	AppDir string // directory holding the software's Dockerfile (build). Exactly one of AppDir and Image
+	Image  string // a docker image the user already built (pack): the user runs docker build, tb does the layering, normalizing and EIF
+	Name   string // image and EIF name. Defaults to the directory name (pack: the image name before the tag)
+	Port   int    // vsock port the responder listens on inside the enclave. 0 means 5000
 
-	// Binary — 얹을 T1 응답기. 비우면 실행파일과 같은 디렉터리의 tb-ra-responder 를 찾는다.
+	// Binary is the responder to layer in. If empty, tb-ra-responder next to the executable is used.
 	//
-	// 예전에는 여기가 비면 자기 자신(os.Executable(), 즉 tb-vendor 나 tb-auditor)을 얹었다.
-	// 그건 역할마다 다른 CLI 바이너리를 이미지에 넣는 셈이라, 레이어를 아무리 정규화해도
-	// Vendor 와 Auditor 가 만드는 이미지가 절대 같을 수 없었다(실측: 실제 EC2 두 대에서
-	// Vendor·Auditor 가 같은 Dockerfile 을 정규화까지 거쳐 각자 빌드했는데도 PCR0·PCR2 가
-	// 갈림 — 원인은 /tb-ra 파일 자체가 두 바이너리라 서로 다른 파일이었던 것). 이제는 모든
-	// 역할이 cmd/ra-responder 하나로 빌드한 동일한 파일을 얹어야 한다.
+	// This used to default to the running executable itself (os.Executable(), i.e. tb-vendor or tb-auditor).
+	// That put a different CLI binary into the image for each role, so no amount of layer normalizing could make
+	// the Vendor's and the Auditor's images equal (measured on two real EC2 instances: the Vendor and the
+	// Auditor built the same Dockerfile, normalization included, and still got different PCR0 and PCR2, because
+	// the /tb-ra file itself was two different binaries). Now every role must layer in the identical file
+	// built from cmd/ra-responder.
 	Binary string
-	Out    string // 결과 디렉터리. 비우면 out
-	Verify bool   // 같은 Dockerfile 을 캐시 없이 한 번 더 빌드해 같은 PCR 이 나오는지 본다 (verify.go)
+	Out    string // result directory. Defaults to out
+	Verify bool   // build the same Dockerfile once more without cache and check that the PCRs match (verify.go)
 }
 
-// Result — 측정값 기록에 적을 것.
+// Result is what goes into the measurement record.
 type Result struct {
 	Name         string
-	Image        string              // 응답기를 얹은 docker 이미지 태그
-	EIF          string              // 이미지 파일
-	Measurements string              // nitro-cli build-enclave 출력 원문 (json)
-	PCR          map[string]string   // PCR0 · PCR1 · PCR2
-	Responder    build.ResponderInfo // 얹은 tb-ra-responder 의 빌드 정보와 sha256 — 기록에 남겨 상대편과 대조한다
+	Image        string              // docker image tag with the responder layered in
+	EIF          string              // enclave image file
+	Measurements string              // raw nitro-cli build-enclave output (json)
+	PCR          map[string]string   // PCR0, PCR1, PCR2
+	Responder    build.ResponderInfo // build info and sha256 of the layered-in tb-ra-responder, kept in the record so the other side can compare
 }
 
 var ErrNotLinux = errors.New("build runs on the Nitro parent instance (linux)")
 
-// Run — 도구 → 소프트웨어 이미지 → T1 응답기 얹기 → EIF · PCR.
+// Run goes through: tools, software image, responder layering, EIF and PCRs.
 //
-// 두 입구. AppDir(build, Case B): tb 가 docker build 부터 한다 — Vendor 와 Auditor 가 같은 명령을 치면 같은 값이
-// 나오도록. Image(pack, Case A): 사용자가 자기 방식으로 만든 이미지를 받아 얹기·정규화·EIF 만 한다 — Auditor 는 이
-// EIF 파일을 받아 재므로 Vendor 혼자 만들면 된다.
+// There are two entry points. AppDir (build): tb starts from docker build, so the Vendor and the Auditor running the
+// same command get the same values. Image (pack): the user hands over an image built their own way and tb only layers,
+// normalizes and makes the EIF; the Auditor measures the received EIF file, so only the Vendor needs to build it.
 func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	var res Result
 	if runtime.GOOS != "linux" {
@@ -114,11 +114,11 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		b.Binary = filepath.Join(filepath.Dir(exe), responderBinaryName)
 	}
 	if _, err := os.Stat(b.Binary); err != nil {
-		return res, fmt.Errorf("%s: T1 responder not found — build cmd/ra-responder and put it there, or point Binary at it", b.Binary)
+		return res, fmt.Errorf("%s: attestation responder not found — build cmd/ra-responder and put it there, or point Binary at it", b.Binary)
 	}
-	// 파일이 있다는 것만으로는 부족하다. 이미지에 얹혀 측정되는 것은 이 파일의 바이트이고, 그 바이트는 응답기를
-	// 빌드한 Go 버전 · -trimpath · GOOS/GOARCH 로 정해진다 (CheckToolchain 은 tb 자신만 본다). 바이너리 안에
-	// Go 가 남긴 빌드 정보를 읽어, 상대편과 같은 바이트가 나올 수 없는 응답기는 여기서 거부한다.
+	// A file being there is not enough. What gets layered in and measured is this file's bytes, and those are fixed by
+	// the Go version, -trimpath and GOOS/GOARCH the responder was built with (CheckToolchain only looks at tb itself).
+	// Read the build info Go left in the binary and refuse a responder that cannot produce the same bytes as the other side.
 	responder, err := build.ReadResponder(b.Binary)
 	if err != nil {
 		return res, err
@@ -134,12 +134,12 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Name = b.Name
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
-	// 단계 이름표: build 는 5 단계, pack 은 docker build 가 빠져 4 단계.
+	// Step labels: build has 5 steps, pack has 4 because it skips docker build.
 	verb, total, n := "build", 5, 0
 	if b.Image != "" {
 		verb, total = "pack", 4
 	}
-	// 단계마다 두 줄: 무엇을 하는 중인지, 그리고 왜 하는지 한 문장. 보는 사람이 우리 용어를 몰라도 따라올 수 있게.
+	// Two lines per step: what is being done, then one sentence on why, so a reader who does not know our terms can follow.
 	step := func(what, why string) {
 		n++
 		fmt.Fprintf(log, "\n%s %s…\n           %s\n", cli.Green(fmt.Sprintf("[%s %d/%d]", verb, n, total)), what, why)
@@ -215,8 +215,8 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	return res, nil
 }
 
-// layerResponder — 소프트웨어 이미지 위에 tb 바이너리와 진입점을 얹는다. 원래 명령은 파일로 넘긴다:
-// nitro-cli 는 스크립트 진입점 뒤의 Docker CMD 를 넘겨주지 않는다.
+// layerResponder layers the tb binary and the entrypoint on top of the software image. The original command is passed as a file,
+// because nitro-cli does not forward a Docker CMD behind a script entrypoint.
 func (b Build) layerResponder(ctx context.Context, r runner, from, to string, appCmd []string) error {
 	dir, err := os.MkdirTemp("", "tb-ra-image")
 	if err != nil {
@@ -249,22 +249,22 @@ ENTRYPOINT ["/tb-entrypoint.sh"]
 	return r.run(ctx, "docker", "build", "-q", "-t", to, dir)
 }
 
-// normalize — docker build 가 쌓은 레이어를 버리고, 파일을 이름순으로 우리가 직접 재포장한다.
+// normalize throws away the layers docker build produced and repacks the files itself, in name order.
 //
-// docker build 는 실행마다 레이어 내부 파일 순서·타임스탬프를 새로 정한다. 최종 파일 내용이
-// 완전히 같아도(실측: sha256 전수 일치) 그 파일을 담은 레이어 tar 의 바이트 자체가 달라서,
-// Vendor 와 Auditor 가 같은 소스로 각자 독립적으로 빌드하면 PCR0·PCR2 가 갈린다(실측: 서로
-// 다른 두 물리 인스턴스에서 재현됨). export 로 레이어 구분을 버리고 파일만 뽑아서, 이름순
-// 정렬 + 시각 고정(tar --sort=name --mtime=@0 --owner=0 --group=0)으로 재포장한 뒤 같은
-// 태그로 import 하면, 서로 다른 물리 서버·시각에 독립적으로 빌드해도 PCR0·PCR1·PCR2 가
-// 정확히 일치한다(실측 확인 — 아래 커밋 메시지의 값).
+// docker build decides file order and timestamps inside layers anew on every run. Even when the final file
+// contents are identical (measured: every sha256 matches), the bytes of the layer tar holding them differ, so when the
+// Vendor and the Auditor build the same source independently, PCR0 and PCR2 diverge (reproduced on two different
+// physical instances). Exporting drops the layer boundaries and leaves just the files; repacking those with name-sorted
+// order and fixed times (tar --sort=name --mtime=@0 --owner=0 --group=0) and importing under the same tag gives
+// exactly matching PCR0, PCR1 and PCR2 even when built independently on different physical servers at different times
+// (confirmed by measurement).
 //
-// import 는 이미지 설정(ENTRYPOINT·ENV)을 버리므로 원래 것을 다시 넣는다 - 그것도 측정
-// 대상이다: 파일은 그대로 두고 ENTRYPOINT 만 바꿔도 PCR0·PCR2 가 달라지는 것을 실측 확인했다.
+// import drops the image config (ENTRYPOINT, ENV), so the original is put back. That is measured too: changing only
+// the ENTRYPOINT, with the files untouched, was measured to change PCR0 and PCR2.
 //
-// workDir 는 실제 디스크(b.Out)를 써야 한다 - OS 기본 임시 디렉터리(/tmp)는 Amazon Linux 에서
-// RAM 기반 tmpfs 로 몇 GiB 밖에 안 되는데, 여기서 내보낸 tar·풀어낸 파일·재포장한 tar 가
-// 한꺼번에 그보다 커질 수 있다(실측: "wrote only N of 10240 bytes" 로 재현됨).
+// workDir must be on real disk (b.Out). The default OS temp directory (/tmp) is a RAM-backed tmpfs of only a few GiB on
+// Amazon Linux, and the exported tar, the extracted files and the repacked tar together can exceed that
+// (reproduced: "wrote only N of 10240 bytes").
 func normalize(ctx context.Context, r runner, image, workDir string) (manifest, error) {
 	out, err := r.output(ctx, "docker", "image", "inspect", image)
 	if err != nil {
@@ -286,7 +286,7 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	if err != nil {
 		return nil, err
 	}
-	// tar 가 sudo 로 풀어 놓은 트리는 root 소유라 os.RemoveAll 로는 못 지운다 — 그대로 두면 빌드마다 out/ 에 쌓인다.
+	// The tree tar extracted with sudo is owned by root and os.RemoveAll cannot delete it; left alone it would pile up in out/ on every build.
 	defer func() {
 		if os.RemoveAll(dir) != nil {
 			r.cmd(ctx, "rm", "-rf", dir).Run()
@@ -294,7 +294,7 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	}()
 
 	container := fmt.Sprintf("tb-canon-%d", os.Getpid())
-	r.cmd(ctx, "docker", "rm", "-f", container).Run() // 이전 실패 잔여물, 있으면 지운다
+	r.cmd(ctx, "docker", "rm", "-f", container).Run() // leftover from an earlier failed run, if any
 	if err := r.run(ctx, "docker", "create", "--name", container, image); err != nil {
 		return nil, err
 	}
@@ -311,7 +311,7 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	if err := r.run(ctx, "tar", "-xf", rootfs, "-C", extract); err != nil {
 		return nil, err
 	}
-	os.Remove(rootfs) // 다 풀었으니 더 안 필요하다 - 재포장 중 피크 디스크 사용량을 줄인다
+	os.Remove(rootfs) // fully extracted, no longer needed; lowers peak disk use while repacking
 	for _, d := range scrubBuildScratch(ctx, r, extract) {
 		fmt.Fprintf(r.log, "    dropped build scratch: /%s\n", d)
 	}
@@ -355,18 +355,18 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	return m, nil
 }
 
-// buildLogs — 패키지 관리자가 docker build 중에 남기는 로그. 무엇을 깔았나가 아니라 언제 깔았나를 적어서
-// (apk: "Running `apk add …` at 2026-09-26 08:14:36") 같은 소스를 빌드해도 내용이 매번 다르다. 실측: nginx 공식
-// alpine-slim Dockerfile 을 Vendor · Auditor 가 각자 빌드했을 때 725개 파일 중 /var/log/apk.log 하나만 달라
-// PCR0·PCR2 가 갈렸다. 파일이 아니라 시각을 재는 것이니 측정 대상에서 뺀다. 소프트웨어 자체의 로그는 건드리지 않는다.
+// buildLogs are logs a package manager writes during docker build. They record when something was installed rather than what
+// (apk: "Running `apk add ...` at 2026-09-26 08:14:36"), so their content differs on every build of the same source. Measured:
+// when the Vendor and the Auditor each built the official nginx alpine-slim Dockerfile, only /var/log/apk.log out of 725 files
+// differed, and PCR0 and PCR2 diverged. They measure a time, not a file, so they are left out of the measurement. The software's own logs are not touched.
 var buildLogs = []string{
 	"var/log/apk.log",                                             // alpine
 	"var/log/dpkg.log", "var/log/alternatives.log", "var/log/apt", // debian · ubuntu
 	"var/log/yum.log", "var/log/dnf.log", "var/log/dnf.rpm.log", "var/log/dnf.librepo.log", "var/log/hawkey.log", // rhel · amazon
 }
 
-// stripBuildLogs — 풀어낸 rootfs 에서 buildLogs 를 지우고, 실제로 지운 것의 상대 경로를 돌려준다.
-// rootfs 는 tar 가 sudo 로 풀어 root 소유라, 직접 못 지우면 runner(sudo rm)로 지운다.
+// stripBuildLogs removes buildLogs from the extracted rootfs and returns the relative paths it actually removed.
+// The rootfs is root-owned because tar extracted it with sudo; if it cannot be removed directly, the runner (sudo rm) does it.
 func stripBuildLogs(ctx context.Context, r runner, root string) []string {
 	var removed []string
 	for _, p := range buildLogs {
@@ -385,7 +385,7 @@ func stripBuildLogs(ctx context.Context, r runner, root string) []string {
 	return removed
 }
 
-// ReadPCR — nitro-cli build-enclave 출력에서 측정값을 꺼낸다.
+// ReadPCR extracts the measurements from nitro-cli build-enclave output.
 func ReadPCR(buildOutput []byte) (map[string]string, error) {
 	var v struct {
 		Measurements map[string]string
@@ -396,7 +396,7 @@ func ReadPCR(buildOutput []byte) (map[string]string, error) {
 	return v.Measurements, nil
 }
 
-// Sanitize — 디렉터리 이름을 docker 태그 · 엔클레이브 이름으로 쓸 수 있게 다듬는다.
+// Sanitize cleans a directory name so it can be used as a docker tag and an enclave name.
 func Sanitize(s string) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(s) {
@@ -414,7 +414,7 @@ func Sanitize(s string) string {
 	return out
 }
 
-// runner — docker · nitro-cli · systemctl 을 부른다. root 가 아니면 sudo 를 앞에 붙인다.
+// runner calls docker, nitro-cli and systemctl. It prefixes sudo when not root.
 type runner struct {
 	log  io.Writer
 	sudo bool
@@ -448,7 +448,7 @@ func (r runner) output(ctx context.Context, name string, args ...string) ([]byte
 	return out, nil
 }
 
-// imageCommand — 이미지의 ENTRYPOINT + CMD.
+// imageCommand returns the image ENTRYPOINT followed by CMD.
 func (r runner) imageCommand(ctx context.Context, image string) ([]string, error) {
 	out, err := r.output(ctx, "docker", "image", "inspect", image)
 	if err != nil {
@@ -470,9 +470,9 @@ func (r runner) imageCommand(ctx context.Context, image string) ([]string, error
 	return cmd, nil
 }
 
-// envChange — docker import --change 의 ENV 한 줄. 값에 공백이 있으면(실측: php 공식 이미지의
-// PHPIZE_DEPS="autoconf dpkg-dev dpkg file g++ …") 따옴표 없는 `ENV k=v` 꼴은 "can't find = in dpkg-dev" 로
-// 거부되므로, 항상 ENV k="v" 꼴로 쓰고 백슬래시와 따옴표를 이스케이프한다.
+// envChange is one ENV line for docker import --change. When the value contains spaces (measured: the official php image's
+// PHPIZE_DEPS="autoconf dpkg-dev dpkg file g++ ..."), the unquoted `ENV k=v` form is rejected with "can't find = in dpkg-dev",
+// so it always writes ENV k="v" and escapes backslashes and quotes.
 func envChange(kv string) string {
 	k, v, _ := strings.Cut(kv, "=")
 	v = strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v)

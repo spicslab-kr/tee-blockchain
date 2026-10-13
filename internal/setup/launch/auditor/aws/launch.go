@@ -1,8 +1,8 @@
-// Package aws 는 A 실행·배포, AWS Nitro: 빌드가 낸 EIF 를 엔클레이브로 띄우고, 부모 인스턴스에 TCP→vsock 다리를 놓고,
-// 보안 그룹 포트를 연다(port.go). 설계서(6·8쪽)가 "다 띄운 뒤 설정값에 적으라"는 RA 주소가 Result 다.
+// Package aws launches the EIF a build produced as an enclave, sets up a TCP-to-vsock bridge on the parent instance,
+// and opens the security group port (port.go). Result holds the RA address to write into the configuration once everything is up.
 //
-// 인스턴스 자체는 Case 1(문서) — 사용자가 Nitro Enclaves 를 켜서 직접 만들고 들어온다. 이 패키지는 그 안에서
-// nitro-cli 만 부르고, 보안 그룹은 권한이 있을 때만 건드린다. 클라우드 자격증명은 쓰지 않는다.
+// The instance itself is created by the user, who enables Nitro Enclaves and logs in. This package only calls
+// nitro-cli from there, touches the security group only when it has permission, and uses no cloud credentials.
 package aws
 
 import (
@@ -23,35 +23,35 @@ import (
 	"tb/internal/cli"
 )
 
-// Launch 는 한 번의 실행 입력. EIF 는 build 의 결과다.
+// Launch is the input to one launch. The EIF is the result of build.
 type Launch struct {
-	Name   string // 엔클레이브 이름. 비우면 EIF 파일 이름
-	EIF    string // 이미지 파일
-	Port   int    // RA 포트 (다리가 받고 엔클레이브 응답기가 듣는). 0 이면 5000
-	Memory int    // 엔클레이브 메모리 MiB. 0 이면 EIF 크기로 정한다
-	CPUs   int    // 0 이면 2
-	CID    int    // 엔클레이브 vsock 주소. 0 이면 16
-	Listen string // 다리가 받을 주소. 비우면 0.0.0.0
-	Binary string // ra-proxy 로 띄울 tb 바이너리. 비우면 자기 자신
-	Out    string // 다리 로그 디렉터리. 비우면 out
+	Name   string // enclave name. Defaults to the EIF file name
+	EIF    string // enclave image file
+	Port   int    // RA port (the bridge accepts on it and the enclave responder listens on it). 0 means 5000
+	Memory int    // enclave memory in MiB. 0 means sized from the EIF size
+	CPUs   int    // 0 means 2
+	CID    int    // enclave vsock address. 0 means 16
+	Listen string // address the bridge accepts on. Defaults to 0.0.0.0
+	Binary string // tb binary to start as ra-proxy. Defaults to itself
+	Out    string // bridge log directory. Defaults to out
 
-	// Measurements — 남이 준 EIF 와 같이 온 measurements.json (Case A). EIF 를 직접 잰 값이 이것과 다르면 띄우지 않는다.
-	// 내가 build 로 만든 EIF(Case B)에는 줄 게 없으니 비운다.
+	// Measurements is the measurements.json that came with an EIF received from someone else. If measuring the EIF directly gives a different value, it is not launched.
+	// Leave it empty for an EIF built here with build, since there is nothing to compare with.
 	Measurements string
 }
 
-// Result — 설정값에 적을 것.
+// Result is what goes into the configuration.
 type Result struct {
 	Name         string
-	Measurements string            // out/measurements.json — 이 EIF 를 nitro-cli 로 직접 잰 값
+	Measurements string            // out/measurements.json: values from measuring this EIF directly with nitro-cli
 	PCR          map[string]string // PCR0 · PCR1 · PCR2
-	Memory       int               // 실제로 준 메모리 MiB
-	Address      string            // 이 인스턴스에서 확인할 주소 127.0.0.1:port. 밖에서는 <공인 IP>:port
+	Memory       int               // memory actually given, in MiB
+	Address      string            // address to check from this instance: 127.0.0.1:port. From outside: <public IP>:port
 }
 
 var ErrNotLinux = errors.New("launch runs on the Nitro parent instance (linux)")
 
-// Run — 도구 · 자원 → 엔클레이브 실행 → 다리.
+// Run goes through: tools and resources, enclave start, bridge.
 func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	var res Result
 	if runtime.GOOS != "linux" {
@@ -107,7 +107,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	// 남이 준 EIF(--measurements 가 같이 온다)만 다시 잰다. 내가 build·pack 한 EIF 는 그때 이미 잰 값이 out/ 에 있다.
+	// Only an EIF received from someone else (it comes with --measurements) is measured again. For one built or packed here, the values measured then are already in out/.
 	if l.Measurements != "" {
 		launchStep(log, 2, "Measuring the received enclave image myself (nitro-cli describe-eif)", "the sender's measurements.json is only a claim — the file itself is measured here and must say the same")
 		if res.PCR, err = measureEIF(ctx, r, l.EIF); err != nil {
@@ -156,7 +156,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	return res, nil
 }
 
-// startProxy — tb 바이너리를 ra-proxy 로 따로 띄운다. launch 가 끝나도 남는다.
+// startProxy starts the tb binary separately as ra-proxy. It keeps running after launch ends.
 func (l Launch) startProxy(ctx context.Context, log io.Writer) error {
 	_ = exec.CommandContext(ctx, "pkill", "-f", fmt.Sprintf("^%s ra-proxy --listen %s:%d", l.Binary, l.Listen, l.Port)).Run()
 	logPath := filepath.Join(l.Out, "proxy.log")
@@ -181,7 +181,7 @@ func (l Launch) startProxy(ctx context.Context, log io.Writer) error {
 	return nil
 }
 
-// MemoryFor — EIF 는 통째로 RAM 에 풀리고 그 위에서 소프트웨어가 돈다. 크기의 4 배를 512 MiB 단위로 올린다.
+// MemoryFor: the EIF is unpacked entirely into RAM and the software runs on top of it. Four times its size, rounded up to 512 MiB units.
 func MemoryFor(eif string) int {
 	st, err := os.Stat(eif)
 	if err != nil {
@@ -199,7 +199,7 @@ func memoryForSize(size int64) int {
 	return m
 }
 
-// runner — nitro-cli · systemctl 을 부른다. root 가 아니면 sudo 를 앞에 붙인다.
+// runner calls nitro-cli and systemctl. It prefixes sudo when not root.
 type runner struct {
 	log  io.Writer
 	sudo bool
@@ -262,7 +262,7 @@ func (r runner) enclaveRunning(ctx context.Context, name string) error {
 
 const allocatorFile = "/etc/nitro_enclaves/allocator.yaml"
 
-// ensureAllocator — 엔클레이브에 줄 메모리 · CPU 가 부족하면 늘린다. 늘리면 돌고 있던 엔클레이브는 내려간다.
+// ensureAllocator raises the memory and CPUs reserved for enclaves if they fall short. Raising them takes down any enclave that was running.
 func (r runner) ensureAllocator(ctx context.Context, memory, cpus int) error {
 	b, err := os.ReadFile(allocatorFile)
 	if err != nil {
@@ -296,7 +296,7 @@ func (r runner) ensureAllocator(ctx context.Context, memory, cpus int) error {
 	return r.run(ctx, "systemctl", "restart", "nitro-enclaves-allocator.service")
 }
 
-// launchStep — 단계마다 두 줄: 무엇을 하는 중인지, 그리고 왜 하는지 한 문장.
+// launchStep: two lines per step, what is being done and one sentence on why.
 func launchStep(log io.Writer, n int, what, why string) {
 	fmt.Fprintf(log, "\n%s %s…\n             %s\n", cli.Green(fmt.Sprintf("[launch %d/4]", n)), what, why)
 }

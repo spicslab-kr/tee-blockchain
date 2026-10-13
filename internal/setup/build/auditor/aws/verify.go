@@ -11,11 +11,11 @@ import (
 	"tb/internal/cli"
 )
 
-// manifest — 정규화 직전 rootfs 의 파일별 요약: 경로 → "모드 종류 내용해시(또는 링크 대상)". 측정에 들어가는 것 그대로다
-// (파일 내용과 모드; 시각·소유자는 재포장이 0 으로 고정하니 뺀다). 두 빌드가 다를 때 어느 파일이 달랐는지 여기서 나온다.
+// manifest is a per-file summary of the rootfs just before normalization: path -> "mode kind content-hash (or link target)". It is exactly what goes into the measurement
+// (file content and mode; times and owners are left out because repacking fixes them to 0). When two builds differ, this shows which file differed.
 type manifest map[string]string
 
-// readManifest — 풀어낸 트리는 root 소유라 runner(sudo)로 find 한다. 파일은 sha256, 링크는 대상, 디렉터리는 모드만.
+// readManifest runs find through the runner (sudo) because the extracted tree is root-owned. Files get a sha256, links their target, directories only their mode.
 func readManifest(ctx context.Context, r runner, root string) (manifest, error) {
 	m := manifest{}
 	out, err := r.output(ctx, "find", root, "-mindepth", "1", "(", "-type", "f", "-o", "-type", "l", "-o", "-type", "d", ")",
@@ -57,7 +57,7 @@ func readManifest(ctx context.Context, r runner, root string) (manifest, error) 
 	return m, nil
 }
 
-// diff — b 가 a 와 다른 곳. 한쪽에만 있는 것, 내용·모드·링크가 다른 것. 경로순.
+// diff lists where b differs from a: what is only on one side, and what differs in content, mode or link. In path order.
 func (a manifest) diff(b manifest) []string {
 	var out []string
 	for p, va := range a {
@@ -86,10 +86,10 @@ func short(v string) string {
 	return strings.Join(f, " ")
 }
 
-// verify — 같은 Dockerfile 을 캐시 없이 한 번 더 빌드해 같은 PCR 이 나오는지 본다. 정적 검사(lint)는 "달라질 수 있다"까지고,
-// 이게 "정말 달라지는가"다. 같은 호스트에서 두 번 같다고 다른 호스트에서도 같다는 보장은 아니지만, 여기서 다르면 어디서도
-// 안 같다 — 그리고 어느 파일 때문인지 바로 나온다(실측: redis 는 redis-server 바이너리, haproxy 는 apk db 두 파일).
-// 다르면 오류를 돌려준다: 첫 빌드의 EIF·측정값은 이미 out/ 에 있지만, 그 값을 넘겨봐야 Auditor 가 재현 못 한다.
+// verify builds the same Dockerfile once more without cache and checks that the same PCRs come out. The static check (lint) only says "may differ";
+// this says whether it really does. Two equal builds on one host do not guarantee equality on another host, but a difference here means
+// it will not match anywhere, and it names the file responsible (measured: redis, the redis-server binary; haproxy, two apk db files).
+// On a difference it returns an error: the EIF and measurements of the first build are already in out/, but handing those values over would not let an Auditor reproduce them.
 func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, first manifest, firstPCR map[string]string) error {
 	checkApp := appImage + "-verify"
 	checkImage := b.Name + ":tb-verify"

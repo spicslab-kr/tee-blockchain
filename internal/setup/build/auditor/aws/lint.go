@@ -9,15 +9,16 @@ import (
 	"strings"
 )
 
-// Risk — Dockerfile 한 줄에서 찾은, 재현빌드를 깨는 것으로 알려진 패턴.
+// Risk is a pattern found on one Dockerfile line that is known to break reproducible builds.
 type Risk struct {
 	Line int
-	Text string // 해당 줄 (앞뒤 공백 제거)
-	Why  string // 왜 두 번 빌드하면 달라질 수 있는지
+	Text string // the line (trimmed)
+	Why  string // why building twice can give different results
 }
 
-// riskPatterns — 실측·문헌으로 아는 비재현 원인. 정규화가 이미 처리하는 것(apk 가상 패키지 버전, /tmp, 패키지 관리자 로그)은
-// 여기 없다. 이건 정적 검사라 "달라질 수 있다"까지만 안다 — 정말 달라지는지는 --verify(두 번 빌드)가 안다.
+// riskPatterns are causes of non-reproducibility known from measurement or the literature. Things normalization already handles
+// (apk virtual package versions, /tmp, package manager logs) are not here. This is a static check, so it only knows "may differ";
+// --verify (building twice) tells whether it really does.
 var riskPatterns = []struct {
 	re  *regexp.Regexp
 	why string
@@ -40,10 +41,10 @@ var riskPatterns = []struct {
 		"compiled from source — compilers and build scripts may embed the time, host or path (redis bakes hostname+time into redis-server). Run with --verify"},
 }
 
-// versionPinned — 패키지 설치 줄에 버전 고정이 하나라도 보이면 그 경고는 뺀다(전부 고정했는지까지는 안 본다).
+// versionPinned: if any version pin is visible on a package install line, that warning is dropped (it does not check that everything is pinned).
 var versionPinned = regexp.MustCompile(`\S+=\S*\d|\S+-\d+\.\d+\S*`)
 
-// LintDockerfile — Dockerfile 을 줄 단위로 훑어 riskPatterns 를 찾는다. 이어지는 줄(\)은 한 줄로 합친다. 주석은 뺀다.
+// LintDockerfile scans the Dockerfile line by line for riskPatterns. Continued lines (\) are joined into one. Comments are skipped.
 func LintDockerfile(path string) ([]Risk, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -78,7 +79,7 @@ func lintReader(rd io.Reader) ([]Risk, error) {
 			}
 			if strings.HasPrefix(text, "FROM ") || strings.HasPrefix(text, "from ") {
 				if p.re != riskPatterns[0].re {
-					continue // FROM 줄에는 베이스 이미지 검사만
+					continue // on a FROM line, only the base image check applies
 				}
 				if m := riskPatterns[0].re.FindStringSubmatch(text); m != nil && m[1] == "scratch" {
 					continue
@@ -117,7 +118,7 @@ func shorten(s string, n int) string {
 	return s[:n-1] + "…"
 }
 
-// printRisks — 빌드 로그에 경고로 찍는다. 빌드는 계속한다: 정적 검사는 "달라질 수 있다"지 "달라진다"가 아니다.
+// printRisks prints them as warnings in the build log. The build continues: a static check says "may differ", not "does differ".
 func printRisks(log io.Writer, dockerfile string, risks []Risk) {
 	if len(risks) == 0 {
 		fmt.Fprintf(log, "reproducibility scan of %s: nothing known to break it\n", dockerfile)
