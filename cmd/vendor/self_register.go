@@ -17,8 +17,8 @@ import (
 	cmp "tb/internal/core/compare/Vendor"
 )
 
-// selfRegisterCmd — 흐름 2, Auditor 없이 Vendor 가 자기 엔클레이브를 직접 등록: 자기 TEE 에 attestation 을 받아(T1·T2),
-// --measurements 가 있으면 내 빌드값과 맞대고(M2), 등록하고(C1), 읽어서 자기확인(C2·M2). audit 와 같은 몸통이다.
+// selfRegisterCmd: the Vendor registers its own enclave directly, without an Auditor: request an attestation document from its own TEE and verify it,
+// compare it with my build values if --measurements is given, register, then read back and check. Same body as audit.
 func selfRegisterCmd(args []string) error {
 	fs := flag.NewFlagSet("self-register", flag.ContinueOnError)
 	tee := fs.String("tee", "", "my enclave's host:port — an attestation is requested from it first")
@@ -40,8 +40,8 @@ func selfRegisterCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	// --config 가 있으면 service · version · arch 는 거기서 온다 (플래그는 덮어쓰기, 경고 한 줄). 없으면 service · version 은
-	// 아래에서 기존 등록에서 찾거나 묻고, arch 는 이 기계의 것.
+	// With --config, service, version and arch come from it (a flag overrides it, with a one-line warning). Without it, service and version are
+	// found in an existing registration below or asked for, and arch is this machine's.
 	cfg, err := loadBuildConfig(*config)
 	if err != nil {
 		return err
@@ -53,7 +53,7 @@ func selfRegisterCmd(args []string) error {
 	} else if *arch == "" {
 		*arch = defaultArch()
 	}
-	// 옵션으로 안 준 값은 register 처럼 차례로 묻는다 — plain 에서 전부 플래그로 줄 필요는 없다.
+	// Values not given as options are asked for in turn, as register does; a plain run need not pass everything as flags.
 	askMainnetRPC(rpc)
 	ask(contract, "Registry contract address (0x…)", "")
 	ask(keyFile, "my private key file", "")
@@ -72,7 +72,7 @@ func selfRegisterCmd(args []string) error {
 	if err := checkArch(*arch); err != nil {
 		return err
 	}
-	quiet = true // 아래 단계들이 raRequest · raParse · register 를 부르는데, 그들의 출력 대신 여기서 한 줄씩 찍는다
+	quiet = true // the steps below call raRequest, raParse and register; print one line here instead of their output
 
 	measPath := *measurements
 	parsedPath := ""
@@ -225,7 +225,7 @@ func selfRegisterCmd(args []string) error {
 	return nil
 }
 
-// fileSize — 받은 문서 크기. 실패해도 0 만 찍히면 되니 오류는 삼킨다.
+// fileSize returns the size of the received document. Errors are swallowed since a 0 is enough if it fails.
 func fileSize(path string) int64 {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -234,7 +234,7 @@ func fileSize(path string) int64 {
 	return st.Size()
 }
 
-// printPCRs — 파싱값 파일의 측정값을 들여쓰기해 찍는다 (PCR0 · PCR1 · PCR2).
+// printPCRs prints the measurements in the parsed-values file, indented (PCR0, PCR1, PCR2).
 func printPCRs(path string) {
 	values, err := readMeasurements(path)
 	if err != nil {

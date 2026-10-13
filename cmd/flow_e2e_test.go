@@ -1,6 +1,6 @@
-// run 을 실제 CLI 로 — 사람이 손으로 T1→T2→C1→C2→M2 를 따로 치던 걸 명령 하나로 묶은 것.
-// 컨트랙트 하나 = 승인자 하나라, Auditor 와 Vendor 는 각자 자기 컨트랙트에 등록한다.
-// anvil 이 PATH 에 없으면 건너뛴다.
+// run through the real CLI: what a person used to type by hand as separate steps (request, parse, register, lookup, compare), bundled into one command.
+// One contract = one approver, so the Auditor and the Vendor each register on their own contract.
+// Skipped if anvil is not on PATH.
 package cmd_test
 
 import (
@@ -12,14 +12,14 @@ import (
 	"testing"
 )
 
-// fixture-my-web.cbor 가 실제로 들고 있는 PCR — nitro-cli build-enclave 가 그때 낸 값 (parse/aws/measure_test.go 와 같다).
+// The PCRs fixture-my-web.cbor actually carries: the values nitro-cli build-enclave produced then (same as internal/tee/parse/aws/measure_test.go).
 const (
 	fixturePCR0 = "a0099c1cd2af380adf19601ad09aa49380fc8c3c78e875ac9fe958fc6a836a8d3c30ca5ff5d66c9dc7293cd30ce67fb1"
 	fixturePCR1 = "4b4d5b3661b3efc12920900c80e126e4ce783c522de6c02a2a5bf7af3a2b9327b86776f188e4be1c1c404a129dbda493"
 	fixturePCR2 = "62f677d0dea159ce42932fa7cc14b885d53d295136f74347a8572ba5f48a36e82485055108bd4f1fa2a3302ab64424cf"
 )
 
-// writeBuildMeasurements — build 가 out/measurements.json 에 남기는 것과 같은 nitro-cli 형식.
+// writeBuildMeasurements: the same nitro-cli format that build leaves in out/measurements.json.
 func writeBuildMeasurements(t *testing.T, dir, name, pcr0, pcr1, pcr2 string) string {
 	t.Helper()
 	p := filepath.Join(dir, name)
@@ -30,8 +30,8 @@ func writeBuildMeasurements(t *testing.T, dir, name, pcr0, pcr1, pcr2 string) st
 	return p
 }
 
-// lastKey — keyLineRe 는 "key ... 에서 가져옴"(service/version 추론 로그)에도 걸린다. register 가 실제로
-// 등록한 key 는 항상 그 뒤, 출력의 마지막 매치다.
+// lastKey: keyLineRe also matches "key ... taken from" (the service/version inference log). The key register actually
+// registered is always after that, the last match in the output.
 func lastKey(out []byte) []byte {
 	m := keyLineRe.FindAllSubmatch(out, -1)
 	if m == nil {
@@ -48,7 +48,7 @@ func deployFor(t *testing.T, bin, rpc, deployerFile, approver string) string {
 	}
 	m := deployedAtRe.FindSubmatch(out)
 	if m == nil {
-		t.Fatalf("컨트랙트 주소를 못 찾음:\n%s", out)
+		t.Fatalf("contract address not found:\n%s", out)
 	}
 	return string(m[1])
 }
@@ -78,28 +78,28 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	teeAddr, stopServe := startServe(t, vendorBin, fixture)
 	defer stopServe()
 
-	// fixture 응답기는 보낸 nonce 에 안 묶인다(FixtureExtractor.Extract 가 nonce 를 무시) — ra-parse 는
-	// 그래서 기본값(ra-request 가 방금 보낸 nonce)이 아니라 fixture 가 실제로 들고 있는 nonce 를 받아야 한다.
+	// The fixture responder is not bound to the nonce sent (FixtureExtractor.Extract ignores the nonce), so ra-parse
+	// must be given the nonce the fixture actually carries, not the default (the nonce ra-request just sent).
 	work := t.TempDir()
 	goodBuild := writeBuildMeasurements(t, work, "build-good.json", fixturePCR0, fixturePCR1, fixturePCR2)
 	badBuild := writeBuildMeasurements(t, work, "build-bad.json", strings.Repeat("ab", 48), fixturePCR1, fixturePCR2)
 
-	// Auditor, 검사 FAIL: 내가 빌드한 값(가짜)과 TEE 가 증명한 값이 다르면 등록하지 않고 실패한다.
+	// Auditor, check FAIL: if the value I built (a fake) differs from what the TEE attests, it does not register and fails.
 	aBad := exec.Command(auditorBin, "audit",
 		"--tee", teeAddr, "--measurements", badBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", auditorFile,
 		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "auditor-bad"))
 	aBadOut, err := aBad.CombinedOutput()
 	if err == nil {
-		t.Fatalf("빌드값이 TEE 값과 다르면 run 은 실패해야 한다:\n%s", aBadOut)
+		t.Fatalf("run must fail when the built value differs from the TEE value:\n%s", aBadOut)
 	}
 	if !strings.Contains(string(aBadOut), "not registering") || !strings.Contains(string(aBadOut), "PCR0") {
-		t.Fatalf("검사 FAIL 의 이유(PCR0)와 '등록하지 않는다'가 찍혀야 한다:\n%s", aBadOut)
+		t.Fatalf("the reason for the check FAIL (PCR0) and 'not registering' must be printed:\n%s", aBadOut)
 	}
 	if strings.Contains(string(aBadOut), "registered") {
-		t.Fatalf("검사에 실패했는데 등록이 됐다:\n%s", aBadOut)
+		t.Fatalf("registered although the check failed:\n%s", aBadOut)
 	}
 
-	// Auditor, 검사 PASS: 빌드값 = TEE 값 → 빌드값을 등록하고 self-check.
+	// Auditor, check PASS: built value = TEE value, so register the built value and self-check.
 	aRun := exec.Command(auditorBin, "audit",
 		"--tee", teeAddr, "--measurements", goodBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", auditorFile,
 		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "auditor"))
@@ -108,16 +108,16 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 		t.Fatalf("auditor run: %v\n%s", err, aOut)
 	}
 	if !strings.Contains(string(aOut), "identical") || !strings.Contains(string(aOut), "PASS") {
-		t.Fatalf("auditor run 은 검사 PASS 와 self-check PASS 를 둘 다 찍어야 한다:\n%s", aOut)
+		t.Fatalf("auditor run must print both check PASS and self-check PASS:\n%s", aOut)
 	}
 	aKey := lastKey(aOut)
 	if aKey == nil {
-		t.Fatalf("auditor run 등록 key 를 못 찾음:\n%s", aOut)
+		t.Fatalf("auditor run: registration key not found:\n%s", aOut)
 	}
 
-	// Vendor: 같은 TEE 에서 자기도 RA 요청해서 자기 컨트랙트에 등록 (흐름2). 자기 컨트랙트엔 아직 아무것도
-	// 없으니 service/version 은 직접 준다. --arch 는 일부러 이 기계와 다르게 — User 의 verify 가 체인이 적은
-	// 아키텍처를 그대로 보여 주는지 아래서 본다 (auditor 쪽은 --arch 를 안 줘서 이 기계의 GOARCH 다).
+	// Vendor: requests RA from the same TEE itself and registers on its own contract. Its own contract has nothing
+	// yet, so service/version are given directly. --arch is deliberately different from this machine's, so below we see whether User's verify
+	// shows the architecture the chain recorded (the auditor side omits --arch, so it is this machine's GOARCH).
 	vRun := exec.Command(vendorBin, "self-register",
 		"--tee", teeAddr, "--rpc", rpc, "--contract", vendorContract, "--key-file", vendorFile,
 		"--service", "run-e2e", "--version", "1.0.0", "--arch", "arm64", "--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
@@ -126,23 +126,23 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 		t.Fatalf("vendor run: %v\n%s", err, vOut)
 	}
 	if !strings.Contains(string(vOut), "PASS") {
-		t.Fatalf("vendor run 은 self-check PASS 를 찍어야 한다:\n%s", vOut)
+		t.Fatalf("vendor run must print self-check PASS:\n%s", vOut)
 	}
 	vKey := lastKey(vOut)
 	if vKey == nil || string(vKey) == string(aKey) {
-		t.Fatalf("vendor run 의 등록 key 가 auditor 것과 같거나 안 잡힘:\n%s", vOut)
+		t.Fatalf("vendor run registration key equals the auditor's or was not captured:\n%s", vOut)
 	}
 
-	// Vendor 키로 Auditor 컨트랙트에 등록하려 하면 거부된다 — 컨트랙트 하나 = 승인자 하나.
+	// Registering on the Auditor's contract with the Vendor's key is rejected: one contract = one approver.
 	vWrong := exec.Command(vendorBin, "self-register",
 		"--measurements", goodBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", vendorFile,
 		"--service", "run-e2e", "--version", "1.0.0")
 	if out, err := vWrong.CombinedOutput(); err == nil {
-		t.Fatalf("Vendor 키는 Auditor 컨트랙트의 승인자가 아니다 — 실패해야 한다:\n%s", out)
+		t.Fatalf("the Vendor key is not the approver of the Auditor contract, so it must fail:\n%s", out)
 	}
 
-	// User: 처음부터 끝까지 한 번에 — request → parse → lookup → compare. 컨트랙트마다 따로 본다. 맞는 등록의
-	// 줄에는 체인이 적은 아키텍처가 보여야 한다 — User 는 arch 를 몰라도 찾고, 찾은 뒤에 읽는다.
+	// User: start to finish in one go (request, parse, lookup, compare), each contract looked at separately. The line of a matching
+	// registration must show the architecture the chain recorded: User finds it without knowing the arch and reads it afterwards.
 	for contract, arch := range map[string]string{auditorContract: runtime.GOARCH, vendorContract: "arm64"} {
 		uRun := exec.Command(userBin, "verify", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
 			"--nonce", fixtureNonce, "--out", t.TempDir())
@@ -151,7 +151,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 			t.Fatalf("user run (%s): %v\n%s", contract, err, uOut)
 		}
 		if !strings.Contains(string(uOut), "trusted —") {
-			t.Fatalf("user run 은 등록된 컨트랙트에선 신뢰할 수 있다고 해야 한다:\n%s", uOut)
+			t.Fatalf("user run must say it is trusted on the registered contract:\n%s", uOut)
 		}
 		if want := "run-e2e 1.0.0 (" + arch + ") by"; !strings.Contains(string(uOut), want) {
 			t.Fatalf("verify must name the architecture the chain recorded, lacks %q:\n%s", want, uOut)
@@ -159,7 +159,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	}
 }
 
-// 아무도 등록 안 한 측정값을 내는 TEE 에 User run 을 돌리면 — 조회에 아무것도 없으니 exit 1.
+// Running User run against a TEE whose measurements nobody registered: the lookup finds nothing, so exit 1.
 func TestRun_E2E_User_NothingRegistered(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
@@ -187,9 +187,9 @@ func TestRun_E2E_User_NothingRegistered(t *testing.T) {
 	out, err := uRun.CombinedOutput()
 	ee, ok := err.(*exec.ExitError)
 	if !ok || ee.ExitCode() != 1 {
-		t.Fatalf("아무도 등록 안 했으면 exit 1 이어야 한다: %v\n%s", err, out)
+		t.Fatalf("exit 1 expected when nobody registered: %v\n%s", err, out)
 	}
 	if !strings.Contains(string(out), "nobody has registered") {
-		t.Fatalf("이유가 명확해야 한다:\n%s", out)
+		t.Fatalf("the reason must be clear:\n%s", out)
 	}
 }

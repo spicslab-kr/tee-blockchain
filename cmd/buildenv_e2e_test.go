@@ -1,6 +1,6 @@
-// build_env — 명령줄 끝에서 끝까지. tb-vendor send 가 자기 빌드 환경(OS·아키텍처·Go)을 build-config.json 에
-// 적고, tb-auditor receive 가 그것을 자기 인스턴스와 견줘 다르면 거절한다(--ignore-env 면 경고만).
-// 원격은 로컬 bare 저장소, 실제 git 이 돈다 — internal/core/transfer 의 git_test 와 같은 방식.
+// build_env, end to end on the command line. tb-vendor send writes its own build environment (OS, architecture, Go) into build-config.json,
+// and tb-auditor receive compares it with its own instance and refuses if they differ (with --ignore-env it only warns).
+// The remote is a local bare repository and real git runs, the same way as the git tests under internal/core/transfer.
 package cmd_test
 
 import (
@@ -25,7 +25,7 @@ func git(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// newRemoteRepo — bare 저장소 하나에 main.go 한 개를 seed 로 넣고, 그 경로와 seed 커밋을 돌려준다.
+// newRemoteRepo seeds one bare repository with a main.go and returns its path and the seed commit.
 func newRemoteRepo(t *testing.T) (remote, seedCommit string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -52,7 +52,7 @@ func cloneRemote(t *testing.T, remote string) string {
 	return dir
 }
 
-// buildConfigJSON — send 에 넘길 설정값. build_env 는 비워 둔다: send 가 채우는지 보는 게 목적.
+// buildConfigJSON is the config to pass to send. build_env is left empty on purpose: the point is to see whether send fills it in.
 func buildConfigJSON(t *testing.T, commit string, env map[string]any) []byte {
 	t.Helper()
 	m := map[string]any{
@@ -70,7 +70,7 @@ func buildConfigJSON(t *testing.T, commit string, env map[string]any) []byte {
 	return b
 }
 
-// pushConfig — Vendor 를 흉내: build-config.json 을 원격에 커밋 · push (send 를 거치지 않고, 내용을 직접 정한다).
+// pushConfig imitates the Vendor: commits build-config.json to the remote and pushes it (bypassing send, with contents chosen directly).
 func pushConfig(t *testing.T, remote string, cfg []byte) {
 	t.Helper()
 	work := cloneRemote(t, remote)
@@ -105,7 +105,7 @@ func otherArch() string {
 	return "amd64"
 }
 
-// tb-vendor send 는 자기가 도는 OS/아키텍처/Go 를 build_env 로 적어 push 한다.
+// tb-vendor send records the OS/architecture/Go it runs on as build_env and pushes.
 func TestBuildEnv_SendRecordsRunningEnv(t *testing.T) {
 	dir := t.TempDir()
 	vendor := build(t, dir, "./cmd/vendor")
@@ -124,7 +124,7 @@ func TestBuildEnv_SendRecordsRunningEnv(t *testing.T) {
 		t.Errorf("send must print the declared env %q, got:\n%s", wantLine, stdout)
 	}
 
-	// 원격에서 다시 받아 읽는다
+	// fetch it again from the remote and read it
 	check := cloneRemote(t, remote)
 	b, err := os.ReadFile(filepath.Join(check, "build-config.json"))
 	if err != nil {
@@ -146,7 +146,7 @@ func TestBuildEnv_SendRecordsRunningEnv(t *testing.T) {
 	}
 }
 
-// send → receive, 같은 기계: 받는 쪽이 자기 환경과 같다고 찍고 0 으로 끝난다.
+// send then receive on the same machine: the receiver reports it matches its own environment and exits 0.
 func TestBuildEnv_ReceiveMatchingEnvPasses(t *testing.T) {
 	dir := t.TempDir()
 	vendor := build(t, dir, "./cmd/vendor")
@@ -175,8 +175,8 @@ func TestBuildEnv_ReceiveMatchingEnvPasses(t *testing.T) {
 	}
 }
 
-// Vendor 가 다른 아키텍처를 적어 두면 receive 는 두 아키텍처를 모두 이름 대며 거절한다(exit ≠ 0).
-// --ignore-env 면 같은 말을 경고로만 찍고 0 으로 끝난다.
+// If the Vendor wrote a different architecture, receive refuses and names both architectures (exit != 0).
+// With --ignore-env it prints the same message as a warning only and exits 0.
 func TestBuildEnv_ReceiveRejectsOtherArch(t *testing.T) {
 	dir := t.TempDir()
 	auditor := build(t, dir, "./cmd/auditor")
@@ -210,7 +210,7 @@ func TestBuildEnv_ReceiveRejectsOtherArch(t *testing.T) {
 	}
 }
 
-// Go 버전만 달라도 거절 — 툴체인이 바뀌면 측정값이 바뀐다.
+// A different Go version alone is refused: a changed toolchain changes the measurements.
 func TestBuildEnv_ReceiveRejectsOtherGoVersion(t *testing.T) {
 	dir := t.TempDir()
 	auditor := build(t, dir, "./cmd/auditor")
@@ -227,7 +227,7 @@ func TestBuildEnv_ReceiveRejectsOtherGoVersion(t *testing.T) {
 	}
 }
 
-// trimpath 없이 빌드한 Vendor 는 경고만 — 거절하지 않는다.
+// A Vendor build made without trimpath only gets a warning, not a refusal.
 func TestBuildEnv_ReceiveWarnsOnNoTrimpath(t *testing.T) {
 	dir := t.TempDir()
 	auditor := build(t, dir, "./cmd/auditor")
@@ -244,7 +244,7 @@ func TestBuildEnv_ReceiveWarnsOnNoTrimpath(t *testing.T) {
 	}
 }
 
-// build_env 가 아예 없는(옛) build-config.json 은 aws 에서 받지 않는다.
+// An (old) build-config.json with no build_env at all is not accepted on aws.
 func TestBuildEnv_ReceiveRejectsConfigWithoutBuildEnv(t *testing.T) {
 	dir := t.TempDir()
 	auditor := build(t, dir, "./cmd/auditor")

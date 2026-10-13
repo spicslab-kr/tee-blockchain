@@ -96,8 +96,8 @@ func usage() {
                    read the registration from the chain and check the value, expiry and trusted signer together. exit 1 on failure
   self-register    [--tee <my enclave host:port>] [--measurements <file>] --rpc <url> --contract <0x…> --key-file <file>
                    (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64])
-                   flow 2, no Auditor: attest my own enclave (T1·T2), register the value under my key (C1), read it back and
-                   self-check (C2·M2). with --measurements too, registers only if the attested value matches it. --config takes
+                   no Auditor: request and verify the attestation document from my own enclave, register the value under my key, read it back and
+                   check it. with --measurements too, registers only if the attested value matches it. --config takes
                    service, version and the build env from my build-config.json; the flags override it, with a warning. --nonce
                    pins the nonce. with --service/--version empty and no --config, takes them from an existing registration on
                    this contract
@@ -107,10 +107,10 @@ func usage() {
                    clone the measurement record and image, and verify them
   build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>] [--verify]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
-              for source that an Auditor will rebuild the same way (Case B)
+              for source that the Auditor rebuilds
   pack        --image <docker image you built>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
               same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
-              for an image you hand to the Auditor as a file (Case A)
+              for an image you hand to the Auditor as a file
   launch      --eif <file>  [--measurements <file>] [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
               on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock,
               requests RA from itself to confirm, then opens the security-group port (when permitted).
@@ -126,7 +126,7 @@ func usage() {
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
               with --format, accepts only a document of that format (aws-nitro · gcp-cs-jwt · azure-maa-jwt)
 
-to do it by hand: setup/vendor/transfer.md`)
+to do it by hand: commit build-config.json at the repository root and push; the other side clones it.`)
 }
 
 func send(args []string) error {
@@ -275,7 +275,7 @@ func buildCmd(args []string) error {
 	fs.StringVar(&b.Name, "name", "", "image and EIF name (default: the directory name)")
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
 	fs.StringVar(&b.Out, "out", "out", "output directory")
-	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	fs.StringVar(&b.Binary, "responder", "", "path to the responder (tb-ra-responder). default: tb-ra-responder next to this executable")
 	fs.BoolVar(&b.Verify, "verify", false, "build the Dockerfile a second time without cache and fail unless PCR0·1·2 come out the same, listing the files that differed")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -299,7 +299,7 @@ func packCmd(args []string) error {
 	fs.StringVar(&b.Name, "name", "", "EIF name (default: the image name without its tag)")
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
 	fs.StringVar(&b.Out, "out", "out", "output directory")
-	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	fs.StringVar(&b.Binary, "responder", "", "path to the responder (tb-ra-responder). default: tb-ra-responder next to this executable")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -365,8 +365,8 @@ func launchCmd(args []string) error {
 		cli.Okln("✓ enclave is up and reachable. anyone can now:  tb user verify --tee <this instance's public IP>:", l.Port, " --rpc … --contract …")
 		return nil
 	}
-	// 여기서는 못 열었다 — 무엇을, 어디서, 어떻게 열어야 하는지까지 적어 준다. 권한이 없는 경우와
-	// 그 밖의 실패(메타데이터 · aws CLI)를 두 번째 줄에서만 가른다.
+	// Could not open it here: say what to open, where and how. The permission-denied case and
+	// other failures (metadata, aws CLI) are told apart only on the second line.
 	why := "This instance has no permission to change it. From an AWS account that does, run:"
 	if !errors.Is(perr, launch.ErrNoPermission) {
 		why = fmt.Sprintf("Could not open it from here (%v). From an AWS account that can, run:", perr)

@@ -1,6 +1,6 @@
-// C2 를 실제 CLI 로 — anvil(로컬 EVM)에 실제로 배포·등록해 두고, tb-auditor · tb-user lookup 바이너리로
-// 조회한다. cmd/register_e2e_test.go(C1) 의 배포·anvil 헬퍼(findAnvil · buildBin · writeKeyFile 등)를 그대로
-// 쓴다 — 같은 패키지(cmd_test)라 다시 안 만든다.
+// lookup, through the real CLI: deploy and register for real on anvil (a local EVM), then query with the tb-auditor and tb-user lookup binaries.
+// It reuses the deploy and anvil helpers of cmd/register_e2e_test.go (findAnvil, buildBin, writeKeyFile, ...) as they
+// are: same package (cmd_test), so they are not rebuilt.
 package cmd_test
 
 import (
@@ -28,7 +28,7 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	vendorBin := buildBin(t, bins, "./cmd/vendor")
 	userBin := buildBin(t, bins, "./cmd/user")
 
-	// 컨트랙트 하나에 서명자 하나 — Auditor 것과 Vendor 것을 따로 올린다.
+	// one signer per contract: the Auditor's and the Vendor's are deployed separately.
 	deploy := exec.Command(auditorBin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--approver", auditorAddr)
 	out, err := deploy.CombinedOutput()
 	if err != nil {
@@ -51,8 +51,8 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	}
 	key := string(keyLineRe.FindSubmatch(regOut)[1])
 
-	// Vendor 도 같은 측정값을 자기 컨트랙트에 등록 — 컨트랙트가 다르니 조회도 각자 한다. 아키텍처는 일부러 다르게 —
-	// 체인이 등록마다 어느 아키텍처인지 말하는지 조회 출력으로 본다 (키에는 안 들어가니 키는 여전히 서명자로만 갈린다).
+	// The Vendor registers the same measurements on its own contract: the contracts differ, so each is queried separately. The architecture is deliberately different,
+	// so the lookup output shows whether the chain says which architecture each registration is for (it is not in the key, so keys still differ only by signer).
 	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
 		"--measurements", measurements, "--service", "lookup-e2e", "--version", "2.0.0", "--platform", "aws-nitro", "--arch", "amd64")
 	vRegOut, err := vReg.CombinedOutput()
@@ -61,82 +61,82 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	}
 	vendorKeyHex := string(keyLineRe.FindSubmatch(vRegOut)[1])
 	if vendorKeyHex == key {
-		t.Fatal("auditor 와 vendor 의 key 가 같으면 안 된다 (서명자가 다르다)")
+		t.Fatal("auditor and vendor keys must not be equal (the signers differ)")
 	}
 
-	// 측정값으로 찾기 — auditor 컨트랙트에서. 서명자가 하나라 key 도 하나, auditor 것이어야 한다.
+	// find by measurements: on the auditor contract. One signer, so one key, and it must be the auditor's.
 	byMeasurements := exec.Command(auditorBin, "lookup", "--rpc", rpc, "--contract", contract, "--measurements", measurements)
 	lmOut, err := byMeasurements.CombinedOutput()
 	if err != nil {
 		t.Fatalf("lookup --measurements: %v\n%s", err, lmOut)
 	}
 	if !strings.Contains(string(lmOut), "found 1 key(s)") || !strings.Contains(string(lmOut), key) {
-		t.Fatalf("auditor 컨트랙트에선 auditor 의 key 하나가 나와야 한다:\n%s", lmOut)
+		t.Fatalf("the auditor contract must yield exactly the auditor's key:\n%s", lmOut)
 	}
 	if strings.Contains(string(lmOut), vendorKeyHex) {
-		t.Fatalf("auditor 컨트랙트 조회에 vendor 의 key 가 섞였다:\n%s", lmOut)
+		t.Fatalf("the vendor's key got mixed into the auditor contract lookup:\n%s", lmOut)
 	}
 	if !strings.Contains(string(lmOut), "lookup-e2e 2.0.0 (aws-nitro, arm64)") {
-		t.Errorf("서비스 메타데이터(아키텍처 포함)가 안 보인다:\n%s", lmOut)
+		t.Errorf("service metadata (including architecture) not shown:\n%s", lmOut)
 	}
-	// 같은 측정값을 vendor 컨트랙트에서 찾으면 vendor 의 key 하나.
+	// finding the same measurements on the vendor contract gives exactly the vendor's key.
 	vByMeasurements := exec.Command(vendorBin, "lookup", "--rpc", rpc, "--contract", vContract, "--measurements", measurements)
 	vlmOut, err := vByMeasurements.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor lookup --measurements: %v\n%s", err, vlmOut)
 	}
 	if !strings.Contains(string(vlmOut), "found 1 key(s)") || !strings.Contains(string(vlmOut), vendorKeyHex) {
-		t.Fatalf("vendor 컨트랙트에선 vendor 의 key 하나가 나와야 한다:\n%s", vlmOut)
+		t.Fatalf("the vendor contract must yield exactly the vendor's key:\n%s", vlmOut)
 	}
 	if !strings.Contains(string(vlmOut), "lookup-e2e 2.0.0 (aws-nitro, amd64)") {
-		t.Errorf("vendor 등록은 amd64 로 했다 — 조회가 그렇게 말해야 한다:\n%s", vlmOut)
+		t.Errorf("the vendor registered as amd64, so the lookup must say so:\n%s", vlmOut)
 	}
 
-	// vendor 쪽 key 로 직접 조회 — signer 가 vendor 주소여야 한다.
+	// look up directly by the vendor-side key: the signer must be the vendor's address.
 	vByKey := exec.Command(vendorBin, "lookup", "--rpc", rpc, "--contract", vContract, "--key", vendorKeyHex)
 	vbkOut, err := vByKey.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor lookup --key: %v\n%s", err, vbkOut)
 	}
 	if !strings.Contains(string(vbkOut), vendorAddr) {
-		t.Errorf("vendor 등록의 signer 가 vendor 주소가 아니다:\n%s", vbkOut)
+		t.Errorf("the signer of the vendor registration is not the vendor address:\n%s", vbkOut)
 	}
 
-	// key 로 바로 읽기 — user 로 (등록 권한이 없는 쪽도 조회는 된다).
+	// read directly by key, as user (the side without registration rights can look up too).
 	byKey := exec.Command(userBin, "lookup", "--rpc", rpc, "--contract", contract, "--key", key)
 	bkOut, err := byKey.CombinedOutput()
 	if err != nil {
 		t.Fatalf("user lookup --key: %v\n%s", err, bkOut)
 	}
 	if !strings.Contains(string(bkOut), auditorAddr) {
-		t.Errorf("signer 가 auditor 주소가 아니다:\n%s", bkOut)
+		t.Errorf("the signer is not the auditor address:\n%s", bkOut)
 	}
 	if !strings.Contains(string(bkOut), "lookup-e2e 2.0.0 (aws-nitro, arm64)") {
-		t.Errorf("user 조회에도 등록의 아키텍처가 보여야 한다:\n%s", bkOut)
+		t.Errorf("the user lookup must show the registration's architecture too:\n%s", bkOut)
 	}
 	hashRe := regexp.MustCompile(`measurement hash\s+([0-9a-f]{64})`)
 	m := hashRe.FindSubmatch(bkOut)
 	if m == nil {
-		t.Fatalf("measurement hash 를 못 찾음:\n%s", bkOut)
+		t.Fatalf("measurement hash not found:\n%s", bkOut)
 	}
 	if _, err := hex.DecodeString(string(m[1])); err != nil {
-		t.Errorf("measurement hash 가 hex 가 아니다: %s", m[1])
+		t.Errorf("measurement hash is not hex: %s", m[1])
 	}
 
-	// 등록되지 않은 측정값 — 빈 결과.
+	// measurements that are not registered: an empty result.
 	freshMeasurements := "PCR0=" + strings.Repeat("11", 48) + ",PCR1=" + strings.Repeat("22", 48) + ",PCR2=" + strings.Repeat("33", 48)
 	notFound := exec.Command(userBin, "lookup", "--rpc", rpc, "--contract", contract, "--measurements", freshMeasurements)
 	nfOut, err := notFound.CombinedOutput()
 	if err != nil {
-		t.Fatalf("lookup (등록 안 된 측정값): %v\n%s", err, nfOut)
+		t.Fatalf("lookup (unregistered measurements): %v\n%s", err, nfOut)
 	}
 	if !strings.Contains(string(nfOut), "nothing registered") {
-		t.Errorf("등록 안 된 측정값인데 뭔가 찾았다:\n%s", nfOut)
+		t.Errorf("found something for unregistered measurements:\n%s", nfOut)
 	}
 
-	// 등록되지 않은 key — 에러.
+	// a key that is not registered: an error.
 	badKey := exec.Command(userBin, "lookup", "--rpc", rpc, "--contract", contract, "--key", "0x"+strings.Repeat("00", 32))
 	if out, err := badKey.CombinedOutput(); err == nil {
-		t.Fatalf("등록 안 된 key 조회가 성공하면 안 된다:\n%s", out)
+		t.Fatalf("lookup of an unregistered key must not succeed:\n%s", out)
 	}
 }

@@ -1,5 +1,5 @@
-// 두 프로세스 — vendor 바이너리가 TEE 쪽 ra-serve 를 띄우고, user 바이너리가 ra-request 로 문서를 받는다.
-// build · repoRoot · startServe 는 e2e_helpers_test.go 에 있다 (parse_e2e_test.go 와 공유).
+// Two processes: the vendor binary starts ra-serve on the TEE side, and the user binary receives a document with ra-request.
+// build, repoRoot and startServe live in e2e_helpers_test.go (shared with parse_e2e_test.go).
 package cmd_test
 
 import (
@@ -50,7 +50,7 @@ func TestRA_TwoProcesses_UserRequestsVendorTEE(t *testing.T) {
 		t.Errorf("output: %s", res)
 	}
 
-	// 다른 형식을 기대하면 문서를 받아도 거부한다 (exit 4)
+	// if a different format is expected, the document is rejected even though it was received (exit 4)
 	req = exec.Command(user, "ra-request", "--tee", addr, "--out", out+".2", "--format", "gcp-cs-jwt", "--timeout", "10s")
 	res, err = req.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 4 {

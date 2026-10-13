@@ -1,7 +1,7 @@
-// 등록·기록의 빌드 환경 표기를 실제 CLI 로 — 같은 소스도 x86_64 와 arm64 에서, 그리고 Go 툴체인이 다르면 PCR 이
-// 다르니, 등록(register)과 전달 기록(measurement-record.json)은 어느 아키텍처·어느 툴체인 것인지 말해야 한다.
-// 체인 Entry 는 그대로다(측정값 해시가 이미 아키텍처마다 다르니 키는 저절로 갈린다) — 여기서 보는 건 화면 출력과
-// 기록 파일의 검사뿐이다. register 는 anvil 이 필요하고(없으면 그 부분만 건너뛴다), send 는 로컬 bare 저장소로 체인 없이 끝까지 돈다.
+// How registration and records state their build environment, through the real CLI. The same source has different PCRs on x86_64 and arm64, and with a different Go toolchain,
+// so a registration and the hand-over record (measurement-record.json) must say which architecture and toolchain they are for.
+// The on-chain Entry is unchanged (the measurement hash already differs per architecture, so keys differ on their own); what is checked here is the screen output and
+// the record file. register needs anvil (without it only that part is skipped); send runs to the end against a local bare repository, no chain needed.
 package cmd_test
 
 import (
@@ -16,8 +16,8 @@ import (
 	"testing"
 )
 
-// TestBuildEnv_E2E_RegisterPrintsArchAndToolchain — register 가 --arch 를 받아 확인 문장에 이 바이너리의 Go 툴체인과 함께 찍고,
-// 잘못된 철자는 거절하고, 없으면 이 기계의 GOARCH.
+// TestBuildEnv_E2E_RegisterPrintsArchAndToolchain: register accepts --arch and prints it in the confirmation sentence together with this binary's Go toolchain,
+// rejects a wrong spelling, and defaults to this machine's GOARCH when the flag is absent.
 func TestBuildEnv_E2E_RegisterPrintsArchAndToolchain(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
@@ -41,7 +41,7 @@ func TestBuildEnv_E2E_RegisterPrintsArchAndToolchain(t *testing.T) {
 	}
 	goVer := runtime.Version() // the test binary and the auditor binary are built by the same (pinned) Go
 
-	// 1. --arch arm64 — 등록 문장과 확인 블록 둘 다에 (arm64, go1.x.y 가 보여야 하고, 상세 줄과 안내 줄은 build_env 전체를 말한다.
+	// 1. --arch arm64: (arm64, go1.x.y) must show in both the registration sentence and the confirmation block, and the detail and hint lines state the whole build_env.
 	out, err := register("--measurements", measurements("a1"), "--arch", "arm64")
 	if err != nil {
 		t.Fatalf("register --arch arm64: %v\n%s", err, out)
@@ -60,7 +60,7 @@ func TestBuildEnv_E2E_RegisterPrintsArchAndToolchain(t *testing.T) {
 		t.Fatalf("no registration key in output:\n%s", out)
 	}
 
-	// 2. --arch x86_64 — uname 철자는 거절. 어떤 철자를 받는지 말해 줘야 한다. 체인에는 아무것도 가지 않는다.
+	// 2. --arch x86_64: the uname spelling is refused, and the message must say which spellings are accepted. Nothing goes to the chain.
 	out, err = register("--measurements", measurements("b2"), "--arch", "x86_64")
 	if err == nil {
 		t.Fatalf("register --arch x86_64 must be rejected:\n%s", out)
@@ -74,7 +74,7 @@ func TestBuildEnv_E2E_RegisterPrintsArchAndToolchain(t *testing.T) {
 		t.Errorf("a rejected --arch must not register anything:\n%s", out)
 	}
 
-	// 3. 플래그 없음 — 이 기계의 GOARCH 가 기본값.
+	// 3. no flag: this machine's GOARCH is the default.
 	out, err = register("--measurements", measurements("c3"))
 	if err != nil {
 		t.Fatalf("register without --arch: %v\n%s", err, out)
@@ -84,12 +84,12 @@ func TestBuildEnv_E2E_RegisterPrintsArchAndToolchain(t *testing.T) {
 	}
 }
 
-// pcrB64 — 기록 파일의 values 는 바이트를 base64 로 싣는다 (48 바이트 PCR).
+// pcrB64: the record file's values carry the bytes as base64 (a 48-byte PCR).
 func pcrB64(fill byte) string {
 	return base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{fill}, 48))
 }
 
-// writeRecord — Go 스키마(tb.measurement-record/1)의 measurement-record.json. buildEnvLine 이 비면 build_env 를 아예 뺀다.
+// writeRecord writes a measurement-record.json in the Go schema (tb.measurement-record/1). If buildEnvLine is empty, build_env is left out entirely.
 func writeRecord(t *testing.T, dir, name, buildEnvLine string) string {
 	t.Helper()
 	body := `{
@@ -113,7 +113,7 @@ func writeRecord(t *testing.T, dir, name, buildEnvLine string) string {
 	return p
 }
 
-// gitBare — send 가 push 할 로컬 bare 저장소. 네트워크도 체인도 없이 send 를 끝까지 돌린다.
+// gitBare is a local bare repository for send to push to. Lets send run to the end with no network and no chain.
 func gitBare(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -126,15 +126,15 @@ func gitBare(t *testing.T) string {
 	return dir
 }
 
-// gitIdentity — 어느 기계에서든 commit 이 되게 이름·메일을 환경으로 준다 (사용자 git 설정에 기대지 않는다).
+// gitIdentity passes a name and mail through the environment so commits work on any machine (without relying on the user's git config).
 func gitIdentity(cmd *exec.Cmd) {
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=tb-test", "GIT_AUTHOR_EMAIL=tb-test@example.invalid",
 		"GIT_COMMITTER_NAME=tb-test", "GIT_COMMITTER_EMAIL=tb-test@example.invalid")
 }
 
-// TestBuildEnv_E2E_SendRequiresBuildEnv — send --record 는 build_env 가 빠진 기록을 거절하고(build_env 를 지목해서),
-// 있으면 그 빌드 환경을 한 줄로 찍고 보낸다. push 된 파일의 build_env.go 는 기록에 적힌 그대로다.
+// TestBuildEnv_E2E_SendRequiresBuildEnv: send --record refuses a record without build_env (naming build_env),
+// and if present, prints that build environment on one line and sends. The pushed file's build_env.go is exactly what the record says.
 func TestBuildEnv_E2E_SendRequiresBuildEnv(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
@@ -146,7 +146,7 @@ func TestBuildEnv_E2E_SendRequiresBuildEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 1. build_env 없음 — 거절. 메시지가 build_env 를 지목해야 하고, clone 도 push 도 하기 전에 걸려야 한다.
+	// 1. no build_env: refused. The message must name build_env, and it must fail before any clone or push.
 	noEnv := writeRecord(t, work, "no-build-env.json", "")
 	cmd := exec.Command(auditorBin, "send", "--repo", gitBare(t), "--record", noEnv, "--image", eif)
 	gitIdentity(cmd)
@@ -163,7 +163,7 @@ func TestBuildEnv_E2E_SendRequiresBuildEnv(t *testing.T) {
 		t.Errorf("nothing must be sent without build_env:\n%s", out)
 	}
 
-	// 2. build_env 있음 (이 툴체인의 Go) — 한 줄로 찍고, 로컬 bare 저장소에 실제로 push 된다.
+	// 2. build_env present (Go of this toolchain): printed on one line, and actually pushed to the local bare repository.
 	goVer := runtime.Version()
 	withEnv := writeRecord(t, work, "with-build-env.json",
 		`  "build_env": { "os": "linux", "arch": "amd64", "go": "`+goVer+`", "trimpath": true },`+"\n")
@@ -183,7 +183,7 @@ func TestBuildEnv_E2E_SendRequiresBuildEnv(t *testing.T) {
 	if !bytes.Contains(out, []byte("sent ")) {
 		t.Errorf("send must report the push:\n%s", out)
 	}
-	// 보내진 파일에도 build_env 가 실려 있다 — 받는 쪽(Vendor)이 읽는 것은 이 파일이다.
+	// The sent file carries build_env too: this is the file the receiver (the Vendor) reads.
 	pushed, err := exec.Command("git", "-C", remote, "show", "HEAD:measurement-record.json").CombinedOutput()
 	if err != nil {
 		t.Fatalf("read pushed record: %v\n%s", err, pushed)
@@ -201,7 +201,7 @@ func TestBuildEnv_E2E_SendRequiresBuildEnv(t *testing.T) {
 		t.Errorf("pushed measurement-record.json build_env drifted: %+v\n%s", rec.BuildEnv, pushed)
 	}
 
-	// 3. 다른 툴체인의 Go 가 적힌 기록 — 보내긴 하되 한 줄 경고한다 (이 프로젝트가 고정한 Go 와 다르다).
+	// 3. a record naming a Go of a different toolchain: it is sent, but with a one-line warning (it differs from the Go this project pins).
 	otherGo := writeRecord(t, work, "other-go.json",
 		`  "build_env": { "os": "linux", "arch": "amd64", "go": "go1.0.0", "trimpath": true },`+"\n")
 	cmd = exec.Command(auditorBin, "send", "--repo", gitBare(t), "--record", otherGo, "--image", eif)

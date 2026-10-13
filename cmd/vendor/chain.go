@@ -31,7 +31,7 @@ func registryDeploy(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	// 옵션으로 안 준 값은 차례로 묻는다
+	// ask for any value not given as an option, in turn
 	askMainnetRPC(rpc)
 	ask(keyFile, "private key file that sends the deploy transaction", "")
 	ask(approver, "address of the signing key this contract accepts (0x…)", "")
@@ -52,7 +52,7 @@ func registryDeploy(args []string) error {
 	return nil
 }
 
-// register — C1. 등록에 쓴 key(조회 좌표)를 돌려준다 — run 이 이어서 바로 self-check compare 하는 데 쓴다.
+// register returns the key (lookup coordinate) used for the registration, so run can immediately self-check it with compare.
 func register(args []string) (string, error) {
 	fs := flag.NewFlagSet("register", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
@@ -72,7 +72,7 @@ func register(args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// 옵션으로 안 준 값은 차례로 묻는다 — service · version 은 --config 가 있으면 거기서 오니 안 묻는다
+	// ask for any value not given as an option, in turn; service and version are not asked when --config provides them
 	askMainnetRPC(rpc)
 	ask(contract, "Registry contract address (0x…)", "")
 	ask(keyFile, "my private key file", "")
@@ -181,8 +181,8 @@ func buildEnvJSON(env tr.BuildEnv) string {
 	return string(b)
 }
 
-// lookup — C2. --key 가 있으면 바로 그 key 를 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다.
-// 찾은 key 들을 돌려준다 — run 이 이어서 각각 compare 하는 데 쓴다.
+// lookup: with --key, reads that key directly. Otherwise it first finds the keys via --measurements, then reads them all.
+// It returns the keys it found, so run can compare each of them.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
@@ -256,7 +256,7 @@ func readKey(path string) ([]byte, error) {
 	return key, nil
 }
 
-// readMeasurements — nitro-cli 의 measurements.json({"Measurements":{"PCR0":…}}), 납작한 {"PCR0":…}, 또는 NAME=hex,… 를 받는다.
+// readMeasurements accepts nitro-cli's measurements.json ({"Measurements":{"PCR0":...}}), a flat {"PCR0":...}, or NAME=hex,...
 func readMeasurements(src string) (p.Measurements, error) {
 	var raw map[string]string
 	if b, err := os.ReadFile(src); err == nil {
@@ -294,7 +294,7 @@ func readMeasurements(src string) (p.Measurements, error) {
 
 var stdin = bufio.NewReader(os.Stdin)
 
-// ask — 값이 비어 있으면 묻는다. 그냥 엔터면 기본값.
+// ask prompts if the value is empty. Plain Enter takes the default.
 func ask(dst *string, label, def string) {
 	if *dst != "" {
 		return
@@ -314,9 +314,9 @@ func ask(dst *string, label, def string) {
 
 const mainnetRPC = "https://ethereum-rpc.publicnode.com"
 
-// askMainnetRPC — 실제 자금이 오가는 트랜잭션(등록 · 배포)이라, mainnet 을 쓸 땐 그냥 엔터로 넘어가지
-// 못하게 한다. 값이 있으면(플래그로 줬으면) 그대로 쓴다. 비어 있으면 y 를 쳐야 mainnet 을 쓰고, 다른
-// 문자열을 치면 그걸 RPC 주소로 그대로 쓴다(Sepolia 같은 테스트넷도 이렇게 명시적으로 준다).
+// askMainnetRPC: registration and deployment are transactions that move real funds, so mainnet is never reached by just pressing
+// Enter. A value given as a flag is used as is. If empty, typing y selects mainnet and any other
+// string is used as the RPC address (a testnet such as Sepolia is likewise given explicitly).
 func askMainnetRPC(dst *string) {
 	if *dst != "" {
 		return

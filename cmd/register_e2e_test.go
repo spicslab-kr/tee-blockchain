@@ -1,7 +1,7 @@
-// C1 을 실제 CLI 로 — tb-auditor · tb-vendor 바이너리를 빌드해 exec 로 띄우고, anvil(로컬 EVM)에 진짜 RPC 로
-// registry-deploy · register 를 보낸다. internal/chain/register/ether_test.go 는 Go 바인딩으로 시뮬레이션
-// 백엔드를 직접 부르지만, register 명령은 --rpc 로 실제 JSON-RPC 엔드포인트에 붙는 구조라 그걸로는 CLI 배선까지는
-// 못 본다. anvil 이 PATH 에 없으면 건너뛴다.
+// register, through the real CLI: build the tb-auditor and tb-vendor binaries, run them with exec, and send registry-deploy and register
+// over real RPC to anvil (a local EVM). internal/chain/register/ether_test.go calls the simulated backend directly
+// through the Go bindings, but the register command attaches to a real JSON-RPC endpoint with --rpc, so that cannot cover the CLI wiring.
+// Skipped if anvil is not on PATH.
 package cmd_test
 
 import (
@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// anvil 의 잘 알려진 개발용 키 (test test test ... junk 니모닉). 비밀값이 아니다 — anvil 을 그냥 띄우면 항상 이 키다.
+// anvil's well-known development key (the test test test ... junk mnemonic). Not a secret: a plain anvil start always has this key.
 const (
 	deployerAddr = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 	deployerKey  = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -57,7 +57,7 @@ func repoRootReg(t *testing.T) string {
 	}
 }
 
-// findAnvil — PATH 에서 찾고, 없으면 foundryup 의 기본 설치 위치(~/.foundry/bin)를 본다.
+// findAnvil looks on PATH, and if absent, at foundryup's default install location (~/.foundry/bin).
 func findAnvil() (string, error) {
 	if p, err := exec.LookPath("anvil"); err == nil {
 		return p, nil
@@ -77,14 +77,14 @@ func findAnvil() (string, error) {
 	return p, nil
 }
 
-// startAnvil — 로컬 EVM 을 띄우고 RPC 주소를 돌려준다. anvil 을 못 찾으면 스킵한다.
+// startAnvil starts a local EVM and returns the RPC address. Skips if anvil cannot be found.
 func startAnvil(t *testing.T) (rpc string, stop func()) {
 	t.Helper()
 	anvilPath, err := findAnvil()
 	if err != nil {
 		t.Skip("anvil not found (foundry) — skipping chain/register cmd e2e")
 	}
-	// 0 포트는 anvil 이 auto-assign 하지 않으니, 비어 있는 포트를 하나 빌려 쓴다.
+	// anvil does not auto-assign port 0, so borrow a free port.
 	port := freePort(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, anvilPath, "--port", fmt.Sprint(port), "--silent")
@@ -98,7 +98,7 @@ func startAnvil(t *testing.T) (rpc string, stop func()) {
 		cancel()
 		t.Fatal(err)
 	}
-	// --silent 라도 리슨 메시지는 나온다. 못 찾아도 포트를 아니까 재시도로 대체한다.
+	// the listen message is printed even with --silent. If it cannot be found, we know the port, so fall back to retrying.
 	done := make(chan struct{})
 	go func() {
 		sc := bufio.NewScanner(stdout)
@@ -166,8 +166,8 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	auditorBin := buildBin(t, bins, "./cmd/auditor")
 	vendorBin := buildBin(t, bins, "./cmd/vendor")
 
-	// 1. 컨트랙트 배포 — 컨트랙트 하나에 서명자 하나. 역할마다 자기 것을 올린다. 트랜잭션은 누가 보내도 된다,
-	// 여기서는 deployer 키로.
+	// 1. deploy the contract: one signer per contract, each role deploys its own. Anyone may send the transaction,
+	// here it is the deployer key.
 	deployFor := func(bin, approver string) string {
 		deploy := exec.Command(bin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--approver", approver)
 		out, err := deploy.CombinedOutput()
@@ -176,10 +176,10 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 		}
 		m := deployedAtRe.FindSubmatch(out)
 		if m == nil {
-			t.Fatalf("컨트랙트 주소를 못 찾음:\n%s", out)
+			t.Fatalf("contract address not found:\n%s", out)
 		}
 		if !strings.Contains(string(out), "approver "+approver) {
-			t.Fatalf("배포 출력에 approver 가 안 보임:\n%s", out)
+			t.Fatalf("approver not shown in the deploy output:\n%s", out)
 		}
 		return string(m[1])
 	}
@@ -189,7 +189,7 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	var out []byte
 	var err error
 
-	// 2. Auditor 등록. --arch 는 체인 Entry 에 실린다 — 아래 조회에서 그대로 읽혀야 한다.
+	// 2. Auditor registers. --arch is carried in the on-chain Entry, so the lookup below must read it back as is.
 	measurements := "PCR0=" + strings.Repeat("aa", 48) + ",PCR1=" + strings.Repeat("bb", 48) + ",PCR2=" + strings.Repeat("cc", 48)
 	aReg := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
 		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro", "--arch", "arm64")
@@ -199,10 +199,10 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	}
 	aKey := keyLineRe.FindSubmatch(aOut)
 	if aKey == nil {
-		t.Fatalf("auditor 등록 key 를 못 찾음:\n%s", aOut)
+		t.Fatalf("auditor registration key not found:\n%s", aOut)
 	}
 
-	// 3. 같은 측정값을 Vendor 도 자기 컨트랙트에 등록 — 다른 key 가 나와야 한다 (서명자가 다르므로).
+	// 3. the Vendor registers the same measurements on its own contract: a different key must come out (the signers differ).
 	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
 		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro", "--arch", "amd64")
 	vOut, err := vReg.CombinedOutput()
@@ -211,14 +211,14 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	}
 	vKey := keyLineRe.FindSubmatch(vOut)
 	if vKey == nil {
-		t.Fatalf("vendor 등록 key 를 못 찾음:\n%s", vOut)
+		t.Fatalf("vendor registration key not found:\n%s", vOut)
 	}
 	if string(aKey[1]) == string(vKey[1]) {
-		t.Fatal("auditor 와 vendor 의 등록 key 가 같으면 안 된다 (서명자가 다르다)")
+		t.Fatal("the auditor and vendor registration keys must not be equal (the signers differ)")
 	}
 
-	// 3b. 체인이 어느 아키텍처의 등록인지 돌려준다 — 등록 때 준 --arch 가 조회 출력에 그대로 보여야 한다.
-	// arch 는 키에 안 들어가니(같은 측정값이면 같은 키) 조회에 arch 를 줄 필요는 없다.
+	// 3b. the chain returns which architecture a registration is for: the --arch given at registration must show as is in the lookup output.
+	// arch is not in the key (same measurements, same key), so the lookup need not be given an arch.
 	for _, c := range []struct{ bin, contract, key, arch string }{
 		{auditorBin, contract, string(aKey[1]), "arm64"},
 		{vendorBin, vContract, string(vKey[1]), "amd64"},
@@ -233,7 +233,7 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 		}
 	}
 
-	// 4. 같은 것을 auditor 로 다시 — 거부, exit 5.
+	// 4. the same again as auditor: rejected, exit 5.
 	again := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
 		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
 	out, err = again.CombinedOutput()
@@ -241,7 +241,7 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 		t.Fatalf("want exit 5 (already registered), got %v\n%s", err, out)
 	}
 
-	// 5. 승인자가 아닌 키로 — 거부, exit 4. 새 측정값으로 (이미 등록됨과 안 섞이게).
+	// 5. with a key that is not the approver: rejected, exit 4. Use new measurements (so it is not confused with already-registered).
 	freshMeasurements := "PCR0=" + strings.Repeat("dd", 48) + ",PCR1=" + strings.Repeat("ee", 48) + ",PCR2=" + strings.Repeat("ff", 48)
 	stranger := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", strangerFile,
 		"--measurements", freshMeasurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
@@ -250,7 +250,7 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 		t.Fatalf("want exit 4 (not an approver), got %v\n%s", err, out)
 	}
 
-	// 5b. Vendor 키로 Auditor 컨트랙트에 — 승인자가 아니라 거부, exit 4. 컨트랙트 하나에 서명자 하나라는 뜻이 이것.
+	// 5b. with the Vendor key on the Auditor contract: rejected because it is not the approver, exit 4. This is what one signer per contract means.
 	cross := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", vendorFile,
 		"--measurements", freshMeasurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
 	out, err = cross.CombinedOutput()
@@ -258,7 +258,7 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 		t.Fatalf("vendor key on the auditor contract: want exit 4, got %v\n%s", err, out)
 	}
 
-	// 6. 이미 지난 만료 — 거부, exit 6.
+	// 6. an expiry already in the past: rejected, exit 6.
 	expired := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
 		"--measurements", freshMeasurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro", "--expires", "-1h")
 	out, err = expired.CombinedOutput()

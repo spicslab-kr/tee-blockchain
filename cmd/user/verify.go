@@ -18,12 +18,12 @@ import (
 	cmp "tb/internal/core/compare/user"
 )
 
-// verifyCmd — 흐름1의 User 구간(14~18)을 명령 하나로: 엔클레이브에 attestation 을 받아(T1·T2) → 그 값으로 등록부에서 등록을
-// 찾고(C2) → 찾은 것마다 값·만료·서명자를 맞댄다(M2). 화면에는 단계 이름표 대신 지금 무엇을 하는지 문장으로 찍는다.
+// verifyCmd runs the User's part in one command: request an attestation document from the enclave and verify it, use its values to find the registration in the registry,
+// then compare value, expiry and signer for each one found. The screen shows a sentence saying what is happening, not a step label.
 //
-// --contract 는 여러 번 줄 수 있다 (흐름 2 의 21~23: Vendor 의 등록부와 Auditor 의 등록부를 나란히). 등록부 하나 = 승인자 하나라,
-// 등록부마다 "이 엔클레이브가 돌리는 값을 그 승인자가 등록했나"를 따로 보여 주고, **준 등록부 전부**에 맞는 등록이 있어야 신뢰한다.
-// 하나만 주면 예전과 같다: 맞는 등록이 하나라도 있으면 신뢰.
+// --contract may be given several times (for example the Vendor's registry and the Auditor's side by side). One registry = one approver, so
+// for each registry it separately shows whether that approver registered what this enclave runs, and trust requires a matching registration in **every registry given**.
+// With just one, it is as before: trusted if at least one registration matches.
 func verifyCmd(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	tee := fs.String("tee", "", "the enclave's host:port")
@@ -45,7 +45,7 @@ func verifyCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	// 옵션으로 안 준 값은 lookup 처럼 차례로 묻는다.
+	// Values not given as options are asked for in turn, as lookup does.
 	ask(tee, "enclave host:port", "")
 	ask(rpc, "RPC URL", "https://ethereum-rpc.publicnode.com")
 	if len(contracts) == 0 {
@@ -107,7 +107,7 @@ func verifyCmd(args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	several := len(contracts) > 1
-	vouched := 0 // 맞는 등록이 하나 이상 있는 등록부 수
+	vouched := 0 // number of registries with at least one matching registration
 	var signers []string
 	for _, c := range contracts {
 		reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(c)}
@@ -189,7 +189,7 @@ func uniq(ss []string) []string {
 	return out
 }
 
-// fileSize — 받은 문서 크기. 실패해도 0 만 찍히면 되니 오류는 삼킨다.
+// fileSize returns the size of the received document. Errors are swallowed since a 0 is enough if it fails.
 func fileSize(path string) int64 {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -198,7 +198,7 @@ func fileSize(path string) int64 {
 	return st.Size()
 }
 
-// printPCRs — 파싱값 파일의 측정값을 들여쓰기해 찍는다 (PCR0 · PCR1 · PCR2).
+// printPCRs prints the measurements in the parsed-values file, indented (PCR0, PCR1, PCR2).
 func printPCRs(path string) {
 	values, err := readMeasurements(path)
 	if err != nil {

@@ -15,8 +15,8 @@ import (
 	cmp "tb/internal/core/compare/user"
 )
 
-// compareCmd — M2. --b 가 있으면 측정값 두 묶음을 그대로 맞댄다(Compare). --key 가 있으면 체인에서
-// 등록 정보를 읽어 만료 · 신뢰 서명자까지 같이 본다(Check).
+// compareCmd: with --b, compares two sets of measurements directly (Compare). With --key, reads the
+// registration from the chain and also checks expiry and the trusted signer (Check).
 func compareCmd(args []string) error {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
 	a := fs.String("a", "", "measurements A: a measurements.json file, or NAME=hex,NAME=hex")
@@ -67,9 +67,9 @@ func compareCmd(args []string) error {
 	return printVerdict((cmp.Impl{}).Compare(va, vb))
 }
 
-// checkMode — --b(평문 모드)와 --key(체인 모드)는 딱 하나만 받는다. 실수로 둘 다 주면 어느 하나를 조용히
-// 무시하고 넘어가지 않고 바로 에러로 알린다. --trusted 는 체인 모드에서만 뜻이 있다 — --key 없이 주면
-// 그냥 버려지므로 이것도 미리 막는다.
+// checkMode accepts exactly one of --b (plain mode) and --key (chain mode). Giving both is reported as an error
+// rather than silently ignoring one. --trusted only means something in chain mode; without --key it would
+// just be dropped, so that is rejected up front too.
 func checkMode(b, rpc, contract, key, trusted string) error {
 	chainFlags := rpc != "" || contract != "" || key != "" || trusted != ""
 	switch {
@@ -92,7 +92,7 @@ func trustedSigners(ctx context.Context, reader lether.Reader, flag string) ([]s
 	return reader.TrustedSigners(ctx)
 }
 
-// printVerdict — 판정을 찍고, 실패면 exit 1 로 끝낸다(스크립트에서 성공 여부를 종료코드로 보게).
+// printVerdict prints the verdict and exits 1 on failure (so scripts can read success from the exit code).
 func printVerdict(v cmp.Verdict) error {
 	if v.Pass {
 		cli.Okln("PASS")

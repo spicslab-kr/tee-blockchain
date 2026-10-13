@@ -98,13 +98,13 @@ func usage() {
                    read the registration from the chain and check the value, expiry and trusted signer together. exit 1 on failure
   audit            --tee <my enclave host:port> --measurements <my out/measurements.json> --rpc <url> --contract <0x…> --key-file <file>
                    (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--vendor-tee <the Vendor's enclave host:port>]
-                   flow 1 in one go: attest my own enclave (T1·T2), check the attested value against --measurements (the value I
-                   built or measured myself), register that value only if they match (C1), then read it back and self-check (C2·M2).
+                   in one go: request and verify the attestation document from my own enclave, check the attested value against --measurements (the value I
+                   built or measured myself), register that value only if they match, then read it back and check it.
                    --config takes service, version and the build env from the Vendor's build-config.json (receive put it in the
                    clone root); the flags override it, with a warning. --nonce pins the nonce. with --service/--version empty and no
                    --config, takes them from an existing registration of the same measurements on this contract. without --tee
                    registers --measurements as is (no audit).
-                   --vendor-tee also asks the Vendor's running enclave and says whether it runs the same value (flow 2 step 15); what is
+                   --vendor-tee also asks the Vendor's running enclave and says whether it runs the same value; what is
                    registered is still my value
   receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
                    clone the source repository and read the build config. build from that directory
@@ -117,10 +117,10 @@ func usage() {
                    arch amd64 | arm64, go, trimpath) — measurements differ per architecture and per Go toolchain
   build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>] [--verify]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
-              for source that an Auditor will rebuild the same way (Case B)
+              for source that the Auditor rebuilds
   pack        --image <docker image you built>  [--name <n>] [--port 5000] [--out out] [--responder <tb-ra-responder>]
               same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
-              for an image handed over as a file (Case A)
+              for an image handed over as a file
   launch      --eif <file>  [--measurements <file>] [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
               on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock,
               requests RA from itself to confirm, then opens the security-group port (when permitted).
@@ -136,7 +136,7 @@ func usage() {
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
               with --format, accepts only a document of that format (aws-nitro · gcp-cs-jwt · azure-maa-jwt)
 
-to do it by hand: setup/auditor/transfer.md`)
+to do it by hand: commit build-config.json at the repository root and push; the other side clones it.`)
 }
 
 func receive(args []string) error {
@@ -214,8 +214,8 @@ func send(args []string) error {
 	if *image != "" {
 		rec.Image.Path = *image
 	}
-	// clone 하고 이미지를 해시하기 전에 기록부터 거른다 (Send 도 다시 검사한다). 이미지 해시는 Send 가 채우니 그 자리만 메워서 본다.
-	// build_env 가 빠진 기록은 어느 아키텍처·어느 툴체인 것인지 알 수 없으니 보내지 않는다.
+	// Screen the record before cloning and hashing the image (Send checks again). Send fills in the image hash, so only that slot is filled in for this check.
+	// A record without build_env cannot say which architecture or toolchain it is for, so it is not sent.
 	chk := rec
 	if chk.Image.Path != "" && chk.Image.SHA256 == "" {
 		chk.Image.SHA256 = strings.Repeat("0", 64)
@@ -399,7 +399,7 @@ func buildCmd(args []string) error {
 	fs.StringVar(&b.Name, "name", "", "image and EIF name (default: the directory name)")
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
 	fs.StringVar(&b.Out, "out", "out", "output directory")
-	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	fs.StringVar(&b.Binary, "responder", "", "path to the responder (tb-ra-responder). default: tb-ra-responder next to this executable")
 	fs.BoolVar(&b.Verify, "verify", false, "build the Dockerfile a second time without cache and fail unless PCR0·1·2 come out the same, listing the files that differed")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -423,7 +423,7 @@ func packCmd(args []string) error {
 	fs.StringVar(&b.Name, "name", "", "EIF name (default: the image name without its tag)")
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
 	fs.StringVar(&b.Out, "out", "out", "output directory")
-	fs.StringVar(&b.Binary, "responder", "", "path to the T1 responder (tb-ra-responder). default: tb-ra-responder next to this executable")
+	fs.StringVar(&b.Binary, "responder", "", "path to the responder (tb-ra-responder). default: tb-ra-responder next to this executable")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -489,8 +489,8 @@ func launchCmd(args []string) error {
 		cli.Okln("✓ enclave is up and reachable. anyone can now:  tb user verify --tee <this instance's public IP>:", l.Port, " --rpc … --contract …")
 		return nil
 	}
-	// 여기서는 못 열었다 — 무엇을, 어디서, 어떻게 열어야 하는지까지 적어 준다. 권한이 없는 경우와
-	// 그 밖의 실패(메타데이터 · aws CLI)를 두 번째 줄에서만 가른다.
+	// Could not open it here: say what to open, where and how. The permission-denied case and
+	// other failures (metadata, aws CLI) are told apart only on the second line.
 	why := "This instance has no permission to change it. From an AWS account that does, run:"
 	if !errors.Is(perr, launch.ErrNoPermission) {
 		why = fmt.Sprintf("Could not open it from here (%v). From an AWS account that can, run:", perr)

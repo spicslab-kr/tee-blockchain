@@ -1,6 +1,6 @@
-// M2 를 실제 CLI 로 — anvil(로컬 EVM)에 실제로 배포·등록해 두고, tb-auditor · tb-user compare 바이너리로
-// 대조한다. cmd/register_e2e_test.go(C1) 의 헬퍼(findAnvil · buildBin · writeKeyFile · deployedAtRe ·
-// keyLineRe 등)를 그대로 쓴다 — 같은 패키지(cmd_test)라 다시 안 만든다.
+// compare, through the real CLI: deploy and register for real on anvil (a local EVM), then compare with the tb-auditor and tb-user compare binaries.
+// It reuses the helpers of cmd/register_e2e_test.go (findAnvil, buildBin, writeKeyFile, deployedAtRe,
+// keyLineRe, ...) as they are: same package (cmd_test), so they are not rebuilt.
 package cmd_test
 
 import (
@@ -40,76 +40,76 @@ func TestCompare_E2E_PlainAndChainModes(t *testing.T) {
 	}
 	key := string(keyLineRe.FindSubmatch(regOut)[1])
 
-	// 1. 그냥 평문 비교(Compare) — 같은 값.
+	// 1. plain comparison (Compare): same values.
 	same := exec.Command(auditorBin, "compare", "--a", measurements, "--b", measurements)
 	out, err = same.CombinedOutput()
 	if err != nil {
-		t.Fatalf("compare --a --b (같은 값): %v\n%s", err, out)
+		t.Fatalf("compare --a --b (same values): %v\n%s", err, out)
 	}
 	if strings.TrimSpace(string(out)) != "PASS" {
-		t.Fatalf("같은 값인데 PASS 가 아님:\n%s", out)
+		t.Fatalf("same values but not PASS:\n%s", out)
 	}
 
-	// 2. 평문 비교 — 다른 값. exit 1 이어야 한다.
+	// 2. plain comparison: different values. Must exit 1.
 	other := "PCR0=" + strings.Repeat("11", 48) + ",PCR1=" + strings.Repeat("22", 48)
 	diff := exec.Command(auditorBin, "compare", "--a", measurements, "--b", other)
 	out, err = diff.CombinedOutput()
 	ee, ok := err.(*exec.ExitError)
 	if !ok || ee.ExitCode() != 1 {
-		t.Fatalf("다른 값인데 exit 1 이 아님: %v\n%s", err, out)
+		t.Fatalf("different values but not exit 1: %v\n%s", err, out)
 	}
 	if !strings.Contains(string(out), "FAIL") {
-		t.Errorf("FAIL 이 안 찍힘:\n%s", out)
+		t.Errorf("FAIL not printed:\n%s", out)
 	}
 
-	// 3. 체인 모드(Check) — 등록한 값 그대로, user 로 (조회만 하는 쪽도 대조는 된다). --trusted 없이 —
-	// 컨트랙트의 APPROVER 를 자동으로 가져와 써야 한다.
+	// 3. chain mode (Check): the registered values as they are, as user (the read-only side can compare too). Without --trusted,
+	// it must fetch the contract's APPROVER automatically and use it.
 	chainSame := exec.Command(userBin, "compare", "--a", measurements, "--rpc", rpc, "--contract", contract, "--key", key)
 	out, err = chainSame.CombinedOutput()
 	if err != nil {
-		t.Fatalf("compare 체인모드 (같은 값): %v\n%s", err, out)
+		t.Fatalf("compare chain mode (same values): %v\n%s", err, out)
 	}
 	if strings.TrimSpace(string(out)) != "PASS" {
-		t.Fatalf("등록한 값 그대로인데 PASS 가 아님:\n%s", out)
+		t.Fatalf("registered values as they are but not PASS:\n%s", out)
 	}
 
-	// 4. 체인 모드 — 다른 값. exit 1, 근거에 해시 불일치가 있어야 한다.
+	// 4. chain mode: different values. Exit 1, and the reasons must include a hash mismatch.
 	chainDiff := exec.Command(userBin, "compare", "--a", other, "--rpc", rpc, "--contract", contract, "--key", key)
 	out, err = chainDiff.CombinedOutput()
 	ee, ok = err.(*exec.ExitError)
 	if !ok || ee.ExitCode() != 1 {
-		t.Fatalf("체인모드, 다른 값인데 exit 1 이 아님: %v\n%s", err, out)
+		t.Fatalf("chain mode, different values but not exit 1: %v\n%s", err, out)
 	}
 	if !strings.Contains(string(out), "measurement hash") {
-		t.Errorf("해시 불일치 근거가 안 보임:\n%s", out)
+		t.Errorf("hash mismatch reason not shown:\n%s", out)
 	}
 
-	// 5. 체인 모드 — 신뢰 목록을 컨트랙트와 무관한 주소로 강제. 값은 맞아도 서명자 불신으로 실패해야 한다.
+	// 5. chain mode: force the trusted list to an address unrelated to the contract. Even with matching values it must fail because the signer is untrusted.
 	untrusted := exec.Command(userBin, "compare", "--a", measurements, "--rpc", rpc, "--contract", contract, "--key", key,
 		"--trusted", "0x0000000000000000000000000000000000000001")
 	out, err = untrusted.CombinedOutput()
 	ee, ok = err.(*exec.ExitError)
 	if !ok || ee.ExitCode() != 1 {
-		t.Fatalf("--trusted 강제로 신뢰 안 되는데 exit 1 이 아님: %v\n%s", err, out)
+		t.Fatalf("--trusted forced to an untrusted signer but not exit 1: %v\n%s", err, out)
 	}
 
-	// 6. 실수로 --b 와 --key 를 같이 주면 — 하나를 조용히 무시하지 않고 바로 에러여야 한다 (exit 2, flag 검증 실패).
+	// 6. giving both --b and --key by mistake: one must not be silently ignored, it must be an error right away (exit 2, flag validation failure).
 	both := exec.Command(userBin, "compare", "--a", measurements, "--b", measurements, "--rpc", rpc, "--contract", contract, "--key", key)
 	out, err = both.CombinedOutput()
 	if err == nil {
-		t.Fatalf("--b 와 --key 를 같이 줬는데 성공함 (하나가 조용히 무시된 것):\n%s", out)
+		t.Fatalf("--b and --key given together but it succeeded (one was silently ignored):\n%s", out)
 	}
 	if !strings.Contains(string(out), "pick one") {
-		t.Errorf("어느 쪽을 골라야 하는지 에러 메시지가 안 보임:\n%s", out)
+		t.Errorf("error message does not say which one to choose:\n%s", out)
 	}
 
-	// 7. --trusted 만 주고 --key(체인 모드 전체)는 빠뜨리면 — 조용히 무시되지 않고 에러여야 한다.
+	// 7. --trusted without --key (chain mode as a whole) must not be silently ignored, it must be an error.
 	trustedNoKey := exec.Command(userBin, "compare", "--a", measurements, "--trusted", "0x0000000000000000000000000000000000000001")
 	out, err = trustedNoKey.CombinedOutput()
 	if err == nil {
-		t.Fatalf("--trusted 만 주고 --key 를 안 줬는데 성공함 (--trusted 가 조용히 무시된 것):\n%s", out)
+		t.Fatalf("--trusted given without --key but it succeeded (--trusted was silently ignored):\n%s", out)
 	}
 	if !strings.Contains(string(out), "chain mode only") {
-		t.Errorf("--trusted 전용이라는 에러 메시지가 안 보임:\n%s", out)
+		t.Errorf("error message saying --trusted is chain-mode only not shown:\n%s", out)
 	}
 }

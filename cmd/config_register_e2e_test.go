@@ -1,7 +1,7 @@
-// build-config.json 을 등록과 전달 기록의 출처로 — Vendor 가 이미 build-config.json 에 service · version · build_env 를 적어
-// 넘겼으니, Auditor 는 그걸 다시 타이핑하지 않는다. register/audit/self-register 는 --config 로 그 파일을 읽고, send 는
-// --config + --measurements 로 measurement-record.json 을 직접 만든다. register 는 anvil 이 필요하고(없으면 건너뛴다),
-// send 는 로컬 bare 저장소로 체인 없이 끝까지 돈다.
+// build-config.json as the source for registration and the hand-over record. The Vendor has already handed service, version and build_env over in build-config.json,
+// so the Auditor does not type them again. register/audit/self-register read that file with --config, and send builds
+// measurement-record.json directly from --config + --measurements. register needs anvil (skipped without it),
+// and send runs to the end against a local bare repository, no chain needed.
 package cmd_test
 
 import (
@@ -17,8 +17,8 @@ import (
 	"testing"
 )
 
-// writeBuildConfig — Vendor 가 send 로 넘기는 build-config.json (tb.build-config/1). arch 는 이 기계와 다르게 줄 수 있다 —
-// 그래야 값이 플래그 기본값이 아니라 파일에서 왔다는 게 보인다.
+// writeBuildConfig writes the build-config.json that the Vendor hands over with send (tb.build-config/1). arch may differ from this machine's,
+// so it is visible that the value came from the file and not from the flag default.
 func writeBuildConfig(t *testing.T, dir, service, version, arch, goVer string) string {
 	t.Helper()
 	body := `{
@@ -38,7 +38,7 @@ func writeBuildConfig(t *testing.T, dir, service, version, arch, goVer string) s
 	return p
 }
 
-// writeNitroMeasurements — nitro-cli 가 쓰는 out/measurements.json ({"Measurements":{"PCR0":hex,…}}).
+// writeNitroMeasurements writes the out/measurements.json that nitro-cli produces ({"Measurements":{"PCR0":hex,...}}).
 func writeNitroMeasurements(t *testing.T, dir string, fill byte) (path string, pcr map[string][]byte) {
 	t.Helper()
 	pcr = map[string][]byte{
@@ -55,8 +55,8 @@ func writeNitroMeasurements(t *testing.T, dir string, fill byte) (path string, p
 	return path, pcr
 }
 
-// TestConfig_E2E_RegisterFromBuildConfig — register --config 만으로(--service/--version/--arch 없이) 등록되고, 등록 문장과
-// build_env 힌트가 파일의 값을 말한다. 플래그를 같이 주면 플래그가 이기되 경고 한 줄. Vendor 쪽 register 도 같다.
+// TestConfig_E2E_RegisterFromBuildConfig: register with --config alone (no --service/--version/--arch) registers, and the registration sentence and
+// build_env hint state the file's values. If flags are also given, the flags win with a one-line warning. The Vendor's register behaves the same.
 func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
@@ -80,7 +80,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 		return "PCR0=" + strings.Repeat(fill, 48) + ",PCR1=" + strings.Repeat(fill, 48) + ",PCR2=" + strings.Repeat(fill, 48)
 	}
 
-	// 1. --config 만 — service · version · arch · go 전부 파일에서. 등록 문장, 확인 블록, build_env 힌트 셋 다.
+	// 1. --config only: service, version, arch and go all from the file. All three of registration sentence, confirmation block and build_env hint.
 	out, err := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
 		"--measurements", measurements("a1"), "--config", cfg).CombinedOutput()
 	if err != nil {
@@ -103,7 +103,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 		t.Fatalf("no registration key in output:\n%s", out)
 	}
 
-	// 2. --config 와 --service other — 플래그가 이기고, 파일과 다르다는 경고 한 줄. version · arch 는 여전히 파일에서.
+	// 2. --config and --service other: the flag wins, with a one-line warning that it differs from the file. version and arch still come from the file.
 	out, err = exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
 		"--measurements", measurements("b2"), "--config", cfg, "--service", "other").CombinedOutput()
 	if err != nil {
@@ -121,7 +121,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 		t.Errorf("only --service was given, so only --service may be warned about:\n%s", out)
 	}
 
-	// 3. 둘 다 없음 — 필수 오류가 --config 도 말한다. 체인에는 아무것도 안 간다.
+	// 3. neither: the required-value error mentions --config too. Nothing goes to the chain.
 	out, err = exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
 		"--measurements", measurements("c3")).CombinedOutput()
 	if err == nil {
@@ -136,7 +136,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 		t.Errorf("nothing must be registered without service/version:\n%s", out)
 	}
 
-	// 4. Vendor 의 register 도 --config 를 같은 방식으로 받는다 (self-register 가 그대로 넘긴다).
+	// 4. the Vendor's register takes --config the same way (self-register passes it straight through).
 	out, err = exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
 		"--measurements", measurements("d4"), "--config", cfg).CombinedOutput()
 	if err != nil {
@@ -147,9 +147,9 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	}
 }
 
-// TestConfig_E2E_SendBuildsRecordFromConfig — send --config --measurements --image (--record 없이): 기록을 여기서 만들어
-// 로컬 bare 저장소에 push 하고, measurements.json 옆에 measurement-record.json 도 남긴다. push 된 기록의 service · version ·
-// build_env 는 config 그대로, values 는 measurements.json 의 PCR 그대로, build_tool.version 은 플래그 값.
+// TestConfig_E2E_SendBuildsRecordFromConfig: send --config --measurements --image (without --record) builds the record here,
+// pushes it to a local bare repository, and also leaves a measurement-record.json next to measurements.json. In the pushed record service, version and
+// build_env are the config's as they are, values are the PCRs of measurements.json as they are, and build_tool.version is the flag's value.
 func TestConfig_E2E_SendBuildsRecordFromConfig(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
@@ -236,7 +236,7 @@ func TestConfig_E2E_SendBuildsRecordFromConfig(t *testing.T) {
 	}
 	check("measurement-record.json beside measurements.json", beside)
 
-	// --config 없이 --measurements 만, 또는 --image 없이 — 무엇이 빠졌는지 말하고 아무것도 보내지 않는다.
+	// --measurements without --config, or without --image: say what is missing and send nothing.
 	cmd = exec.Command(auditorBin, "send", "--repo", gitBare(t), "--measurements", meas, "--image", eif)
 	gitIdentity(cmd)
 	if out, err := cmd.CombinedOutput(); err == nil || !bytes.Contains(out, []byte("--config")) || bytes.Contains(out, []byte("sent ")) {

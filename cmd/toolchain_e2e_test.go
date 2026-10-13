@@ -1,8 +1,8 @@
-// 툴체인 고정(internal/setup/build/GO_TOOLCHAIN)을 실제 CLI 로 — tb-vendor 를 진짜로 빌드해 실행해 본다.
-//   - 고정된 툴체인으로 빌드한 tb-vendor 는 `version` 이 exit 0 이고 고정 버전을 찍는다
-//   - `build --app-dir` 은 리눅스가 아닌 곳에서 GOOS 오류가 먼저 난다 (순서: GOOS 검사 → 툴체인 검사)
-//   - 다른 패치 버전(GOTOOLCHAIN=go1.26.0)으로 빌드한 tb-vendor 는 `version` 이 exit 1 이고 두 버전을 다 말한다;
-//     리눅스에서는 `build --app-dir` 도 같은 메시지로 거부한다. 그 툴체인을 못 받아오는 환경(오프라인)이면 그 절반만 건너뛴다.
+// The toolchain pin (internal/setup/build/GO_TOOLCHAIN) through the real CLI: actually builds and runs tb-vendor.
+//   - tb-vendor built with the pinned toolchain: `version` exits 0 and prints the pinned version
+//   - `build --app-dir` hits the GOOS error first off Linux (order: GOOS check, toolchain check)
+//   - tb-vendor built with a newer patch version (GOTOOLCHAIN=go1.26.2): `version` exits 1 and names both versions;
+//     on Linux, `build --app-dir` refuses with the same message. If that toolchain cannot be fetched (offline), only that half is skipped.
 package cmd_test
 
 import (
@@ -16,16 +16,16 @@ import (
 	toolchain "tb/internal/setup/build"
 )
 
-// wrongToolchain — 고정 버전과 다른 패치 버전. 1.26.1 이 고정이므로 1.26.0 은 항상 다르다.
-const wrongToolchain = "go1.26.0"
+// wrongToolchain is a patch version different from the pinned one. go.mod requires go >= 1.26.1 and 1.26.1 is the pin, so the newer 1.26.2 always differs.
+const wrongToolchain = "go1.26.2"
 
-// buildWith — build() 와 같되 GOTOOLCHAIN 을 강제한다. 그 툴체인을 못 받아오면 ok=false.
+// buildWith is like build() but forces GOTOOLCHAIN. ok=false if that toolchain cannot be fetched.
 func buildWith(t *testing.T, dir, pkg, gotoolchain string) (bin string, ok bool) {
 	t.Helper()
 	probe := exec.Command("go", "version")
 	probe.Env = append(os.Environ(), "GOTOOLCHAIN="+gotoolchain)
 	if out, err := probe.CombinedOutput(); err != nil || !strings.Contains(string(out), gotoolchain) {
-		t.Logf("GOTOOLCHAIN=%s 을 쓸 수 없음 (오프라인?): %v\n%s", gotoolchain, err, out)
+		t.Logf("GOTOOLCHAIN=%s unavailable (offline?): %v\n%s", gotoolchain, err, out)
 		return "", false
 	}
 	bin = filepath.Join(dir, filepath.Base(pkg)+"-"+gotoolchain)
@@ -56,7 +56,7 @@ func TestToolchain_E2E_PinnedBinaryPasses(t *testing.T) {
 		t.Fatalf("version output does not report the pin %s on both sides:\n%s", want, out)
 	}
 
-	// build --app-dir: 리눅스가 아니면 GOOS 오류가 먼저 — 툴체인 메시지가 아니라. (순서 증명)
+	// build --app-dir: off Linux the GOOS error comes first, not the toolchain message (proves the order).
 	if runtime.GOOS != "linux" {
 		app := t.TempDir()
 		if err := os.WriteFile(filepath.Join(app, "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {

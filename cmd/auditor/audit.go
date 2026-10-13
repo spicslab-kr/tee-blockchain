@@ -17,14 +17,14 @@ import (
 	cmp "tb/internal/core/compare/auditor"
 )
 
-// auditCmd — 흐름 1 의 Auditor 구간을 명령 하나로: 자기 TEE 에 attestation 을 받아(T1·T2) 내가 빌드·측정한 값과 맞대고(M2),
-// 같을 때만 그 값을 등록하고(C1), 읽어서 자기확인(C2·M2). 화면에는 단계 이름표 대신 지금 무엇을 하는지 문장으로 찍는다.
+// auditCmd runs the Auditor's part in one command: request an attestation document from its own TEE and verify it, compare it with the values I built and measured,
+// register those values only if they match, then read the registration back and check it. The screen shows a sentence saying what is happening, not a step label.
 //
-// --tee 만 주면 증명값을 그대로 등록한다(검사 없음). --measurements 만 주면 그 파일을 그대로 등록한다.
+// With only --tee, the attested values are registered as they are (no check). With only --measurements, that file is registered as it is.
 func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	tee := fs.String("tee", "", "my enclave's host:port — an attestation is requested from it first")
-	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port — also ask it, and say whether it runs the same value I built (flow 2 step 15). it is registered either way: what I built, not what the Vendor runs")
+	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port — also ask it, and say whether it runs the same value I built. it is registered either way: what I built, not what the Vendor runs")
 	format := fs.String("format", "aws-nitro", "expected document format")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
@@ -43,8 +43,8 @@ func auditCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	// --config 가 있으면 service · version · arch 는 거기서 온다 (플래그는 덮어쓰기, 경고 한 줄). 없으면 service · version 은
-	// 아래에서 기존 등록에서 찾거나 묻고, arch 는 이 기계의 것.
+	// With --config, service, version and arch come from it (a flag overrides it, with a one-line warning). Without it, service and version are
+	// found in an existing registration below or asked for, and arch is this machine's.
 	cfg, err := loadBuildConfig(*config)
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func auditCmd(args []string) error {
 	} else if *arch == "" {
 		*arch = defaultArch()
 	}
-	// 옵션으로 안 준 값은 register 처럼 차례로 묻는다 — plain 에서 전부 플래그로 줄 필요는 없다.
+	// Values not given as options are asked for in turn, as register does; a plain run need not pass everything as flags.
 	askMainnetRPC(rpc)
 	ask(contract, "Registry contract address (0x…)", "")
 	ask(keyFile, "my private key file", "")
@@ -75,7 +75,7 @@ func auditCmd(args []string) error {
 	if err := checkArch(*arch); err != nil {
 		return err
 	}
-	quiet = true // 아래 단계들이 raRequest · raParse · register 를 부르는데, 그들의 출력 대신 여기서 한 줄씩 찍는다
+	quiet = true // the steps below call raRequest, raParse and register; print one line here instead of their output
 
 	measPath := *measurements
 	parsedPath := ""
@@ -144,8 +144,8 @@ func auditCmd(args []string) error {
 		cli.Why("this is the audit: the value I obtained myself and the value the running enclave attests to are the same, so the enclave is not running something else")
 	}
 
-	// 흐름 2 의 8·9·15: Vendor 가 지금 띄워 둔 것도 물어본다. 다르면 그 사실을 찍되, 등록하는 값은 내가 빌드한 값 그대로다 —
-	// 체인에 올라가는 건 "Vendor 가 돌리는 것"이 아니라 "내가 검증한 것"이어야 하니까.
+	// Also ask what the Vendor is running right now. If it differs, say so, but the value registered is still the one I built:
+	// what goes on the chain must be "what I verified", not "what the Vendor runs".
 	vendorRunsSomethingElse := false
 	if *vendorTee != "" {
 		dir, err := os.MkdirTemp("", "tb-auditor-vendor-*")
@@ -269,7 +269,7 @@ func auditCmd(args []string) error {
 	return nil
 }
 
-// fileSize — 받은 문서 크기. 실패해도 0 만 찍히면 되니 오류는 삼킨다.
+// fileSize returns the size of the received document. Errors are swallowed since a 0 is enough if it fails.
 func fileSize(path string) int64 {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -278,7 +278,7 @@ func fileSize(path string) int64 {
 	return st.Size()
 }
 
-// printPCRs — 파싱값 파일의 측정값을 들여쓰기해 찍는다 (PCR0 · PCR1 · PCR2).
+// printPCRs prints the measurements in the parsed-values file, indented (PCR0, PCR1, PCR2).
 func printPCRs(path string) {
 	values, err := readMeasurements(path)
 	if err != nil {

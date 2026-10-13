@@ -1,5 +1,5 @@
-// cmd 밑 e2e 테스트들이 공유하는 도구 — 바이너리 빌드, 저장소 루트 찾기, fixture 로 ra-serve 띄우기.
-// request_e2e_test.go(T1) 와 parse_e2e_test.go(T2) 가 원래 각자 들고 있던 걸 하나로 모았다.
+// Tools shared by the e2e tests under cmd: building binaries, finding the repository root, starting ra-serve with a fixture.
+// Gathered into one place from what request_e2e_test.go and parse_e2e_test.go each used to carry.
 package cmd_test
 
 import (
@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-// build — go build 로 cmd/<pkg> 를 임시 디렉터리에 만든다.
+// build builds cmd/<pkg> into a temporary directory with go build.
 func build(t *testing.T, dir, pkg string) string {
 	t.Helper()
 	bin := filepath.Join(dir, filepath.Base(pkg))
@@ -41,7 +41,7 @@ func repoRoot(t *testing.T) string {
 	}
 }
 
-// startServe — vendor 바이너리로 ra-serve 를 fixture 추출기로 띄우고, 알려주는 주소를 돌려준다.
+// startServe starts ra-serve from the vendor binary with a fixture extractor and returns the address it announces.
 func startServe(t *testing.T, bin, fixture string) (addr string, stop func()) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())

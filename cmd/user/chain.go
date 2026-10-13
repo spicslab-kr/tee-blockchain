@@ -18,9 +18,9 @@ import (
 	p "tb/internal/tee/parse/user"
 )
 
-// lookup — C2. User 는 등록을 안 하니 registry-deploy · register 는 없다. --key 가 있으면 바로 그 key 를
-// 읽는다. 없으면 --measurements 로 key 를 먼저 찾은 뒤 전부 읽는다. 찾은 key 들을 돌려준다 — run 이
-// 이어서 각각 compare 하는 데 쓴다.
+// lookup: the User does not register, so there is no registry-deploy or register. With --key, reads that key directly.
+// Otherwise it first finds the keys via --measurements, then reads them all. It returns the keys it found, so run
+// can compare each of them.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
@@ -81,7 +81,7 @@ func lookup(args []string) ([]string, error) {
 	return keys, nil
 }
 
-// readMeasurements — nitro-cli 의 measurements.json({"Measurements":{"PCR0":…}}), 납작한 {"PCR0":…}, 또는 NAME=hex,… 를 받는다.
+// readMeasurements accepts nitro-cli's measurements.json ({"Measurements":{"PCR0":...}}), a flat {"PCR0":...}, or NAME=hex,...
 func readMeasurements(src string) (p.Measurements, error) {
 	var raw map[string]string
 	if b, err := os.ReadFile(src); err == nil {
@@ -119,7 +119,7 @@ func readMeasurements(src string) (p.Measurements, error) {
 
 var stdin = bufio.NewReader(os.Stdin)
 
-// ask — 값이 비어 있으면 묻는다. 그냥 엔터면 기본값.
+// ask prompts if the value is empty. Plain Enter takes the default.
 func ask(dst *string, label, def string) {
 	if *dst != "" {
 		return

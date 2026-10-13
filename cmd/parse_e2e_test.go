@@ -1,7 +1,7 @@
-// 세 바이너리(cmd/vendor, cmd/user, cmd/auditor)를 실제로 빌드해 exec 로 띄우고, ra-serve → ra-request → ra-parse
-// 전체 사슬이 CLI 층까지 맞물리는지 본다. request_e2e_test.go(T1) 와 같은 패턴이지만 여기서는 ra-parse 까지 이어서,
-// 실제로 registry 에 들어갈 measurements.json 이 알려진 fixture 값과 맞는지 확인한다.
-// build · repoRoot · startServe 는 e2e_helpers_test.go 에 있다 (request_e2e_test.go 와 공유).
+// Builds the three binaries (cmd/vendor, cmd/user, cmd/auditor) for real, runs them with exec, and checks that the whole ra-serve, ra-request, ra-parse
+// chain fits together up to the CLI layer. Same pattern as request_e2e_test.go, but this one continues through ra-parse,
+// confirming that the measurements.json that would go into the registry matches the known fixture values.
+// build, repoRoot and startServe live in e2e_helpers_test.go (shared with request_e2e_test.go).
 package cmd_test
 
 import (
@@ -15,14 +15,14 @@ import (
 	"time"
 )
 
-// TestCmd_E2E_ServeRequestParse — vendor 가 ra-serve 로 (fixture) TEE 문서를 내주고, user 가 ra-request 로 받아
-// 저장하고, auditor 가 ra-parse 로 서명 · 난수 · 측정값을 확인한다. 세 바이너리가 서로 다른 프로세스로 실행되며
-// 실제 CLI 플래그 · 종료 코드 · 파일 계약까지 맞물리는지가 목적이라, 단위 테스트로는 잡히지 않는 배선 실수를 잡는다.
+// TestCmd_E2E_ServeRequestParse: vendor serves a (fixture) TEE document with ra-serve, user receives and saves it with ra-request,
+// and auditor verifies signature, nonce and measurements with ra-parse. The three binaries run as separate processes, and the point is
+// that real CLI flags, exit codes and file contracts fit together, which catches wiring mistakes that unit tests miss.
 //
-// fixture 는 실제 Nitro 엔클레이브에서 받은 문서(fixture-my-web.cbor)라 서명은 진짜다. 다만 FixtureExtractor 는
-// 요청마다 오는 난수와 묶지 않고 항상 같은 문서를 돌려주므로, ra-request 가 저장하는 <out>.nonce (매번 새로 만든
-// 난수)는 문서 안의 진짜 난수와 다르다 — 그래서 ra-parse 에는 문서가 실제로 실린, 미리 알고 있는 난수를
-// (--nonce) 로 직접 준다. (실기기라면 추출기가 난수를 문서에 실어 보내므로 이 우회가 필요 없다.)
+// The fixture is a document received from a real Nitro enclave (fixture-my-web.cbor), so the signature is genuine. But FixtureExtractor
+// does not bind to the nonce of each request and always returns the same document, so the <out>.nonce that ra-request saves (a fresh
+// nonce each time) differs from the real nonce inside the document. So ra-parse is given the known nonce the document actually carries
+// directly with --nonce. (On real hardware the extractor puts the nonce in the document, so this workaround is not needed.)
 func TestCmd_E2E_ServeRequestParse(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
@@ -54,26 +54,26 @@ func TestCmd_E2E_ServeRequestParse(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	// user 쪽 — ra-request 로 문서를 받는다.
+	// user side: receive the document with ra-request.
 	reqCmd := exec.CommandContext(ctx, user, "ra-request", "--tee", addr, "--out", docPath, "--format", "aws-nitro", "--timeout", "10s")
 	reqOut, err := reqCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("ra-request: %v\n%s", err, reqOut)
 	}
 	if _, err := os.Stat(docPath); err != nil {
-		t.Fatalf("문서 파일이 없다: %v", err)
+		t.Fatalf("document file missing: %v", err)
 	}
 	noncePath := docPath + ".nonce"
 	sentNonce, err := os.ReadFile(noncePath)
 	if err != nil {
-		t.Fatalf("nonce 파일이 없다: %v", err)
+		t.Fatalf("nonce file missing: %v", err)
 	}
 	if len(strings.TrimSpace(string(sentNonce))) != 64 {
-		t.Fatalf("nonce 길이가 이상하다: %q", sentNonce)
+		t.Fatalf("nonce length looks wrong: %q", sentNonce)
 	}
 
-	// auditor 쪽 — ra-parse 로 서명 · 난수 · 측정값을 확인한다. 문서에 실제로 실린 난수(fixture 의 것)를 명시로 준다 —
-	// fixture 추출기는 요청 난수와 묶지 않으므로 방금 보낸 난수로는 검증에 실패한다 (위 주석 참고).
+	// auditor side: verify signature, nonce and measurements with ra-parse. Pass the nonce the document actually carries (the fixture's) explicitly,
+	// since the fixture extractor does not bind to the request nonce, verifying with the nonce just sent would fail (see the comment above).
 	measurementsPath := docPath + ".measurements.json"
 	parseCmd := exec.CommandContext(ctx, auditor, "ra-parse", "--doc", docPath, "--nonce", fixtureNonceFile, "--out", measurementsPath)
 	parseOut, err := parseCmd.CombinedOutput()
@@ -82,37 +82,37 @@ func TestCmd_E2E_ServeRequestParse(t *testing.T) {
 	}
 	out := string(parseOut)
 	if !strings.Contains(out, "signature  ok") {
-		t.Errorf("서명 확인 로그가 없다:\n%s", out)
+		t.Errorf("signature verification log missing:\n%s", out)
 	}
 	if !strings.Contains(out, "nonce      ok") {
-		t.Errorf("난수 확인 로그가 없다:\n%s", out)
+		t.Errorf("nonce verification log missing:\n%s", out)
 	}
 
-	// 결과 measurements.json 이 register --measurements 에 그대로 들어갈 모양이고, 알려진 fixture 의 PCR0 과 같은지.
+	// the resulting measurements.json must be in a shape that goes straight into register --measurements, and PCR0 must equal the known fixture's.
 	raw, err := os.ReadFile(measurementsPath)
 	if err != nil {
-		t.Fatalf("measurements.json 이 없다: %v", err)
+		t.Fatalf("measurements.json missing: %v", err)
 	}
 	var got struct {
 		Format       string
 		Measurements map[string]string
 	}
 	if err := json.Unmarshal(raw, &got); err != nil {
-		t.Fatalf("measurements.json 파싱 실패: %v\n%s", err, raw)
+		t.Fatalf("measurements.json parse failed: %v\n%s", err, raw)
 	}
 	if got.Format != "aws-nitro" {
 		t.Errorf("Format = %q, want aws-nitro", got.Format)
 	}
-	// PCR 은 SHA384 값(48 바이트 = hex 96 글자)이어야 한다. 정확한 값은 fixture 문서 자체에서 나온 것이라 여기서
-	// 다시 계산하지 않고, ra-parse 가 실제로 뭔가를 뽑아 파일로 남겼는지 · 모양이 맞는지만 본다.
+	// A PCR must be a SHA384 value (48 bytes = 96 hex characters). The exact value comes from the fixture document itself, so it is not
+	// recomputed here; this only checks that ra-parse actually extracted something and left it in a file, and that the shape is right.
 	pcr0, ok := got.Measurements["PCR0"]
 	if !ok || len(pcr0) != 96 {
-		t.Errorf("PCR0 = %q, want 96 개 hex 문자", pcr0)
+		t.Errorf("PCR0 = %q, want 96 hex characters", pcr0)
 	}
 }
 
-// TestCmd_E2E_ParseRejectsTamperedNonce — 다른 난수를 주면 ra-parse 가 exit 6(난수 불일치)으로 거부하는지.
-// CLI 종료 코드가 cmd/auditor 의 exitCode() 배선과 실제로 맞는지를 본다.
+// TestCmd_E2E_ParseRejectsTamperedNonce: checks that ra-parse rejects a different nonce with exit 6 (nonce mismatch).
+// It checks that the CLI exit code really matches the exitCode() wiring in cmd/auditor.
 func TestCmd_E2E_ParseRejectsTamperedNonce(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
@@ -132,7 +132,7 @@ func TestCmd_E2E_ParseRejectsTamperedNonce(t *testing.T) {
 	if err := os.WriteFile(docPath, docBytes, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// 진짜와 다른, 그럴듯한 64-hex 난수.
+	// a plausible 64-hex nonce that differs from the real one.
 	wrongNonce := strings.Repeat("ab", 32)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

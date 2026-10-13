@@ -1,8 +1,8 @@
-// 응답기 빌드 정보 검사(internal/setup/build/responder.go)를 실제 CLI 로 — tb-vendor 를 진짜로 빌드해 실행해 본다.
-//   - 리눅스가 아닌 곳에서는 `build --responder <엉뚱한 파일>` 이 GOOS 오류로 먼저 끝난다 (순서: GOOS 검사 → 툴체인 검사
-//     → 응답기 검사). 그래서 Windows/macOS 에서는 응답기 메시지가 절대 나오지 않는다는 것만 확인한다.
-//   - 리눅스에서는 다른 아키텍처(amd64 호스트에 arm64 응답기, 또는 그 반대)로 크로스빌드한 응답기를 주면 두 아키텍처를
-//     다 말하며 거부하고, -trimpath 없이 빌드한 응답기는 -trimpath 를 말하며 거부한다. 실제 Nitro 호스트에서의 실측은
+// The responder build-info check (internal/setup/build/responder.go) through the real CLI: actually builds and runs tb-vendor.
+//   - Off Linux, `build --responder <unrelated file>` ends first with a GOOS error (order: GOOS check, toolchain check,
+//     responder check). So on Windows/macOS it only confirms that the responder message never appears.
+//   - On Linux, given a responder cross-built for another architecture (an arm64 responder on an amd64 host, or the reverse), it refuses naming both architectures,
+//     and a responder built without -trimpath is refused naming -trimpath. The real measurement on an actual Nitro host is
 //     e2e/responder-check.sh.
 package cmd_test
 
@@ -33,7 +33,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 	}
 
 	if runtime.GOOS != "linux" {
-		// 응답기 검사는 GOOS 검사 뒤에 온다: 리눅스가 아니면 엉뚱한 파일을 줘도 GOOS 오류가 먼저 나고 응답기 얘기는 없다.
+		// the responder check comes after the GOOS check: off Linux, even an unrelated file gets the GOOS error first and no mention of the responder.
 		bad := filepath.Join(t.TempDir(), "tb-ra-responder")
 		if err := os.WriteFile(bad, []byte("not a go binary\n"), 0o755); err != nil {
 			t.Fatal(err)
@@ -52,7 +52,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 		return
 	}
 
-	// 리눅스: 이 호스트와 다른 아키텍처의 응답기를 만들어 준다 — 두 아키텍처를 다 말하며 거부해야 한다.
+	// Linux: build a responder for an architecture different from this host's; it must be refused, naming both architectures.
 	other := "arm64"
 	if runtime.GOARCH == "arm64" {
 		other = "amd64"
@@ -69,7 +69,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 		t.Fatalf("refusal does not name both architectures:\n%s", out)
 	}
 
-	// -trimpath 없이 빌드한 응답기 — -trimpath 를 말하며 거부해야 한다.
+	// a responder built without -trimpath: must be refused, naming -trimpath.
 	noTrim := filepath.Join(t.TempDir(), "tb-ra-responder-notrimpath")
 	cmd := exec.Command("go", "build", "-o", noTrim, "./cmd/ra-responder")
 	cmd.Dir = repoRoot(t)

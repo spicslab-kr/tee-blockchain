@@ -15,8 +15,8 @@ import (
 	ra "tb/internal/tee/request/Vendor"
 )
 
-// raParse — 문서를 읽어 서명 · 체인 · 난수를 확인하고 측정값을 낸다. 결과 파일은 nitro-cli 의 measurements.json 과 같은 모양이라
-// 그대로 register --measurements 에 넣을 수 있다.
+// raParse reads the document, verifies the signature, chain and nonce, and extracts the measurements. The output file has the same shape as nitro-cli's measurements.json,
+// so it can go straight into register --measurements.
 func raParse(args []string) error {
 	fs := flag.NewFlagSet("ra-parse", flag.ContinueOnError)
 	docPath := fs.String("doc", "", "RA document file (as saved by ra-request)")
@@ -103,7 +103,7 @@ func raParse(args []string) error {
 	return nil
 }
 
-// loadNonce — hex 문자열, hex 가 든 파일, 또는 <doc>.nonce. 셋 다 없으면 nil.
+// loadNonce takes a hex string, a file containing hex, or <doc>.nonce. nil if none of the three exists.
 func loadNonce(src, docPath string) (ra.Nonce, error) {
 	if src == "" {
 		b, err := os.ReadFile(docPath + ".nonce")
@@ -121,7 +121,7 @@ func loadNonce(src, docPath string) (ra.Nonce, error) {
 	return n, nil
 }
 
-// say — quiet 가 아닐 때만 한 줄 찍는다.
+// say prints a line only when not quiet.
 func say(line string) {
 	if !quiet {
 		fmt.Println(line)
