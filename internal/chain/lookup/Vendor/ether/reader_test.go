@@ -1,5 +1,5 @@
-// 시뮬레이션 체인에 register 로 등록해 두고, Reader 로 조회한다. chain() · newKey() 는 auditor 쪽 reader_test.go
-// 에도 있는 것과 같은 모양이지만, 여긴 다른 패키지라 그대로 가져다 쓸 수 없어 다시 적는다.
+// Registers on a simulated chain with register, then looks up with Reader. chain() and newKey() have the same shape as the
+// ones in register's ether_test.go, but this is a different package so they cannot be reused and are written out again.
 package ether
 
 import (
@@ -100,42 +100,41 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 	if got.Signer != vendorAddr.Hex() || got.Meta.Service != "unit-test" || got.Meta.Platform != DefaultPlatform || got.Expires != expires.Unix() {
 		t.Fatalf("Lookup = %+v", got)
 	}
-	// 만료 판정에 쓸 체인 시계 — 조회를 처리한 블록의 시각. 0 이면 Check 가 로컬 시계로 떨어진다.
+	// chain clock used for the expiry decision: the time of the block that served the lookup. If 0, Check falls back to the local clock.
 	if got.ChainTime <= 0 || got.ChainTime > time.Now().Unix()+60 {
 		t.Fatalf("Lookup ChainTime = %d, want the block's unix time", got.ChainTime)
 	}
-	// 체인이 어느 아키텍처의 등록인지 말한다 — 이벤트에서 그대로 읽힌다.
+	// the chain says which architecture the registration is for; it is read straight from the event.
 	if got.Meta.Arch != "arm64" {
 		t.Fatalf("Lookup arch = %q, want arm64", got.Meta.Arch)
 	}
 	h, _ := reg.MeasurementHash(values)
 	if !bytes.Equal(got.Values.Get("measurementHash"), h[:]) {
-		t.Error("measurement hash 가 등록 때 계산한 것과 다르다")
+		t.Error("measurement hash differs from the one computed at registration")
 	}
 
-	// 등록되지 않은 값 — 빈 슬라이스.
+	// unregistered value: empty slice.
 	other := p.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x99}, 48)}}
 	if got, err := reader.FindAddress(ctx, other); err != nil || len(got) != 0 {
-		t.Fatalf("등록 안 된 측정값의 FindAddress = %v, %v", got, err)
+		t.Fatalf("FindAddress for an unregistered measurement = %v, %v", got, err)
 	}
 
-	// 등록되지 않은 key — 에러.
+	// unregistered key: error.
 	if _, err := reader.Lookup(ctx, common.HexToHash("0x3039").Hex()); err == nil {
-		t.Fatal("등록되지 않은 key 는 에러여야 한다")
+		t.Fatal("an unregistered key should be an error")
 	}
 
-	// 길이는 맞는데 hex 가 아닌 key — 조용히 0 으로 바뀌어 "not registered" 로 둔갑하면 안 되고, 그 자체로
-	// 에러여야 한다.
+	// a key of the right length that is not hex: it must not silently become 0 and pass as "not registered"; it must be an error in itself.
 	bad := "0x" + strings.Repeat("zz", 32)
 	if _, err := reader.Lookup(ctx, bad); err == nil {
-		t.Fatal("hex 가 아닌 key 는 에러여야 한다 (0 으로 조용히 바뀌면 안 된다)")
+		t.Fatal("a non-hex key should be an error (it must not silently turn into 0)")
 	}
 }
 
-// TestReader_Lookup_ScansMultipleLogChunks — 등록 뒤에도 블록이 계속 쌓이는 실제 체인을 흉내 낸다.
-// LogRangeChunk 를 아주 작게 줘서, 최신 블록에서 한 번에 못 찾고 여러 번 거슬러 올라가야만 이벤트를
-// 찾는 경로를 실제로 돌려본다 (기본값 4000 짜리 청크로는 시뮬레이션 체인의 몇 블록 안에서 항상 한 번에
-// 찾아져서 이 경로가 확인되지 않는다).
+// TestReader_Lookup_ScansMultipleLogChunks imitates a real chain where blocks keep piling up after the registration.
+// LogRangeChunk is made very small so the event cannot be found in one query from the latest block and the scan has to step
+// back several times, exercising that path (with the default chunk of 4000, a simulated chain's few blocks are always found
+// in one go, so that path would never be checked).
 func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	vendorKey, vendorAddr := newKey(t)
@@ -160,8 +159,7 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 등록 뒤로도 블록을 여러 개 더 쌓는다 — 실제 체인에서 시간이 지나 최신 블록이 등록 시점보다 한참
-	// 앞서가는 상황.
+	// Pile up several more blocks after registration: on a real chain time passes and the latest block is far ahead of the registration.
 	for i := 0; i < 8; i++ {
 		sim.Commit()
 	}
@@ -169,7 +167,7 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 	reader := Reader{Contract: contract, Backend: client, LogRangeChunk: 1}
 	got, err := reader.Lookup(ctx, receipt.Key)
 	if err != nil {
-		t.Fatalf("청크 1개씩 거슬러 올라가며 찾기 실패: %v", err)
+		t.Fatalf("scan failed when stepping back one chunk at a time: %v", err)
 	}
 	if got.Meta.Service != "chunk-test" {
 		t.Fatalf("Lookup = %+v", got)

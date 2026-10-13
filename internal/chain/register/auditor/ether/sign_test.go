@@ -65,8 +65,8 @@ func TestDigest_DependsOnChainAndContract(t *testing.T) {
 	}
 }
 
-// TestDigest_IncludesArch — arch 는 서명되는 값이다: 같은 측정값을 다른 아키텍처의 것이라고 적으면 다른 해시가 나온다.
-// 컨트랙트의 digest() 와 같은 값이 나오는지는 chain/register/ether_test.go 가 체인에 물어본다.
+// TestDigest_IncludesArch: arch is part of the signed value, so labelling the same measurements with a different architecture gives a different hash.
+// That the result equals the contract's digest() is checked against the chain in chain/register/ether_test.go.
 func TestDigest_IncludesArch(t *testing.T) {
 	v, m := sample()
 	amd, err := toEntry(v, m)

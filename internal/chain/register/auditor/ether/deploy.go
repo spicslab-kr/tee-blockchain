@@ -10,9 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// Deploy 는 Registry 를 배포한다. 서명자(approver) 주소는 배포 뒤 바꿀 수 없다. 바꾸려면 새로 배포한다.
-// 컨트랙트 하나 = 서명자 하나 — 각 역할이 자기 주소로 자기 컨트랙트를 배포한다.
-// backend 가 nil 이면 rpc 에 연결한다.
+// Deploy deploys Registry. The approver (signer) address cannot be changed after deployment; to change it, deploy anew.
+// One contract, one approver: each role deploys its own contract with its own address.
+// If backend is nil it connects to rpc.
 func Deploy(ctx context.Context, rpc string, backend Backend, deployerKey []byte, approver common.Address) (common.Address, string, error) {
 	deployer, err := crypto.ToECDSA(deployerKey)
 	if err != nil {

@@ -1,5 +1,5 @@
-// Package ether 는 이더리움(EVM) 체인에 등록한다. contracts/evm/Registry.sol 과 짝이다.
-// registry.go 는 그 컨트랙트에서 abigen 으로 만든 바인딩이다 (generate.go).
+// Package ether registers on an Ethereum (EVM) chain. It pairs with contracts/evm/Registry.sol.
+// registry.go is the abigen binding generated from that contract (see generate.go).
 package ether
 
 import (
@@ -19,20 +19,20 @@ import (
 	p "tb/internal/tee/parse/Vendor"
 )
 
-// Registrar 는 RPC 로 Registry 컨트랙트 하나를 바라본다.
+// Registrar talks to a single Registry contract over RPC.
 type Registrar struct {
-	RPC      string         // 예: https://ethereum-sepolia-rpc.publicnode.com
-	Contract common.Address // 배포된 Registry
-	// SenderKey 는 트랜잭션을 보내고 가스를 내는 키. 서명자와 같아도, 달라도 된다.
+	RPC      string         // e.g. https://ethereum-sepolia-rpc.publicnode.com
+	Contract common.Address // the deployed Registry
+	// SenderKey is the key that sends the transaction and pays gas. It may or may not be the signer.
 	SenderKey []byte
-	Timeout   time.Duration // 채굴 대기. 0 이면 2 분
-	// Backend 가 있으면 RPC 대신 쓴다. 테스트에서 simulated backend 를 넣는다.
+	Timeout   time.Duration // how long to wait for mining; 0 means 2 minutes
+	// If Backend is set it is used instead of RPC. Tests inject a simulated backend.
 	Backend Backend
 }
 
 var _ reg.Registrar = (*Registrar)(nil)
 
-// toEntry — 우리 타입을 컨트랙트의 Entry 로. 측정값은 32 바이트 해시 하나로 줄어든다.
+// toEntry converts our types into the contract's Entry. The measurements are reduced to a single 32-byte hash.
 func toEntry(values p.Measurements, meta reg.Meta) (RegistryEntry, error) {
 	if err := meta.Validate(); err != nil {
 		return RegistryEntry{}, err
@@ -44,7 +44,8 @@ func toEntry(values p.Measurements, meta reg.Meta) (RegistryEntry, error) {
 	return RegistryEntry{Platform: meta.Platform, Arch: meta.Arch, Service: meta.Service, Version: meta.Version, Measurement: h, Expires: uint64(meta.Expires.Unix())}, nil
 }
 
-// Digest 는 서명 대상 해시 — 컨트랙트의 digest(e) 와 같은 값. 체인 ID 와 컨트랙트 주소가 들어가 다른 배포에는 못 쓴다.
+// Digest is the hash to sign, the same value as the contract's digest(e). It includes the chain ID and contract address,
+// so it cannot be reused on another deployment.
 func Digest(chainID *big.Int, contract common.Address, e RegistryEntry) ([]byte, error) {
 	td := apitypes.TypedData{
 		Types: apitypes.Types{
@@ -71,7 +72,7 @@ func Digest(chainID *big.Int, contract common.Address, e RegistryEntry) ([]byte,
 	return digest, err
 }
 
-// Sign 은 체인 ID 를 읽어 서명한다. 키는 secp256k1 개인키 32 바이트.
+// Sign reads the chain ID and signs. The key is a 32-byte secp256k1 private key.
 func (r Registrar) Sign(values p.Measurements, meta reg.Meta, key []byte) (reg.Signed, error) {
 	priv, err := crypto.ToECDSA(key)
 	if err != nil {
@@ -104,7 +105,7 @@ func (r Registrar) signWith(chainID *big.Int, values p.Measurements, meta reg.Me
 	if err != nil {
 		return reg.Signed{}, err
 	}
-	sig[64] += 27 // 컨트랙트(ECDSA.recover)는 v 를 27/28 로 받는다
+	sig[64] += 27 // the contract (ECDSA.recover) expects v as 27/28
 	return reg.Signed{
 		Values: values, Meta: meta,
 		Signer:    crypto.PubkeyToAddress(priv.PublicKey).Hex(),
@@ -113,7 +114,7 @@ func (r Registrar) signWith(chainID *big.Int, values p.Measurements, meta reg.Me
 	}, nil
 }
 
-// backend — Backend 가 있으면 그것, 없으면 RPC 에 연결한다. done 은 연결을 닫는다.
+// backend returns Backend if set, otherwise connects to RPC. done closes the connection.
 func (r Registrar) backend(ctx context.Context) (Backend, func(), error) {
 	if r.Backend != nil {
 		return r.Backend, func() {}, nil

@@ -1,13 +1,13 @@
-// Package user 는 C2 체인 조회 — 읽기만 한다.
+// Package user reads registrations from the chain. It only reads.
 //
-// auditor · Vendor · user 세 역할에 이 파일이 똑같이 하나씩 있다. Registration.Values 와
-// Reader.FindAddress 가 이 역할의 tee/parse/user.Measurements 를 쓰는데, auditor·Vendor 의
-// Measurements 는 필드가 똑같아도(Name, Value) 패키지가 달라서 Go 에서는 다른 타입이다 — 그래서
-// 인터페이스 하나를 세 역할이 같이 쓸 수가 없다. Meta 자체는 역할 타입이 없어 합칠 수도 있었지만,
-// Registration·Reader 와 한 파일에 있는 게 자연스러워 그냥 같이 뒀다.
+// The auditor, vendor and user roles each have an identical copy of this file. Registration.Values and
+// Reader.FindAddress use this role's tee/parse/user.Measurements. The other roles' Measurements have the same fields
+// (Name, Value) but live in different packages, so Go treats them as different types and one interface
+// cannot be shared by the three roles. Meta has no role-specific type and could have been shared, but it sits more
+// naturally in the same file as Registration and Reader, so it was left here.
 //
-// 실제 구현(ether/reader.go)도 마찬가지 이유다. user 는 등록을 안 해서 chain/register/user 가 없다 —
-// ether/reader.go 가 auditor 의 컨트랙트 바인딩을 빌려 쓰는 이유는 그 파일 자체의 주석에 있다.
+// The implementation (ether/reader.go) is per role for the same reason. The user role does not register, so there is
+// no chain/register/user; the reason ether/reader.go borrows the auditor's contract binding is in the comment of that file.
 package user
 
 import (
@@ -20,15 +20,15 @@ type Meta struct {
 	Service  string
 	Version  string
 	Platform string
-	Arch     string // 이미지를 빌드한 CPU 아키텍처 (amd64 | arm64). 표시용 — 키에는 안 들어간다
+	Arch     string // CPU architecture the image was built for (amd64 | arm64); informational, not part of the key
 }
 
 type Registration struct {
 	Address   string
 	Values    user.Measurements
 	Meta      Meta
-	Expires   int64 // 체인 시계 기준
-	ChainTime int64 // lookup 을 처리한 블록의 시각(unix 초). 만료 판정은 이것과 Expires 를 맞댄다 — 검증자 노트북 시계가 아니라
+	Expires   int64 // by the chain's clock
+	ChainTime int64 // unix time of the block that served the lookup; expiry is judged against this, not the verifier's clock
 	Signer    string
 	Signature []byte
 }

@@ -15,14 +15,14 @@ import (
 	reg "tb/internal/chain/register/Vendor"
 )
 
-// Backend 는 체인과 말하는 데 필요한 것. *ethclient.Client 와 simulated.Client 가 둘 다 만족한다.
+// Backend is what is needed to talk to the chain. Both *ethclient.Client and simulated.Client satisfy it.
 type Backend interface {
 	bind.ContractBackend
 	bind.DeployBackend
 	ChainID(ctx context.Context) (*big.Int, error)
 }
 
-// Register 는 register(e, signature) 트랜잭션을 보내고 채굴을 기다린다. 컨트랙트가 거부하면 그 이유를 에러로 돌려준다.
+// Register sends the register(e, signature) transaction and waits for it to be mined. If the contract rejects it, the reason is returned as an error.
 func (r Registrar) Register(ctx context.Context, s reg.Signed) (reg.Receipt, error) {
 	if len(r.SenderKey) == 0 {
 		return reg.Receipt{}, errors.New("sender key is required to pay for the transaction")
@@ -78,7 +78,7 @@ func (r Registrar) Register(ctx context.Context, s reg.Signed) (reg.Receipt, err
 	return reg.Receipt{}, errors.New("Registered event not found in receipt")
 }
 
-// classify — 컨트랙트가 되돌린 revert 데이터를 우리 에러로 바꾼다.
+// classify turns the revert data returned by the contract into our errors.
 func classify(err error) error {
 	var de interface{ ErrorData() interface{} }
 	if !errors.As(err, &de) {

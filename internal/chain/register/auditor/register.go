@@ -1,4 +1,4 @@
-// Package auditor 는 체인 등록 — 측정값을 서명해 컨트랙트에 기록한다.
+// Package auditor registers measurements on chain: it signs them and records them in the contract.
 package auditor
 
 import (
@@ -14,43 +14,44 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// Meta 는 측정값에 붙는 등록 정보. Expires 가 지나면 등록은 효력을 잃는다. 취소는 없다.
+// Meta is the registration info attached to the measurements. Once Expires has passed the registration no longer
+// counts. There is no revocation.
 type Meta struct {
 	l.Meta
 	Expires time.Time
 }
 
-// Signed 는 서명이 끝나 체인에 보낼 수 있는 값.
+// Signed is a value that has been signed and is ready to send to the chain.
 type Signed struct {
 	Values    p.Measurements
 	Meta      Meta
-	Signer    string // 서명 키의 주소. 컨트랙트가 서명에서 복원하는 값과 같다
-	Digest    []byte // 서명한 해시. 컨트랙트의 digest() 와 같아야 한다
-	Signature []byte // 65 바이트 r‖s‖v
+	Signer    string // address of the signing key; equals the value the contract recovers from the signature
+	Digest    []byte // the hash that was signed; must equal the contract's digest()
+	Signature []byte // 65 bytes, r‖s‖v
 }
 
-// Receipt 는 등록 완료. Key 가 조회 좌표다.
+// Receipt confirms a registration. Key is the lookup coordinate.
 type Receipt struct {
-	Key    string // 0x… 32 바이트
+	Key    string // 0x…, 32 bytes
 	TxHash string
 	Block  uint64
 }
 
 type Registrar interface {
-	// Sign 은 측정값과 등록 정보를 서명 키로 서명한다. 누가 등록했는지는 이 서명으로 갈린다.
+	// Sign signs the measurements and registration info with the signing key. This signature is what says who registered.
 	Sign(values p.Measurements, meta Meta, key []byte) (Signed, error)
-	// Register 는 서명된 값을 컨트랙트에 보낸다. 컨트랙트가 서명자를 확인한 뒤 저장한다.
+	// Register sends the signed value to the contract, which checks the signer and then stores it.
 	Register(ctx context.Context, s Signed) (Receipt, error)
 }
 
 var (
-	ErrNotAnApprover     = errors.New("signer is not one of the approvers fixed in the contract")
+	ErrNotAnApprover     = errors.New("signer is not the approver fixed in the contract")
 	ErrAlreadyRegistered = errors.New("this signer already registered this measurement")
 	ErrExpiryPassed      = errors.New("expiry is not in the future by the chain's clock")
 )
 
-// MeasurementHash 는 측정값 묶음을 32 바이트 하나로 줄인다. 컨트랙트에는 이 값이 들어간다.
-// 이름순으로 "이름=값(hex)\n" 을 이어 붙여 keccak256. 같은 측정값이면 누가 계산해도 같다.
+// MeasurementHash reduces a set of measurements to a single 32-byte value, which is what goes into the contract.
+// It is keccak256 over "name=value(hex)\n" entries concatenated in name order, so anyone computing it from the same measurements gets the same result.
 func MeasurementHash(values p.Measurements) ([32]byte, error) {
 	var out [32]byte
 	if len(values) == 0 {

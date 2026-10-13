@@ -1,6 +1,7 @@
-// 시뮬레이션 체인에 register 로 등록해 두고, Reader 로 조회한다. User 는 등록을 안 해서 register/user 가
-// 없다 — auditor 패키지로 등록해 두고, user 의 Reader(= auditor 바인딩을 빌려 씀)로 읽는다. chain() ·
-// newKey() 는 auditor 쪽 reader_test.go 에도 있는 것과 같은 모양이지만, 여긴 다른 패키지라 다시 적는다.
+// Registers on a simulated chain with register, then looks up with Reader. The user role does not register, so there is no
+// register/user: the value is registered with the auditor package and read with the user's Reader (which borrows the
+// auditor binding). chain() and newKey() have the same shape as in the auditor's reader_test.go, but this is a different
+// package so they are written out again.
 package ether
 
 import (
@@ -68,7 +69,7 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// auditor 쪽 타입으로 등록 — 이 브랜치엔 register/user 가 없다.
+	// register with the auditor's types; there is no register/user.
 	aValues := ap.Measurements{
 		{Name: "PCR0", Value: bytes.Repeat([]byte{0x11}, 48)},
 		{Name: "PCR1", Value: bytes.Repeat([]byte{0x22}, 48)},
@@ -86,7 +87,7 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// user 쪽 타입으로 같은 측정값을 다시 만들어 — user.Reader 가 필드는 같아도 다른 타입을 받는지 확인.
+	// rebuild the same measurements with the user's types, to check that user.Reader accepts them even though the fields are the same and the type differs.
 	uValues := make(up.Measurements, len(aValues))
 	for i, m := range aValues {
 		uValues[i] = up.Measurement{Name: m.Name, Value: m.Value}
@@ -109,46 +110,45 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 	if got.Signer != auditorAddr.Hex() || got.Meta.Service != "unit-test" || got.Meta.Platform != DefaultPlatform || got.Expires != expires.Unix() {
 		t.Fatalf("Lookup = %+v", got)
 	}
-	// 만료 판정에 쓸 체인 시계 — 조회를 처리한 블록의 시각. 0 이면 Check 가 로컬 시계로 떨어진다.
+	// chain clock used for the expiry decision: the time of the block that served the lookup. If 0, Check falls back to the local clock.
 	if got.ChainTime <= 0 || got.ChainTime > time.Now().Unix()+60 {
 		t.Fatalf("Lookup ChainTime = %d, want the block's unix time", got.ChainTime)
 	}
-	// 체인이 어느 아키텍처의 등록인지 말한다 — User 는 arch 를 몰라도 찾고, 찾은 뒤에 읽는다.
+	// the chain says which architecture the registration is for: the user role finds without knowing arch and reads it after finding.
 	if got.Meta.Arch != "arm64" {
 		t.Fatalf("Lookup arch = %q, want arm64", got.Meta.Arch)
 	}
 	h, _ := measurementHash(uValues)
 	if !bytes.Equal(got.Values.Get("measurementHash"), h[:]) {
-		t.Error("measurement hash 가 등록 때 계산한 것과 다르다")
+		t.Error("measurement hash differs from the one computed at registration")
 	}
-	// register 패키지의 계산과도 같아야 한다 — 등록은 그쪽으로, 조회는 이쪽으로 했으니.
+	// must also equal the register package's computation: registered with that one, looked up with this one.
 	ah, _ := aud.MeasurementHash(aValues)
 	if h != ah {
-		t.Error("user 의 measurementHash 가 register 의 MeasurementHash 와 다르다")
+		t.Error("user's measurementHash differs from register's MeasurementHash")
 	}
 
-	// 등록되지 않은 값 — 빈 슬라이스.
+	// unregistered value: empty slice.
 	other := up.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x99}, 48)}}
 	if got, err := reader.FindAddress(ctx, other); err != nil || len(got) != 0 {
-		t.Fatalf("등록 안 된 측정값의 FindAddress = %v, %v", got, err)
+		t.Fatalf("FindAddress for an unregistered measurement = %v, %v", got, err)
 	}
 
-	// 등록되지 않은 key — 에러.
+	// unregistered key: error.
 	if _, err := reader.Lookup(ctx, common.HexToHash("0x3039").Hex()); err == nil {
-		t.Fatal("등록되지 않은 key 는 에러여야 한다")
+		t.Fatal("an unregistered key should be an error")
 	}
 
-	// 길이는 맞는데 hex 가 아닌 key — 조용히 0 으로 바뀌어 "not registered" 로 둔갑하면 안 되고, 그 자체로
-	// 에러여야 한다.
+	// a key of the right length that is not hex: it must not silently become 0 and pass as "not registered"; it must be an error in itself.
 	bad := "0x" + strings.Repeat("zz", 32)
 	if _, err := reader.Lookup(ctx, bad); err == nil {
-		t.Fatal("hex 가 아닌 key 는 에러여야 한다 (0 으로 조용히 바뀌면 안 된다)")
+		t.Fatal("a non-hex key should be an error (it must not silently turn into 0)")
 	}
 }
 
-// TestReader_Lookup_ScansMultipleLogChunks — 등록 뒤에도 블록이 계속 쌓이는 실제 체인을 흉내 낸다.
-// LogRangeChunk 를 아주 작게 줘서, 최신 블록에서 한 번에 못 찾고 여러 번 거슬러 올라가야만 이벤트를
-// 찾는 경로를 실제로 돌려본다.
+// TestReader_Lookup_ScansMultipleLogChunks imitates a real chain where blocks keep piling up after the registration.
+// LogRangeChunk is made very small so the event cannot be found in one query from the latest block and the scan has to step
+// back several times, exercising that path.
 func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	auditorKey, auditorAddr := newKey(t)
@@ -180,7 +180,7 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 	reader := Reader{Contract: contract, Backend: client, LogRangeChunk: 1}
 	got, err := reader.Lookup(ctx, receipt.Key)
 	if err != nil {
-		t.Fatalf("청크 1개씩 거슬러 올라가며 찾기 실패: %v", err)
+		t.Fatalf("scan failed when stepping back one chunk at a time: %v", err)
 	}
 	if got.Meta.Service != "chunk-test" {
 		t.Fatalf("Lookup = %+v", got)

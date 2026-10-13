@@ -1,5 +1,5 @@
-// Package ether 는 이더리움(EVM) 체인을 읽기만 한다. chain/register/Vendor/ether 가 낸 abigen 바인딩
-// (registry.go)을 그대로 쓴다 — 같은 컨트랙트를 두 번 컴파일해 둘 이유가 없다.
+// Package ether only reads an Ethereum (EVM) chain. It uses the abigen binding (registry.go) produced by
+// chain/register/Vendor/ether as is; there is no reason to compile the same contract twice.
 package ether
 
 import (
@@ -18,29 +18,29 @@ import (
 	p "tb/internal/tee/parse/Vendor"
 )
 
-// DefaultPlatform — 지금 지원하는 유일한 측정값 형식. 여러 플랫폼을 섞어 등록하기 시작하면 FindAddress 의
-// 시그니처 자체를 늘려야 한다 (Registry.sol 의 key 는 platform 마다 다르다).
+// DefaultPlatform is the only measurement format supported for now. Once registrations start mixing platforms,
+// FindAddress's signature itself will have to grow (the key in Registry.sol differs per platform).
 const DefaultPlatform = "aws-nitro"
 
-// defaultLogRangeChunk — Lookup 이 이벤트 로그를 한 번에 물어보는 블록 범위. 공개 RPC(Infura·Alchemy·
-// publicnode 류)는 대개 eth_getLogs 의 fromBlock~toBlock 범위를 수천~수만 블록으로 제한한다. 등록된 지
-// 오래된 컨트랙트(예: 이 저장소가 올려 본 Sepolia 컨트랙트는 이미 1100만+ 블록째다)를 블록 0부터 한 번에
-// 훑으면 그 제한에 걸려 거절당한다 — 그래서 최신 블록에서부터 이 범위씩 거슬러 올라가며 나눠 묻는다.
+// defaultLogRangeChunk is the block range Lookup asks for in one event-log query. Public RPCs (Infura, Alchemy,
+// publicnode and the like) usually cap the fromBlock..toBlock range of eth_getLogs at a few thousand to tens of thousands
+// of blocks. A contract registered long ago (a Sepolia contract is already past block 11 million) would be rejected if
+// scanned from block 0 in one go, so the scan works backwards from the latest block in chunks of this size.
 const defaultLogRangeChunk = 4000
 
-// Backend — 조회에 필요한 것. *ethclient.Client 와 *simulated.Backend.Client() 가 둘 다 만족한다.
-// BlockNumber 가 필요한 건 Lookup 이 이벤트 로그를 최신 블록에서부터 나눠 훑기 때문이다.
+// Backend is what a lookup needs. Both *ethclient.Client and *simulated.Backend.Client() satisfy it.
+// BlockNumber is needed because Lookup scans the event logs in chunks starting from the latest block.
 type Backend interface {
 	bind.ContractBackend
 	BlockNumber(ctx context.Context) (uint64, error)
 }
 
-// Reader — RPC 로 컨트랙트를 읽는다. Backend 가 있으면 그걸 쓰고(시뮬레이션 체인 시험용), 없으면 RPC 에 연결한다.
+// Reader reads the contract over RPC. It uses Backend if set (for tests on a simulated chain), otherwise connects to RPC.
 type Reader struct {
 	RPC      string
 	Contract common.Address
 	Backend  Backend
-	// LogRangeChunk — 0 이면 defaultLogRangeChunk. 시험에서 여러 번 나눠 훑는 경로를 실제로 돌려보려고 열어 둠.
+	// LogRangeChunk: if 0, defaultLogRangeChunk. Exposed so tests can exercise the multi-chunk scan path.
 	LogRangeChunk uint64
 }
 
@@ -64,9 +64,9 @@ func (r Reader) client(ctx context.Context) (*regether.Registry, Backend, func()
 	return registry, backend, closeFn, nil
 }
 
-// FindAddress — 측정값을 해시해 DefaultPlatform 아래서 등록된 key 를 찾는다. 컨트랙트 하나에 서명자가
-// 하나라 key 도 최대 하나다. 등록이 없으면 빈 슬라이스. (Auditor · Vendor 가 둘 다 등록하는 흐름은 컨트랙트가
-// 둘이고, 각각 따로 조회한다.)
+// FindAddress hashes the measurements and finds the key registered under DefaultPlatform. A contract has one signer,
+// so there is at most one key. With no registration it returns an empty slice. (If an auditor and a vendor both
+// register, that is two contracts, each looked up separately.)
 func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]string, error) {
 	h, err := reg.MeasurementHash(values)
 	if err != nil {
@@ -81,8 +81,8 @@ func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]strin
 	if err != nil {
 		return nil, err
 	}
-	// keyFor 는 순수 계산이라 등록 여부와 상관없이 항상 키를 낸다 (키가 0 인 경우도 없다).
-	// 실제로 등록됐는지는 그 key 로 lookup 을 해서 signer 가 채워졌는지로 본다.
+	// keyFor is a pure computation, so it always yields a key regardless of registration (and the key is never zero).
+	// Whether it is actually registered is seen by calling lookup with that key and checking that signer is filled in.
 	rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, key)
 	if err != nil {
 		return nil, err
@@ -93,9 +93,9 @@ func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]strin
 	return []string{common.Hash(key).Hex()}, nil
 }
 
-// parseKey — address 는 FindAddress 가 준 것과 같은 모양(0x + 32 바이트 hex)이어야 한다. 길이만 보면
-// 잘못된 hex(오타·복붙 깨짐)가 common.HexToHash 에서 조용히 0 값으로 바뀌어 "등록 없음"으로 오인될 수
-// 있어서, hex 로 실제로 디코드되는지까지 본다.
+// parseKey: address must have the same shape FindAddress returns (0x + 32 bytes of hex). Checking only the length
+// would let invalid hex (a typo or a broken paste) silently become the zero value in common.HexToHash and be mistaken for
+// "not registered", so it also checks that the string really decodes as hex.
 func parseKey(address string) (common.Hash, error) {
 	s := strings.TrimPrefix(address, "0x")
 	if len(s) != 64 {
@@ -108,11 +108,13 @@ func parseKey(address string) (common.Hash, error) {
 	return common.BytesToHash(b), nil
 }
 
-// Lookup — key(FindAddress 가 준 것)로 등록 정보를 읽는다. 컨트랙트 저장소(records)엔 서명자 · 만료 · 등록
-// 시각만 있어서, 메타데이터(서비스 · 버전 · 플랫폼) · 서명은 Registered 이벤트 로그에서 채운다.
+// Lookup reads the registration for a key (as returned by FindAddress). The contract storage (records) holds only the
+// signer, expiry and registration time, so the metadata (service, version, platform) and the signature are filled in
+// from the Registered event log.
 //
-// Values 에는 원래 PCR 이름별 값이 아니라 측정값 해시 하나만 들어간다 — 컨트랙트가 저장하는 게 그 해시뿐이라
-// 개별 PCR 을 되돌릴 방법이 없다. 대조(M2)는 이 해시를 빌드 시점에 같은 방식으로 계산한 해시와 맞대봐야 한다.
+// Values holds a single measurement hash rather than per-PCR values: the contract stores only that hash, so there is
+// no way to recover the individual PCRs. The comparison (compare.Check) must check this hash against one computed the
+// same way at build time.
 func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, error) {
 	key, err := parseKey(address)
 	if err != nil {
@@ -148,8 +150,9 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 	}, nil
 }
 
-// TrustedSigners — 컨트랙트에 고정된 서명자(APPROVER) 주소. M2 의 Check 가 등록 서명자가 이 주소인지
-// 볼 때 쓴다. 배포 뒤 바뀌지 않는 값이라(Registry.sol 의 APPROVER 는 immutable) 매번 새로 불러도 항상 같다.
+// TrustedSigners is the signer address (APPROVER) fixed in the contract. compare.Check uses it to see whether the
+// registration signer is this address.
+// It never changes after deployment (APPROVER in Registry.sol is immutable), so fetching it again always gives the same value.
 func (r Reader) TrustedSigners(ctx context.Context) ([]string, error) {
 	registry, _, done, err := r.client(ctx)
 	if err != nil {
@@ -163,9 +166,9 @@ func (r Reader) TrustedSigners(ctx context.Context) ([]string, error) {
 	return []string{a.Hex()}, nil
 }
 
-// findRegisteredEvent — Registered 이벤트를 최신 블록에서부터 chunk 블록씩 거슬러 올라가며 찾는다.
-// key 하나에 등록은 최대 하나뿐이라(컨트랙트가 중복을 거절한다), 찾으면 바로 돌려준다. 컨트랙트를 배포한
-// 지점보다 먼저까지 가면(from == 0 을 다 봤는데도 없으면) 못 찾은 것으로 본다.
+// findRegisteredEvent finds the Registered event by scanning backwards from the latest block, chunk blocks at a time.
+// A key has at most one registration (the contract rejects duplicates), so it returns as soon as it finds one. If the
+// scan reaches before the contract's deployment (from == 0 has been scanned and nothing found), it counts as not found.
 func findRegisteredEvent(ctx context.Context, backend Backend, registry *regether.Registry, key common.Hash, chunk uint64) (*regether.RegistryRegistered, error) {
 	if chunk == 0 {
 		chunk = defaultLogRangeChunk

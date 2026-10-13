@@ -1,6 +1,6 @@
-// go-ethereum 의 시뮬레이션 체인에 컨트랙트를 배포하고, Auditor 와 Vendor 가 각자 패키지로 등록하고 읽어 본다.
-// 컨트랙트 하나 = 서명자 하나라, 둘이 다 등록하는 흐름은 컨트랙트가 둘이다.
-// 실제 노드가 없어도 돈다. 실제 체인(Sepolia)에서 한 기록은 setup/*/chain.md 에 있다.
+// Deploys the contract on go-ethereum's simulated chain and has the auditor and vendor each register and read through their own package.
+// One contract, one approver, so if both register there are two contracts.
+// Runs without a real node.
 package register_test
 
 import (
@@ -36,7 +36,7 @@ func newKey(t *testing.T) ([]byte, common.Address) {
 	return crypto.FromECDSA(k), crypto.PubkeyToAddress(k.PublicKey)
 }
 
-// chain — 시뮬레이션 체인. 트랜잭션이 채굴되도록 뒤에서 계속 블록을 만든다.
+// chain is the simulated chain. It keeps producing blocks in the background so that transactions get mined.
 func chain(t *testing.T, funded ...common.Address) *simulated.Backend {
 	t.Helper()
 	alloc := types.GenesisAlloc{}
@@ -83,7 +83,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	// 각 역할이 자기 주소로 자기 컨트랙트를 배포한다.
+	// Each role deploys its own contract with its own address.
 	aContract, _, err := audether.Deploy(ctx, "", client, deployerKey, auditorAddr)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if aContract == vContract {
 		t.Fatal("two deployments must land at different addresses")
 	}
-	// 조회는 C2 의 일이다. 여기서는 등록이 실제로 들어갔는지 보기 위해 바인딩으로 직접 읽는다.
+	// Lookup is the job of the lookup packages. Here the binding is read directly to see that the registration actually went in.
 	aRegistry, err := audether.NewRegistry(aContract, client)
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +115,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	expires := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Second)
 	vValues, aValues := pcrs(0x10)
 
-	// Auditor — auditor 패키지로, 자기 컨트랙트에
+	// Auditor: through the auditor package, to its own contract.
 	auditor := audether.Registrar{Backend: client, Contract: aContract, SenderKey: auditorKey}
 	aMeta := aud.Meta{Meta: al.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro", Arch: "amd64"}, Expires: expires}
 	aSigned, err := auditor.Sign(aValues, aMeta, auditorKey)
@@ -131,14 +131,14 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if err != nil || !bytes.Equal(onchainDigest[:], aSigned.Digest) {
 		t.Fatalf("Go digest differs from the contract's: %x vs %x (%v)", aSigned.Digest, onchainDigest, err)
 	}
-	// arch 가 다르면 컨트랙트의 digest 도 달라야 한다 — 같다면 arch 가 서명에 안 들어간 것.
+	// If arch differs, the contract's digest must differ too: if it does not, arch is not part of the signature.
 	otherArch := onchainEntry
 	otherArch.Arch = "arm64"
 	if d, err := aRegistry.Digest(call, otherArch); err != nil || d == onchainDigest {
 		t.Fatalf("the contract's digest must depend on arch (%v)", err)
 	}
-	// arch 가 빈 Entry — 컨트랙트가 MissingField("arch") 로 거부한다. Go 쪽은 Meta.Validate 가 먼저 막으니
-	// 바인딩으로 직접 보낸다. 필드 검사는 서명 복원보다 앞이라 서명은 아무거나 된다.
+	// An Entry with an empty arch: the contract rejects it with MissingField("arch"). On the Go side Meta.Validate blocks it first,
+	// so it is sent through the binding directly. The field check comes before signature recovery, so any signature will do.
 	if field := missingField(t, ctx, client, aRegistry, auditorKey, audether.RegistryEntry{Platform: "aws-nitro", Service: "my-app", Version: "1.0.0", Measurement: h, Expires: uint64(expires.Unix())}, aSigned.Signature); field != "arch" {
 		t.Fatalf("an entry without an arch must be rejected with MissingField(\"arch\"), got %q", field)
 	}
@@ -154,12 +154,12 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("lookup: %+v", rec)
 	}
 
-	// 같은 것을 다시 — 거부
+	// the same again: rejected
 	if _, err := auditor.Register(ctx, aSigned); !errors.Is(err, aud.ErrAlreadyRegistered) {
 		t.Fatalf("want ErrAlreadyRegistered, got %v", err)
 	}
 
-	// Vendor — Vendor 패키지로, 같은 측정값을 자기 컨트랙트에. 서명자가 달라 키도 다르다
+	// Vendor: through the vendor package, the same measurements to its own contract. The signer differs, so the key differs.
 	vendor := venether.Registrar{Backend: client, Contract: vContract, SenderKey: vendorKey}
 	vMeta := ven.Meta{Meta: vl.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro", Arch: "arm64"}, Expires: expires}
 	vSigned, err := vendor.Sign(vValues, vMeta, vendorKey)
@@ -173,7 +173,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if vReceipt.Key == aReceipt.Key {
 		t.Fatal("auditor and vendor registrations must have different keys")
 	}
-	// keyFor — 각 컨트랙트가 자기 서명자 기준으로 내는 키가 영수증의 키와 같아야 한다
+	// keyFor: the key each contract produces for its own signer must equal the key in the receipt.
 	if k, err := aRegistry.KeyFor(call, "aws-nitro", h); err != nil || common.Hash(k).Hex() != aReceipt.Key {
 		t.Fatalf("auditor keyFor = %x (%v), want %s", k, err, aReceipt.Key)
 	}
@@ -181,7 +181,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("vendor keyFor = %x (%v), want %s", k, err, vReceipt.Key)
 	}
 
-	// 서명자가 다른 컨트랙트에는 못 올린다 — Auditor 서명을 Vendor 컨트랙트에
+	// A signature cannot be registered on a contract with a different approver: an auditor signature on the vendor's contract.
 	crossValues, _ := pcrs(0x50)
 	crossSigned, err := vendor.Sign(crossValues, vMeta, auditorKey)
 	if err != nil {
@@ -191,7 +191,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("auditor signature on the vendor contract: want ErrNotAnApprover, got %v", err)
 	}
 
-	// 제3자 키 — 서명은 되지만 컨트랙트가 거부
+	// third-party key: signing works but the contract rejects it.
 	strangerKey, _ := newKey(t)
 	sValues, _ := pcrs(0x20)
 	sSigned, err := vendor.Sign(sValues, vMeta, strangerKey)
@@ -202,14 +202,14 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("want ErrNotAnApprover, got %v", err)
 	}
 
-	// 서명 뒤 값을 바꾸면 — 서명자가 다른 주소로 복원되어 거부
+	// changing a value after signing: a different address is recovered as the signer, so it is rejected.
 	tampered := vSigned
 	tampered.Meta.Version = "1.0.1"
 	if _, err := vendor.Register(ctx, tampered); !errors.Is(err, ven.ErrNotAnApprover) {
 		t.Fatalf("tampered: want ErrNotAnApprover, got %v", err)
 	}
 
-	// 이미 지난 만료 — 거부
+	// expiry already passed: rejected
 	past := vMeta
 	past.Expires = time.Now().Add(-time.Hour)
 	pValues, _ := pcrs(0x30)
@@ -221,13 +221,13 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("want ErrExpiryPassed, got %v", err)
 	}
 
-	// 등록되지 않은 키 — 비어 있음
+	// unregistered key: empty
 	empty, err := vRegistry.Lookup(call, common.HexToHash("0x3039"))
 	if err != nil || empty.Signer != (common.Address{}) || empty.Expires != 0 {
 		t.Fatalf("unknown key must be empty: %+v %v", empty, err)
 	}
 
-	// 아무나 트랜잭션을 보내도 서명자가 등록자다
+	// anyone may send the transaction; the signer is the registrant
 	relay := venether.Registrar{Backend: client, Contract: vContract, SenderKey: deployerKey}
 	rValues, _ := pcrs(0x40)
 	rSigned, err := relay.Sign(rValues, vMeta, vendorKey)
@@ -242,7 +242,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("signer must be the vendor, not the sender: %s", rec.Signer.Hex())
 	}
 
-	// Registered 이벤트가 arch 를 싣는다 — 조회(chain/lookup)는 여기서 읽는다.
+	// the Registered event carries arch; lookup (chain/lookup) reads it from there
 	iter, err := vRegistry.FilterRegistered(&bind.FilterOpts{Context: ctx}, [][32]byte{common.HexToHash(rReceipt.Key)}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -256,8 +256,8 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	}
 }
 
-// missingField — Entry 를 바인딩으로 바로 보내서, 컨트랙트가 MissingField 로 거부하면 그 필드 이름을 돌려준다.
-// 다른 에러거나 성공이면 실패.
+// missingField sends an Entry straight through the binding and, if the contract rejects it with MissingField, returns that field name.
+// Any other error, or success, is a failure.
 func missingField(t *testing.T, ctx context.Context, client simulated.Client, registry *audether.Registry, senderKey []byte, e audether.RegistryEntry, sig []byte) string {
 	t.Helper()
 	chainID, err := client.ChainID(ctx)
