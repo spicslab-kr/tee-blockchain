@@ -1,4 +1,8 @@
-<h1 align="center">tee-blockchain</h1>
+<p align="center">
+  <img src="docs/img/logo.svg" alt="Teestamp logo" width="160">
+</p>
+
+<h1 align="center">Teestamp</h1>
 
 <p align="center"><b>Remote attestation you can check against a public ledger.</b></p>
 
