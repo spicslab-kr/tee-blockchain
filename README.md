@@ -8,7 +8,7 @@
 
 <p align="center">
   <sub>CREATED AND MAINTAINED BY</sub><br>
-  <b>SPICS Lab</b>, Kyung Hee University<br>
+  SPICS Lab, Kyung Hee University<br>
   <a href="https://github.com/spicslab-kr/tee-blockchain/issues">GitHub issues</a> &nbsp;·&nbsp;
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
