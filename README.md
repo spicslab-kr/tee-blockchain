@@ -164,7 +164,7 @@ the responder only work on a Nitro-enabled EC2 instance (Linux); everything else
 
 ## 1. Vendor
 
-### 1.1 Build and launch the enclave — Case A or Case B
+### 1.1 Build and launch the enclave: an image file or the source
 
 Both cases must end with the same three things, because that is all the rest of the system uses:
 
@@ -177,7 +177,7 @@ Both cases must end with the same three things, because that is all the rest of 
 Building is optional for the Vendor — an EIF received from the Auditor works too (see 1.3); then
 only the launch half applies.
 
-#### Case A — your image, handed over as a file
+#### Option 1: your image, handed over as a file
 
 You build the software image however you like; tb packs it into an EIF; you give the Auditor the
 EIF and its measurements. The Auditor never rebuilds — it measures the file it received.
@@ -206,7 +206,7 @@ file measures to what the JSON claims.
 Done by hand, this is the responder layer (three files and a six-line Dockerfile) followed by
 `nitro-cli build-enclave`.
 
-#### Case B — the source, rebuilt by the Auditor
+#### Option 2: the source, rebuilt by the Auditor
 
 You give the Auditor the repository and commit; both of you run the same two commands on your
 own Nitro instance and must get the same PCR0·1·2. That is the audit.
@@ -336,7 +336,7 @@ the OS, CPU architecture or Go version differ — a build here would not reprodu
 measurements, and the mismatch would look like a finding. Move to a matching instance, or pass
 `--ignore-env` if you know better. A Vendor that built without `-trimpath` gets a warning only.
 
-### 2.2 Build and launch — Case A or Case B
+### 2.2 Build and launch: an image file or the source
 
 Identical to the Vendor's 1.1 with `tb-auditor` in place of `tb-vendor`. Reproducibility is the
 whole point here: same source + same `tb-ra-responder` + normalized layers ⇒ the same PCR0·1·2 the
