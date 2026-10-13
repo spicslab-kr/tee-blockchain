@@ -1,7 +1,7 @@
 dist/
 setup/vendor/nitro/tb-*-linux-amd64
 
-# go build ./cmd/<role>/... (개별 패키지 검증) 이 -o 없이 돌면 그 패키지 이름으로 루트에 바이너리를 떨어뜨린다.
+# `go build ./cmd/<role>/...` without -o drops a binary named after the package into the repo root.
 /auditor
 /auditor.exe
 /vendor
@@ -14,3 +14,9 @@ e2e-work/
 
 # SSH private key — never commit
 pem2.pem
+*.pem
+*.key
+!internal/tee/parse/aws/root.pem
+
+# Local instance addresses (copy e2e/env.local.example.sh)
+e2e/env.local.sh

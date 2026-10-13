@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 정리 — 두 인스턴스의 엔클레이브와 TCP 다리를 내린다. (인스턴스 자체는 콘솔에서 Stop)
+# Cleanup - stop the enclaves and TCP bridges on both instances. (Stop the instances themselves from the console.)
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
 . "$here/env.sh"

@@ -1,35 +1,37 @@
 #!/usr/bin/env bash
-# 아키텍처별 측정값 비교. 같은 소스·같은 Dockerfile을 x86_64 두 대(기존 VENDOR/AUDITOR)와
-#    arm64 한 대(ARM64_HOST)에서 각자 빌드해 PCR0·1·2 를 실측한다.
-#    기대하는 결과: x86_64 두 대는 완전히 같은 값(재현 — 체크아웃 경로에 안 묶인다는 증거), arm64 는 다른 값(정상 —
-#    커널·기계어·베이스 이미지 레이어가 아키텍처마다 다르므로 같은 소스라도 PCR 은 갈린다. 결함이 아니다).
-#    같으면 안 되는데 같은 경우(버그)와 달라야 하는데 다른 경우(정상)를 스크립트 끝에서 판정해서 찍는다.
+# Per-architecture measurement comparison. The same source and Dockerfile are built on two x86_64 machines
+#    (the existing VENDOR/AUDITOR) and one arm64 machine (ARM64_HOST), and PCR0/1/2 are measured on each.
+#    Expected: the two x86_64 machines give identical values (reproducible - evidence it is not tied to the checkout
+#    path); arm64 gives different values (normal - kernel, machine code and base image layers differ per architecture,
+#    so the PCRs differ even for the same source; this is not a defect). The script judges at the end and prints
+#    whether values that must differ are equal (a bug) or values that must match differ.
 #
-#    필요: ARM64_HOST 에 arm64(Graviton) Nitro 인스턴스를 새로 띄우고 그 퍼블릭 IP를 e2e/env.sh 에 적어야 한다.
-#    스펙(검토 보완서 §4.1·부록 실측 그대로):
-#      - 타입    c7g.xlarge  (Graviton, 4 vCPU) — 기존 VENDOR/AUDITOR 와 같은 급의 m6i.xlarge(x86) 짝
-#      - OS      Amazon Linux 2023 (arm64 AMI — x86 AMI 와 다른 이미지이니 콘솔에서 아키텍처 필터를 arm64로)
-#      - 옵션    Nitro Enclaves enabled 체크, 나머지(리전 eu-north-1·보안그룹·키페어)는 기존 VENDOR/AUDITOR 와 동일하게
-#      - 준비    bash e2e/0-Setup-local-install.sh 와 같은 사전설치가 이 인스턴스에도 필요 (git·docker·nitro-cli는
-#                tb-vendor build 가 첫 실행에 알아서 깐다 — INSTANCE-INFO.md 참고)
-#    실행: TB-live 에서  bash "e2e/arch-measurement-compare.sh"
+#    Needs: launch an arm64 (Graviton) Nitro instance and put its public IP in ARM64_HOST in e2e/env.local.sh.
+#    Spec:
+#      - type    c7g.xlarge (Graviton, 4 vCPU) - the arm64 counterpart of the m6i.xlarge (x86) used for VENDOR/AUDITOR
+#      - OS      Amazon Linux 2023 (arm64 AMI - a different image from the x86 one, so set the console architecture filter to arm64)
+#      - options Nitro Enclaves enabled; the rest (region eu-north-1, security group, key pair) same as VENDOR/AUDITOR
+#      - setup   git, docker and nitro-cli are installed by the first run of tb-vendor build, so nothing needs to be
+#                installed on the instance beforehand
+#    Run from TB-live:  bash "e2e/arch-measurement-compare.sh"
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
 . "$here/env.sh"
 
 if [ -z "$ARM64_HOST" ]; then
-  echo "ARM64_HOST 가 비어 있다 — e2e/env.sh 에 arm64 인스턴스 퍼블릭 IP를 적어야 이 테스트를 돌릴 수 있다."
-  echo "필요한 인스턴스 스펙은 이 파일 맨 위 주석 참고."
+  echo "ARM64_HOST is empty - put the arm64 instance's public IP in e2e/env.local.sh to run this test."
+  echo "See the comment at the top of this file for the instance spec."
   exit 0
 fi
 
+need_host VENDOR_HOST; need_host AUDITOR_HOST
 SRC_REPO=https://github.com/qixiangme/docker-nginx
 SRC_COMMIT=ef5a25a6314e652a2dcfbce6074bef729f4d9639
 SRC_DIR=mainline/alpine-slim
 
-# ▶ 우리가 만든 tb 명령의 실행 파일 — x86_64(amd64)용과 arm64용을 각자 크로스컴파일한다.
-#   -trimpath: 체크아웃 경로가 바이너리에 안 박히게. 모듈러: 아키텍처를 늘리려면 GOARCH_OF 에 한 줄만 추가하면 된다.
+# Build the tb executables - cross-compiled separately for x86_64 (amd64) and arm64.
+#   -trimpath: keeps the checkout path out of the binary. To add an architecture, add one line to GOARCH_OF.
 step "CROSS-BUILDING PER ARCHITECTURE"
 declare -A GOARCH_OF=( [x86_64]=amd64 [arm64]=arm64 )
 mkdir -p "$WORK/arch"
@@ -42,8 +44,8 @@ done
 
 host_of() { case $1 in V) echo "$VENDOR_HOST";; A) echo "$AUDITOR_HOST";; R) echo "$ARM64_HOST";; esac; }
 
-# measure_on <ssh-func> <storage-key> <label> <arch> — storage-key 는 host 마다 따로 줘야 한다
-# (x86_64 Vendor·Auditor 둘 다 arch="x86_64" 이지만 결과 파일은 겹치면 안 되므로).
+# measure_on <ssh-func> <storage-key> <label> <arch> - storage-key must be distinct per host
+# (Vendor and Auditor are both arch="x86_64" but their result files must not overlap).
 measure_on() {
   sshf=$1; key=$2; label=$3; arch=$4
   nitroBanner "$label"
@@ -90,16 +92,16 @@ echo
 
 fail=0
 if [ "$(triplet vendor-x86)" != "$(triplet auditor-x86)" ]; then
-  echo "❌ 재현성 회귀 — 같은 아키텍처(x86_64)인데 Vendor 와 Auditor 의 PCR 이 다르다. -trimpath 나 재정규화가 깨졌다."
+  echo "❌ reproducibility regression - same architecture (x86_64) but Vendor and Auditor PCRs differ. -trimpath or normalization is broken."
   fail=1
 else
-  echo "✅ x86_64: Vendor·Auditor 재현됨 — 같은 소스, 같은 값"
+  echo "✅ x86_64: Vendor and Auditor reproduce - same source, same values"
 fi
 if [ "$(triplet vendor-x86)" = "$(triplet arm64-host)" ]; then
-  echo "❌ 이상 — x86_64 와 arm64 의 PCR 이 우연히 같다. GOARCH 가 실제로 안 바뀌었을 가능성 (측정값 캐시·빌드 스킵 등을 의심)."
+  echo "❌ anomaly - x86_64 and arm64 PCRs are identical. GOARCH may not have actually changed (suspect a cached measurement or a skipped build)."
   fail=1
 else
-  echo "✅ arm64: x86_64 와 다른 값 — 정상 (결함 아님)"
+  echo "✅ arm64: differs from x86_64 - expected (not a defect)"
 fi
-echo "next: 없음 — 이 스크립트가 이 테스트의 끝이다"
+echo "next: none - this script is the end of this test"
 exit $fail

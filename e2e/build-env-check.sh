@@ -1,28 +1,31 @@
 #!/usr/bin/env bash
-# 빌드 환경 선언 · 확인. Vendor 가 build-config.json 에 자기가 빌드한 환경(OS · CPU 아키텍처 · Go 툴체인 ·
-#    -trimpath)을 build_env 로 적어 두고, Auditor 는 받을 때 그것을 자기 인스턴스와 견준다. 다르면 거절(exit ≠ 0) —
-#    그 인스턴스에서는 Vendor 의 측정값이 나올 수 없고(PCR 은 아키텍처·Go 버전마다 갈린다), 그대로 빌드하면
-#    Vendor 가 거짓말한 것과 똑같아 보이기 때문이다. --ignore-env 면 경고만 하고 넘어간다.
+# Build-environment declaration and check. The Vendor records the environment it built in (OS, CPU architecture, Go
+#    toolchain, -trimpath) as build_env in build-config.json, and the Auditor compares it with its own instance on
+#    receipt. If they differ it refuses (exit != 0): that instance cannot produce the Vendor's measurement (PCRs differ
+#    per architecture and Go version), and building anyway would look exactly as if the Vendor had lied.
+#    With --ignore-env it only warns and carries on.
 #
-#    실제 인스턴스에서 실측한다. 각 호스트에 로컬 bare 저장소를 하나 만들어 Vendor 저장소로 쓰고(외부 git 원격 불필요),
-#    build-config.json 을 세 가지로 push 해 tb-auditor receive 의 판정을 본다:
-#      1. 다른 아키텍처를 선언  → 거절해야 한다 (x86_64 호스트에 arm64 라고, arm64 호스트에 amd64 라고)
-#      2. 같은 것 + --ignore-env → 경고만 하고 0
-#      3. 자기 아키텍처를 선언  → 통과, "build env matches" 가 찍힌다
-#    x86_64 는 VENDOR_HOST(V), arm64 는 ARM64_HOST(R) 에서 각각 돈다 — 거울처럼. ARM64_HOST 가 비어 있으면
-#    x86_64 쪽만 하고 그 사실을 알린다.
+#    Measured on real instances. On each host a local bare repository is created and used as the Vendor repository
+#    (no external git remote needed), and build-config.json is pushed in three variants to see the verdict of
+#    tb-auditor receive:
+#      1. declares another architecture -> must be refused (arm64 on the x86_64 host, amd64 on the arm64 host)
+#      2. same, with --ignore-env       -> only a warning, exit 0
+#      3. declares its own architecture -> passes, "build env matches" is printed
+#    x86_64 runs on VENDOR_HOST (V) and arm64 on ARM64_HOST (R), mirror-style. If ARM64_HOST is empty only the
+#    x86_64 side runs and that is reported.
 #
-#    Go 버전: 여기서 크로스컴파일한 tb-auditor 의 runtime.Version() 은 이 컴퓨터의 go 와 같으니, 설정값에는
-#    `go env GOVERSION` 을 그대로 적는다. 그래야 아키텍처 하나만 다르게 만들 수 있다.
-#    실행: TB-live 에서  bash "e2e/build-env-check.sh"
+#    Go version: the runtime.Version() of the tb-auditor cross-compiled here equals this machine's go, so the config
+#    gets `go env GOVERSION` as is. That way only the architecture can be made to differ.
+#    Run from TB-live:  bash "e2e/build-env-check.sh"
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
 . "$here/env.sh"
 
+need_host VENDOR_HOST
 GOVER=$(go env GOVERSION)
 
-# ▶ tb-auditor 를 아키텍처별로 크로스컴파일. -trimpath: 체크아웃 경로가 바이너리에 안 박히게.
+# Cross-compile tb-auditor per architecture. -trimpath: keeps the checkout path out of the binary.
 step "CROSS-BUILDING tb-auditor PER ARCHITECTURE ($GOVER)"
 declare -A GOARCH_OF=( [x86_64]=amd64 [arm64]=arm64 )
 mkdir -p "$WORK/arch"
@@ -33,7 +36,7 @@ done
 host_of() { case $1 in V) echo "$VENDOR_HOST";; A) echo "$AUDITOR_HOST";; R) echo "$ARM64_HOST";; esac; }
 
 fail=0
-# check_on <ssh-func> <label> <arch> — 그 호스트에서 세 판정을 돌린다. 원격 스크립트는 실패한 판정 수를 exit 코드로 돌려준다.
+# check_on <ssh-func> <label> <arch> - run the three verdicts on that host. The remote script returns the number of wrong verdicts as its exit code.
 check_on() {
   sshf=$1; label=$2; arch=$3
   mine=${GOARCH_OF[$arch]}
@@ -44,7 +47,7 @@ check_on() {
 set -uo pipefail
 step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "\$1"; shift; "\$@"; }
 chmod +x tb-auditor
-rm -rf g4 && mkdir g4 && cd g4
+rm -rf build-env-check && mkdir build-env-check && cd build-env-check
 git init -q --bare --initial-branch=main remote.git
 git clone -q remote.git work
 git -C work config user.email t@t; git -C work config user.name t
@@ -52,7 +55,7 @@ echo 'package main' > work/main.go
 git -C work add main.go; git -C work commit -qm seed; git -C work push -q -u origin main
 seed=\$(git -C work rev-parse HEAD)
 
-# push_cfg <arch> <trimpath> — build-config.json 하나를 새 커밋으로 push
+# push_cfg <arch> <trimpath> - push one build-config.json as a new commit
 push_cfg() {
   cat > work/build-config.json <<CFG
 {
@@ -111,7 +114,7 @@ check_on V "Vendor (x86_64)" x86_64
 if [ -n "$ARM64_HOST" ]; then
   check_on R "arm64 comparison host" arm64
 else
-  echo "ARM64_HOST 가 비어 있다 — arm64 쪽 거울 검사는 건너뛴다 (e2e/env.sh 에 IP를 적으면 돈다)."
+  echo "ARM64_HOST is empty - skipping the arm64 mirror check (set it in e2e/env.local.sh to run it)."
 fi
 
 echo
@@ -121,5 +124,5 @@ if [ $fail -eq 0 ]; then
 else
   echo "❌ $fail verdict(s) wrong — see the ❌ lines above"
 fi
-echo "next: 없음 — 이 스크립트가 이 테스트의 끝이다"
+echo "next: none - this script is the end of this test"
 exit $fail

@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
-# 내 컴퓨터에 e2e 를 돌리는 데 필요한 것들을 설치한다: git, ssh 클라이언트, Go (internal/setup/build/GO_TOOLCHAIN 에 고정된 버전).
-# 이미 있는 건 다시 안 깐다 — 몇 번 돌려도 안전하다. 아래 것들을 자동으로 구분해서 각자 맞는 방법으로 설치한다:
-#   - Ubuntu/Debian 계열 (apt)
-#   - Fedora/RHEL/Amazon Linux 계열 (dnf)
-#   - mac (Homebrew — 없으면 설치 안내만 하고 https://brew.sh 로 보냄)
-#   - Windows (Git Bash) — git·ssh 는 Git for Windows 에 이미 들어있어서 보통 자동으로 통과되고, Go 만 winget 으로 설치
-#    실행: bash "e2e/0-Setup-local-install.sh"
+# Installs what the e2e scripts need on your machine: git, an ssh client, and Go (the version pinned in
+# internal/setup/build/GO_TOOLCHAIN). Anything already present is left alone, so it is safe to run repeatedly.
+# The environment is detected automatically and each case uses its own installer:
+#   - Ubuntu/Debian family (apt)
+#   - Fedora/RHEL/Amazon Linux family (dnf)
+#   - macOS (Homebrew; if missing, only prints instructions and points to https://brew.sh)
+#   - Windows (Git Bash): git and ssh ship with Git for Windows so they normally pass; only Go is installed, via winget
+#    Run: bash "e2e/0-Setup-local-install.sh"
 set -euo pipefail
 
-# 정확히 이 버전 — 다르면 재현빌드 값이 안 맞는다. 더 낮아도, 더 높아도 다시 이걸로 맞춘다.
-# 버전은 여기 적지 않는다: internal/setup/build/GO_TOOLCHAIN 파일이 유일한 출처다 (tb 바이너리도 같은 파일을
-# 안에 품고 빌드 때 검사한다). 바꾸려면 그 파일만 고친다.
+# Exactly this version - any other one (lower or higher) breaks the reproducible-build values, so it is forced back here.
+# The version is not written here: the file internal/setup/build/GO_TOOLCHAIN is the only source (the tb binary
+# also embeds that file and checks it at build time). To change it, edit only that file.
 here="$(cd "$(dirname "$0")" && pwd)"
 GO_VERSION="$(sed 's/^go//' "$here/../internal/setup/build/GO_TOOLCHAIN" | tr -d '[:space:]')"
 
-# -- 환경 구분 --
+# -- detect environment --
 OS_KIND=unknown
 case "$(uname -s)" in
   Linux*)
@@ -26,22 +27,22 @@ case "$(uname -s)" in
   Darwin*) OS_KIND=mac ;;
   MINGW*|MSYS*|CYGWIN*) OS_KIND=windows ;;
 esac
-echo "== 감지된 환경: $(uname -s) → $OS_KIND"
+echo "== detected environment: $(uname -s) -> $OS_KIND"
 
 go_version_ok() {
-  # "이상"이 아니라 정확히 일치 — 재현빌드 대조에는 컴파일러 버전이 정확히 같아야 한다.
+  # Exact match, not "at least" - the reproducible-build comparison needs the identical compiler version.
   command -v go >/dev/null 2>&1 || return 1
   have="$(go version | awk '{print $3}' | sed 's/^go//')"
   [ "$have" = "$GO_VERSION" ]
 }
 
 install_go_tarball() {
-  # apt/dnf/yum 공통 — apt 리포의 golang 패키지는 버전이 오래된 경우가 많아서, 공식 tar.gz 로 직접 받는다.
+  # Shared by apt/dnf/yum - the golang package in apt repos is often outdated, so fetch the official tar.gz directly.
   local os arch tarball url tmp
   os="$1"; arch="$2"
   tarball="go${GO_VERSION}.${os}-${arch}.tar.gz"
   url="https://go.dev/dl/${tarball}"
-  echo "== Go $GO_VERSION 받는 중: $url"
+  echo "== downloading Go $GO_VERSION: $url"
   tmp=$(mktemp -d)
   curl -fsSL "$url" -o "$tmp/$tarball"
   sudo rm -rf /usr/local/go
@@ -49,46 +50,46 @@ install_go_tarball() {
   rm -rf "$tmp"
   if ! grep -q '/usr/local/go/bin' "$HOME/.bashrc" 2>/dev/null; then
     echo 'export PATH=$PATH:/usr/local/go/bin' >> "$HOME/.bashrc"
-    echo "== ~/.bashrc 에 PATH 추가함 — 새 터미널을 열거나 'source ~/.bashrc' 해야 go 명령이 바로 보인다"
+    echo "== added PATH to ~/.bashrc - open a new terminal or run 'source ~/.bashrc' before the go command is visible"
   fi
   export PATH="$PATH:/usr/local/go/bin"
 }
 
 case "$OS_KIND" in
   apt)
-    echo "== git, ssh 클라이언트, 빌드 도구 설치 (apt)"
+    echo "== installing git, ssh client, build tools (apt)"
     sudo apt-get update -qq
     sudo apt-get install -y -qq git openssh-client ca-certificates curl build-essential
     if go_version_ok; then
-      echo "== Go 는 이미 충분한 버전 — 건너뜀"
+      echo "== Go is already at the right version - skipping"
     else
       install_go_tarball linux amd64
     fi
     ;;
   dnf|yum)
-    echo "== git, ssh 클라이언트 설치 ($OS_KIND)"
+    echo "== installing git and ssh client ($OS_KIND)"
     sudo "$OS_KIND" install -y -q git openssh-clients ca-certificates curl gcc make
     if go_version_ok; then
-      echo "== Go 는 이미 충분한 버전 — 건너뜀"
+      echo "== Go is already at the right version - skipping"
     else
       install_go_tarball linux amd64
     fi
     ;;
   mac)
     if command -v git >/dev/null 2>&1; then
-      echo "== git 은 이미 있음 (mac 기본 제공) — 건너뜀"
+      echo "== git already present (ships with macOS) - skipping"
     elif command -v brew >/dev/null 2>&1; then
-      echo "== git 설치 (Homebrew)"
+      echo "== installing git (Homebrew)"
       brew install git
     else
-      echo "git 이 없고 Homebrew 도 없습니다. https://brew.sh 에서 Homebrew 를 설치하거나 git 을 직접 설치해 주세요."
+      echo "git and Homebrew are both missing. Install Homebrew from https://brew.sh or install git yourself."
       exit 1
     fi
     if go_version_ok; then
-      echo "== Go 는 이미 정확히 $GO_VERSION — 건너뜀"
+      echo "== Go is already exactly $GO_VERSION - skipping"
     else
-      # brew 는 항상 최신 버전만 받아서, --version 으로 정확히 고정할 수 없다 — go.dev 공식 pkg 로 직접 받는다.
-      echo "== Go $GO_VERSION 받는 중 (공식 pkg, Homebrew 는 버전 고정이 안 돼서 안 씀)"
+      # brew only installs the latest version and cannot pin one - fetch the official pkg from go.dev instead.
+      echo "== downloading Go $GO_VERSION (official pkg; Homebrew cannot pin a version, so it is not used)"
       tmp=$(mktemp -d)
       curl -fsSL "https://go.dev/dl/go${GO_VERSION}.darwin-$(uname -m | sed 's/x86_64/amd64/').pkg" -o "$tmp/go.pkg"
       sudo installer -pkg "$tmp/go.pkg" -target /
@@ -97,56 +98,56 @@ case "$OS_KIND" in
     fi
     ;;
   windows)
-    echo "== Git Bash 안에는 git·ssh·bash 가 이미 들어있어서 따로 설치 안 함"
+    echo "== Git Bash already bundles git, ssh and bash - nothing to install"
     if go_version_ok; then
-      echo "== Go 는 이미 정확히 $GO_VERSION — 건너뜀"
+      echo "== Go is already exactly $GO_VERSION - skipping"
     elif command -v winget >/dev/null 2>&1; then
-      # Go 의 공식 설치 프로그램(.msi)은 Program Files 에 깔리는 머신 전체용이라, 항상 관리자 권한이 필요하다
-      # (winget 에 사용자 권한 설치 옵션 자체가 없다). 관리자가 아니면 미리 알려주고 여기서 멈춘다 — 안 그러면
-      # winget 이 알아보기 힘든 에러(1603/1618)만 남기고 실패한다.
+      # Go's official installer (.msi) is machine-wide under Program Files, so it always needs administrator rights
+      # (winget has no per-user option for it). If not elevated, say so and stop here - otherwise winget fails with an
+      # obscure error (1603/1618).
       if ! net session >/dev/null 2>&1; then
-        echo "Go 설치는 관리자 권한이 필요합니다 (Go 의 설치 프로그램 자체가 그렇게 만들어져 있음)."
-        echo "관리자 권한으로 Git Bash 나 PowerShell 을 새로 열어서 (시작 메뉴에서 검색 → 오른쪽 클릭 →"
-        echo "'관리자 권한으로 실행') 이 스크립트를 다시 실행해 주세요."
+        echo "Installing Go needs administrator rights (that is how the Go installer is built)."
+        echo "Open a new Git Bash or PowerShell as administrator (search in the Start menu, right-click,"
+        echo "'Run as administrator') and run this script again."
         exit 1
       fi
-      echo "== Go $GO_VERSION 설치 (winget, 버전 고정 — --version 없이는 winget 이 그냥 최신을 받는다)"
+      echo "== installing Go $GO_VERSION (winget, version pinned - without --version winget just takes the latest)"
       winget install --id GoLang.Go --version "$GO_VERSION" --silent --accept-package-agreements --accept-source-agreements
-      echo "새 Git Bash 창을 열어야 PATH 에 go 가 잡힙니다."
+      echo "Open a new Git Bash window so go shows up on PATH."
     else
-      echo "winget 이 없습니다. https://go.dev/dl 에서 Go $GO_VERSION 설치 파일을 받아 직접 설치해 주세요."
+      echo "winget is missing. Download the Go $GO_VERSION installer from https://go.dev/dl and install it yourself."
       exit 1
     fi
     ;;
   *)
-    echo "환경을 자동으로 못 알아봤습니다. 아래를 직접 설치해 주세요:"
-    echo "  git, openssh 클라이언트, Go ${GO_VERSION}+ (https://go.dev/dl)"
+    echo "Could not detect the environment. Please install these yourself:"
+    echo "  git, an openssh client, Go ${GO_VERSION} (https://go.dev/dl)"
     exit 1
     ;;
 esac
 
 echo
-echo "== 설치 확인"
+echo "== verifying install"
 git --version
 ssh -V
-# 방금 이 창 안에서 처음 설치했으면, Windows 는 이미 열려 있는 창의 PATH 를 새로고침 안 해서 'go' 가
-# 아직 안 잡힐 수 있다 — PATH 말고 각 설치 방식이 실제로 파일을 두는 자리를 직접 찾아본다.
+# If Go was just installed in this very window, Windows does not refresh PATH of an already-open window, so
+# 'go' may not be found yet - look in the places each install method actually puts the file instead of PATH.
 GOBIN=go
 for cand in /usr/local/go/bin/go "/c/Program Files/Go/bin/go.exe"; do
   [ -x "$cand" ] && GOBIN="$cand" && break
 done
 if ! "$GOBIN" version >/dev/null 2>&1; then
-  echo "Go 는 방금 설치됐지만 이 창에는 아직 안 잡힙니다 — 새 Git Bash 창을 열어서"
-  echo "'go version'으로 확인해 주세요 (설치 자체는 끝났습니다)."
+  echo "Go was just installed but this window cannot see it yet - open a new Git Bash window and"
+  echo "check with 'go version' (the install itself is done)."
   exit 0
 fi
 "$GOBIN" version
 HAVE_GO="$("$GOBIN" version | awk '{print $3}' | sed 's/^go//')"
 if [ "$HAVE_GO" != "$GO_VERSION" ]; then
   echo
-  echo "⚠ Go 버전이 정확히 $GO_VERSION 이 아니라 $HAVE_GO 입니다 — 재현빌드 대조를 하려면 정확히 맞아야 합니다."
-  echo "  GOTOOLCHAIN=go${GO_VERSION} 를 앞에 붙여서 실행하면 이번만 강제로 맞출 수 있습니다."
+  echo "WARNING: Go is $HAVE_GO, not exactly $GO_VERSION - it must match exactly for the reproducible-build comparison."
+  echo "  Prefix the command with GOTOOLCHAIN=go${GO_VERSION} to force it for this run only."
   exit 1
 fi
 echo
-echo "준비 끝 — Go $GO_VERSION 정확히 확인됨. 다음: bash e2e/0-Setup-local-upload.sh"
+echo "Ready - Go $GO_VERSION confirmed exactly. Next: bash e2e/0-Setup-local-upload.sh"

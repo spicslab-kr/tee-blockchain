@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# 조작 · Vendor — Auditor 가 준 이미지 대신 다른 이미지를 몰래 띄운다. 여기, 내 컴퓨터에서 실행 — 실제 교체는
-#    Vendor 인스턴스 안에서 자동으로 접속해 실행된다. (정상 흐름 2-Vendor-launch-check-record 까지 끝난 뒤)
-#    다음: 5-User-tamper-verify   → ✗ nobody … not trusted
-#    실행: bash "e2e/flow1-auditor-registers/4-Vendor-tamper-swap-enclave.sh"
+# Tamper, Vendor - secretly launches a different image instead of the one the Auditor handed over. Run here, on my machine -
+#    the actual swap runs inside the Vendor instance, connected to automatically. (After the normal flow through 2-Vendor-launch-check-record)
+#    Next: 5-User-tamper-verify   -> ✗ nobody ... not trusted
+#    Run: bash "e2e/flow1-auditor-registers/4-Vendor-tamper-swap-enclave.sh"
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
+need_host VENDOR_HOST
 
 nitroBanner "Vendor"
 V 'bash -s' <<'REMOTE'
@@ -15,7 +16,7 @@ step_stop() { :; }
 step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; shift; "$@"; }
 umask 022
 mkdir -p tampered
-# 준비 — 조작 데모용으로 작은 이미지 하나를 직접 만든다. Auditor 는 이 이미지를 본 적이 없다.
+# Build a small image of our own for the tamper demo. The Auditor has never seen this image.
 cat > tampered/Dockerfile <<'DOCKER'
 FROM alpine:3.20
 RUN echo "not the audited image" > /etc/tb-tampered
@@ -23,16 +24,16 @@ CMD ["sleep", "1000000"]
 DOCKER
 step "BUILDING TAMPERED IMAGE" sudo docker build -q -t tampered:latest tampered
 
-# ▶ 우리가 만든 tb 명령 — 이 도커 이미지를 엔클레이브 이미지(EIF)로 포장한다.
+# tb command - packs this docker image into an enclave image (EIF).
 step "PACKING IMAGE" ./tb-vendor pack --image tampered:latest --name tampered --out out-tampered
 
-# 준비 — 인스턴스 하나가 가진 엔클레이브 자원은 하나 분량이라, 먼저 내리고 바꿔 띄운다.
+# An instance has resources for only one enclave, so stop the old one first and then launch the replacement.
 step_start "STOPPING PREVIOUS ENCLAVE"
 sudo nitro-cli terminate-enclave --all >/dev/null 2>&1 || true
 pkill -x tb-vendor || true
 step_stop "STOPPING PREVIOUS ENCLAVE"
 
-# ▶ 우리가 만든 tb 명령 — 그 조작된 이미지를 내 TEE 에 띄운다 (Auditor 가 준 것 대신).
+# tb command - launches that tampered image in my TEE (instead of the one the Auditor gave).
 step "LAUNCHING TAMPERED ENCLAVE" ./tb-vendor launch --eif out-tampered/tampered.eif
 
 echo

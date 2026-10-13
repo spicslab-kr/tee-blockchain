@@ -1,35 +1,39 @@
 #!/usr/bin/env bash
-# 빌드 환경 표기 확인. 같은 소스도 x86_64 와 arm64 에서 PCR 이 다르다는 걸 실측했고 Go 툴체인이 달라도 다르니, 이제 등록과
-#    전달 기록(measurement-record.json)이 "어느 아키텍처·어느 툴체인 것인지"(build_env)를 말하는지 본다. 체인 Entry 는 그대로다 —
-#    측정값 해시가 아키텍처마다 이미 다르니 키는 저절로 갈린다. 여기서 보는 것은 세 가지뿐이고, 트랜잭션은 하나도 안 보낸다.
-#      1. 흐름 스크립트가 쓰는 uname -m → GOARCH 매핑이 실제 인스턴스에서 맞게 나오는지 (x86 Vendor → amd64, arm64 호스트 → arm64)
-#      2. tb-auditor send 가 build_env 없는 기록을 거절하고, 있는 기록은 그 빌드 환경을 한 줄로 찍고 (로컬 bare 저장소로) 실제로 보내는지
-#         — 그리고 --record 없이 --config(build-config.json) + --measurements(measurements.json) 로 기록을 직접 만들어 보내는지
-#      3. tb-auditor register 가 uname 철자(x86_64)를 거절하는지 — 거절은 키를 읽기도, 체인에 붙기도 전에 난다
-#    register --arch arm64 가 실제로 등록되는 것은 체인 트랜잭션이라 여기서는 안 본다 (cmd/buildenv_record_e2e_test.go 가 anvil 로 본다).
+# Build-environment record check. The same source gives different PCRs on x86_64 and arm64 (measured), and a different Go
+#    toolchain changes them too, so this checks that the registration and the handoff record (measurement-record.json) say
+#    which architecture and toolchain they came from (build_env). The on-chain Entry is unchanged - the measurement hash
+#    already differs per architecture, so the keys separate by themselves. Only three things are checked, and no
+#    transaction is sent:
+#      1. the uname -m -> GOARCH mapping used by the flow scripts comes out right on the real instances (x86 Vendor -> amd64, arm64 host -> arm64)
+#      2. tb-auditor send refuses a record without build_env, and for a record with it prints the build environment on one
+#         line and really sends it (to a local bare repository), and also builds the record itself from --config
+#         (build-config.json) + --measurements (measurements.json) without --record
+#      3. tb-auditor register refuses the uname spelling (x86_64) - the refusal happens before reading the key or touching the chain
+#    That register --arch arm64 really registers is a chain transaction and is not checked here (cmd/buildenv_record_e2e_test.go checks it with anvil).
 #
-#    필요: ARM64_HOST 가 e2e/env.sh 에 있어야 1 번을 arm64 쪽까지 본다. 비어 있으면 x86 쪽만 보고 안내만 찍는다.
-#    실행: TB-live 에서  bash "e2e/arch-record-check.sh"
+#    Needs: ARM64_HOST in e2e/env.local.sh to check item 1 on the arm64 side too. If empty, only x86 is checked and a notice is printed.
+#    Run from TB-live:  bash "e2e/arch-record-check.sh"
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
 . "$here/env.sh"
 
+need_host VENDOR_HOST
 fail=0
 
-# 준비 — 흐름 스크립트(flow1/flow2 의 1-*.sh)와 똑같은 매핑. uname 철자를 tb 가 쓰는 GOARCH 철자로.
+# Same mapping as the flow scripts (the 1-*.sh in flow1/flow2): uname spelling to the GOARCH spelling tb uses.
 goarch_of() { case "$1" in x86_64) echo amd64;; aarch64|arm64) echo arm64;; *) echo "";; esac; }
 
-# 1. 실제 인스턴스에서 uname -m 을 받아 매핑 — 흐름 스크립트가 measurement-record.json 에 적을 값이 이렇게 나온다.
+# 1. Take uname -m from the real instance and map it - this is the value the flow scripts write into measurement-record.json.
 check_host() {  # <ssh-func> <label> <expected GOARCH>
   sshf=$1; label=$2; want=$3
   step "ARCH OF $label"
   raw=$($sshf 'uname -m' 2>/dev/null | tr -d '\r\n')
   got=$(goarch_of "$raw")
   if [ "$got" = "$want" ]; then
-    echo "✅ $label: uname -m = $raw → arch $got"
+    echo "✅ $label: uname -m = $raw -> arch $got"
   else
-    echo "❌ $label: uname -m = '$raw' → arch '$got', expected $want"
+    echo "❌ $label: uname -m = '$raw' -> arch '$got', expected $want"
     fail=1
   fi
 }
@@ -37,16 +41,16 @@ check_host V "Vendor (x86_64)" amd64
 if [ -n "$ARM64_HOST" ]; then
   check_host R "arm64 host" arm64
 else
-  echo "ARM64_HOST 가 비어 있다 — arm64 쪽 매핑은 건너뛴다 (e2e/env.sh 에 적으면 같이 본다)."
+  echo "ARM64_HOST is empty - skipping the arm64 mapping (set it in e2e/env.local.sh to check it too)."
 fi
 
-# 2. send — 로컬 bare 저장소를 상대로, 네트워크·체인 없이 끝까지. 흐름 1 의 handoff 가 Go 스키마로 보낼 때 그대로다.
-#    기록의 build_env.go 는 이 컴퓨터의 Go 로 적는다 — tb 바이너리를 만든 그 Go 다 (0-Setup 이 고정된 것만 받는다).
+# 2. send - against a local bare repository, end to end with no network or chain. Same as what the flow 1 handoff sends with the Go schema.
+#    The record's build_env.go is this machine's Go - the Go that built the tb binaries (0-Setup accepts only the pinned one).
 GOVER=$(go env GOVERSION)
 step "SEND: RECORD WITHOUT BUILD_ENV IS REFUSED"
 WD="$WORK/build-env-check"; rm -rf "$WD"; mkdir -p "$WD"
 printf 'eif-bytes' > "$WD/svc.eif"
-pcr_b64() { head -c 48 /dev/zero | tr '\0' "$1" | base64 | tr -d '\n'; }   # 준비 — 기록 파일의 values 는 base64 바이트
+pcr_b64() { head -c 48 /dev/zero | tr '\0' "$1" | base64 | tr -d '\n'; }   # the values in the record file are base64 bytes
 write_record() {  # <path> <build_env-line or empty>
   cat > "$1" <<EOF
 {
@@ -70,9 +74,9 @@ git init --quiet --bare --initial-branch=main "$WD/remote-a.git"
 out=$("$TBA" send --repo "$WD/remote-a.git" --record "$WD/no-build-env.json" --image "$WD/svc.eif" 2>&1); rc=$?
 echo "$out" | sed 's/^/  /'
 if [ $rc -ne 0 ] && echo "$out" | grep -q 'build_env.arch: want one of amd64|arm64' && echo "$out" | grep -q 'build_env.go'; then
-  echo "✅ send: build_env 없는 기록은 거절 — 메시지가 build_env 를 지목한다 (exit $rc)"
+  echo "✅ send: a record without build_env is refused - the message names build_env (exit $rc)"
 else
-  echo "❌ send: build_env 없는 기록이 거절되지 않았거나, 메시지가 build_env 를 지목하지 않는다 (exit $rc)"
+  echo "❌ send: a record without build_env was not refused, or the message does not name build_env (exit $rc)"
   fail=1
 fi
 
@@ -83,14 +87,14 @@ git init --quiet --bare --initial-branch=main "$WD/remote-b.git"
 out=$("$TBA" send --repo "$WD/remote-b.git" --record "$WD/with-build-env.json" --image "$WD/svc.eif" 2>&1); rc=$?
 echo "$out" | sed 's/^/  /'
 if [ $rc -eq 0 ] && echo "$out" | grep -q "build env: linux/amd64 $GOVER trimpath=true" && git -C "$WD/remote-b.git" show HEAD:measurement-record.json 2>/dev/null | grep -q '"build_env"'; then
-  echo "✅ send: build env: linux/amd64 $GOVER trimpath=true 를 찍고, push 된 measurement-record.json 에도 build_env 가 실려 있다"
+  echo "✅ send: printed build env: linux/amd64 $GOVER trimpath=true, and the pushed measurement-record.json carries build_env"
 else
-  echo "❌ send: exit $rc — build env 가 안 찍혔거나, push 된 기록에 build_env 가 없다"
+  echo "❌ send: exit $rc - build env was not printed, or the pushed record has no build_env"
   fail=1
 fi
 
-# 2b. send --config --measurements — 기록을 손으로 쓰지 않고 build-config.json 과 nitro-cli 의 measurements.json 에서 만든다.
-#     push 된 기록의 service · build_env 는 config 그대로여야 한다.
+# 2b. send --config --measurements - the record is not written by hand but built from build-config.json and nitro-cli's measurements.json.
+#     The pushed record's service and build_env must be exactly those of the config.
 step "SEND: RECORD BUILT FROM BUILD-CONFIG AND MEASUREMENTS"
 pcr_hex() { head -c 48 /dev/zero | tr '\0' "$1" | od -An -v -tx1 | tr -d ' \n'; }
 cat > "$WD/build-config.json" <<EOF
@@ -114,27 +118,27 @@ pushed=$(git -C "$WD/remote-c.git" show HEAD:measurement-record.json 2>/dev/null
 if [ $rc -eq 0 ] && echo "$out" | grep -q "record $SERVICE $VERSION aws · build env: linux/arm64 $GOVER trimpath=true" \
    && echo "$pushed" | grep -q "\"service\": \"$SERVICE\"" && echo "$pushed" | grep -q '"arch": "arm64"' && echo "$pushed" | grep -q "\"go\": \"$GOVER\"" \
    && [ -f "$WD/measurement-record.json" ]; then
-  echo "✅ send --config --measurements: 기록을 만들어 보냈고, push 된 기록의 service · build_env 가 build-config.json 그대로다 (measurement-record.json 도 measurements.json 옆에 남는다)"
+  echo "✅ send --config --measurements: built and sent the record; the pushed record's service and build_env are exactly those of build-config.json (measurement-record.json is also left next to measurements.json)"
 else
-  echo "❌ send --config --measurements: exit $rc — 기록이 안 만들어졌거나, push 된 기록의 service · build_env 가 config 와 다르다"
+  echo "❌ send --config --measurements: exit $rc - the record was not built, or the pushed record's service/build_env differ from the config"
   fail=1
 fi
 
-# 3. register — uname 철자 거절. 필수 플래그는 다 주되, --arch 검사는 키 파일을 읽기 전·체인에 붙기 전에 나니 아무 데도 안 간다.
+# 3. register - the uname spelling is refused. All required flags are given, but the --arch check runs before the key file is read or the chain is touched, so nothing is contacted.
 step "REGISTER: --arch x86_64 IS REFUSED BEFORE TOUCHING THE CHAIN"
 pcr_hex() { head -c 48 /dev/zero | tr '\0' "$1" | od -An -v -tx1 | tr -d ' \n'; }
 out=$("$TBA" register --rpc http://127.0.0.1:1 --contract 0x0000000000000000000000000000000000000001 --key-file "$WD/no-such.key" \
   --measurements "PCR0=$(pcr_hex 1),PCR1=$(pcr_hex 2),PCR2=$(pcr_hex 3)" --service "$SERVICE" --version "$VERSION" --arch x86_64 2>&1); rc=$?
 echo "$out" | sed 's/^/  /'
 if [ $rc -ne 0 ] && echo "$out" | grep -q -- '--arch: want one of amd64|arm64'; then
-  echo "✅ register: x86_64 는 거절 — amd64 라고 써야 한다고 알려준다 (exit $rc)"
+  echo "✅ register: x86_64 is refused - it says to write amd64 (exit $rc)"
 else
-  echo "❌ register: --arch x86_64 가 거절되지 않았거나 메시지가 다르다 (exit $rc)"
+  echo "❌ register: --arch x86_64 was not refused, or the message differs (exit $rc)"
   fail=1
 fi
 
 echo
 echo "===================== build env record check ====================="
-[ $fail -eq 0 ] && echo "✅ 모두 통과 — 기록과 등록 출력이 빌드 환경(아키텍처·Go 툴체인)을 말한다" || echo "❌ 실패한 항목이 있다 (위 ❌ 참고)"
-echo "next: 없음 — 이 스크립트가 이 테스트의 끝이다"
+[ $fail -eq 0 ] && echo "✅ all passed - the record and registration output state the build environment (architecture, Go toolchain)" || echo "❌ some checks failed (see the ❌ lines above)"
+echo "next: none - this script is the end of this test"
 exit $fail
