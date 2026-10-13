@@ -4,7 +4,7 @@
 
 <h1 align="center">Attestamp</h1>
 
-<p align="center"><b>Remote attestation you can check against a public ledger.</b></p>
+<p align="center"><b>Remote attestation that makes the hash of the code running in a TEE trustworthy.</b></p>
 
 <p align="center">
   <sub>CREATED AND MAINTAINED BY</sub><br>

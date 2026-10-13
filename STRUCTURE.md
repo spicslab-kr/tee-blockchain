@@ -30,7 +30,7 @@ This page lists every folder in the repository, then explains the one idea that 
 │   ├── setup/              getting an enclave image built and running
 │   │   ├── build/          reproducible image build, reproducibility scan, toolchain and responder checks
 │   │   └── launch/         start the enclave, bridge the port, measure it
-│   ├── chain/              the public ledger
+│   ├── chain/              the Ethereum side: register and look up measurements
 │   │   ├── register/       sign a measurement (EIP-712) and write it to the registry contract
 │   │   └── lookup/         read registrations back (read only)
 │   ├── core/               logic that is about measurements, not about a platform or a chain
