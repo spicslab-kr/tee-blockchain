@@ -80,7 +80,7 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	contract, _, err := audether.Deploy(ctx, "", client, deployerKey, auditorAddr)
+	registryAddr, _, err := audether.Deploy(ctx, "", client, deployerKey, auditorAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 		{Name: "PCR1", Value: bytes.Repeat([]byte{0x22}, 48)},
 	}
 	expires := time.Now().Add(time.Hour).Truncate(time.Second)
-	registrar := audether.Registrar{Backend: client, Contract: contract, SenderKey: auditorKey}
+	registrar := audether.Registrar{Backend: client, RegistryAddr: registryAddr, SenderKey: auditorKey}
 	meta := aud.Meta{Meta: al.Meta{Service: "svc", Version: "1.0.0", Platform: lether.DefaultPlatform, Arch: "amd64"}, Expires: expires}
 	signed, err := registrar.Sign(aValues, meta, auditorKey)
 	if err != nil {
@@ -106,12 +106,12 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 		values[i] = p.Measurement{Name: m.Name, Value: m.Value}
 	}
 
-	reader := lether.Reader{Contract: contract, Backend: client}
-	regInfo, err := reader.Lookup(ctx, receipt.Key)
+	reader := lether.Reader{RegistryAddr: registryAddr, Backend: client}
+	regInfo, err := reader.Lookup(ctx, receipt.RecordKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	trusted, err := reader.TrustedSigners(ctx)
+	trustedApprovers, err := reader.TrustedApprovers(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,22 +120,22 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 		t.Fatalf("Lookup did not fill in ChainTime: %+v", regInfo)
 	}
 	// The real call path: now is the lookup block's time, not the local clock.
-	if v := (Impl{}).Check(values, regInfo, Clock(regInfo), trusted); !v.Pass {
+	if v := (Impl{}).Check(values, regInfo, Clock(regInfo), trustedApprovers); !v.Pass {
 		t.Fatalf("exactly the registered value failed: %+v", v)
 	}
 
 	other := p.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x99}, 48)}}
-	if v := (Impl{}).Check(other, regInfo, time.Now().Unix(), trusted); v.Pass {
+	if v := (Impl{}).Check(other, regInfo, time.Now().Unix(), trustedApprovers); v.Pass {
 		t.Fatal("a different measurement passed")
 	}
 
 	future := expires.Add(time.Hour).Unix()
-	if v := (Impl{}).Check(values, regInfo, future, trusted); v.Pass {
+	if v := (Impl{}).Check(values, regInfo, future, trustedApprovers); v.Pass {
 		t.Fatal("a time past expiry passed")
 	}
 
 	if v := (Impl{}).Check(values, regInfo, time.Now().Unix(), []string{"0x0000000000000000000000000000000000000001"}); v.Pass {
-		t.Fatal("a signer outside the trusted list passed")
+		t.Fatal("a approver outside the trusted list passed")
 	}
 }
 
@@ -153,10 +153,10 @@ func TestClock_PrefersChainTime(t *testing.T) {
 
 // Expiry is judged on the chain clock: however slow the verifier's clock is, if the lookup block's time is past expiry the approval is dead.
 func TestCheck_ExpiryUsesChainClockNotLocal(t *testing.T) {
-	reg := l.Registration{Expires: 1_000, ChainTime: 2_000, Signer: "0x0000000000000000000000000000000000000001",
+	reg := l.Registration{Expires: 1_000, ChainTime: 2_000, Approver: "0x0000000000000000000000000000000000000001",
 		Values: p.Measurements{{Name: "measurementHash", Value: make([]byte, 32)}}}
 	// Even if the local clock is stuck in the past (500), Clock(reg) returns 2000 and Check treats the registration as expired.
-	v := (Impl{}).Check(p.Measurements{{Name: "PCR0", Value: []byte{1}}}, reg, Clock(reg), []string{reg.Signer})
+	v := (Impl{}).Check(p.Measurements{{Name: "PCR0", Value: []byte{1}}}, reg, Clock(reg), []string{reg.Approver})
 	found := false
 	for _, r := range v.Reason {
 		if r == "registration expired" {

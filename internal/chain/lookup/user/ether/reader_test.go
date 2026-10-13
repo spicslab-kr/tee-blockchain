@@ -57,7 +57,7 @@ func chain(t *testing.T, funded ...common.Address) *simulated.Backend {
 	return b
 }
 
-func TestReader_FindAddressAndLookup(t *testing.T) {
+func TestReader_FindRecordKeysAndLookup(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	auditorKey, auditorAddr := newKey(t)
 	client := chain(t, deployer, auditorAddr).Client()
@@ -76,7 +76,7 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 		{Name: "PCR2", Value: bytes.Repeat([]byte{0x33}, 48)},
 	}
 	expires := time.Now().Add(24 * time.Hour).Truncate(time.Second)
-	registrar := audether.Registrar{Backend: client, Contract: contract, SenderKey: auditorKey}
+	registrar := audether.Registrar{Backend: client, RegistryAddr: contract, SenderKey: auditorKey}
 	meta := aud.Meta{Meta: al.Meta{Service: "unit-test", Version: "0.1.0", Platform: DefaultPlatform, Arch: "arm64"}, Expires: expires}
 	signed, err := registrar.Sign(aValues, meta, auditorKey)
 	if err != nil {
@@ -93,21 +93,21 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 		uValues[i] = up.Measurement{Name: m.Name, Value: m.Value}
 	}
 
-	reader := Reader{Contract: contract, Backend: client}
+	reader := Reader{RegistryAddr: contract, Backend: client}
 
-	keys, err := reader.FindAddress(ctx, uValues)
+	keys, err := reader.FindRecordKeys(ctx, uValues)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(keys) != 1 || keys[0] != receipt.Key {
-		t.Fatalf("FindAddress = %v, want [%s]", keys, receipt.Key)
+	if len(keys) != 1 || keys[0] != receipt.RecordKey {
+		t.Fatalf("FindRecordKeys = %v, want [%s]", keys, receipt.RecordKey)
 	}
 
-	got, err := reader.Lookup(ctx, receipt.Key)
+	got, err := reader.Lookup(ctx, receipt.RecordKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Signer != auditorAddr.Hex() || got.Meta.Service != "unit-test" || got.Meta.Platform != DefaultPlatform || got.Expires != expires.Unix() {
+	if got.Approver != auditorAddr.Hex() || got.Meta.Service != "unit-test" || got.Meta.Platform != DefaultPlatform || got.Expires != expires.Unix() {
 		t.Fatalf("Lookup = %+v", got)
 	}
 	// chain clock used for the expiry decision: the time of the block that served the lookup. If 0, Check falls back to the local clock.
@@ -130,19 +130,19 @@ func TestReader_FindAddressAndLookup(t *testing.T) {
 
 	// unregistered value: empty slice.
 	other := up.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x99}, 48)}}
-	if got, err := reader.FindAddress(ctx, other); err != nil || len(got) != 0 {
-		t.Fatalf("FindAddress for an unregistered measurement = %v, %v", got, err)
+	if got, err := reader.FindRecordKeys(ctx, other); err != nil || len(got) != 0 {
+		t.Fatalf("FindRecordKeys for an unregistered measurement = %v, %v", got, err)
 	}
 
-	// unregistered key: error.
+	// unregistered record key: error.
 	if _, err := reader.Lookup(ctx, common.HexToHash("0x3039").Hex()); err == nil {
-		t.Fatal("an unregistered key should be an error")
+		t.Fatal("an unregistered record key should be an error")
 	}
 
-	// a key of the right length that is not hex: it must not silently become 0 and pass as "not registered"; it must be an error in itself.
+	// a record key of the right length that is not hex: it must not silently become 0 and pass as "not registered"; it must be an error in itself.
 	bad := "0x" + strings.Repeat("zz", 32)
 	if _, err := reader.Lookup(ctx, bad); err == nil {
-		t.Fatal("a non-hex key should be an error (it must not silently turn into 0)")
+		t.Fatal("a non-hex record key should be an error (it must not silently turn into 0)")
 	}
 }
 
@@ -162,7 +162,7 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 		t.Fatal(err)
 	}
 	aValues := ap.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x44}, 48)}}
-	registrar := audether.Registrar{Backend: client, Contract: contract, SenderKey: auditorKey}
+	registrar := audether.Registrar{Backend: client, RegistryAddr: contract, SenderKey: auditorKey}
 	meta := aud.Meta{Meta: al.Meta{Service: "chunk-test", Version: "0.1.0", Platform: DefaultPlatform, Arch: "amd64"}, Expires: time.Now().Add(time.Hour)}
 	signed, err := registrar.Sign(aValues, meta, auditorKey)
 	if err != nil {
@@ -177,8 +177,8 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 		sim.Commit()
 	}
 
-	reader := Reader{Contract: contract, Backend: client, LogRangeChunk: 1}
-	got, err := reader.Lookup(ctx, receipt.Key)
+	reader := Reader{RegistryAddr: contract, Backend: client, LogRangeChunk: 1}
+	got, err := reader.Lookup(ctx, receipt.RecordKey)
 	if err != nil {
 		t.Fatalf("scan failed when stepping back one chunk at a time: %v", err)
 	}

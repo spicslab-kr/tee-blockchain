@@ -26,10 +26,10 @@ func (ms Measurements) Get(name string) []byte {
 	return nil
 }
 
-// There is one Parser per platform. key is that platform's verification key (e.g. the Nitro root certificate PEM); if empty, the built-in one is used.
+// There is one Parser per platform. rootCert is that platform's root certificate (e.g. the Nitro root certificate PEM); if empty, the built-in one is used.
 type Parser interface {
 	// VerifySig checks that the platform signed the document: the signature and the certificate chain.
-	VerifySig(ctx context.Context, ra r.RADoc, key []byte) error
+	VerifySig(ctx context.Context, ra r.RADoc, rootCert []byte) error
 	// CheckNonce checks that the nonce inside the document is the one I sent.
 	CheckNonce(ra r.RADoc, nonce r.Nonce) error
 	// Parse extracts the measurements. It does not check the signature; run VerifySig first.

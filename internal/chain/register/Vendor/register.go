@@ -25,28 +25,28 @@ type Meta struct {
 type Signed struct {
 	Values    p.Measurements
 	Meta      Meta
-	Signer    string // address of the signing key; equals the value the contract recovers from the signature
+	Approver  string // address of the signing key; equals the value the contract recovers from the signature
 	Digest    []byte // the hash that was signed; must equal the contract's digest()
 	Signature []byte // 65 bytes, r‖s‖v
 }
 
-// Receipt confirms a registration. Key is the lookup coordinate.
+// Receipt confirms a registration. RecordKey locates it in the registry.
 type Receipt struct {
-	Key    string // 0x…, 32 bytes
+	RecordKey string // 0x…, 32 bytes
 	TxHash string
 	Block  uint64
 }
 
 type Registrar interface {
 	// Sign signs the measurements and registration info with the signing key. This signature is what says who registered.
-	Sign(values p.Measurements, meta Meta, key []byte) (Signed, error)
-	// Register sends the signed value to the contract, which checks the signer and then stores it.
+	Sign(values p.Measurements, meta Meta, signingKey []byte) (Signed, error)
+	// Register sends the signed value to the contract, which checks the approver and then stores it.
 	Register(ctx context.Context, s Signed) (Receipt, error)
 }
 
 var (
-	ErrNotAnApprover     = errors.New("signer is not the approver fixed in the contract")
-	ErrAlreadyRegistered = errors.New("this signer already registered this measurement")
+	ErrNotAnApprover     = errors.New("the approver is not the one fixed in the contract")
+	ErrAlreadyRegistered = errors.New("this approver already registered this measurement")
 	ErrExpiryPassed      = errors.New("expiry is not in the future by the chain's clock")
 )
 

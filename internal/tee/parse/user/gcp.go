@@ -12,7 +12,7 @@ type GCPParser struct{}
 
 var _ Parser = (*GCPParser)(nil)
 
-func (GCPParser) VerifySig(ctx context.Context, ra r.RADoc, key []byte) error {
+func (GCPParser) VerifySig(ctx context.Context, ra r.RADoc, rootCert []byte) error {
 	return errors.New("tee/parse/user: gcp VerifySig not implemented")
 }
 

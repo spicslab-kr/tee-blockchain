@@ -12,12 +12,12 @@ const SchemaMeasurementRecord = "attestamp.measurement-record/1"
 
 // MeasurementNames lists the required measurement names per platform.
 var MeasurementNames = map[string][]string{
-	"aws":   {"PCR0", "PCR1", "PCR2"},
-	"gcp":   {"image_digest"},
-	"azure": {}, // digest (container) or image_id (VM); see Image
+	"aws-nitro": {"PCR0", "PCR1", "PCR2"},
+	"gcp":       {"image_digest"},
+	"azure":     {}, // digest (container) or image_id (VM); see Image
 }
 
-// Image: aws is a file plus sha256, gcp is a digest, azure is a digest or an image_id.
+// Image: aws-nitro is a file plus sha256, gcp is a digest, azure is a digest or an image_id.
 type Image struct {
 	Path    string `json:"path,omitempty"`
 	SHA256  string `json:"sha256,omitempty"`
@@ -64,26 +64,26 @@ func (r MeasurementRecord) Validate() error {
 		errs = append(errs, "platform: unknown "+quote(r.Platform))
 	}
 	switch r.Platform {
-	case "aws":
+	case "aws-nitro":
 		// build_env: the record is what the Vendor reads to learn which architecture and which
-		// Go toolchain the measured image came from, so on aws it must be declared in full.
+		// Go toolchain the measured image came from, so on aws-nitro it must be declared in full.
 		if r.BuildEnv.OS == "" {
-			errs = append(errs, "build_env.os: required for aws")
+			errs = append(errs, "build_env.os: required for aws-nitro")
 		}
 		if !validArch(r.BuildEnv.Arch) {
 			errs = append(errs, "build_env.arch: want one of "+strings.Join(archNames(), "|")+" (GOARCH spelling), got "+quote(r.BuildEnv.Arch))
 		}
 		if r.BuildEnv.Go == "" {
-			errs = append(errs, "build_env.go: required for aws")
+			errs = append(errs, "build_env.go: required for aws-nitro")
 		}
 		if r.Image.Path == "" {
-			errs = append(errs, "image.path: EIF file required for aws")
+			errs = append(errs, "image.path: EIF file required for aws-nitro")
 		}
 		if !isHex(r.Image.SHA256, 64) {
 			errs = append(errs, "image.sha256: want 64 hex chars")
 		}
 		if r.BuildTool.Version == "" {
-			errs = append(errs, "build_tool.version: required for aws")
+			errs = append(errs, "build_tool.version: required for aws-nitro")
 		}
 	case "gcp":
 		if !isDigest(r.Image.Digest) {
@@ -95,7 +95,7 @@ func (r MeasurementRecord) Validate() error {
 		}
 	}
 	// as in build-config: an architecture the project does not build for is refused on any platform.
-	if r.Platform != "aws" && r.BuildEnv.Arch != "" && !validArch(r.BuildEnv.Arch) {
+	if r.Platform != "aws-nitro" && r.BuildEnv.Arch != "" && !validArch(r.BuildEnv.Arch) {
 		errs = append(errs, "build_env.arch: unknown "+quote(r.BuildEnv.Arch)+" (want one of "+archList()+")")
 	}
 	if len(r.Values) == 0 {

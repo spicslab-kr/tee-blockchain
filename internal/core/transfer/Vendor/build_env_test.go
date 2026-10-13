@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// build_env — aws must declare os/arch/go; arch must be one the project builds for.
+// build_env — aws-nitro must declare os/arch/go; arch must be one the project builds for.
 func TestBuildConfig_BuildEnvRequiredOnAWS(t *testing.T) {
 	for _, field := range []string{"os", "arch", "go"} {
 		c := cfgAWS()
@@ -19,13 +19,13 @@ func TestBuildConfig_BuildEnvRequiredOnAWS(t *testing.T) {
 			c.BuildEnv.Go = ""
 		}
 		if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "build_env."+field) {
-			t.Errorf("missing build_env.%s must be rejected on aws, got %v", field, err)
+			t.Errorf("missing build_env.%s must be rejected on aws-nitro, got %v", field, err)
 		}
 	}
 	c := cfgAWS()
 	c.BuildEnv = BuildEnv{}
 	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "build_env") {
-		t.Errorf("an old config without build_env must be rejected on aws, got %v", err)
+		t.Errorf("an old config without build_env must be rejected on aws-nitro, got %v", err)
 	}
 	c = cfgAWS()
 	c.BuildEnv.Trimpath = false

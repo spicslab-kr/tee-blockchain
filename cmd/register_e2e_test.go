@@ -147,7 +147,7 @@ func writeKeyFile(t *testing.T, dir, name, hexKey string) string {
 }
 
 var deployedAtRe = regexp.MustCompile(`Registry deployed at (0x[0-9a-fA-F]{40})`)
-var keyLineRe = regexp.MustCompile(`key\s+(0x[0-9a-fA-F]{64})`)
+var recordKeyLineRe = regexp.MustCompile(`record key\s+(0x[0-9a-fA-F]{64})`)
 
 func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
@@ -166,67 +166,67 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	auditorBin := buildBin(t, bins, "./cmd/auditor")
 	vendorBin := buildBin(t, bins, "./cmd/vendor")
 
-	// 1. deploy the contract: one signer per contract, each role deploys its own. Anyone may send the transaction,
+	// 1. deploy the contract: one approver per registry, each role deploys its own. Anyone may send the transaction,
 	// here it is the deployer key.
 	deployFor := func(bin, approver string) string {
-		deploy := exec.Command(bin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--approver", approver)
+		deploy := exec.Command(bin, "registry-deploy", "--rpc", rpc, "--deployer-key-file", deployerFile, "--approver", approver)
 		out, err := deploy.CombinedOutput()
 		if err != nil {
 			t.Fatalf("registry-deploy: %v\n%s", err, out)
 		}
 		m := deployedAtRe.FindSubmatch(out)
 		if m == nil {
-			t.Fatalf("contract address not found:\n%s", out)
+			t.Fatalf("registry address not found:\n%s", out)
 		}
 		if !strings.Contains(string(out), "approver "+approver) {
 			t.Fatalf("approver not shown in the deploy output:\n%s", out)
 		}
 		return string(m[1])
 	}
-	contract := deployFor(auditorBin, auditorAddr)
-	vContract := deployFor(vendorBin, vendorAddr)
-	t.Logf("registries deployed at %s (auditor) and %s (vendor)", contract, vContract)
+	registryAddr := deployFor(auditorBin, auditorAddr)
+	vendorRegistryAddr := deployFor(vendorBin, vendorAddr)
+	t.Logf("registries deployed at %s (auditor) and %s (vendor)", registryAddr, vendorRegistryAddr)
 	var out []byte
 	var err error
 
-	// 2. Auditor registers. --arch is carried in the on-chain Entry, so the lookup below must read it back as is.
+	// 2. Auditor registers. --arch is carried in the on-chain registration, so the lookup below must read it back as is.
 	measurements := "PCR0=" + strings.Repeat("aa", 48) + ",PCR1=" + strings.Repeat("bb", 48) + ",PCR2=" + strings.Repeat("cc", 48)
-	aReg := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
+	aReg := exec.Command(auditorBin, "register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile,
 		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro", "--arch", "arm64")
 	aOut, err := aReg.CombinedOutput()
 	if err != nil {
 		t.Fatalf("auditor register: %v\n%s", err, aOut)
 	}
-	aKey := keyLineRe.FindSubmatch(aOut)
-	if aKey == nil {
-		t.Fatalf("auditor registration key not found:\n%s", aOut)
+	aRecordKey := recordKeyLineRe.FindSubmatch(aOut)
+	if aRecordKey == nil {
+		t.Fatalf("auditor record key not found:\n%s", aOut)
 	}
 
-	// 3. the Vendor registers the same measurements on its own contract: a different key must come out (the signers differ).
-	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
+	// 3. the Vendor registers the same measurements on its own contract: a different key must come out (the approvers differ).
+	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--registry", vendorRegistryAddr, "--signing-key-file", vendorFile,
 		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro", "--arch", "amd64")
 	vOut, err := vReg.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor register: %v\n%s", err, vOut)
 	}
-	vKey := keyLineRe.FindSubmatch(vOut)
-	if vKey == nil {
-		t.Fatalf("vendor registration key not found:\n%s", vOut)
+	vRecordKey := recordKeyLineRe.FindSubmatch(vOut)
+	if vRecordKey == nil {
+		t.Fatalf("vendor record key not found:\n%s", vOut)
 	}
-	if string(aKey[1]) == string(vKey[1]) {
-		t.Fatal("the auditor and vendor registration keys must not be equal (the signers differ)")
+	if string(aRecordKey[1]) == string(vRecordKey[1]) {
+		t.Fatal("the auditor and vendor registration record keys must not be equal (the approvers differ)")
 	}
 
 	// 3b. the chain returns which architecture a registration is for: the --arch given at registration must show as is in the lookup output.
 	// arch is not in the key (same measurements, same key), so the lookup need not be given an arch.
-	for _, c := range []struct{ bin, contract, key, arch string }{
-		{auditorBin, contract, string(aKey[1]), "arm64"},
-		{vendorBin, vContract, string(vKey[1]), "amd64"},
+	for _, c := range []struct{ bin, registryAddr, recordKey, arch string }{
+		{auditorBin, registryAddr, string(aRecordKey[1]), "arm64"},
+		{vendorBin, vendorRegistryAddr, string(vRecordKey[1]), "amd64"},
 	} {
-		look := exec.Command(c.bin, "lookup", "--rpc", rpc, "--contract", c.contract, "--key", c.key)
+		look := exec.Command(c.bin, "lookup", "--rpc", rpc, "--registry", c.registryAddr, "--record-key", c.recordKey)
 		out, err := look.CombinedOutput()
 		if err != nil {
-			t.Fatalf("lookup --key %s: %v\n%s", c.key, err, out)
+			t.Fatalf("lookup --record-key %s: %v\n%s", c.recordKey, err, out)
 		}
 		if want := "e2e-svc 1.0.0 (aws-nitro, " + c.arch + ")"; !strings.Contains(string(out), want) {
 			t.Errorf("lookup must print the architecture the chain recorded, lacks %q:\n%s", want, out)
@@ -234,7 +234,7 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	}
 
 	// 4. the same again as auditor: rejected, exit 5.
-	again := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
+	again := exec.Command(auditorBin, "register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile,
 		"--measurements", measurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
 	out, err = again.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 5 {
@@ -243,15 +243,15 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 
 	// 5. with a key that is not the approver: rejected, exit 4. Use new measurements (so it is not confused with already-registered).
 	freshMeasurements := "PCR0=" + strings.Repeat("dd", 48) + ",PCR1=" + strings.Repeat("ee", 48) + ",PCR2=" + strings.Repeat("ff", 48)
-	stranger := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", strangerFile,
+	stranger := exec.Command(auditorBin, "register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", strangerFile,
 		"--measurements", freshMeasurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
 	out, err = stranger.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 4 {
 		t.Fatalf("want exit 4 (not an approver), got %v\n%s", err, out)
 	}
 
-	// 5b. with the Vendor key on the Auditor contract: rejected because it is not the approver, exit 4. This is what one signer per contract means.
-	cross := exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", vendorFile,
+	// 5b. with the Vendor key on the Auditor contract: rejected because it is not the approver, exit 4. This is what one approver per registry means.
+	cross := exec.Command(vendorBin, "register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", vendorFile,
 		"--measurements", freshMeasurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro")
 	out, err = cross.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 4 {
@@ -259,7 +259,7 @@ func TestRegister_E2E_DeployAndRegister(t *testing.T) {
 	}
 
 	// 6. an expiry already in the past: rejected, exit 6.
-	expired := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
+	expired := exec.Command(auditorBin, "register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile,
 		"--measurements", freshMeasurements, "--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro", "--expires", "-1h")
 	out, err = expired.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 6 {

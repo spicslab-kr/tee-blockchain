@@ -22,7 +22,7 @@ type Backend interface {
 	ChainID(ctx context.Context) (*big.Int, error)
 }
 
-// Register sends the register(e, signature) transaction and waits for it to be mined. If the contract rejects it, the reason is returned as an error.
+// Register sends the register(registration, signature) transaction and waits for it to be mined. If the contract rejects it, the reason is returned as an error.
 func (r Registrar) Register(ctx context.Context, s reg.Signed) (reg.Receipt, error) {
 	if len(r.SenderKey) == 0 {
 		return reg.Receipt{}, errors.New("sender key is required to pay for the transaction")
@@ -31,7 +31,7 @@ func (r Registrar) Register(ctx context.Context, s reg.Signed) (reg.Receipt, err
 	if err != nil {
 		return reg.Receipt{}, fmt.Errorf("sender key: %w", err)
 	}
-	e, err := toEntry(s.Values, s.Meta)
+	e, err := toRegistration(s.Values, s.Meta)
 	if err != nil {
 		return reg.Receipt{}, err
 	}
@@ -49,7 +49,7 @@ func (r Registrar) Register(ctx context.Context, s reg.Signed) (reg.Receipt, err
 		return reg.Receipt{}, err
 	}
 	opts.Context = ctx
-	registry, err := NewRegistry(r.Contract, backend)
+	registry, err := NewRegistry(r.RegistryAddr, backend)
 	if err != nil {
 		return reg.Receipt{}, err
 	}
@@ -72,7 +72,7 @@ func (r Registrar) Register(ctx context.Context, s reg.Signed) (reg.Receipt, err
 	}
 	for _, lg := range receipt.Logs {
 		if ev, err := registry.ParseRegistered(*lg); err == nil {
-			return reg.Receipt{Key: common.Hash(ev.Key).Hex(), TxHash: tx.Hash().Hex(), Block: receipt.BlockNumber.Uint64()}, nil
+			return reg.Receipt{RecordKey: common.Hash(ev.RecordKey).Hex(), TxHash: tx.Hash().Hex(), Block: receipt.BlockNumber.Uint64()}, nil
 		}
 	}
 	return reg.Receipt{}, errors.New("Registered event not found in receipt")
@@ -107,10 +107,10 @@ func classify(err error) error {
 		}
 		switch name {
 		case "NotAnApprover":
-			return fmt.Errorf("%w: signer %v", reg.ErrNotAnApprover, args[0])
+			return fmt.Errorf("%w: approver %v", reg.ErrNotAnApprover, args[0])
 		case "AlreadyRegistered":
-			key, _ := args[0].([32]byte)
-			return fmt.Errorf("%w: key %s, expires %s", reg.ErrAlreadyRegistered, common.Hash(key).Hex(), unixTime(args[1]))
+			recordKey, _ := args[0].([32]byte)
+			return fmt.Errorf("%w: record key %s, expires %s", reg.ErrAlreadyRegistered, common.Hash(recordKey).Hex(), unixTime(args[1]))
 		case "ExpiryAlreadyPassed":
 			return fmt.Errorf("%w: expires %s, chain time %s", reg.ErrExpiryPassed, unixTime(args[0]), unixTime(args[1]))
 		default:

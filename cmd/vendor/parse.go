@@ -23,7 +23,7 @@ func raParse(args []string) error {
 	noncePath := fs.String("nonce", "", "the nonce that was sent, as hex or a file. empty uses <doc>.nonce; if that is missing too, the nonce check is skipped")
 	format := fs.String("format", p.AWSFormat, "document format")
 	rootPath := fs.String("root", "", "platform verification key (root certificate PEM). empty uses the built-in one")
-	out := fs.String("out", "", "file to save the measurements to (default: <doc>.measurements.json)")
+	outFile := fs.String("out-file", "", "file to save the measurements to (default: <doc>.measurements.json)")
 	at := fs.String("at", "", "time at which to judge the certificate chain (RFC3339). empty uses the document's time")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -92,14 +92,14 @@ func raParse(args []string) error {
 		values[m.Name] = hex.EncodeToString(m.Value)
 		say(fmt.Sprintf("%-10s %s", m.Name, values[m.Name]))
 	}
-	if *out == "" {
-		*out = *docPath + ".measurements.json"
+	if *outFile == "" {
+		*outFile = *docPath + ".measurements.json"
 	}
 	b, _ := json.MarshalIndent(map[string]any{"Format": *format, "Measurements": values}, "", "  ")
-	if err := os.WriteFile(*out, append(b, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(*outFile, append(b, '\n'), 0o644); err != nil {
 		return err
 	}
-	say("→ " + *out)
+	say("→ " + *outFile)
 	return nil
 }
 

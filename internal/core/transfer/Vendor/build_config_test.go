@@ -10,13 +10,13 @@ func TestBuildConfig_TEEInfoKeysPerPlatform(t *testing.T) {
 		cfg  BuildConfig
 		drop string
 	}{
-		"aws needs ami_id":          {cfgAWS(), "ami_id"},
-		"aws needs region":          {cfgAWS(), "region"},
-		"aws needs instance_id":     {cfgAWS(), "instance_id"},
-		"gcp needs container_image": {cfgGCP(), "container_image"},
-		"gcp needs project_id":      {cfgGCP(), "project_id"},
-		"azure needs maa_endpoint":  {cfgAzure(), "maa_endpoint"},
-		"azure needs vm_name":       {cfgAzure(), "vm_name"},
+		"aws-nitro needs ami_id":      {cfgAWS(), "ami_id"},
+		"aws-nitro needs region":      {cfgAWS(), "region"},
+		"aws-nitro needs instance_id": {cfgAWS(), "instance_id"},
+		"gcp needs container_image":   {cfgGCP(), "container_image"},
+		"gcp needs project_id":        {cfgGCP(), "project_id"},
+		"azure needs maa_endpoint":    {cfgAzure(), "maa_endpoint"},
+		"azure needs vm_name":         {cfgAzure(), "vm_name"},
 	}
 	for name, tc := range cases {
 		c := tc.cfg

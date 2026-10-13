@@ -21,16 +21,16 @@ type Parser struct {
 	Now time.Time
 }
 
-// VerifySig runs in this order: decode the document, check that the leaf certificate chains to the root (key) as of the document time, then check the COSE signature against the leaf certificate key.
-func (a Parser) VerifySig(ctx context.Context, format string, raw []byte, key []byte) error {
+// VerifySig runs in this order: decode the document, check that the leaf certificate chains to the root (rootCert) as of the document time, then check the COSE signature against the leaf certificate key.
+func (a Parser) VerifySig(ctx context.Context, format string, raw []byte, rootCert []byte) error {
 	cose, doc, err := decode(format, raw)
 	if err != nil {
 		return err
 	}
-	if len(key) == 0 {
-		key = rootPEM
+	if len(rootCert) == 0 {
+		rootCert = rootPEM
 	}
-	roots, err := loadRoots(key)
+	roots, err := loadRoots(rootCert)
 	if err != nil {
 		return err
 	}

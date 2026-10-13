@@ -8,7 +8,7 @@ var quiet bool
 
 // lastRegistered: the registration that register last submitted. Kept so audit / self-register can print it in their own sentence.
 var lastRegistered struct {
-	Key, Tx, Expires, Signer string
-	BuildEnv                 tr.BuildEnv // the architecture and Go toolchain of the measurements; not put on the chain, only shown on screen and in measurement-record.json
-	Block                    uint64
+	RecordKey, Tx, Expires, Approver string
+	BuildEnv                         tr.BuildEnv // the architecture and Go toolchain of the measurements; not put on the chain, only shown on screen and in measurement-record.json
+	Block                            uint64
 }

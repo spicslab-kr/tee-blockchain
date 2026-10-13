@@ -26,7 +26,7 @@ type Verdict = compare.Verdict
 
 type Comparer interface {
 	Compare(a, b p.Measurements) Verdict
-	Check(a p.Measurements, reg l.Registration, now int64, trusted []string) Verdict
+	Check(a p.Measurements, reg l.Registration, now int64, trustedApprovers []string) Verdict
 }
 
 type Impl struct{}
@@ -45,7 +45,7 @@ func (Impl) Compare(a, b p.Measurements) Verdict {
 	return compare.Compare(toItems(a), toItems(b))
 }
 
-func (Impl) Check(a p.Measurements, r l.Registration, now int64, trusted []string) Verdict {
+func (Impl) Check(a p.Measurements, r l.Registration, now int64, trustedApprovers []string) Verdict {
 	h, err := measurementHash(a)
 	if err != nil {
 		return Verdict{Reason: []string{"could not compute the measurement hash: " + err.Error()}}
@@ -53,8 +53,8 @@ func (Impl) Check(a p.Measurements, r l.Registration, now int64, trusted []strin
 	return compare.Check(h[:], compare.RegInfo{
 		MeasurementHash: r.Values.Get("measurementHash"),
 		Expires:         r.Expires,
-		Signer:          r.Signer,
-	}, now, trusted)
+		Approver:        r.Approver,
+	}, now, trustedApprovers)
 }
 
 // measurementHash is the same computation as MeasurementHash in chain/register: keccak256 of "name=value(hex)\n" lines in name order.

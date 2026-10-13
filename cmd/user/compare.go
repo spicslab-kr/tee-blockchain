@@ -15,81 +15,82 @@ import (
 	cmp "attestamp/internal/core/compare/user"
 )
 
-// compareCmd: with --b, compares two sets of measurements directly (Compare). With --key, reads the
-// registration from the chain and also checks expiry and the trusted signer (Check).
+// compareCmd: with --expected, compares two sets of measurements directly (Compare). With --record-key, reads the
+// registration from the chain and also checks expiry and the approver (Check).
 func compareCmd(args []string) error {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
-	a := fs.String("a", "", "measurements A: a measurements.json file, or NAME=hex,NAME=hex")
-	b := fs.String("b", "", "measurements B — required unless --key is used")
+	attested := fs.String("attested", "", "the attested measurements: a measurements.json file, or NAME=hex,NAME=hex")
+	expected := fs.String("expected", "", "the expected measurements, same shape — required unless --record-key is used")
 	rpc := fs.String("rpc", "", "chain mode: Ethereum RPC URL")
-	contract := fs.String("contract", "", "chain mode: Registry contract address")
-	key := fs.String("key", "", "chain mode: lookup key (the key from register)")
-	trusted := fs.String("trusted", "", "chain mode: trusted signer addresses, comma-separated. empty uses the contract's APPROVER")
+	registry := fs.String("registry", "", "chain mode: Registry contract address")
+	recordKey := fs.String("record-key", "", "chain mode: record key (the one register printed)")
+	trustedApprovers := fs.String("trusted-approvers", "", "chain mode: trusted approver addresses, comma-separated. empty uses the registry's APPROVER")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *a == "" {
-		return errors.New("--a is required")
+	if *attested == "" {
+		return errors.New("--attested is required")
 	}
-	if err := checkMode(*b, *rpc, *contract, *key, *trusted); err != nil {
+	if err := checkMode(*expected, *rpc, *registry, *recordKey, *trustedApprovers); err != nil {
 		return err
 	}
-	va, err := readMeasurements(*a)
+	attestedValues, err := readMeasurements(*attested)
 	if err != nil {
 		return err
 	}
 
-	if *key != "" {
-		if *rpc == "" || !common.IsHexAddress(*contract) {
-			return errors.New("chain mode needs --rpc, --contract and --key together")
+	if *recordKey != "" {
+		if *rpc == "" || !common.IsHexAddress(*registry) {
+			return errors.New("chain mode needs --attested, --registry, --rpc and --record-key together")
 		}
-		reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
+		reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry)}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
-		reg, err := reader.Lookup(ctx, *key)
+		reg, err := reader.Lookup(ctx, *recordKey)
 		if err != nil {
 			return err
 		}
-		trustedList, err := trustedSigners(ctx, reader, *trusted)
+		approvers, err := resolveTrustedApprovers(ctx, reader, *trustedApprovers)
 		if err != nil {
 			return err
 		}
-		return printVerdict((cmp.Impl{}).Check(va, reg, cmp.Clock(reg), trustedList))
+		return printVerdict((cmp.Impl{}).Check(attestedValues, reg, cmp.Clock(reg), approvers))
 	}
 
-	if *b == "" {
-		return errors.New("--b or (--contract and --key) is required")
+	if *expected == "" {
+		return errors.New("--expected or (--registry and --record-key) is required")
 	}
-	vb, err := readMeasurements(*b)
+	expectedValues, err := readMeasurements(*expected)
 	if err != nil {
 		return err
 	}
-	return printVerdict((cmp.Impl{}).Compare(va, vb))
+	return printVerdict((cmp.Impl{}).Compare(attestedValues, expectedValues))
 }
 
-// checkMode accepts exactly one of --b (plain mode) and --key (chain mode). Giving both is reported as an error
-// rather than silently ignoring one. --trusted only means something in chain mode; without --key it would
+// checkMode accepts exactly one of --expected (plain mode) and --record-key (chain mode). Giving both is reported as an error
+// rather than silently ignoring one. --trusted-approvers only means something in chain mode; without --record-key it would
 // just be dropped, so that is rejected up front too.
-func checkMode(b, rpc, contract, key, trusted string) error {
-	chainFlags := rpc != "" || contract != "" || key != "" || trusted != ""
+func checkMode(expected, rpc, registry, recordKey, trustedApprovers string) error {
+	chainFlags := rpc != "" || registry != "" || recordKey != "" || trustedApprovers != ""
 	switch {
-	case b != "" && key != "":
-		return errors.New("--b (plain compare) and --key (chain lookup) cannot be given together — pick one")
-	case b != "" && chainFlags:
-		return errors.New("--b was given along with --rpc/--contract/--trusted — without --key this is not chain mode, drop them")
-	case key == "" && (rpc != "" || contract != ""):
-		return errors.New("--rpc or --contract needs --key as well to be chain mode")
-	case key == "" && trusted != "":
-		return errors.New("--trusted is unused without --key (chain mode only)")
+	case expected != "" && recordKey != "":
+		return errors.New("--expected (plain compare) and --record-key (chain lookup) cannot be given together — pick one")
+	case expected != "" && chainFlags:
+		return errors.New("--expected was given along with --rpc/--registry/--trusted-approvers — without --record-key this is not chain mode, drop them")
+	case recordKey == "" && (rpc != "" || registry != ""):
+		return errors.New("--rpc or --registry needs --record-key as well to be chain mode")
+	case recordKey == "" && trustedApprovers != "":
+		return errors.New("--trusted-approvers is unused without --record-key (chain mode only)")
 	}
 	return nil
 }
 
-func trustedSigners(ctx context.Context, reader lether.Reader, flag string) ([]string, error) {
-	if flag != "" {
-		return strings.Split(flag, ","), nil
+// resolveTrustedApprovers: the --trusted-approvers list when given, else the registry's own approver.
+func resolveTrustedApprovers(ctx context.Context, reader lether.Reader, flagValue string) ([]string, error) {
+	if flagValue != "" {
+		return strings.Split(flagValue, ","), nil
 	}
-	return reader.TrustedSigners(ctx)
+	return reader.TrustedApprovers(ctx)
 }
 
 // printVerdict prints the verdict and exits 1 on failure (so scripts can read success from the exit code).

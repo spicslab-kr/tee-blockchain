@@ -25,19 +25,19 @@ import (
 
 // Launch is the input to one launch. The EIF is the result of build.
 type Launch struct {
-	Name   string // enclave name. Defaults to the EIF file name
-	EIF    string // enclave image file
-	Port   int    // RA port (the bridge accepts on it and the enclave responder listens on it). 0 means 5000
-	Memory int    // enclave memory in MiB. 0 means sized from the EIF size
-	CPUs   int    // 0 means 2
-	CID    int    // enclave vsock address. 0 means 16
-	Listen string // address the bridge accepts on. Defaults to 0.0.0.0
-	Binary string // att binary to start as ra-proxy. Defaults to itself
-	Out    string // bridge log directory. Defaults to out
+	EnclaveName string // enclave name. Defaults to the EIF file name
+	EIF         string // enclave image file
+	Port        int    // RA port (the bridge accepts on it and the enclave responder listens on it). 0 means 5000
+	Memory      int    // enclave memory in MiB. 0 means sized from the EIF size
+	CPUs        int    // 0 means 2
+	CID         int    // enclave vsock address. 0 means 16
+	Listen      string // address the bridge accepts on. Defaults to 0.0.0.0
+	ProxyBinary string // att binary to start as ra-proxy. Defaults to itself
+	OutDir      string // bridge log directory. Defaults to out
 
-	// Measurements is the measurements.json that came with an EIF received from someone else. If measuring the EIF directly gives a different value, it is not launched.
+	// BuildMeasurements is the measurements.json that came with an EIF received from someone else. If measuring the EIF directly gives a different value, it is not launched.
 	// Leave it empty for an EIF built here with build, since there is nothing to compare with.
-	Measurements string
+	BuildMeasurements string
 }
 
 // Result is what goes into the configuration.
@@ -63,8 +63,8 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if _, err := os.Stat(l.EIF); err != nil {
 		return res, err
 	}
-	if l.Name == "" {
-		l.Name = strings.TrimSuffix(filepath.Base(l.EIF), ".eif")
+	if l.EnclaveName == "" {
+		l.EnclaveName = strings.TrimSuffix(filepath.Base(l.EIF), ".eif")
 	}
 	if l.Port == 0 {
 		l.Port = 5000
@@ -78,22 +78,22 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if l.Listen == "" {
 		l.Listen = "0.0.0.0"
 	}
-	if l.Out == "" {
-		l.Out = "out"
+	if l.OutDir == "" {
+		l.OutDir = "out"
 	}
 	if l.Memory == 0 {
 		l.Memory = MemoryFor(l.EIF)
 	}
 	var err error
-	if l.Binary == "" {
-		if l.Binary, err = os.Executable(); err != nil {
+	if l.ProxyBinary == "" {
+		if l.ProxyBinary, err = os.Executable(); err != nil {
 			return res, err
 		}
 	}
-	if err := os.MkdirAll(l.Out, 0o755); err != nil {
+	if err := os.MkdirAll(l.OutDir, 0o755); err != nil {
 		return res, err
 	}
-	res.Name, res.Memory = l.Name, l.Memory
+	res.Name, res.Memory = l.EnclaveName, l.Memory
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
 	launchStep(log, 1, fmt.Sprintf("Reserving enclave resources (%d cpu · %d MiB)", l.CPUs, l.Memory), "an enclave takes CPUs and memory away from this host for itself; the allocator sets them aside")
@@ -107,8 +107,8 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	// Only an EIF received from someone else (it comes with --measurements) is measured again. For one built or packed here, the values measured then are already in out/.
-	if l.Measurements != "" {
+	// Only an EIF received from someone else (it comes with --build-measurements) is measured again. For one built or packed here, the values measured then are already in out/.
+	if l.BuildMeasurements != "" {
 		launchStep(log, 2, "Measuring the received enclave image myself (nitro-cli describe-eif)", "the sender's measurements.json is only a claim — the file itself is measured here and must say the same")
 		if res.PCR, err = measureEIF(ctx, r, l.EIF); err != nil {
 			return res, err
@@ -116,19 +116,19 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		for _, k := range imagePCRs {
 			fmt.Fprintf(log, "    %s %s\n", k, res.PCR[k])
 		}
-		reasons, err := checkAgainst(res.PCR, l.Measurements)
+		reasons, err := checkAgainst(res.PCR, l.BuildMeasurements)
 		if err != nil {
 			return res, err
 		}
 		if len(reasons) > 0 {
-			fmt.Fprintln(log, cli.Red("✗ it does NOT measure to what "+l.Measurements+" says — not running it"))
+			fmt.Fprintln(log, cli.Red("✗ it does NOT measure to what "+l.BuildMeasurements+" says — not running it"))
 			for _, why := range reasons {
 				fmt.Fprintln(log, cli.Red("    "+why))
 			}
 			return res, errMeasurementMismatch
 		}
-		fmt.Fprintln(log, cli.Green("✓ it measures exactly what "+l.Measurements+" says"), "— the file is what the sender described; safe to run")
-		res.Measurements = filepath.Join(l.Out, "measurements.json")
+		fmt.Fprintln(log, cli.Green("✓ it measures exactly what "+l.BuildMeasurements+" says"), "— the file is what the sender described; safe to run")
+		res.Measurements = filepath.Join(l.OutDir, "measurements.json")
 		if _, err := writeMeasurements(res.Measurements, res.PCR); err != nil {
 			return res, err
 		}
@@ -138,13 +138,13 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 
 	launchStep(log, 3, fmt.Sprintf("Starting the enclave (cid %d)", l.CID), "the image boots inside the Nitro enclave; from here on nothing on this host can read or change its memory")
-	_ = r.quiet(ctx, "nitro-cli", "terminate-enclave", "--enclave-name", l.Name)
+	_ = r.quiet(ctx, "nitro-cli", "terminate-enclave", "--enclave-name", l.EnclaveName)
 	if err := r.run(ctx, "nitro-cli", "run-enclave", "--eif-path", l.EIF, "--cpu-count", strconv.Itoa(l.CPUs),
-		"--memory", strconv.Itoa(l.Memory), "--enclave-cid", strconv.Itoa(l.CID), "--enclave-name", l.Name); err != nil {
+		"--memory", strconv.Itoa(l.Memory), "--enclave-cid", strconv.Itoa(l.CID), "--enclave-name", l.EnclaveName); err != nil {
 		return res, err
 	}
 	time.Sleep(3 * time.Second)
-	if err := r.enclaveRunning(ctx, l.Name); err != nil {
+	if err := r.enclaveRunning(ctx, l.EnclaveName); err != nil {
 		return res, err
 	}
 
@@ -158,14 +158,14 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 // startProxy starts the att binary separately as ra-proxy. It keeps running after launch ends.
 func (l Launch) startProxy(ctx context.Context, log io.Writer) error {
-	_ = exec.CommandContext(ctx, "pkill", "-f", fmt.Sprintf("^%s ra-proxy --listen %s:%d", l.Binary, l.Listen, l.Port)).Run()
-	logPath := filepath.Join(l.Out, "proxy.log")
+	_ = exec.CommandContext(ctx, "pkill", "-f", fmt.Sprintf("^%s ra-proxy --listen %s:%d", l.ProxyBinary, l.Listen, l.Port)).Run()
+	logPath := filepath.Join(l.OutDir, "proxy.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}
 	defer logFile.Close()
-	cmd := exec.Command(l.Binary, "ra-proxy", "--listen", fmt.Sprintf("%s:%d", l.Listen, l.Port), "--vsock", fmt.Sprintf("%d:%d", l.CID, l.Port))
+	cmd := exec.Command(l.ProxyBinary, "ra-proxy", "--listen", fmt.Sprintf("%s:%d", l.Listen, l.Port), "--vsock", fmt.Sprintf("%d:%d", l.CID, l.Port))
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.SysProcAttr = detached()

@@ -22,8 +22,8 @@ import (
 // Registrar talks to a single Registry contract over RPC.
 type Registrar struct {
 	RPC      string         // e.g. https://ethereum-sepolia-rpc.publicnode.com
-	Contract common.Address // the deployed Registry
-	// SenderKey is the key that sends the transaction and pays gas. It may or may not be the signer.
+	RegistryAddr common.Address // the deployed Registry
+	// SenderKey is the key that sends the transaction and pays gas. It may or may not be the approver.
 	SenderKey []byte
 	Timeout   time.Duration // how long to wait for mining; 0 means 2 minutes
 	// If Backend is set it is used instead of RPC. Tests inject a simulated backend.
@@ -32,36 +32,36 @@ type Registrar struct {
 
 var _ reg.Registrar = (*Registrar)(nil)
 
-// toEntry converts our types into the contract's Entry. The measurements are reduced to a single 32-byte hash.
-func toEntry(values p.Measurements, meta reg.Meta) (RegistryEntry, error) {
+// toRegistration converts our types into the contract's Registration. The measurements are reduced to a single 32-byte hash.
+func toRegistration(values p.Measurements, meta reg.Meta) (RegistryRegistration, error) {
 	if err := meta.Validate(); err != nil {
-		return RegistryEntry{}, err
+		return RegistryRegistration{}, err
 	}
 	h, err := reg.MeasurementHash(values)
 	if err != nil {
-		return RegistryEntry{}, err
+		return RegistryRegistration{}, err
 	}
-	return RegistryEntry{Platform: meta.Platform, Arch: meta.Arch, Service: meta.Service, Version: meta.Version, Measurement: h, Expires: uint64(meta.Expires.Unix())}, nil
+	return RegistryRegistration{Platform: meta.Platform, Arch: meta.Arch, Service: meta.Service, Version: meta.Version, Measurement: h, Expires: uint64(meta.Expires.Unix())}, nil
 }
 
-// Digest is the hash to sign, the same value as the contract's digest(e). It includes the chain ID and contract address,
+// Digest is the hash to sign, the same value as the contract's digest(e). It includes the chain ID and registry address,
 // so it cannot be reused on another deployment.
-func Digest(chainID *big.Int, contract common.Address, e RegistryEntry) ([]byte, error) {
+func Digest(chainID *big.Int, registryAddr common.Address, e RegistryRegistration) ([]byte, error) {
 	td := apitypes.TypedData{
 		Types: apitypes.Types{
 			"EIP712Domain": {
 				{Name: "name", Type: "string"}, {Name: "version", Type: "string"},
 				{Name: "chainId", Type: "uint256"}, {Name: "verifyingContract", Type: "address"},
 			},
-			"Entry": {
+			"Registration": {
 				{Name: "platform", Type: "string"}, {Name: "arch", Type: "string"}, {Name: "service", Type: "string"},
 				{Name: "version", Type: "string"}, {Name: "measurement", Type: "bytes32"}, {Name: "expires", Type: "uint64"},
 			},
 		},
-		PrimaryType: "Entry",
+		PrimaryType: "Registration",
 		Domain: apitypes.TypedDataDomain{
 			Name: "Registry", Version: "1",
-			ChainId: (*math.HexOrDecimal256)(chainID), VerifyingContract: contract.Hex(),
+			ChainId: (*math.HexOrDecimal256)(chainID), VerifyingContract: registryAddr.Hex(),
 		},
 		Message: apitypes.TypedDataMessage{
 			"platform": e.Platform, "arch": e.Arch, "service": e.Service, "version": e.Version,
@@ -72,9 +72,9 @@ func Digest(chainID *big.Int, contract common.Address, e RegistryEntry) ([]byte,
 	return digest, err
 }
 
-// Sign reads the chain ID and signs. The key is a 32-byte secp256k1 private key.
-func (r Registrar) Sign(values p.Measurements, meta reg.Meta, key []byte) (reg.Signed, error) {
-	priv, err := crypto.ToECDSA(key)
+// Sign reads the chain ID and signs. The signing key is a 32-byte secp256k1 private key.
+func (r Registrar) Sign(values p.Measurements, meta reg.Meta, signingKey []byte) (reg.Signed, error) {
+	priv, err := crypto.ToECDSA(signingKey)
 	if err != nil {
 		return reg.Signed{}, fmt.Errorf("signing key: %w", err)
 	}
@@ -93,11 +93,11 @@ func (r Registrar) Sign(values p.Measurements, meta reg.Meta, key []byte) (reg.S
 }
 
 func (r Registrar) signWith(chainID *big.Int, values p.Measurements, meta reg.Meta, priv *ecdsa.PrivateKey) (reg.Signed, error) {
-	e, err := toEntry(values, meta)
+	e, err := toRegistration(values, meta)
 	if err != nil {
 		return reg.Signed{}, err
 	}
-	digest, err := Digest(chainID, r.Contract, e)
+	digest, err := Digest(chainID, r.RegistryAddr, e)
 	if err != nil {
 		return reg.Signed{}, err
 	}
@@ -108,7 +108,7 @@ func (r Registrar) signWith(chainID *big.Int, values p.Measurements, meta reg.Me
 	sig[64] += 27 // the contract (ECDSA.recover) expects v as 27/28
 	return reg.Signed{
 		Values: values, Meta: meta,
-		Signer:    crypto.PubkeyToAddress(priv.PublicKey).Hex(),
+		Approver:  crypto.PubkeyToAddress(priv.PublicKey).Hex(),
 		Digest:    digest,
 		Signature: sig,
 	}, nil

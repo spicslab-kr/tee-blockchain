@@ -26,25 +26,25 @@ import (
 func registryDeploy(args []string) error {
 	fs := flag.NewFlagSet("registry-deploy", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
-	keyFile := fs.String("key-file", "", "private key file (hex) that sends the deploy transaction")
-	approver := fs.String("approver", "", "address of the signing key this contract accepts (usually my signing key)")
+	deployerKeyFile := fs.String("deployer-key-file", "", "private key file (hex) of the deployer key, which only pays gas for the deploy transaction")
+	approver := fs.String("approver", "", "address of the signing key this registry accepts (usually my signing key's address)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	// ask for any value not given as an option, in turn
 	askMainnetRPC(rpc)
-	ask(keyFile, "private key file that sends the deploy transaction", "")
-	ask(approver, "address of the signing key this contract accepts (0x…)", "")
-	if *rpc == "" || *keyFile == "" || !common.IsHexAddress(*approver) {
-		return errors.New("--rpc, --key-file and --approver are required")
+	ask(deployerKeyFile, "deployer key file (pays gas for the deploy transaction)", "")
+	ask(approver, "address of the signing key this registry accepts (0x…)", "")
+	if *rpc == "" || *deployerKeyFile == "" || !common.IsHexAddress(*approver) {
+		return errors.New("--rpc, --deployer-key-file and --approver are required")
 	}
-	key, err := readKey(*keyFile)
+	deployerKey, err := readKey(*deployerKeyFile)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	addr, tx, err := ether.Deploy(ctx, *rpc, nil, key, common.HexToAddress(*approver))
+	addr, tx, err := ether.Deploy(ctx, *rpc, nil, deployerKey, common.HexToAddress(*approver))
 	if err != nil {
 		return err
 	}
@@ -52,12 +52,12 @@ func registryDeploy(args []string) error {
 	return nil
 }
 
-// register returns the key (lookup coordinate) used for the registration, so run can immediately self-check it with compare.
+// register returns the record key (lookup coordinate) used for the registration, so run can immediately self-check it with compare.
 func register(args []string) (string, error) {
 	fs := flag.NewFlagSet("register", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
-	contract := fs.String("contract", "", "Registry contract address")
-	keyFile := fs.String("key-file", "", "private key file (hex) that signs and sends the transaction")
+	registry := fs.String("registry", "", "Registry contract address")
+	signingKeyFile := fs.String("signing-key-file", "", "signing key file (hex): its signature authorises the registration, and the same key sends the transaction")
 	measurements := fs.String("measurements", "", "measurements: a nitro measurements.json file, or NAME=hex,NAME=hex")
 	platform := fs.String("platform", "aws-nitro", "measurement format")
 	config := fs.String("config", "", "my build-config.json (the one send pushes): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
@@ -74,15 +74,15 @@ func register(args []string) (string, error) {
 	}
 	// ask for any value not given as an option, in turn; service and version are not asked when --config provides them
 	askMainnetRPC(rpc)
-	ask(contract, "Registry contract address (0x…)", "")
-	ask(keyFile, "my private key file", "")
+	ask(registry, "Registry address (0x…)", "")
+	ask(signingKeyFile, "my signing key file", "")
 	ask(measurements, "measurements (path to measurements.json, or NAME=hex,…)", "out/measurements.json")
 	if cfg == nil {
 		ask(service, "service name", "")
 		ask(version, "version", "")
 	}
-	if *rpc == "" || !common.IsHexAddress(*contract) || *keyFile == "" || *measurements == "" || (cfg == nil && (*service == "" || *version == "")) {
-		return "", errors.New("--rpc, --contract, --key-file, --measurements, and --service and --version (or --config <build-config.json>, which carries them) are required")
+	if *rpc == "" || !common.IsHexAddress(*registry) || *signingKeyFile == "" || *measurements == "" || (cfg == nil && (*service == "" || *version == "")) {
+		return "", errors.New("--rpc, --registry, --signing-key-file, --measurements, and --service and --version (or --config <build-config.json>, which carries them) are required")
 	}
 	if err := resolveRegistration(cfg, service, version, arch); err != nil {
 		return "", err
@@ -90,7 +90,7 @@ func register(args []string) (string, error) {
 	if err := checkArch(*arch); err != nil {
 		return "", err
 	}
-	key, err := readKey(*keyFile)
+	signingKey, err := readKey(*signingKeyFile)
 	if err != nil {
 		return "", err
 	}
@@ -99,8 +99,8 @@ func register(args []string) (string, error) {
 		return "", err
 	}
 	meta := reg.Meta{Meta: l.Meta{Service: *service, Version: *version, Platform: *platform, Arch: *arch}, Expires: time.Now().Add(*expires).Truncate(time.Second)}
-	r := ether.Registrar{RPC: *rpc, Contract: common.HexToAddress(*contract), SenderKey: key}
-	signed, err := r.Sign(values, meta, key)
+	r := ether.Registrar{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry), SenderKey: signingKey}
+	signed, err := r.Sign(values, meta, signingKey)
 	if err != nil {
 		return "", err
 	}
@@ -108,7 +108,7 @@ func register(args []string) (string, error) {
 	// on; the Go toolchain is this binary's — it is pinned project-wide (build.CheckToolchain at build start), so it is
 	// the one that compiled att-ra-responder into the image. with --config it is the config's build_env instead: that
 	// describes the build that was measured, whichever machine runs register. of it, only the arch goes into the chain
-	// Entry (meta.Arch above) — display only, so a reader can tell the two architectures' registrations apart; the key
+	// registration (meta.Arch above) — display only, so a reader can tell the two architectures' registrations apart; the record key
 	// still splits by the measurement hash alone. the rest is said here and in measurement-record.json.
 	env := tr.CurrentBuildEnv()
 	if cfg != nil {
@@ -121,7 +121,7 @@ func register(args []string) (string, error) {
 		goVer += " -trimpath"
 	}
 	if !quiet {
-		fmt.Printf("registering %s %s (%s, %s)\nsigner %s\n", *service, *version, *arch, goVer, signed.Signer)
+		fmt.Printf("registering %s %s (%s, %s)\napprover %s\n", *service, *version, *arch, goVer, signed.Approver)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -129,13 +129,13 @@ func register(args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	lastRegistered.Key, lastRegistered.Tx, lastRegistered.Block = receipt.Key, receipt.TxHash, receipt.Block
-	lastRegistered.Expires, lastRegistered.Signer, lastRegistered.BuildEnv = meta.Expires.UTC().Format(time.RFC3339), signed.Signer, env
+	lastRegistered.RecordKey, lastRegistered.Tx, lastRegistered.Block = receipt.RecordKey, receipt.TxHash, receipt.Block
+	lastRegistered.Expires, lastRegistered.Approver, lastRegistered.BuildEnv = meta.Expires.UTC().Format(time.RFC3339), signed.Approver, env
 	if !quiet {
-		fmt.Printf("registered %s %s (%s, %s)\n  key     %s\n  tx      %s\n  block   %d\n  expires %s\n  build env  %s\n", *service, *version, *arch, goVer, receipt.Key, receipt.TxHash, receipt.Block, lastRegistered.Expires, env)
+		fmt.Printf("registered %s %s (%s, %s)\n  record key  %s\n  tx          %s\n  block       %d\n  expires     %s\n  build env   %s\n", *service, *version, *arch, goVer, receipt.RecordKey, receipt.TxHash, receipt.Block, lastRegistered.Expires, env)
 		fmt.Printf("  this registration is for %s only — put \"build_env\": %s in measurement-record.json, and register the other architecture's build separately\n", *arch, buildEnvJSON(env))
 	}
-	return receipt.Key, nil
+	return receipt.RecordKey, nil
 }
 
 // loadBuildConfig — --config: my build-config.json. Empty path → nil (flags only).
@@ -181,50 +181,50 @@ func buildEnvJSON(env tr.BuildEnv) string {
 	return string(b)
 }
 
-// lookup: with --key, reads that key directly. Otherwise it first finds the keys via --measurements, then reads them all.
-// It returns the keys it found, so run can compare each of them.
+// lookup: with --record-key, reads that record key directly. Otherwise it first finds the record keys via --measurements, then reads them all.
+// It returns the record keys it found, so run can compare each of them.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
-	contract := fs.String("contract", "", "Registry contract address")
-	key := fs.String("key", "", "lookup key (0x…, the key from register). with it, --measurements is not needed")
+	registry := fs.String("registry", "", "Registry contract address")
+	recordKey := fs.String("record-key", "", "record key (0x…, the one register printed). with it, --measurements is not needed")
 	measurements := fs.String("measurements", "", "measurements: a measurements.json file, or NAME=hex,NAME=hex")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
 	ask(rpc, "RPC URL", "https://ethereum-rpc.publicnode.com")
-	ask(contract, "Registry contract address (0x…)", "")
-	if *rpc == "" || !common.IsHexAddress(*contract) {
-		return nil, errors.New("--rpc and --contract are required")
+	ask(registry, "Registry address (0x…)", "")
+	if *rpc == "" || !common.IsHexAddress(*registry) {
+		return nil, errors.New("--rpc and --registry are required")
 	}
-	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
+	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry)}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	keys := []string{*key}
-	if *key == "" {
+	recordKeys := []string{*recordKey}
+	if *recordKey == "" {
 		if *measurements == "" {
-			return nil, errors.New("--key or --measurements is required")
+			return nil, errors.New("--record-key or --measurements is required")
 		}
 		values, err := readMeasurements(*measurements)
 		if err != nil {
 			return nil, err
 		}
-		keys, err = reader.FindAddress(ctx, values)
+		recordKeys, err = reader.FindRecordKeys(ctx, values)
 		if err != nil {
 			return nil, err
 		}
-		if len(keys) == 0 {
+		if len(recordKeys) == 0 {
 			if !quiet {
 				fmt.Println("nothing registered")
 			}
 			return nil, nil
 		}
 		if !quiet {
-			fmt.Printf("found %d key(s)\n", len(keys))
+			fmt.Printf("found %d record key(s)\n", len(recordKeys))
 		}
 	}
-	for _, k := range keys {
+	for _, k := range recordKeys {
 		reg, err := reader.Lookup(ctx, k)
 		if err != nil {
 			return nil, err
@@ -232,15 +232,15 @@ func lookup(args []string) ([]string, error) {
 		if quiet {
 			continue
 		}
-		fmt.Printf("key       %s\n", k)
-		fmt.Printf("  signer  %s\n", reg.Signer)
-		fmt.Printf("  service %s %s (%s, %s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform, reg.Meta.Arch)
-		fmt.Printf("  expires %s\n", time.Unix(reg.Expires, 0).UTC().Format(time.RFC3339))
+		fmt.Printf("record key  %s\n", k)
+		fmt.Printf("  approver  %s\n", reg.Approver)
+		fmt.Printf("  service   %s %s (%s, %s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform, reg.Meta.Arch)
+		fmt.Printf("  expires   %s\n", time.Unix(reg.Expires, 0).UTC().Format(time.RFC3339))
 		if h := reg.Values.Get("measurementHash"); h != nil {
 			fmt.Printf("  measurement hash  %s\n", hex.EncodeToString(h))
 		}
 	}
-	return keys, nil
+	return recordKeys, nil
 }
 
 func readKey(path string) ([]byte, error) {

@@ -4,7 +4,7 @@
 // (compare.go and check.go).
 //
 // compare.go is the comparison with no chain value (parsed vs build values, etc.). check.go is used when a chain
-// registration is on either side; it checks expiry and the approving signer (trusted) as well as value equality.
+// registration is on either side; it checks expiry and the approver (trustedApprovers) as well as value equality.
 package compare
 
 // Item is one named measurement and Items is a set of them. The fields match the per-role Measurement/Measurements.

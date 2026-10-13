@@ -12,9 +12,9 @@ const SchemaBuildConfig = "attestamp.build-config/1"
 
 // TEEInfoKeys lists the required TEE info keys per platform.
 var TEEInfoKeys = map[string][]string{
-	"aws":   {"instance_id", "region", "ami_id"},
-	"gcp":   {"instance_name", "project_id", "container_image"},
-	"azure": {"vm_name", "region", "maa_endpoint"},
+	"aws-nitro": {"instance_id", "region", "ami_id"},
+	"gcp":       {"instance_name", "project_id", "container_image"},
+	"azure":     {"vm_name", "region", "maa_endpoint"},
 }
 
 type Source struct {
@@ -114,18 +114,18 @@ func (c BuildConfig) Validate() error {
 			errs = append(errs, "tee_info."+k+": required for "+c.Platform)
 		}
 	}
-	// build_env: the Auditor rebuilds to it, so on aws (where the measurements are per
+	// build_env: the Auditor rebuilds to it, so on aws-nitro (where the measurements are per
 	// architecture and per toolchain) it must be declared. trimpath=false is allowed here; the
 	// Auditor warns on it instead.
-	if c.Platform == "aws" {
+	if c.Platform == "aws-nitro" {
 		if c.BuildEnv.OS == "" {
-			errs = append(errs, "build_env.os: required for aws")
+			errs = append(errs, "build_env.os: required for aws-nitro")
 		}
 		if c.BuildEnv.Arch == "" {
-			errs = append(errs, "build_env.arch: required for aws")
+			errs = append(errs, "build_env.arch: required for aws-nitro")
 		}
 		if c.BuildEnv.Go == "" {
-			errs = append(errs, "build_env.go: required for aws")
+			errs = append(errs, "build_env.go: required for aws-nitro")
 		}
 	}
 	if c.BuildEnv.Arch != "" && !validArch(c.BuildEnv.Arch) {

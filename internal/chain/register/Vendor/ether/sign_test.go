@@ -49,7 +49,7 @@ func TestMeasurementHash_OrderIndependent(t *testing.T) {
 
 func TestDigest_DependsOnChainAndContract(t *testing.T) {
 	v, m := sample()
-	e, err := toEntry(v, m)
+	e, err := toRegistration(v, m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,17 +69,17 @@ func TestDigest_DependsOnChainAndContract(t *testing.T) {
 // That the result equals the contract's digest() is checked against the chain in chain/register/ether_test.go.
 func TestDigest_IncludesArch(t *testing.T) {
 	v, m := sample()
-	amd, err := toEntry(v, m)
+	amd, err := toRegistration(v, m)
 	if err != nil {
 		t.Fatal(err)
 	}
 	m.Arch = "arm64"
-	arm, err := toEntry(v, m)
+	arm, err := toRegistration(v, m)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if arm.Arch != "arm64" || amd.Arch != "amd64" {
-		t.Fatalf("toEntry must carry Meta.Arch into the Entry: %q / %q", amd.Arch, arm.Arch)
+		t.Fatalf("toRegistration must carry Meta.Arch into the Registration: %q / %q", amd.Arch, arm.Arch)
 	}
 	c := common.HexToAddress("0x1000000000000000000000000000000000000001")
 	d1, _ := Digest(big.NewInt(31337), c, amd)
@@ -88,15 +88,15 @@ func TestDigest_IncludesArch(t *testing.T) {
 		t.Fatal("the arch must be part of the signed digest")
 	}
 	m.Arch = ""
-	if _, err := toEntry(v, m); err == nil {
-		t.Fatal("an entry without an arch must be rejected before signing")
+	if _, err := toRegistration(v, m); err == nil {
+		t.Fatal("a registration without an arch must be rejected before signing")
 	}
 }
 
-func TestSign_RecoversToSigner(t *testing.T) {
+func TestSign_RecoversToApprover(t *testing.T) {
 	v, m := sample()
 	priv, _ := crypto.GenerateKey()
-	r := Registrar{Contract: common.HexToAddress("0x1000000000000000000000000000000000000001")}
+	r := Registrar{RegistryAddr: common.HexToAddress("0x1000000000000000000000000000000000000001")}
 	s, err := r.signWith(big.NewInt(31337), v, m, priv)
 	if err != nil {
 		t.Fatal(err)
@@ -110,8 +110,8 @@ func TestSign_RecoversToSigner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if crypto.PubkeyToAddress(*pub).Hex() != s.Signer {
-		t.Fatal("signature does not recover to the signer address")
+	if crypto.PubkeyToAddress(*pub).Hex() != s.Approver {
+		t.Fatal("signature does not recover to the approver address")
 	}
 }
 

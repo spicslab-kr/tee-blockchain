@@ -16,7 +16,7 @@ import (
 // AWSFormat is the document format the AWS Nitro parser reads.
 const AWSFormat = shared.Format
 
-// AWSRootPEM is the built-in AWS Nitro Enclaves root certificate. It is used when AWSParser.VerifySig is given an empty key.
+// AWSRootPEM is the built-in AWS Nitro Enclaves root certificate. It is used when AWSParser.VerifySig is given an empty certificate.
 func AWSRootPEM() []byte { return shared.RootPEM() }
 
 // AWSParser: if Now is zero, the certificate chain is judged at the document's own time.
@@ -26,8 +26,8 @@ type AWSParser struct {
 
 var _ Parser = (*AWSParser)(nil)
 
-func (a AWSParser) VerifySig(ctx context.Context, ra r.RADoc, key []byte) error {
-	return awsTranslate(shared.Parser{Now: a.Now}.VerifySig(ctx, ra.Format, ra.Raw, key))
+func (a AWSParser) VerifySig(ctx context.Context, ra r.RADoc, rootCert []byte) error {
+	return awsTranslate(shared.Parser{Now: a.Now}.VerifySig(ctx, ra.Format, ra.Raw, rootCert))
 }
 
 func (a AWSParser) CheckNonce(ra r.RADoc, nonce r.Nonce) error {

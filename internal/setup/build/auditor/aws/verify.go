@@ -92,7 +92,7 @@ func short(v string) string {
 // On a difference it returns an error: the EIF and measurements of the first build are already in out/, but handing those values over would not let an Auditor reproduce them.
 func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, first manifest, firstPCR map[string]string) error {
 	checkApp := appImage + "-verify"
-	checkImage := b.Name + ":att-verify"
+	checkImage := b.ImageName + ":att-verify"
 	fmt.Fprintf(r.log, "\n[verify 1/3] building %s again from scratch (--no-cache) → %s\n", appDir, checkApp)
 	if err := r.run(ctx, "docker", "build", "-q", "--no-cache", "-t", checkApp, appDir); err != nil {
 		return err
@@ -106,11 +106,11 @@ func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, fi
 		return err
 	}
 	fmt.Fprintf(r.log, "\n[verify 2/3] repacking the second build\n")
-	second, err := normalize(ctx, r, checkImage, b.Out)
+	second, err := normalize(ctx, r, checkImage, b.OutDir)
 	if err != nil {
 		return err
 	}
-	eif := filepath.Join(b.Out, b.Name+".verify.eif")
+	eif := filepath.Join(b.OutDir, b.ImageName+".verify.eif")
 	defer os.Remove(eif)
 	fmt.Fprintf(r.log, "\n[verify 3/3] measuring the second build\n")
 	out, err := r.output(ctx, "nitro-cli", "build-enclave", "--docker-uri", checkImage, "--output-file", eif)

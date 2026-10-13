@@ -30,7 +30,7 @@ func TestRA_TwoProcesses_UserRequestsVendorTEE(t *testing.T) {
 	defer stop()
 
 	out := filepath.Join(t.TempDir(), "doc.cbor")
-	req := exec.Command(user, "ra-request", "--tee", addr, "--out", out, "--timeout", "10s")
+	req := exec.Command(user, "ra-request", "--tee-addr", addr, "--out-file", out, "--timeout", "10s")
 	res, err := req.CombinedOutput()
 	if err != nil {
 		t.Fatalf("ra-request: %v\n%s", err, res)
@@ -51,7 +51,7 @@ func TestRA_TwoProcesses_UserRequestsVendorTEE(t *testing.T) {
 	}
 
 	// if a different format is expected, the document is rejected even though it was received (exit 4)
-	req = exec.Command(user, "ra-request", "--tee", addr, "--out", out+".2", "--format", "gcp-cs-jwt", "--timeout", "10s")
+	req = exec.Command(user, "ra-request", "--tee-addr", addr, "--out-file", out+".2", "--format", "gcp-cs-jwt", "--timeout", "10s")
 	res, err = req.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 4 {
 		t.Fatalf("want exit 4 (format mismatch), got %v\n%s", err, res)
@@ -66,7 +66,7 @@ func TestRA_TwoProcesses_ServerDownExitCode(t *testing.T) {
 		t.Skip("go toolchain not on PATH")
 	}
 	user := build(t, t.TempDir(), "./cmd/user")
-	req := exec.Command(user, "ra-request", "--tee", "127.0.0.1:1", "--timeout", "2s")
+	req := exec.Command(user, "ra-request", "--tee-addr", "127.0.0.1:1", "--timeout", "2s")
 	out, err := req.CombinedOutput()
 	if err == nil {
 		t.Fatalf("must fail when no TEE listens\n%s", out)

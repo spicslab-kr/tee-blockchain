@@ -11,7 +11,7 @@ const (
   "schema": "attestamp.build-config/1",
   "service": "svc",
   "version": "1.2.0",
-  "platform": "aws",
+  "platform": "aws-nitro",
   "source": {
     "repo": "https://example.com/svc.git",
     "commit": "0123456789abcdef0123456789abcdef01234567"
@@ -33,7 +33,7 @@ const (
   "schema": "attestamp.measurement-record/1",
   "service": "svc",
   "version": "1.2.0",
-  "platform": "aws",
+  "platform": "aws-nitro",
   "build_env": {
     "os": "linux",
     "arch": "amd64",

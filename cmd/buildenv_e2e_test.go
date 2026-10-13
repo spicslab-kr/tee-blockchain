@@ -56,7 +56,7 @@ func cloneRemote(t *testing.T, remote string) string {
 func buildConfigJSON(t *testing.T, commit string, env map[string]any) []byte {
 	t.Helper()
 	m := map[string]any{
-		"schema": "attestamp.build-config/1", "service": "svc", "version": "1.2.0", "platform": "aws",
+		"schema": "attestamp.build-config/1", "service": "svc", "version": "1.2.0", "platform": "aws-nitro",
 		"source":   map[string]string{"repo": "https://example.com/svc.git", "commit": commit},
 		"tee_info": map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
 	}

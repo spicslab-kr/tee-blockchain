@@ -12,7 +12,7 @@ func TestMeasurementRecord_PerPlatform(t *testing.T) {
 			t.Errorf("%s: complete record must validate: %v", r.Platform, err)
 		}
 	}
-	// aws: EIF file, PCR0/1/2, tool and version
+	// aws-nitro: EIF file, PCR0/1/2, tool and version
 	r := recAWS()
 	r.Image.Path = ""
 	mustErr(t, r, "image.path")
@@ -76,7 +76,7 @@ func TestMeasurementRecord_Registration(t *testing.T) {
 	}
 }
 
-// The same source gives different PCRs on x86_64 and arm64, and under a different Go toolchain. So an aws record must say which build environment it comes from
+// The same source gives different PCRs on x86_64 and arm64, and under a different Go toolchain. So an aws-nitro record must say which build environment it comes from
 // (build_env: os, arch, go, trimpath) must be recorded; it has the same shape as build_env in build-config.json.
 // The arch spelling is GOARCH only (amd64, arm64); uname spellings such as x86_64 and aarch64 are rejected. The source is build.ArchTargets.
 func TestMeasurementRecord_BuildEnvArch(t *testing.T) {
@@ -104,14 +104,14 @@ func TestMeasurementRecord_BuildEnvArch(t *testing.T) {
 	mustErr(t, r, "build_env.arch: unknown")
 }
 
-// An aws record cannot leave the OS or Go toolchain empty either; the Vendor uses the record to learn which toolchain built the image.
+// An aws-nitro record cannot leave the OS or Go toolchain empty either; the Vendor uses the record to learn which toolchain built the image.
 func TestMeasurementRecord_BuildEnvRequiresOSAndGoOnAWS(t *testing.T) {
 	r := recAWS()
 	r.BuildEnv.OS = ""
-	mustErr(t, r, "build_env.os: required for aws")
+	mustErr(t, r, "build_env.os: required for aws-nitro")
 	r = recAWS()
 	r.BuildEnv.Go = ""
-	mustErr(t, r, "build_env.go: required for aws")
+	mustErr(t, r, "build_env.go: required for aws-nitro")
 	// trimpath=false is allowed: it records a fact, not a requirement.
 	r = recAWS()
 	r.BuildEnv.Trimpath = false

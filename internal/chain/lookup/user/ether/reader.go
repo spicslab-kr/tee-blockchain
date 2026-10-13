@@ -37,9 +37,9 @@ type Backend interface {
 
 // Reader reads the contract over RPC. It uses Backend if set (for tests on a simulated chain), otherwise connects to RPC.
 type Reader struct {
-	RPC      string
-	Contract common.Address
-	Backend  Backend
+	RPC          string
+	RegistryAddr common.Address
+	Backend      Backend
 	// LogRangeChunk: if 0, defaultLogRangeChunk.
 	LogRangeChunk uint64
 }
@@ -56,7 +56,7 @@ func (r Reader) client(ctx context.Context) (*regether.Registry, Backend, func()
 		}
 		backend, closeFn = c, c.Close
 	}
-	registry, err := regether.NewRegistry(r.Contract, backend)
+	registry, err := regether.NewRegistry(r.RegistryAddr, backend)
 	if err != nil {
 		closeFn()
 		return nil, nil, nil, err
@@ -91,8 +91,8 @@ func measurementHash(values p.Measurements) ([32]byte, error) {
 	return out, nil
 }
 
-// FindAddress hashes the measurements and finds the key registered under DefaultPlatform.
-func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]string, error) {
+// FindRecordKeys hashes the measurements and finds the record key registered under DefaultPlatform.
+func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]string, error) {
 	h, err := measurementHash(values)
 	if err != nil {
 		return nil, err
@@ -102,40 +102,40 @@ func (r Reader) FindAddress(ctx context.Context, values p.Measurements) ([]strin
 		return nil, err
 	}
 	defer done()
-	key, err := registry.KeyFor(&bind.CallOpts{Context: ctx}, DefaultPlatform, h)
+	recordKey, err := registry.RecordKeyFor(&bind.CallOpts{Context: ctx}, DefaultPlatform, h)
 	if err != nil {
 		return nil, err
 	}
-	// keyFor is a pure computation, so it always yields a key regardless of registration (and the key is never zero).
-	// Whether it is actually registered is seen by calling lookup with that key and checking that signer is filled in.
-	rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, key)
+	// recordKeyFor is a pure computation, so it always yields a record key regardless of registration (and it is never zero).
+	// Whether it is actually registered is seen by calling lookup with that record key and checking that approver is filled in.
+	rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, recordKey)
 	if err != nil {
 		return nil, err
 	}
-	if rec.Signer == (common.Address{}) {
+	if rec.Approver == (common.Address{}) {
 		return nil, nil
 	}
-	return []string{common.Hash(key).Hex()}, nil
+	return []string{common.Hash(recordKey).Hex()}, nil
 }
 
-// parseKey: checking only the length would let invalid hex (a typo or a broken paste) silently become the zero value in
+// parseRecordKey: checking only the length would let invalid hex (a typo or a broken paste) silently become the zero value in
 // common.HexToHash and be mistaken for "not registered", so it also checks that the string really decodes as hex.
-func parseKey(address string) (common.Hash, error) {
-	s := strings.TrimPrefix(address, "0x")
+func parseRecordKey(recordKey string) (common.Hash, error) {
+	s := strings.TrimPrefix(recordKey, "0x")
 	if len(s) != 64 {
-		return common.Hash{}, fmt.Errorf("key %q: want a 32-byte hex value (0x…, 66 chars)", address)
+		return common.Hash{}, fmt.Errorf("record key %q: want a 32-byte hex value (0x…, 66 chars)", recordKey)
 	}
 	b, err := hex.DecodeString(s)
 	if err != nil {
-		return common.Hash{}, fmt.Errorf("key %q: not valid hex: %w", address, err)
+		return common.Hash{}, fmt.Errorf("record key %q: not valid hex: %w", recordKey, err)
 	}
 	return common.BytesToHash(b), nil
 }
 
-// Lookup reads the registration for a key (as returned by FindAddress). For the reason, see the comment in auditor/ether:
-// the contract storage holds only the signer, expiry and registration time, so the rest is filled in from the event log.
-func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, error) {
-	key, err := parseKey(address)
+// Lookup reads the registration for a record key (as returned by FindRecordKeys). For the reason, see the comment in auditor/ether:
+// the contract storage holds only the approver, expiry and registration time, so the rest is filled in from the event log.
+func (r Reader) Lookup(ctx context.Context, recordKey string) (l.Registration, error) {
+	parsedKey, err := parseRecordKey(recordKey)
 	if err != nil {
 		return l.Registration{}, err
 	}
@@ -144,34 +144,34 @@ func (r Reader) Lookup(ctx context.Context, address string) (l.Registration, err
 		return l.Registration{}, err
 	}
 	defer done()
-	rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, key)
+	rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, parsedKey)
 	if err != nil {
 		return l.Registration{}, err
 	}
-	if rec.Signer == (common.Address{}) {
-		return l.Registration{}, fmt.Errorf("key %s: not registered", address)
+	if rec.Approver == (common.Address{}) {
+		return l.Registration{}, fmt.Errorf("record key %s: not registered", recordKey)
 	}
-	ev, err := findRegisteredEvent(ctx, backend, registry, key, r.LogRangeChunk)
+	ev, err := findRegisteredEvent(ctx, backend, registry, parsedKey, r.LogRangeChunk)
 	if err != nil {
-		return l.Registration{}, fmt.Errorf("record exists but its event log could not be read: %w", err)
+		return l.Registration{}, fmt.Errorf("registration exists but its event log could not be read: %w", err)
 	}
 	if ev == nil {
-		return l.Registration{}, fmt.Errorf("key %s: registered, but no event log found (an old node may have pruned its logs)", address)
+		return l.Registration{}, fmt.Errorf("record key %s: registered, but no event log found (an old node may have pruned its logs)", recordKey)
 	}
 	return l.Registration{
-		Address:   address,
+		RecordKey: recordKey,
 		Values:    p.Measurements{{Name: "measurementHash", Value: ev.Measurement[:]}},
 		Meta:      l.Meta{Service: ev.Service, Version: ev.Version, Platform: ev.Platform, Arch: ev.Arch},
 		Expires:   int64(rec.Expires),
 		ChainTime: int64(rec.ChainTime),
-		Signer:    rec.Signer.Hex(),
+		Approver:  rec.Approver.Hex(),
 		Signature: ev.Signature,
 	}, nil
 }
 
-// TrustedSigners is the signer address (APPROVER) fixed in the contract. compare.Check uses it to see whether the
-// registration signer is this address.
-func (r Reader) TrustedSigners(ctx context.Context) ([]string, error) {
+// TrustedApprovers is the approver address (APPROVER) fixed in the contract. compare.Check uses it to see whether the
+// registration approver is this address.
+func (r Reader) TrustedApprovers(ctx context.Context) ([]string, error) {
 	registry, _, done, err := r.client(ctx)
 	if err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func (r Reader) TrustedSigners(ctx context.Context) ([]string, error) {
 
 // findRegisteredEvent finds the Registered event by scanning backwards from the latest block, chunk blocks at a time.
 // For the reason, see the same function in auditor/ether.
-func findRegisteredEvent(ctx context.Context, backend Backend, registry *regether.Registry, key common.Hash, chunk uint64) (*regether.RegistryRegistered, error) {
+func findRegisteredEvent(ctx context.Context, backend Backend, registry *regether.Registry, recordKey common.Hash, chunk uint64) (*regether.RegistryRegistered, error) {
 	if chunk == 0 {
 		chunk = defaultLogRangeChunk
 	}
@@ -201,7 +201,7 @@ func findRegisteredEvent(ctx context.Context, backend Backend, registry *regethe
 			from = to - chunk + 1
 		}
 		end := to
-		iter, err := registry.FilterRegistered(&bind.FilterOpts{Start: from, End: &end, Context: ctx}, [][32]byte{key}, nil)
+		iter, err := registry.FilterRegistered(&bind.FilterOpts{Start: from, End: &end, Context: ctx}, [][32]byte{recordKey}, nil)
 		if err != nil {
 			return nil, err
 		}

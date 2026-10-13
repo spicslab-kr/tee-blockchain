@@ -1,6 +1,6 @@
 // Package auditor compares two sets of values and reports match or mismatch with reasons.
 //
-// The actual logic (per-item comparison, expiry and trusted-signer checks) lives once, role-independent, in
+// The actual logic (per-item comparison, expiry and trustedApprovers checks) lives once, role-independent, in
 // internal/core/compare. This package is a thin delegate that converts this role's tee/parse/auditor.Measurements
 // into the shape that logic takes (compare.Items). The same delegate exists for auditor, Vendor and user,
 // because the Comparer interface takes a Measurements type and Go cannot share one interface across the
@@ -22,8 +22,8 @@ type Verdict = compare.Verdict
 type Comparer interface {
 	// Compare matches two sets of measurements directly, e.g. parsed vs build values, or lookup vs registered values.
 	Compare(a, b p.Measurements) Verdict
-	// Check compares against an on-chain registration. Besides equal values it checks expiry and the approving signer (trusted).
-	Check(a p.Measurements, reg l.Registration, now int64, trusted []string) Verdict
+	// Check compares against an on-chain registration. Besides equal values it checks expiry and the approver (trustedApprovers).
+	Check(a p.Measurements, reg l.Registration, now int64, trustedApprovers []string) Verdict
 }
 
 type Impl struct{}
@@ -42,7 +42,7 @@ func (Impl) Compare(a, b p.Measurements) Verdict {
 	return compare.Compare(toItems(a), toItems(b))
 }
 
-func (Impl) Check(a p.Measurements, r l.Registration, now int64, trusted []string) Verdict {
+func (Impl) Check(a p.Measurements, r l.Registration, now int64, trustedApprovers []string) Verdict {
 	h, err := reg.MeasurementHash(a)
 	if err != nil {
 		return Verdict{Reason: []string{"could not compute the measurement hash: " + err.Error()}}
@@ -50,8 +50,8 @@ func (Impl) Check(a p.Measurements, r l.Registration, now int64, trusted []strin
 	return compare.Check(h[:], compare.RegInfo{
 		MeasurementHash: r.Values.Get("measurementHash"),
 		Expires:         r.Expires,
-		Signer:          r.Signer,
-	}, now, trusted)
+		Approver:        r.Approver,
+	}, now, trustedApprovers)
 }
 
 // Clock returns the time to use as Check's now: the time of the block the registration was read from

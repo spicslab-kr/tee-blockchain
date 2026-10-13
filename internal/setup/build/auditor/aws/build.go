@@ -34,12 +34,12 @@ const responderBinaryName = "att-ra-responder"
 
 // Build is the input to one build. The Dockerfile in AppDir is the software.
 type Build struct {
-	AppDir string // directory holding the software's Dockerfile (build). Exactly one of AppDir and Image
-	Image  string // a docker image the user already built (pack): the user runs docker build, att does the layering, normalizing and EIF
-	Name   string // image and EIF name. Defaults to the directory name (pack: the image name before the tag)
-	Port   int    // vsock port the responder listens on inside the enclave. 0 means 5000
+	AppDir      string // directory holding the software's Dockerfile (build). Exactly one of AppDir and DockerImage
+	DockerImage string // a docker image the user already built (pack): the user runs docker build, att does the layering, normalizing and EIF
+	ImageName   string // image and EIF name. Defaults to the directory name (pack: the image name before the tag)
+	Port        int    // vsock port the responder listens on inside the enclave. 0 means 5000
 
-	// Binary is the responder to layer in. If empty, att-ra-responder next to the executable is used.
+	// ResponderPath is the responder to layer in. If empty, att-ra-responder next to the executable is used.
 	//
 	// This used to default to the running executable itself (os.Executable(), i.e. att-vendor or att-auditor).
 	// That put a different CLI binary into the image for each role, so no amount of layer normalizing could make
@@ -47,9 +47,9 @@ type Build struct {
 	// Auditor built the same Dockerfile, normalization included, and still got different PCR0 and PCR2, because
 	// the /att-ra file itself was two different binaries). Now every role must layer in the identical file
 	// built from cmd/ra-responder.
-	Binary string
-	Out    string // result directory. Defaults to out
-	Verify bool   // build the same Dockerfile once more without cache and check that the PCRs match (verify.go)
+	ResponderPath string
+	OutDir        string // result directory. Defaults to out
+	Verify        bool   // build the same Dockerfile once more without cache and check that the PCRs match (verify.go)
 }
 
 // Result is what goes into the measurement record.
@@ -67,7 +67,7 @@ var ErrNotLinux = errors.New("build runs on the Nitro parent instance (linux)")
 // Run goes through: tools, software image, responder layering, EIF and PCRs.
 //
 // There are two entry points. AppDir (build): att starts from docker build, so the Vendor and the Auditor running the
-// same command get the same values. Image (pack): the user hands over an image built their own way and att only layers,
+// same command get the same values. DockerImage (pack): the user hands over an image built their own way and att only layers,
 // normalizes and makes the EIF; the Auditor measures the received EIF file, so only the Vendor needs to build it.
 func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	var res Result
@@ -77,14 +77,14 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if err := build.CheckToolchain(); err != nil {
 		return res, err
 	}
-	if (b.AppDir == "") == (b.Image == "") {
+	if (b.AppDir == "") == (b.DockerImage == "") {
 		return res, errors.New("give either an app dir (build) or an image (pack)")
 	}
-	if b.Image != "" && b.Verify {
+	if b.DockerImage != "" && b.Verify {
 		return res, errors.New("--verify needs the Dockerfile: it rebuilds; pack only packs an image you built")
 	}
 	var appDir, dockerfile string
-	if b.Image == "" {
+	if b.DockerImage == "" {
 		var err error
 		if appDir, err = filepath.Abs(b.AppDir); err != nil {
 			return res, err
@@ -93,33 +93,33 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		if st, err := os.Stat(dockerfile); err != nil || st.IsDir() {
 			return res, fmt.Errorf("%s: Dockerfile not found", appDir)
 		}
-		if b.Name == "" {
-			b.Name = Sanitize(filepath.Base(appDir))
+		if b.ImageName == "" {
+			b.ImageName = Sanitize(filepath.Base(appDir))
 		}
-	} else if b.Name == "" {
-		name, _, _ := strings.Cut(b.Image, ":")
-		b.Name = Sanitize(filepath.Base(name))
+	} else if b.ImageName == "" {
+		name, _, _ := strings.Cut(b.DockerImage, ":")
+		b.ImageName = Sanitize(filepath.Base(name))
 	}
 	if b.Port == 0 {
 		b.Port = 5000
 	}
-	if b.Out == "" {
-		b.Out = "out"
+	if b.OutDir == "" {
+		b.OutDir = "out"
 	}
-	if b.Binary == "" {
+	if b.ResponderPath == "" {
 		exe, err := os.Executable()
 		if err != nil {
 			return res, err
 		}
-		b.Binary = filepath.Join(filepath.Dir(exe), responderBinaryName)
+		b.ResponderPath = filepath.Join(filepath.Dir(exe), responderBinaryName)
 	}
-	if _, err := os.Stat(b.Binary); err != nil {
-		return res, fmt.Errorf("%s: attestation responder not found — build cmd/ra-responder and put it there, or point Binary at it", b.Binary)
+	if _, err := os.Stat(b.ResponderPath); err != nil {
+		return res, fmt.Errorf("%s: attestation responder not found — build cmd/ra-responder and put it there, or point ResponderPath at it", b.ResponderPath)
 	}
 	// A file being there is not enough. What gets layered in and measured is this file's bytes, and those are fixed by
 	// the Go version, -trimpath and GOOS/GOARCH the responder was built with (CheckToolchain only looks at att itself).
 	// Read the build info Go left in the binary and refuse a responder that cannot produce the same bytes as the other side.
-	responder, err := build.ReadResponder(b.Binary)
+	responder, err := build.ReadResponder(b.ResponderPath)
 	if err != nil {
 		return res, err
 	}
@@ -128,15 +128,15 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 	res.Responder = responder
 	fmt.Fprintln(log, responder.String())
-	if err := os.MkdirAll(b.Out, 0o755); err != nil {
+	if err := os.MkdirAll(b.OutDir, 0o755); err != nil {
 		return res, err
 	}
-	res.Name = b.Name
+	res.Name = b.ImageName
 	r := runner{log: log, sudo: os.Geteuid() != 0}
 
 	// Step labels: build has 5 steps, pack has 4 because it skips docker build.
 	verb, total, n := "build", 5, 0
-	if b.Image != "" {
+	if b.DockerImage != "" {
 		verb, total = "pack", 4
 	}
 	// Two lines per step: what is being done, then one sentence on why, so a reader who does not know our terms can follow.
@@ -145,7 +145,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		fmt.Fprintf(log, "\n%s %s…\n           %s\n", cli.Green(fmt.Sprintf("[%s %d/%d]", verb, n, total)), what, why)
 	}
 
-	if b.Image == "" {
+	if b.DockerImage == "" {
 		risks, err := LintDockerfile(dockerfile)
 		if err != nil {
 			return res, err
@@ -161,10 +161,10 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	appImage := b.Image
-	res.Image = b.Name + ":att"
-	if b.Image == "" {
-		appImage = b.Name + ":app"
+	appImage := b.DockerImage
+	res.Image = b.ImageName + ":att"
+	if b.DockerImage == "" {
+		appImage = b.ImageName + ":app"
 		step(fmt.Sprintf("Building the software image from %s → %s", appDir, appImage), "the software exactly as its own Dockerfile makes it — nothing of ours inside yet. an Auditor runs this same step on the same source")
 		if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
 			return res, err
@@ -185,13 +185,13 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 
 	step("Repacking the image so that anyone rebuilding it gets the same bytes", "docker layers carry build timestamps and an arbitrary file order; we lay the filesystem out in a fixed order and drop files that only record when it was built, so the Vendor's and the Auditor's builds of one source are byte-identical")
-	first, err := normalize(ctx, r, res.Image, b.Out)
+	first, err := normalize(ctx, r, res.Image, b.OutDir)
 	if err != nil {
 		return res, err
 	}
 
-	res.EIF = filepath.Join(b.Out, b.Name+".eif")
-	res.Measurements = filepath.Join(b.Out, "measurements.json")
+	res.EIF = filepath.Join(b.OutDir, b.ImageName+".eif")
+	res.Measurements = filepath.Join(b.OutDir, "measurements.json")
 	step("Making the enclave image (EIF) → "+res.EIF, "nitro-cli produces the bootable enclave image and its measurements PCR0·1·2 — the fingerprint that the enclave will attest to and that goes on the chain")
 	out, err := r.output(ctx, "nitro-cli", "build-enclave", "--docker-uri", res.Image, "--output-file", res.EIF)
 	if err != nil {
@@ -223,7 +223,7 @@ func (b Build) layerResponder(ctx context.Context, r runner, from, to string, ap
 		return err
 	}
 	defer os.RemoveAll(dir)
-	bin, err := os.ReadFile(b.Binary)
+	bin, err := os.ReadFile(b.ResponderPath)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ ENTRYPOINT ["/att-entrypoint.sh"]
 // import drops the image config (ENTRYPOINT, ENV), so the original is put back. That is measured too: changing only
 // the ENTRYPOINT, with the files untouched, was measured to change PCR0 and PCR2.
 //
-// workDir must be on real disk (b.Out). The default OS temp directory (/tmp) is a RAM-backed tmpfs of only a few GiB on
+// workDir must be on real disk (b.OutDir). The default OS temp directory (/tmp) is a RAM-backed tmpfs of only a few GiB on
 // Amazon Linux, and the exported tar, the extracted files and the repacked tar together can exceed that
 // (reproduced: "wrote only N of 10240 bytes").
 func normalize(ctx context.Context, r runner, image, workDir string) (manifest, error) {

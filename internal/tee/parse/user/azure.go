@@ -12,7 +12,7 @@ type AzureParser struct{}
 
 var _ Parser = (*AzureParser)(nil)
 
-func (AzureParser) VerifySig(ctx context.Context, ra r.RADoc, key []byte) error {
+func (AzureParser) VerifySig(ctx context.Context, ra r.RADoc, rootCert []byte) error {
 	return errors.New("tee/parse/user: azure VerifySig not implemented")
 }
 

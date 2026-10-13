@@ -18,51 +18,51 @@ import (
 	p "attestamp/internal/tee/parse/user"
 )
 
-// lookup: the User does not register, so there is no registry-deploy or register. With --key, reads that key directly.
-// Otherwise it first finds the keys via --measurements, then reads them all. It returns the keys it found, so run
+// lookup: the User does not register, so there is no registry-deploy or register. With --record-key, reads that record key directly.
+// Otherwise it first finds the record keys via --measurements, then reads them all. It returns the record keys it found, so run
 // can compare each of them.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
-	contract := fs.String("contract", "", "Registry contract address")
-	key := fs.String("key", "", "lookup key (0x…, the key from register). with it, --measurements is not needed")
+	registry := fs.String("registry", "", "Registry contract address")
+	recordKey := fs.String("record-key", "", "record key (0x…, the one register printed). with it, --measurements is not needed")
 	measurements := fs.String("measurements", "", "measurements: a measurements.json file, or NAME=hex,NAME=hex")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
 	ask(rpc, "RPC URL", "https://ethereum-rpc.publicnode.com")
-	ask(contract, "Registry contract address (0x…)", "")
-	if *rpc == "" || !common.IsHexAddress(*contract) {
-		return nil, errors.New("--rpc and --contract are required")
+	ask(registry, "Registry address (0x…)", "")
+	if *rpc == "" || !common.IsHexAddress(*registry) {
+		return nil, errors.New("--rpc and --registry are required")
 	}
-	reader := lether.Reader{RPC: *rpc, Contract: common.HexToAddress(*contract)}
+	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry)}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	keys := []string{*key}
-	if *key == "" {
+	recordKeys := []string{*recordKey}
+	if *recordKey == "" {
 		if *measurements == "" {
-			return nil, errors.New("--key or --measurements is required")
+			return nil, errors.New("--record-key or --measurements is required")
 		}
 		values, err := readMeasurements(*measurements)
 		if err != nil {
 			return nil, err
 		}
-		keys, err = reader.FindAddress(ctx, values)
+		recordKeys, err = reader.FindRecordKeys(ctx, values)
 		if err != nil {
 			return nil, err
 		}
-		if len(keys) == 0 {
+		if len(recordKeys) == 0 {
 			if !quiet {
 				fmt.Println("nothing registered")
 			}
 			return nil, nil
 		}
 		if !quiet {
-			fmt.Printf("found %d key(s)\n", len(keys))
+			fmt.Printf("found %d record key(s)\n", len(recordKeys))
 		}
 	}
-	for _, k := range keys {
+	for _, k := range recordKeys {
 		reg, err := reader.Lookup(ctx, k)
 		if err != nil {
 			return nil, err
@@ -70,15 +70,15 @@ func lookup(args []string) ([]string, error) {
 		if quiet {
 			continue
 		}
-		fmt.Printf("key       %s\n", k)
-		fmt.Printf("  signer  %s\n", reg.Signer)
-		fmt.Printf("  service %s %s (%s, %s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform, reg.Meta.Arch)
-		fmt.Printf("  expires %s\n", time.Unix(reg.Expires, 0).UTC().Format(time.RFC3339))
+		fmt.Printf("record key  %s\n", k)
+		fmt.Printf("  approver  %s\n", reg.Approver)
+		fmt.Printf("  service   %s %s (%s, %s)\n", reg.Meta.Service, reg.Meta.Version, reg.Meta.Platform, reg.Meta.Arch)
+		fmt.Printf("  expires   %s\n", time.Unix(reg.Expires, 0).UTC().Format(time.RFC3339))
 		if h := reg.Values.Get("measurementHash"); h != nil {
 			fmt.Printf("  measurement hash  %s\n", hex.EncodeToString(h))
 		}
 	}
-	return keys, nil
+	return recordKeys, nil
 }
 
 // readMeasurements accepts nitro-cli's measurements.json ({"Measurements":{"PCR0":...}}), a flat {"PCR0":...}, or NAME=hex,...

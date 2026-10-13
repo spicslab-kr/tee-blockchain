@@ -116,41 +116,41 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	vValues, aValues := pcrs(0x10)
 
 	// Auditor: through the auditor package, to its own contract.
-	auditor := audether.Registrar{Backend: client, Contract: aContract, SenderKey: auditorKey}
+	auditor := audether.Registrar{Backend: client, RegistryAddr: aContract, SenderKey: auditorKey}
 	aMeta := aud.Meta{Meta: al.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro", Arch: "amd64"}, Expires: expires}
 	aSigned, err := auditor.Sign(aValues, aMeta, auditorKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if aSigned.Signer != auditorAddr.Hex() {
-		t.Fatalf("signer %s", aSigned.Signer)
+	if aSigned.Approver != auditorAddr.Hex() {
+		t.Fatalf("approver %s", aSigned.Approver)
 	}
 	h, _ := aud.MeasurementHash(aValues)
-	onchainEntry := audether.RegistryEntry{Platform: aMeta.Platform, Arch: aMeta.Arch, Service: aMeta.Service, Version: aMeta.Version, Measurement: h, Expires: uint64(expires.Unix())}
-	onchainDigest, err := aRegistry.Digest(call, onchainEntry)
+	onchainRegistration := audether.RegistryRegistration{Platform: aMeta.Platform, Arch: aMeta.Arch, Service: aMeta.Service, Version: aMeta.Version, Measurement: h, Expires: uint64(expires.Unix())}
+	onchainDigest, err := aRegistry.Digest(call, onchainRegistration)
 	if err != nil || !bytes.Equal(onchainDigest[:], aSigned.Digest) {
 		t.Fatalf("Go digest differs from the contract's: %x vs %x (%v)", aSigned.Digest, onchainDigest, err)
 	}
 	// If arch differs, the contract's digest must differ too: if it does not, arch is not part of the signature.
-	otherArch := onchainEntry
+	otherArch := onchainRegistration
 	otherArch.Arch = "arm64"
 	if d, err := aRegistry.Digest(call, otherArch); err != nil || d == onchainDigest {
 		t.Fatalf("the contract's digest must depend on arch (%v)", err)
 	}
-	// An Entry with an empty arch: the contract rejects it with MissingField("arch"). On the Go side Meta.Validate blocks it first,
+	// A Registration with an empty arch: the contract rejects it with MissingField("arch"). On the Go side Meta.Validate blocks it first,
 	// so it is sent through the binding directly. The field check comes before signature recovery, so any signature will do.
-	if field := missingField(t, ctx, client, aRegistry, auditorKey, audether.RegistryEntry{Platform: "aws-nitro", Service: "my-app", Version: "1.0.0", Measurement: h, Expires: uint64(expires.Unix())}, aSigned.Signature); field != "arch" {
-		t.Fatalf("an entry without an arch must be rejected with MissingField(\"arch\"), got %q", field)
+	if field := missingField(t, ctx, client, aRegistry, auditorKey, audether.RegistryRegistration{Platform: "aws-nitro", Service: "my-app", Version: "1.0.0", Measurement: h, Expires: uint64(expires.Unix())}, aSigned.Signature); field != "arch" {
+		t.Fatalf("a registration without an arch must be rejected with MissingField(\"arch\"), got %q", field)
 	}
 	aReceipt, err := auditor.Register(ctx, aSigned)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec, err := aRegistry.Lookup(call, common.HexToHash(aReceipt.Key))
+	rec, err := aRegistry.Lookup(call, common.HexToHash(aReceipt.RecordKey))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rec.Signer != auditorAddr || rec.Expires != uint64(expires.Unix()) || rec.RegisteredAt == 0 || rec.ChainTime < rec.RegisteredAt {
+	if rec.Approver != auditorAddr || rec.Expires != uint64(expires.Unix()) || rec.RegisteredAt == 0 || rec.ChainTime < rec.RegisteredAt {
 		t.Fatalf("lookup: %+v", rec)
 	}
 
@@ -159,8 +159,8 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("want ErrAlreadyRegistered, got %v", err)
 	}
 
-	// Vendor: through the vendor package, the same measurements to its own contract. The signer differs, so the key differs.
-	vendor := venether.Registrar{Backend: client, Contract: vContract, SenderKey: vendorKey}
+	// Vendor: through the vendor package, the same measurements to its own contract. The approver differs, so the record key differs.
+	vendor := venether.Registrar{Backend: client, RegistryAddr: vContract, SenderKey: vendorKey}
 	vMeta := ven.Meta{Meta: vl.Meta{Service: "my-app", Version: "1.0.0", Platform: "aws-nitro", Arch: "arm64"}, Expires: expires}
 	vSigned, err := vendor.Sign(vValues, vMeta, vendorKey)
 	if err != nil {
@@ -170,15 +170,15 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vReceipt.Key == aReceipt.Key {
-		t.Fatal("auditor and vendor registrations must have different keys")
+	if vReceipt.RecordKey == aReceipt.RecordKey {
+		t.Fatal("auditor and vendor registrations must have different record keys")
 	}
-	// keyFor: the key each contract produces for its own signer must equal the key in the receipt.
-	if k, err := aRegistry.KeyFor(call, "aws-nitro", h); err != nil || common.Hash(k).Hex() != aReceipt.Key {
-		t.Fatalf("auditor keyFor = %x (%v), want %s", k, err, aReceipt.Key)
+	// recordKeyFor: the record key each contract produces for its own approver must equal the one in the receipt.
+	if k, err := aRegistry.RecordKeyFor(call, "aws-nitro", h); err != nil || common.Hash(k).Hex() != aReceipt.RecordKey {
+		t.Fatalf("auditor recordKeyFor = %x (%v), want %s", k, err, aReceipt.RecordKey)
 	}
-	if k, err := vRegistry.KeyFor(call, "aws-nitro", h); err != nil || common.Hash(k).Hex() != vReceipt.Key {
-		t.Fatalf("vendor keyFor = %x (%v), want %s", k, err, vReceipt.Key)
+	if k, err := vRegistry.RecordKeyFor(call, "aws-nitro", h); err != nil || common.Hash(k).Hex() != vReceipt.RecordKey {
+		t.Fatalf("vendor recordKeyFor = %x (%v), want %s", k, err, vReceipt.RecordKey)
 	}
 
 	// A signature cannot be registered on a contract with a different approver: an auditor signature on the vendor's contract.
@@ -202,7 +202,7 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("want ErrNotAnApprover, got %v", err)
 	}
 
-	// changing a value after signing: a different address is recovered as the signer, so it is rejected.
+	// changing a value after signing: a different address is recovered as the approver, so it is rejected.
 	tampered := vSigned
 	tampered.Meta.Version = "1.0.1"
 	if _, err := vendor.Register(ctx, tampered); !errors.Is(err, ven.ErrNotAnApprover) {
@@ -221,14 +221,14 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 		t.Fatalf("want ErrExpiryPassed, got %v", err)
 	}
 
-	// unregistered key: empty
+	// unregistered record key: empty
 	empty, err := vRegistry.Lookup(call, common.HexToHash("0x3039"))
-	if err != nil || empty.Signer != (common.Address{}) || empty.Expires != 0 {
-		t.Fatalf("unknown key must be empty: %+v %v", empty, err)
+	if err != nil || empty.Approver != (common.Address{}) || empty.Expires != 0 {
+		t.Fatalf("unknown record key must be empty: %+v %v", empty, err)
 	}
 
-	// anyone may send the transaction; the signer is the registrant
-	relay := venether.Registrar{Backend: client, Contract: vContract, SenderKey: deployerKey}
+	// anyone may send the transaction; the approver is the registrant
+	relay := venether.Registrar{Backend: client, RegistryAddr: vContract, SenderKey: deployerKey}
 	rValues, _ := pcrs(0x40)
 	rSigned, err := relay.Sign(rValues, vMeta, vendorKey)
 	if err != nil {
@@ -238,27 +238,27 @@ func TestEther_AuditorAndVendorRegister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rec, _ := vRegistry.Lookup(call, common.HexToHash(rReceipt.Key)); rec.Signer != vendorAddr {
-		t.Fatalf("signer must be the vendor, not the sender: %s", rec.Signer.Hex())
+	if rec, _ := vRegistry.Lookup(call, common.HexToHash(rReceipt.RecordKey)); rec.Approver != vendorAddr {
+		t.Fatalf("approver must be the vendor, not the sender: %s", rec.Approver.Hex())
 	}
 
 	// the Registered event carries arch; lookup (chain/lookup) reads it from there
-	iter, err := vRegistry.FilterRegistered(&bind.FilterOpts{Context: ctx}, [][32]byte{common.HexToHash(rReceipt.Key)}, nil)
+	iter, err := vRegistry.FilterRegistered(&bind.FilterOpts{Context: ctx}, [][32]byte{common.HexToHash(rReceipt.RecordKey)}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer iter.Close()
 	if !iter.Next() {
-		t.Fatalf("no Registered event for %s (%v)", rReceipt.Key, iter.Error())
+		t.Fatalf("no Registered event for %s (%v)", rReceipt.RecordKey, iter.Error())
 	}
-	if ev := iter.Event; ev.Arch != "arm64" || ev.Service != "my-app" || ev.Signer != vendorAddr {
-		t.Fatalf("Registered event = arch %q service %q signer %s", ev.Arch, ev.Service, ev.Signer.Hex())
+	if ev := iter.Event; ev.Arch != "arm64" || ev.Service != "my-app" || ev.Approver != vendorAddr {
+		t.Fatalf("Registered event = arch %q service %q approver %s", ev.Arch, ev.Service, ev.Approver.Hex())
 	}
 }
 
-// missingField sends an Entry straight through the binding and, if the contract rejects it with MissingField, returns that field name.
+// missingField sends a Registration straight through the binding and, if the contract rejects it with MissingField, returns that field name.
 // Any other error, or success, is a failure.
-func missingField(t *testing.T, ctx context.Context, client simulated.Client, registry *audether.Registry, senderKey []byte, e audether.RegistryEntry, sig []byte) string {
+func missingField(t *testing.T, ctx context.Context, client simulated.Client, registry *audether.Registry, senderKey []byte, e audether.RegistryRegistration, sig []byte) string {
 	t.Helper()
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
@@ -275,7 +275,7 @@ func missingField(t *testing.T, ctx context.Context, client simulated.Client, re
 	opts.Context = ctx
 	_, err = registry.Register(opts, e, sig)
 	if err == nil {
-		t.Fatal("the contract accepted an entry it must reject")
+		t.Fatal("the contract accepted a registration it must reject")
 	}
 	var de interface{ ErrorData() interface{} }
 	if !errors.As(err, &de) {

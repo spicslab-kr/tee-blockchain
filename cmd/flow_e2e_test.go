@@ -1,5 +1,5 @@
 // run through the real CLI: what a person used to type by hand as separate steps (request, parse, register, lookup, compare), bundled into one command.
-// One contract = one approver, so the Auditor and the Vendor each register on their own contract.
+// One registry = one approver, so the Auditor and the Vendor each register on their own contract.
 // Skipped if anvil is not on PATH.
 package cmd_test
 
@@ -30,10 +30,10 @@ func writeBuildMeasurements(t *testing.T, dir, name, pcr0, pcr1, pcr2 string) st
 	return p
 }
 
-// lastKey: keyLineRe also matches "key ... taken from" (the service/version inference log). The key register actually
+// lastRecordKey: recordKeyLineRe may match more than once (the service/version inference log). The record key register actually
 // registered is always after that, the last match in the output.
-func lastKey(out []byte) []byte {
-	m := keyLineRe.FindAllSubmatch(out, -1)
+func lastRecordKey(out []byte) []byte {
+	m := recordKeyLineRe.FindAllSubmatch(out, -1)
 	if m == nil {
 		return nil
 	}
@@ -42,13 +42,13 @@ func lastKey(out []byte) []byte {
 
 func deployFor(t *testing.T, bin, rpc, deployerFile, approver string) string {
 	t.Helper()
-	out, err := exec.Command(bin, "registry-deploy", "--rpc", rpc, "--key-file", deployerFile, "--approver", approver).CombinedOutput()
+	out, err := exec.Command(bin, "registry-deploy", "--rpc", rpc, "--deployer-key-file", deployerFile, "--approver", approver).CombinedOutput()
 	if err != nil {
 		t.Fatalf("registry-deploy: %v\n%s", err, out)
 	}
 	m := deployedAtRe.FindSubmatch(out)
 	if m == nil {
-		t.Fatalf("contract address not found:\n%s", out)
+		t.Fatalf("registry address not found:\n%s", out)
 	}
 	return string(m[1])
 }
@@ -70,8 +70,8 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	vendorBin := buildBin(t, bins, "./cmd/vendor")
 	userBin := buildBin(t, bins, "./cmd/user")
 
-	auditorContract := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
-	vendorContract := deployFor(t, vendorBin, rpc, deployerFile, vendorAddr)
+	auditorRegistryAddr := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
+	vendorRegistryAddr := deployFor(t, vendorBin, rpc, deployerFile, vendorAddr)
 
 	fixture := filepath.Join(repoRootReg(t), "internal", "tee", "parse", "aws", "testdata", "fixture-my-web.cbor")
 	fixtureNonce := filepath.Join(repoRootReg(t), "internal", "tee", "parse", "aws", "testdata", "fixture-my-web.nonce")
@@ -86,8 +86,8 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 
 	// Auditor, check FAIL: if the value I built (a fake) differs from what the TEE attests, it does not register and fails.
 	aBad := exec.Command(auditorBin, "audit",
-		"--tee", teeAddr, "--measurements", badBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", auditorFile,
-		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "auditor-bad"))
+		"--tee-addr", teeAddr, "--build-measurements", badBuild, "--rpc", rpc, "--registry", auditorRegistryAddr, "--signing-key-file", auditorFile,
+		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out-dir", filepath.Join(work, "auditor-bad"))
 	aBadOut, err := aBad.CombinedOutput()
 	if err == nil {
 		t.Fatalf("run must fail when the built value differs from the TEE value:\n%s", aBadOut)
@@ -101,8 +101,8 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 
 	// Auditor, check PASS: built value = TEE value, so register the built value and self-check.
 	aRun := exec.Command(auditorBin, "audit",
-		"--tee", teeAddr, "--measurements", goodBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", auditorFile,
-		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out", filepath.Join(work, "auditor"))
+		"--tee-addr", teeAddr, "--build-measurements", goodBuild, "--rpc", rpc, "--registry", auditorRegistryAddr, "--signing-key-file", auditorFile,
+		"--service", "run-e2e", "--version", "1.0.0", "--nonce", fixtureNonce, "--out-dir", filepath.Join(work, "auditor"))
 	aOut, err := aRun.CombinedOutput()
 	if err != nil {
 		t.Fatalf("auditor run: %v\n%s", err, aOut)
@@ -110,17 +110,17 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	if !strings.Contains(string(aOut), "identical") || !strings.Contains(string(aOut), "PASS") {
 		t.Fatalf("auditor run must print both check PASS and self-check PASS:\n%s", aOut)
 	}
-	aKey := lastKey(aOut)
-	if aKey == nil {
-		t.Fatalf("auditor run: registration key not found:\n%s", aOut)
+	aRecordKey := lastRecordKey(aOut)
+	if aRecordKey == nil {
+		t.Fatalf("auditor run: record key not found:\n%s", aOut)
 	}
 
 	// Vendor: requests RA from the same TEE itself and registers on its own contract. Its own contract has nothing
 	// yet, so service/version are given directly. --arch is deliberately different from this machine's, so below we see whether User's verify
 	// shows the architecture the chain recorded (the auditor side omits --arch, so it is this machine's GOARCH).
 	vRun := exec.Command(vendorBin, "self-register",
-		"--tee", teeAddr, "--rpc", rpc, "--contract", vendorContract, "--key-file", vendorFile,
-		"--service", "run-e2e", "--version", "1.0.0", "--arch", "arm64", "--nonce", fixtureNonce, "--out", filepath.Join(work, "vendor"))
+		"--tee-addr", teeAddr, "--rpc", rpc, "--registry", vendorRegistryAddr, "--signing-key-file", vendorFile,
+		"--service", "run-e2e", "--version", "1.0.0", "--arch", "arm64", "--nonce", fixtureNonce, "--out-dir", filepath.Join(work, "vendor"))
 	vOut, err := vRun.CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor run: %v\n%s", err, vOut)
@@ -128,14 +128,14 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	if !strings.Contains(string(vOut), "PASS") {
 		t.Fatalf("vendor run must print self-check PASS:\n%s", vOut)
 	}
-	vKey := lastKey(vOut)
-	if vKey == nil || string(vKey) == string(aKey) {
-		t.Fatalf("vendor run registration key equals the auditor's or was not captured:\n%s", vOut)
+	vRecordKey := lastRecordKey(vOut)
+	if vRecordKey == nil || string(vRecordKey) == string(aRecordKey) {
+		t.Fatalf("vendor run registration record key equals the auditor's or was not captured:\n%s", vOut)
 	}
 
-	// Registering on the Auditor's contract with the Vendor's key is rejected: one contract = one approver.
+	// Registering on the Auditor's contract with the Vendor's key is rejected: one registry = one approver.
 	vWrong := exec.Command(vendorBin, "self-register",
-		"--measurements", goodBuild, "--rpc", rpc, "--contract", auditorContract, "--key-file", vendorFile,
+		"--build-measurements", goodBuild, "--rpc", rpc, "--registry", auditorRegistryAddr, "--signing-key-file", vendorFile,
 		"--service", "run-e2e", "--version", "1.0.0")
 	if out, err := vWrong.CombinedOutput(); err == nil {
 		t.Fatalf("the Vendor key is not the approver of the Auditor contract, so it must fail:\n%s", out)
@@ -143,12 +143,12 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 
 	// User: start to finish in one go (request, parse, lookup, compare), each contract looked at separately. The line of a matching
 	// registration must show the architecture the chain recorded: User finds it without knowing the arch and reads it afterwards.
-	for contract, arch := range map[string]string{auditorContract: runtime.GOARCH, vendorContract: "arm64"} {
-		uRun := exec.Command(userBin, "verify", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
-			"--nonce", fixtureNonce, "--out", t.TempDir())
+	for registryAddr, arch := range map[string]string{auditorRegistryAddr: runtime.GOARCH, vendorRegistryAddr: "arm64"} {
+		uRun := exec.Command(userBin, "verify", "--tee-addr", teeAddr, "--rpc", rpc, "--registry", registryAddr,
+			"--nonce", fixtureNonce, "--out-dir", t.TempDir())
 		uOut, err := uRun.CombinedOutput()
 		if err != nil {
-			t.Fatalf("user run (%s): %v\n%s", contract, err, uOut)
+			t.Fatalf("user run (%s): %v\n%s", registryAddr, err, uOut)
 		}
 		if !strings.Contains(string(uOut), "trusted —") {
 			t.Fatalf("user run must say it is trusted on the registered contract:\n%s", uOut)
@@ -175,15 +175,15 @@ func TestRun_E2E_User_NothingRegistered(t *testing.T) {
 	vendorBin := buildBin(t, bins, "./cmd/vendor")
 	userBin := buildBin(t, bins, "./cmd/user")
 
-	contract := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
+	registryAddr := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
 
 	fixture := filepath.Join(repoRootReg(t), "internal", "tee", "parse", "aws", "testdata", "fixture-my-web.cbor")
 	fixtureNonce := filepath.Join(repoRootReg(t), "internal", "tee", "parse", "aws", "testdata", "fixture-my-web.nonce")
 	teeAddr, stopServe := startServe(t, vendorBin, fixture)
 	defer stopServe()
 
-	uRun := exec.Command(userBin, "verify", "--tee", teeAddr, "--rpc", rpc, "--contract", contract,
-		"--nonce", fixtureNonce, "--out", t.TempDir())
+	uRun := exec.Command(userBin, "verify", "--tee-addr", teeAddr, "--rpc", rpc, "--registry", registryAddr,
+		"--nonce", fixtureNonce, "--out-dir", t.TempDir())
 	out, err := uRun.CombinedOutput()
 	ee, ok := err.(*exec.ExitError)
 	if !ok || ee.ExitCode() != 1 {

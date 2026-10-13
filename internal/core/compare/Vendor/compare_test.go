@@ -77,7 +77,7 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, vendorAddr)
+	registryAddr, _, err := regether.Deploy(ctx, "", client, deployerKey, vendorAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 		{Name: "PCR1", Value: bytes.Repeat([]byte{0x22}, 48)},
 	}
 	expires := time.Now().Add(time.Hour).Truncate(time.Second)
-	registrar := regether.Registrar{Backend: client, Contract: contract, SenderKey: vendorKey}
+	registrar := regether.Registrar{Backend: client, RegistryAddr: registryAddr, SenderKey: vendorKey}
 	meta := reg.Meta{Meta: l.Meta{Service: "svc", Version: "1.0.0", Platform: lether.DefaultPlatform, Arch: "amd64"}, Expires: expires}
 	signed, err := registrar.Sign(values, meta, vendorKey)
 	if err != nil {
@@ -97,35 +97,35 @@ func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reader := lether.Reader{Contract: contract, Backend: client}
-	regInfo, err := reader.Lookup(ctx, receipt.Key)
+	reader := lether.Reader{RegistryAddr: registryAddr, Backend: client}
+	regInfo, err := reader.Lookup(ctx, receipt.RecordKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	trusted, err := reader.TrustedSigners(ctx)
+	trustedApprovers, err := reader.TrustedApprovers(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Check with the value just registered; it must pass.
-	if v := (Impl{}).Check(values, regInfo, time.Now().Unix(), trusted); !v.Pass {
+	if v := (Impl{}).Check(values, regInfo, time.Now().Unix(), trustedApprovers); !v.Pass {
 		t.Fatalf("exactly the registered value failed: %+v", v)
 	}
 
 	// Check with a different value; the hash differs, so it must fail.
 	other := p.Measurements{{Name: "PCR0", Value: bytes.Repeat([]byte{0x99}, 48)}}
-	if v := (Impl{}).Check(other, regInfo, time.Now().Unix(), trusted); v.Pass {
+	if v := (Impl{}).Check(other, regInfo, time.Now().Unix(), trustedApprovers); v.Pass {
 		t.Fatal("a different measurement passed")
 	}
 
 	// Check with a time past expiry; it must fail.
 	future := expires.Add(time.Hour).Unix()
-	if v := (Impl{}).Check(values, regInfo, future, trusted); v.Pass {
+	if v := (Impl{}).Check(values, regInfo, future, trustedApprovers); v.Pass {
 		t.Fatal("a time past expiry passed")
 	}
 
-	// A signer outside the trusted list; it must fail.
+	// A approver outside the trusted list; it must fail.
 	if v := (Impl{}).Check(values, regInfo, time.Now().Unix(), []string{"0x0000000000000000000000000000000000000001"}); v.Pass {
-		t.Fatal("a signer outside the trusted list passed")
+		t.Fatal("a approver outside the trusted list passed")
 	}
 }

@@ -25,7 +25,7 @@ func writeBuildConfig(t *testing.T, dir, service, version, arch, goVer string) s
   "schema": "attestamp.build-config/1",
   "service": "` + service + `",
   "version": "` + version + `",
-  "platform": "aws",
+  "platform": "aws-nitro",
   "source": { "repo": "https://example.com/svc.git", "commit": "0123456789abcdef0123456789abcdef01234567", "path": "mainline/alpine-slim" },
   "tee_info": { "instance_id": "i-0abc", "region": "eu-north-1", "ami_id": "ami-0123" },
   "build_env": { "os": "linux", "arch": "` + arch + `", "go": "` + goVer + `", "trimpath": true }
@@ -71,8 +71,8 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	bins := t.TempDir()
 	auditorBin := buildBin(t, bins, "./cmd/auditor")
 	vendorBin := buildBin(t, bins, "./cmd/vendor")
-	contract := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
-	vContract := deployFor(t, vendorBin, rpc, deployerFile, vendorAddr)
+	registryAddr := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
+	vendorRegistryAddr := deployFor(t, vendorBin, rpc, deployerFile, vendorAddr)
 
 	goVer, arch := runtime.Version(), otherArch()
 	cfg := writeBuildConfig(t, t.TempDir(), "cfg-svc", "2.0.0", arch, goVer)
@@ -81,7 +81,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	}
 
 	// 1. --config only: service, version, arch and go all from the file. All three of registration sentence, confirmation block and build_env hint.
-	out, err := exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
+	out, err := exec.Command(auditorBin, "register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile,
 		"--measurements", measurements("a1"), "--config", cfg).CombinedOutput()
 	if err != nil {
 		t.Fatalf("register --config: %v\n%s", err, out)
@@ -89,7 +89,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	for _, want := range []string{
 		"registering cfg-svc 2.0.0 (" + arch + ", " + goVer + " -trimpath)",
 		"registered cfg-svc 2.0.0 (" + arch + ", " + goVer + " -trimpath)",
-		"build env  linux/" + arch + " " + goVer + " trimpath=true",
+		"build env   linux/" + arch + " " + goVer + " trimpath=true",
 		`"build_env": {"os":"linux","arch":"` + arch + `","go":"` + goVer + `","trimpath":true}`,
 	} {
 		if !bytes.Contains(out, []byte(want)) {
@@ -99,12 +99,12 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	if bytes.Contains(out, []byte("warning:")) {
 		t.Errorf("--config alone must not warn:\n%s", out)
 	}
-	if keyLineRe.FindSubmatch(out) == nil {
-		t.Fatalf("no registration key in output:\n%s", out)
+	if recordKeyLineRe.FindSubmatch(out) == nil {
+		t.Fatalf("no record key in output:\n%s", out)
 	}
 
 	// 2. --config and --service other: the flag wins, with a one-line warning that it differs from the file. version and arch still come from the file.
-	out, err = exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
+	out, err = exec.Command(auditorBin, "register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile,
 		"--measurements", measurements("b2"), "--config", cfg, "--service", "other").CombinedOutput()
 	if err != nil {
 		t.Fatalf("register --config --service other: %v\n%s", err, out)
@@ -122,7 +122,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	}
 
 	// 3. neither: the required-value error mentions --config too. Nothing goes to the chain.
-	out, err = exec.Command(auditorBin, "register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
+	out, err = exec.Command(auditorBin, "register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile,
 		"--measurements", measurements("c3")).CombinedOutput()
 	if err == nil {
 		t.Fatalf("register with neither --config nor --service/--version must fail:\n%s", out)
@@ -137,7 +137,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	}
 
 	// 4. the Vendor's register takes --config the same way (self-register passes it straight through).
-	out, err = exec.Command(vendorBin, "register", "--rpc", rpc, "--contract", vContract, "--key-file", vendorFile,
+	out, err = exec.Command(vendorBin, "register", "--rpc", rpc, "--registry", vendorRegistryAddr, "--signing-key-file", vendorFile,
 		"--measurements", measurements("d4"), "--config", cfg).CombinedOutput()
 	if err != nil {
 		t.Fatalf("vendor register --config: %v\n%s", err, out)
@@ -147,7 +147,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	}
 }
 
-// TestConfig_E2E_SendBuildsRecordFromConfig: send --config --measurements --image (without --record) builds the record here,
+// TestConfig_E2E_SendBuildsRecordFromConfig: send --config --measurements --eif (without --record) builds the record here,
 // pushes it to a local bare repository, and also leaves a measurement-record.json next to measurements.json. In the pushed record service, version and
 // build_env are the config's as they are, values are the PCRs of measurements.json as they are, and build_tool.version is the flag's value.
 func TestConfig_E2E_SendBuildsRecordFromConfig(t *testing.T) {
@@ -169,14 +169,14 @@ func TestConfig_E2E_SendBuildsRecordFromConfig(t *testing.T) {
 	}
 
 	remote := gitBare(t)
-	cmd := exec.Command(auditorBin, "send", "--repo", remote, "--config", cfg, "--measurements", meas, "--image", eif, "--build-tool-version", "1.5.0")
+	cmd := exec.Command(auditorBin, "send", "--repo", remote, "--config", cfg, "--measurements", meas, "--eif", eif, "--build-tool-version", "1.5.0")
 	gitIdentity(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("send --config --measurements: %v\n%s", err, out)
 	}
 	for _, want := range []string{
-		"record cfg-svc 2.0.0 aws · build env: linux/" + arch + " " + goVer + " trimpath=true",
+		"record cfg-svc 2.0.0 aws-nitro · build env: linux/" + arch + " " + goVer + " trimpath=true",
 		"record written to " + filepath.Join(outDir, "measurement-record.json"),
 		"sent ",
 	} {
@@ -203,7 +203,7 @@ func TestConfig_E2E_SendBuildsRecordFromConfig(t *testing.T) {
 		if err := json.Unmarshal(raw, &rec); err != nil {
 			t.Fatalf("%s is not JSON: %v\n%s", where, err, raw)
 		}
-		if rec.Schema != "attestamp.measurement-record/1" || rec.Service != "cfg-svc" || rec.Version != "2.0.0" || rec.Platform != "aws" {
+		if rec.Schema != "attestamp.measurement-record/1" || rec.Service != "cfg-svc" || rec.Version != "2.0.0" || rec.Platform != "aws-nitro" {
 			t.Errorf("%s: header drifted from the config: %+v", where, rec)
 		}
 		if rec.BuildEnv.OS != "linux" || rec.BuildEnv.Arch != arch || rec.BuildEnv.Go != goVer || !rec.BuildEnv.Trimpath {
@@ -236,15 +236,15 @@ func TestConfig_E2E_SendBuildsRecordFromConfig(t *testing.T) {
 	}
 	check("measurement-record.json beside measurements.json", beside)
 
-	// --measurements without --config, or without --image: say what is missing and send nothing.
-	cmd = exec.Command(auditorBin, "send", "--repo", gitBare(t), "--measurements", meas, "--image", eif)
+	// --measurements without --config, or without --eif: say what is missing and send nothing.
+	cmd = exec.Command(auditorBin, "send", "--repo", gitBare(t), "--measurements", meas, "--eif", eif)
 	gitIdentity(cmd)
 	if out, err := cmd.CombinedOutput(); err == nil || !bytes.Contains(out, []byte("--config")) || bytes.Contains(out, []byte("sent ")) {
 		t.Errorf("send without --record or --config must refuse and name --config: %v\n%s", err, out)
 	}
 	cmd = exec.Command(auditorBin, "send", "--repo", gitBare(t), "--config", cfg, "--measurements", meas, "--build-tool-version", "1.5.0")
 	gitIdentity(cmd)
-	if out, err := cmd.CombinedOutput(); err == nil || !bytes.Contains(out, []byte("--image")) || bytes.Contains(out, []byte("sent ")) {
-		t.Errorf("send --config without --image must refuse and name --image: %v\n%s", err, out)
+	if out, err := cmd.CombinedOutput(); err == nil || !bytes.Contains(out, []byte("--eif")) || bytes.Contains(out, []byte("sent ")) {
+		t.Errorf("send --config without --eif must refuse and name --eif: %v\n%s", err, out)
 	}
 }

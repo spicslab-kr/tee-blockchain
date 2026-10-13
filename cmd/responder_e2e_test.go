@@ -28,7 +28,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 		t.Fatal(err)
 	}
 	runBuild := func(responder string) (string, error) {
-		out, err := exec.Command(bin, "build", "--app-dir", app, "--out", t.TempDir(), "--responder", responder).CombinedOutput()
+		out, err := exec.Command(bin, "build", "--app-dir", app, "--out-dir", t.TempDir(), "--responder", responder).CombinedOutput()
 		return string(out), err
 	}
 

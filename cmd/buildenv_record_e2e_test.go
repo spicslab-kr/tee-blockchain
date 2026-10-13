@@ -1,6 +1,6 @@
 // How registration and records state their build environment, through the real CLI. The same source has different PCRs on x86_64 and arm64, and with a different Go toolchain,
 // so a registration and the hand-over record (measurement-record.json) must say which architecture and toolchain they are for.
-// The on-chain Entry is unchanged (the measurement hash already differs per architecture, so keys differ on their own); what is checked here is the screen output and
+// The on-chain registration is unchanged (the measurement hash already differs per architecture, so keys differ on their own); what is checked here is the screen output and
 // the record file. register needs anvil (without it only that part is skipped); send runs to the end against a local bare repository, no chain needed.
 package cmd_test
 
@@ -29,13 +29,13 @@ func TestBuildEnv_E2E_RegisterPrintsArchAndToolchain(t *testing.T) {
 	deployerFile := writeKeyFile(t, keys, "deployer.key", deployerKey)
 	auditorFile := writeKeyFile(t, keys, "auditor.key", auditorKey)
 	auditorBin := buildBin(t, t.TempDir(), "./cmd/auditor")
-	contract := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
+	registryAddr := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
 
 	measurements := func(fill string) string {
 		return "PCR0=" + strings.Repeat(fill, 48) + ",PCR1=" + strings.Repeat(fill, 48) + ",PCR2=" + strings.Repeat(fill, 48)
 	}
 	register := func(extra ...string) ([]byte, error) {
-		args := append([]string{"register", "--rpc", rpc, "--contract", contract, "--key-file", auditorFile,
+		args := append([]string{"register", "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile,
 			"--service", "e2e-svc", "--version", "1.0.0", "--platform", "aws-nitro"}, extra...)
 		return exec.Command(auditorBin, args...).CombinedOutput()
 	}
@@ -49,15 +49,15 @@ func TestBuildEnv_E2E_RegisterPrintsArchAndToolchain(t *testing.T) {
 	for _, want := range []string{
 		"registering e2e-svc 1.0.0 (arm64, " + goVer,
 		"registered e2e-svc 1.0.0 (arm64, " + goVer,
-		"build env  linux/arm64 " + goVer + " trimpath=", // the enclave's OS, not this machine's
+		"build env   linux/arm64 " + goVer + " trimpath=", // the enclave's OS, not this machine's
 		`"build_env": {"os":"linux","arch":"arm64","go":"` + goVer + `","trimpath":`,
 	} {
 		if !bytes.Contains(out, []byte(want)) {
 			t.Errorf("register --arch arm64: output lacks %q:\n%s", want, out)
 		}
 	}
-	if keyLineRe.FindSubmatch(out) == nil {
-		t.Fatalf("no registration key in output:\n%s", out)
+	if recordKeyLineRe.FindSubmatch(out) == nil {
+		t.Fatalf("no record key in output:\n%s", out)
 	}
 
 	// 2. --arch x86_64: the uname spelling is refused, and the message must say which spellings are accepted. Nothing goes to the chain.
@@ -96,7 +96,7 @@ func writeRecord(t *testing.T, dir, name, buildEnvLine string) string {
   "schema": "attestamp.measurement-record/1",
   "service": "svc",
   "version": "1.0.0",
-  "platform": "aws",
+  "platform": "aws-nitro",
 ` + buildEnvLine + `  "image": { "path": "svc.eif" },
   "values": [
     { "name": "PCR0", "value": "` + pcrB64(1) + `" },
@@ -148,7 +148,7 @@ func TestBuildEnv_E2E_SendRequiresBuildEnv(t *testing.T) {
 
 	// 1. no build_env: refused. The message must name build_env, and it must fail before any clone or push.
 	noEnv := writeRecord(t, work, "no-build-env.json", "")
-	cmd := exec.Command(auditorBin, "send", "--repo", gitBare(t), "--record", noEnv, "--image", eif)
+	cmd := exec.Command(auditorBin, "send", "--repo", gitBare(t), "--record", noEnv, "--eif", eif)
 	gitIdentity(cmd)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
@@ -168,7 +168,7 @@ func TestBuildEnv_E2E_SendRequiresBuildEnv(t *testing.T) {
 	withEnv := writeRecord(t, work, "with-build-env.json",
 		`  "build_env": { "os": "linux", "arch": "amd64", "go": "`+goVer+`", "trimpath": true },`+"\n")
 	remote := gitBare(t)
-	cmd = exec.Command(auditorBin, "send", "--repo", remote, "--record", withEnv, "--image", eif)
+	cmd = exec.Command(auditorBin, "send", "--repo", remote, "--record", withEnv, "--eif", eif)
 	gitIdentity(cmd)
 	out, err = cmd.CombinedOutput()
 	if err != nil {
@@ -204,7 +204,7 @@ func TestBuildEnv_E2E_SendRequiresBuildEnv(t *testing.T) {
 	// 3. a record naming a Go of a different toolchain: it is sent, but with a one-line warning (it differs from the Go this project pins).
 	otherGo := writeRecord(t, work, "other-go.json",
 		`  "build_env": { "os": "linux", "arch": "amd64", "go": "go1.0.0", "trimpath": true },`+"\n")
-	cmd = exec.Command(auditorBin, "send", "--repo", gitBare(t), "--record", otherGo, "--image", eif)
+	cmd = exec.Command(auditorBin, "send", "--repo", gitBare(t), "--record", otherGo, "--eif", eif)
 	gitIdentity(cmd)
 	out, err = cmd.CombinedOutput()
 	if err != nil {

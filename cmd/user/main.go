@@ -45,48 +45,50 @@ func main() {
 func usage() {
 	fmt.Fprintln(os.Stderr, `att-user — RA request
 
-  ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out <file>] [--at <RFC3339>]
+  ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out-file <file>] [--at <RFC3339>]
               verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements
-  ra-request  --tee <host:port> [--out <file>] [--format <name>] [--timeout 30s]
+  ra-request  --tee-addr <host:port> [--out-file <file>] [--format <name>] [--timeout 30s]
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
               with --format, accepts only a document of that format (aws-nitro · gcp-cs-jwt · azure-maa-jwt)
-  lookup      --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
-              read one key directly, or find the key(s) for the measurements first and read them all. a User only looks up, never registers
-  compare     --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
-              match the value from ra-parse against the chain registration — value, expiry and trusted signer. exit 1 on failure
-  verify      --tee <the Vendor's enclave host:port> --rpc <url> --contract <0x…> [--contract <0x…> …] [--trusted <0x…,0x…>]
+  lookup      --rpc <url> --registry <0x…> (--record-key <0x…> | --measurements <measurements.json | NAME=hex,…>)
+              read one record key directly, or find the record key(s) for the measurements first and read them all. a User only looks up, never registers
+  compare     --attested <measurements.json | NAME=hex,…> --rpc <url> --registry <0x…> --record-key <0x…> [--trusted-approvers <0x…,0x…>]
+              match the value from ra-parse against the chain registration — value, expiry and approver. exit 1 on failure
+  compare     --attested <measurements.json | NAME=hex,…> --expected <same shape>
+              match two sets of measurements as they are. prints PASS/FAIL with the reasons
+  verify      --tee-addr <the Vendor's enclave host:port> --rpc <url> --registry <0x…> [--registry <0x…> …] [--trusted-approvers <0x…,0x…>]
               the trust decision in one go: request and verify the enclave's attestation document, find who registered that measurement, check each
               registration. exit 0 if at least one PASSes, 1 with the reason otherwise. no key, no ETH. --nonce pins the nonce.
-              several --contract (e.g. the Vendor's and the Auditor's registry): each is shown side by side and every one must vouch`)
+              several --registry (e.g. the Vendor's and the Auditor's registry): each is shown side by side and every one must vouch`)
 }
 
 func raRequest(args []string) error {
 	fs := flag.NewFlagSet("ra-request", flag.ContinueOnError)
-	tee := fs.String("tee", "", "TEE address host:port")
-	out := fs.String("out", "ra-doc.cbor", "file to save the document to")
+	teeAddr := fs.String("tee-addr", "", "TEE address host:port")
+	outFile := fs.String("out-file", "ra-doc.cbor", "file to save the document to")
 	format := fs.String("format", "", "expected document format. empty accepts any")
 	timeout := fs.Duration("timeout", 30*time.Second, "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *tee == "" {
-		return errors.New("--tee is required")
+	if *teeAddr == "" {
+		return errors.New("--tee-addr is required")
 	}
-	nonce, doc, err := ra.TCPRequester{Timeout: *timeout}.RequestFresh(context.Background(), *tee)
+	nonce, doc, err := ra.TCPRequester{Timeout: *timeout}.RequestFresh(context.Background(), *teeAddr)
 	if err != nil {
 		return err
 	}
 	if err := doc.ExpectFormat(*format); err != nil {
 		return err
 	}
-	if err := os.WriteFile(*out, doc.Raw, 0o644); err != nil {
+	if err := os.WriteFile(*outFile, doc.Raw, 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(*out+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(*outFile+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
 		return err
 	}
 	if !quiet {
-		fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *out, *out)
+		fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *outFile, *outFile)
 	}
 	return nil
 }

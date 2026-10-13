@@ -84,55 +84,55 @@ func usage() {
 
   version          print the pinned Go toolchain (internal/setup/build/GO_TOOLCHAIN) and the one this binary was built with;
                    exit 1 if they differ — build/pack refuse to run in that case, since the responder's bytes and the measurements depend on it
-  registry-deploy  --rpc <url> --key-file <file> --approver <0x…>
-                   deploy the Registry contract. one signer per contract, fixed at deploy time
-  register         --rpc <url> --contract <0x…> --key-file <file> --measurements <measurements.json | NAME=hex,…>
+  registry-deploy  --rpc <url> --deployer-key-file <file> --approver <0x…>
+                   deploy the Registry contract. one approver per registry, fixed at deploy time. the deployer key only pays gas
+  register         --rpc <url> --registry <0x…> --signing-key-file <file> --measurements <measurements.json | NAME=hex,…>
                    (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--platform aws-nitro] [--expires 2160h]
-                   sign the measurements with my key and register them on the contract. the key in the output is the lookup coordinate.
+                   sign the measurements with my signing key and register them on the registry. the record key in the output is the lookup coordinate.
                    --config takes service, version and the build env from the Vendor's build-config.json; the flags override it, with a warning
-  lookup           --rpc <url> --contract <0x…> (--key <0x…> | --measurements <measurements.json | NAME=hex,…>)
-                   read one key directly, or find the key(s) for the measurements first and read them all
-  compare          --a <measurements.json | NAME=hex,…> --b <same shape>
+  lookup           --rpc <url> --registry <0x…> (--record-key <0x…> | --measurements <measurements.json | NAME=hex,…>)
+                   read one record key directly, or find the record key(s) for the measurements first and read them all
+  compare          --attested <measurements.json | NAME=hex,…> --expected <same shape>
                    match two sets of measurements as they are (parsed vs built, etc.). prints PASS/FAIL with the reasons
-  compare          --a <measurements.json | NAME=hex,…> --rpc <url> --contract <0x…> --key <0x…> [--trusted <0x…,0x…>]
-                   read the registration from the chain and check the value, expiry and trusted signer together. exit 1 on failure
-  audit            --tee <my enclave host:port> --measurements <my out/measurements.json> --rpc <url> --contract <0x…> --key-file <file>
+  compare          --attested <measurements.json | NAME=hex,…> --rpc <url> --registry <0x…> --record-key <0x…> [--trusted-approvers <0x…,0x…>]
+                   read the registration from the chain and check the value, expiry and approver together. exit 1 on failure
+  audit            --tee-addr <my enclave host:port> --build-measurements <my out/measurements.json> --rpc <url> --registry <0x…> --signing-key-file <file>
                    (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--vendor-tee <the Vendor's enclave host:port>]
-                   in one go: request and verify the attestation document from my own enclave, check the attested value against --measurements (the value I
+                   in one go: request and verify the attestation document from my own enclave, check the attested value against --build-measurements (the value I
                    built or measured myself), register that value only if they match, then read it back and check it.
                    --config takes service, version and the build env from the Vendor's build-config.json (receive put it in the
                    clone root); the flags override it, with a warning. --nonce pins the nonce. with --service/--version empty and no
-                   --config, takes them from an existing registration of the same measurements on this contract. without --tee
-                   registers --measurements as is (no audit).
+                   --config, takes them from an existing registration of the same measurements on this registry. without --tee-addr
+                   registers --build-measurements as is (no audit).
                    --vendor-tee also asks the Vendor's running enclave and says whether it runs the same value; what is
                    registered is still my value
   receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
                    clone the source repository and read the build config. build from that directory
-  send             --repo <url> --config <build-config.json> --measurements <out/measurements.json> --image <file> [--build-tool-version <v>] [--workdir <clone>]
+  send             --repo <url> --config <build-config.json> --measurements <out/measurements.json> --eif <file> [--build-tool-version <v>] [--workdir <clone>]
                    build the measurement record from the Vendor's build-config.json (service, version, build_env) and my
                    measurements.json (PCR0·1·2), write it next to the measurements, then commit and push it with the image.
                    --build-tool-version is nitro-cli's; without it, what nitro-cli --version says here
-  send             --repo <url> --record <measurement-record.json> [--image <file>] [--workdir <clone>]
+  send             --repo <url> --record <measurement-record.json> [--eif <file>] [--workdir <clone>]
                    the same with a hand-written record. it must say which build environment it is for ("build_env": os,
                    arch amd64 | arm64, go, trimpath) — measurements differ per architecture and per Go toolchain
-  build       --app-dir <dir with the software's Dockerfile>  [--name <n>] [--port 5000] [--out out] [--responder <att-ra-responder>] [--verify]
+  build       --app-dir <dir with the software's Dockerfile>  [--image-name <n>] [--port 5000] [--out-dir out] [--responder <att-ra-responder>] [--verify]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
               for source that the Auditor rebuilds
-  pack        --image <docker image you built>  [--name <n>] [--port 5000] [--out out] [--responder <att-ra-responder>]
+  pack        --docker-image <docker image you built>  [--image-name <n>] [--port 5000] [--out-dir out] [--responder <att-ra-responder>]
               same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
               for an image handed over as a file
-  launch      --eif <file>  [--measurements <file>] [--name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out out]
+  launch      --eif <file>  [--build-measurements <file>] [--enclave-name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out-dir out]
               on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock,
               requests RA from itself to confirm, then opens the security-group port (when permitted).
-              --measurements is for a received EIF: the file it came with. the EIF is then measured itself (→ out/measurements.json) and launched only if it measures to that
+              --build-measurements is for a received EIF: the file it came with. the EIF is then measured itself (→ out/measurements.json) and launched only if it measures to that
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
   lo-up       brings up loopback inside the enclave. once, before starting the software
   ra-proxy    --listen <host:port>  --vsock <cid>:<port>
               runs on the Nitro parent instance. forwards incoming TCP connections to the enclave's vsock
-  ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out <file>] [--at <RFC3339>]
+  ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out-file <file>] [--at <RFC3339>]
               verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements
-  ra-request  --tee <host:port> [--out <file>] [--format <name>] [--timeout 30s]
+  ra-request  --tee-addr <host:port> [--out-file <file>] [--format <name>] [--timeout 30s]
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
               with --format, accepts only a document of that format (aws-nitro · gcp-cs-jwt · azure-maa-jwt)
 
@@ -177,7 +177,7 @@ func receive(args []string) error {
 		cli.Okln("build env matches the Vendor's")
 	}
 	// the config carries service, version and build_env, so audit needs none of them typed again
-	fmt.Printf("next: att-auditor audit --config %s --tee <this-instance>:5000 --measurements out/measurements.json --rpc <url> --contract <0x…> --key-file <key>\n", got.Path)
+	fmt.Printf("next: att-auditor audit --config %s --tee-addr <this-instance>:5000 --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>\n", got.Path)
 	return nil
 }
 
@@ -187,7 +187,7 @@ func send(args []string) error {
 	recPath := fs.String("record", "", "path to a hand-written measurement-record.json. instead of it, --config and --measurements build the record here")
 	config := fs.String("config", "", "the Vendor's build-config.json: the record's service, version, platform and build_env are taken from it")
 	measurements := fs.String("measurements", "", "my out/measurements.json (nitro-cli's {\"Measurements\":{\"PCR0\":…}}): the record's values are taken from it")
-	image := fs.String("image", "", "image file (aws: the EIF). overrides image.path in the record; required with --config")
+	eif := fs.String("eif", "", "the EIF file. overrides image.path in the record; required with --config")
 	buildToolVersion := fs.String("build-tool-version", "", "with --config: nitro-cli's version, for the record's build_tool. default: what `nitro-cli --version` says here")
 	work := fs.String("workdir", "", "an existing clone to work in (default: a temporary clone)")
 	if err := fs.Parse(args); err != nil {
@@ -207,12 +207,12 @@ func send(args []string) error {
 		}
 	} else {
 		var err error
-		if rec, err = buildRecord(*config, *measurements, *image, *buildToolVersion); err != nil {
+		if rec, err = buildRecord(*config, *measurements, *eif, *buildToolVersion); err != nil {
 			return err
 		}
 	}
-	if *image != "" {
-		rec.Image.Path = *image
+	if *eif != "" {
+		rec.Image.Path = *eif
 	}
 	// Screen the record before cloning and hashing the image (Send checks again). Send fills in the image hash, so only that slot is filled in for this check.
 	// A record without build_env cannot say which architecture or toolchain it is for, so it is not sent.
@@ -244,15 +244,15 @@ func send(args []string) error {
 
 // buildRecord — send --config --measurements: the measurement record from what is already on disk. service, version,
 // platform and build_env are the Vendor's build-config.json (the build that was measured); values are nitro-cli's
-// measurements.json (PCR0·1·2); image.path is --image; build_tool is nitro-cli with --build-tool-version, or the
+// measurements.json (PCR0·1·2); image.path is --eif; build_tool is nitro-cli with --build-tool-version, or the
 // version `nitro-cli --version` reports on this instance. Send fills in image.sha256.
-func buildRecord(configPath, measPath, image, toolVersion string) (tr.MeasurementRecord, error) {
+func buildRecord(configPath, measPath, eif, toolVersion string) (tr.MeasurementRecord, error) {
 	cfg, err := loadBuildConfig(configPath)
 	if err != nil {
 		return tr.MeasurementRecord{}, err
 	}
-	if image == "" {
-		return tr.MeasurementRecord{}, errors.New("--image is required with --config: the record names the EIF that was measured")
+	if eif == "" {
+		return tr.MeasurementRecord{}, errors.New("--eif is required with --config: the record names the EIF that was measured")
 	}
 	values, err := readMeasurements(measPath)
 	if err != nil {
@@ -268,7 +268,7 @@ func buildRecord(configPath, measPath, image, toolVersion string) (tr.Measuremen
 	return tr.MeasurementRecord{
 		Schema: tr.SchemaMeasurementRecord, Service: cfg.Service, Version: cfg.Version, Platform: cfg.Platform,
 		BuildEnv:  cfg.BuildEnv,
-		Image:     tr.Image{Path: image},
+		Image:     tr.Image{Path: eif},
 		Values:    values,
 		BuildTool: tr.BuildTool{Name: "nitro-cli", Version: toolVersion},
 	}, nil
@@ -314,31 +314,31 @@ func writeRecordBeside(rec tr.MeasurementRecord, measPath string) (string, error
 
 func raRequest(args []string) error {
 	fs := flag.NewFlagSet("ra-request", flag.ContinueOnError)
-	tee := fs.String("tee", "", "TEE address host:port")
-	out := fs.String("out", "ra-doc.cbor", "file to save the document to")
+	teeAddr := fs.String("tee-addr", "", "TEE address host:port")
+	outFile := fs.String("out-file", "ra-doc.cbor", "file to save the document to")
 	format := fs.String("format", "", "expected document format. empty accepts any")
 	timeout := fs.Duration("timeout", 30*time.Second, "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *tee == "" {
-		return errors.New("--tee is required")
+	if *teeAddr == "" {
+		return errors.New("--tee-addr is required")
 	}
-	nonce, doc, err := ra.TCPRequester{Timeout: *timeout}.RequestFresh(context.Background(), *tee)
+	nonce, doc, err := ra.TCPRequester{Timeout: *timeout}.RequestFresh(context.Background(), *teeAddr)
 	if err != nil {
 		return err
 	}
 	if err := doc.ExpectFormat(*format); err != nil {
 		return err
 	}
-	if err := os.WriteFile(*out, doc.Raw, 0o644); err != nil {
+	if err := os.WriteFile(*outFile, doc.Raw, 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(*out+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(*outFile+".nonce", []byte(hex.EncodeToString(nonce)+"\n"), 0o644); err != nil {
 		return err
 	}
 	if !quiet {
-		fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *out, *out)
+		fmt.Printf("received %s document, %d bytes → %s (nonce → %s.nonce)\n", doc.Format, len(doc.Raw), *outFile, *outFile)
 	}
 	return nil
 }
@@ -396,10 +396,10 @@ func buildCmd(args []string) error {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	b := build.Build{}
 	fs.StringVar(&b.AppDir, "app-dir", "", "directory with the software's Dockerfile")
-	fs.StringVar(&b.Name, "name", "", "image and EIF name (default: the directory name)")
+	fs.StringVar(&b.ImageName, "image-name", "", "image and EIF name (default: the directory name)")
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
-	fs.StringVar(&b.Out, "out", "out", "output directory")
-	fs.StringVar(&b.Binary, "responder", "", "path to the responder (att-ra-responder). default: att-ra-responder next to this executable")
+	fs.StringVar(&b.OutDir, "out-dir", "out", "output directory")
+	fs.StringVar(&b.ResponderPath, "responder", "", "path to the responder (att-ra-responder). default: att-ra-responder next to this executable")
 	fs.BoolVar(&b.Verify, "verify", false, "build the Dockerfile a second time without cache and fail unless PCR0·1·2 come out the same, listing the files that differed")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -419,16 +419,16 @@ func buildCmd(args []string) error {
 func packCmd(args []string) error {
 	fs := flag.NewFlagSet("pack", flag.ContinueOnError)
 	b := build.Build{}
-	fs.StringVar(&b.Image, "image", "", "a docker image you built (name:tag)")
-	fs.StringVar(&b.Name, "name", "", "EIF name (default: the image name without its tag)")
+	fs.StringVar(&b.DockerImage, "docker-image", "", "a docker image you built (name:tag)")
+	fs.StringVar(&b.ImageName, "image-name", "", "EIF name (default: the docker image name without its tag)")
 	fs.IntVar(&b.Port, "port", 5000, "port the responder listens on inside the enclave")
-	fs.StringVar(&b.Out, "out", "out", "output directory")
-	fs.StringVar(&b.Binary, "responder", "", "path to the responder (att-ra-responder). default: att-ra-responder next to this executable")
+	fs.StringVar(&b.OutDir, "out-dir", "out", "output directory")
+	fs.StringVar(&b.ResponderPath, "responder", "", "path to the responder (att-ra-responder). default: att-ra-responder next to this executable")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if b.Image == "" {
-		return errors.New("--image is required")
+	if b.DockerImage == "" {
+		return errors.New("--docker-image is required")
 	}
 	built, err := b.Run(context.Background(), os.Stdout)
 	if err != nil {
@@ -443,14 +443,14 @@ func launchCmd(args []string) error {
 	fs := flag.NewFlagSet("launch", flag.ContinueOnError)
 	l := launch.Launch{}
 	fs.StringVar(&l.EIF, "eif", "", "EIF file to run")
-	fs.StringVar(&l.Name, "name", "", "enclave name (default: the EIF file name)")
+	fs.StringVar(&l.EnclaveName, "enclave-name", "", "enclave name (default: the EIF file name)")
 	fs.IntVar(&l.Port, "port", 5000, "RA port. must match the value given to build")
 	fs.IntVar(&l.Memory, "memory", 0, "enclave memory in MiB (0: sized from the EIF)")
 	fs.IntVar(&l.CPUs, "cpus", 2, "enclave CPU count")
 	fs.IntVar(&l.CID, "cid", 16, "enclave vsock CID")
 	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "address the bridge listens on")
-	fs.StringVar(&l.Out, "out", "out", "directory for logs and the self-check document")
-	fs.StringVar(&l.Measurements, "measurements", "", "the measurements.json that came with a received EIF: the EIF is measured itself and must match, or it is not launched")
+	fs.StringVar(&l.OutDir, "out-dir", "out", "directory for logs and the self-check document")
+	fs.StringVar(&l.BuildMeasurements, "build-measurements", "", "the measurements.json that came with a received EIF: the EIF is measured itself and must match, or it is not launched")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -474,7 +474,7 @@ func launchCmd(args []string) error {
 		t.Fail("wrong format")
 		return err
 	}
-	selfDoc := filepath.Join(l.Out, "selfcheck.cbor")
+	selfDoc := filepath.Join(l.OutDir, "selfcheck.cbor")
 	if err := os.WriteFile(selfDoc, doc.Raw, 0o644); err != nil {
 		return err
 	}
@@ -486,7 +486,7 @@ func launchCmd(args []string) error {
 	fmt.Printf("Security group: inbound TCP %d\n", l.Port)
 	cmd, group, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
 	if perr == nil {
-		cli.Okln("✓ enclave is up and reachable. anyone can now:  att-user verify --tee <this instance's public IP>:", l.Port, " --rpc … --contract …")
+		cli.Okln("✓ enclave is up and reachable. anyone can now:  att-user verify --tee-addr <this instance's public IP>:", l.Port, " --rpc … --registry …")
 		return nil
 	}
 	// Could not open it here: say what to open, where and how. The permission-denied case and
@@ -503,7 +503,7 @@ Inbound TCP %d must be open on this instance's security group so the Auditor and
 %s
   %s
 or open it in the console: EC2 → Security Groups → %s → Inbound rules → Custom TCP %d, source 0.0.0.0/0.
-Then anyone can:  att-user ra-request --tee <this instance's public IP>:%d --format aws-nitro
+Then anyone can:  att-user ra-request --tee-addr <this instance's public IP>:%d --format aws-nitro
 `, l.Port, why, cmd, group, l.Port, l.Port)
 	return nil
 }

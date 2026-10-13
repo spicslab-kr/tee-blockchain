@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// Deploy deploys Registry. The approver (signer) address cannot be changed after deployment; to change it, deploy anew.
+// Deploy deploys Registry. The approver address cannot be changed after deployment; to change it, deploy anew.
 // One contract, one approver: each role deploys its own contract with its own address.
 // If backend is nil it connects to rpc.
 func Deploy(ctx context.Context, rpc string, backend Backend, deployerKey []byte, approver common.Address) (common.Address, string, error) {

@@ -62,7 +62,7 @@ func TestToolchain_E2E_PinnedBinaryPasses(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(app, "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		out, err := exec.Command(bin, "build", "--app-dir", app, "--out", t.TempDir()).CombinedOutput()
+		out, err := exec.Command(bin, "build", "--app-dir", app, "--out-dir", t.TempDir()).CombinedOutput()
 		if err == nil {
 			t.Fatalf("build on %s should fail:\n%s", runtime.GOOS, out)
 		}
@@ -106,7 +106,7 @@ func TestToolchain_E2E_WrongToolchainRefused(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(app, "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err = exec.Command(bin, "build", "--app-dir", app, "--out", t.TempDir()).CombinedOutput()
+	out, err = exec.Command(bin, "build", "--app-dir", app, "--out-dir", t.TempDir()).CombinedOutput()
 	if err == nil {
 		t.Fatalf("build with a %s-built binary should be refused:\n%s", wrongToolchain, out)
 	}

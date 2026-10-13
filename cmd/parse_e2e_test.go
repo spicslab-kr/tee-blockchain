@@ -55,7 +55,7 @@ func TestCmd_E2E_ServeRequestParse(t *testing.T) {
 	defer cancel()
 
 	// user side: receive the document with ra-request.
-	reqCmd := exec.CommandContext(ctx, user, "ra-request", "--tee", addr, "--out", docPath, "--format", "aws-nitro", "--timeout", "10s")
+	reqCmd := exec.CommandContext(ctx, user, "ra-request", "--tee-addr", addr, "--out-file", docPath, "--format", "aws-nitro", "--timeout", "10s")
 	reqOut, err := reqCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("ra-request: %v\n%s", err, reqOut)
@@ -75,7 +75,7 @@ func TestCmd_E2E_ServeRequestParse(t *testing.T) {
 	// auditor side: verify signature, nonce and measurements with ra-parse. Pass the nonce the document actually carries (the fixture's) explicitly,
 	// since the fixture extractor does not bind to the request nonce, verifying with the nonce just sent would fail (see the comment above).
 	measurementsPath := docPath + ".measurements.json"
-	parseCmd := exec.CommandContext(ctx, auditor, "ra-parse", "--doc", docPath, "--nonce", fixtureNonceFile, "--out", measurementsPath)
+	parseCmd := exec.CommandContext(ctx, auditor, "ra-parse", "--doc", docPath, "--nonce", fixtureNonceFile, "--out-file", measurementsPath)
 	parseOut, err := parseCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("ra-parse: %v\n%s", err, parseOut)

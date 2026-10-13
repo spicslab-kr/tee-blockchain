@@ -25,7 +25,7 @@ const Format = "aws-nitro"
 //go:embed root.pem
 var rootPEM []byte
 
-// RootPEM is the built-in AWS Nitro Enclaves root certificate. It is used when VerifySig is given an empty key.
+// RootPEM is the built-in AWS Nitro Enclaves root certificate. It is used when VerifySig is given an empty certificate.
 func RootPEM() []byte { return rootPEM }
 
 var (
