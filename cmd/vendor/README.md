@@ -9,8 +9,8 @@ Both ways of building end with the same three things, and the rest of the system
 
 | what | where it goes |
 |---|---|
-| the enclave image (`.eif`) | `launch`, and the hand-off |
-| the measurements, nitro-cli's JSON (`{"Measurements":{"PCR0":...,"PCR1":...,"PCR2":...}}`) | `launch --build-measurements`, `register --measurements`, `compare --expected` |
+| the enclave image (`.eif`, `EIF` in the build result [`Result`](../../internal/setup/build/Vendor/aws/build.go)) | `launch`, and the hand-off |
+| the measurements (`Measurements` in `Result`, held as `PCR` with the keys `PCR0`, `PCR1`, `PCR2`), nitro-cli's JSON (`{"Measurements":{"PCR0":...,"PCR1":...,"PCR2":...}}`) | `launch --build-measurements`, `register --measurements`, `compare --expected` |
 | the address `host:port` the enclave answers on | `--tee-addr` for the Auditor and the User |
 
 Building is optional. You can launch an image received from the Auditor directly (see
@@ -27,17 +27,17 @@ the Auditor the image and its measurements. The Auditor measures the file it rec
 docker build -t app:base <dir>
 ```
 
-`pack` reads the image's original command, layers the responder and its entrypoint on top,
+`pack` is the build config ([`Build`](../../internal/setup/build/Vendor/aws/build.go)) with `DockerImage` set. It reads the image's original command, layers the responder and its entrypoint on top,
 normalizes the layers, and writes `out/app.eif` and `out/measurements.json`:
 
 ```
 att-vendor pack --docker-image app:base --out-dir out
 ```
 
-Flags: `--docker-image` (required), `--image-name`, `--port` (default 5000), `--out-dir` (default `out`),
-`--responder`.
+Flags: `--docker-image` (required, `DockerImage`), `--image-name` (`ImageName`), `--port` (`Port`, default 5000),
+`--out-dir` (`OutDir`, default `out`), `--responder` (`ResponderPath`).
 
-`launch` starts the enclave, bridges TCP 5000 to the enclave's vsock, asks the new enclave for an
+`launch` is the launch config ([`Launch`](../../internal/setup/launch/Vendor/aws/launch.go)). It starts the enclave, bridges TCP 5000 to the enclave's vsock, asks the new enclave for an
 attestation to confirm it answers (`out/selfcheck.cbor`), and opens the security-group port. If the
 instance has no IAM permission to do that, `launch` prints the one `aws ec2` line to run from your account.
 
@@ -45,7 +45,7 @@ instance has no IAM permission to do that, `launch` prints the one `aws ec2` lin
 att-vendor launch --eif out/app.eif
 ```
 
-Flags: `--eif` (required), `--build-measurements`, `--enclave-name`, `--port` (default 5000, must match the
+Flags: `--eif` (required, `EIF`), `--build-measurements` (`BuildMeasurements`), `--enclave-name` (`EnclaveName`), `--port` (default 5000, must match the
 build), `--memory` (MiB, default sized from the image), `--cpus` (2), `--cid` (16), `--listen`
 (0.0.0.0), `--out-dir`.
 
@@ -58,7 +58,7 @@ file measures to what the JSON claims.
 You give the Auditor the repository and commit. You each run the same two commands on your own
 Nitro instance and must get the same PCR0, PCR1 and PCR2. That comparison is the audit.
 
-`build` installs docker and nitro-cli if they are missing, builds the image, layers the responder,
+`build` is the build config with `AppDir` set. It installs docker and nitro-cli if they are missing, builds the image, layers the responder,
 normalizes the layers, and writes `out/<name>.eif` and `out/measurements.json`.
 
 ```
@@ -67,27 +67,27 @@ att-vendor build --app-dir <dir with Dockerfile> --out-dir out
 
 `build` first scans the Dockerfile for known causes of unreproducible images (unpinned base image or
 packages, `date` or `hostname`, random keys, compiling from source) and prints each with its line.
-Add `--verify` to build a second time from scratch; it fails unless the measurements come out
+Add `--verify` (`Verify`) to build a second time from scratch; it fails unless the measurements come out
 identical and lists the files that differ. Use it the first time you send a source to an Auditor.
 
 ```
 att-vendor launch --eif out/<name>.eif
 ```
 
-`build` takes a directory with a Dockerfile and runs `docker build` for you. `pack` takes an image
-you already built. They share `--image-name`, `--port`, `--out-dir` and `--responder`.
+`build` takes a directory with a Dockerfile (`AppDir`) and runs `docker build` for you. `pack` takes an image
+you already built (`DockerImage`); you set exactly one of the two. They share `--image-name`, `--port`, `--out-dir` and `--responder`.
 
 ## Self-register (flow 2)
 
 In flow 1 the Auditor audits and registers. In flow 2 you register your own enclave with
-`self-register`:
+`self-register` ([`selfRegisterCmd`](self_register.go)):
 
 ```
 att-vendor self-register --config build-config.json --tee-addr 127.0.0.1:5000 \
     --rpc <url> --registry <0x...> --signing-key-file <key>
 ```
 
-`--config` is the same `build-config.json` that `send` pushes. Service, version and the build
+`--config` is the same `build-config.json` that `send` pushes (`BuildConfig` in [build_config.go](../../internal/core/transfer/Vendor/build_config.go), checked by `Validate`). Service, version and the build
 environment (`build_env`: OS, CPU architecture, Go toolchain, `-trimpath`) come from it.
 `--service`, `--version` and `--arch` override the file and print a warning when they
 differ (`warning: --service nginx2 differs from build-config.json (nginx)`). Without `--config`,
@@ -96,10 +96,10 @@ value on that registry.
 
 The confirmation names the CPU architecture and Go toolchain the enclave was built with
 (`registered nginx 1.31.6 (amd64, go1.26.1 -trimpath)`). The architecture is also stored on-chain in the
-registration's `arch` field, and `lookup` prints it back. It is display only and is no part of the record key.
+registration's `arch` field (`Arch` in `Meta`, [register.go](../../internal/chain/register/Vendor/register.go)), and `lookup` prints it back. It is display only and is no part of the record key.
 
 Further flags: `--build-measurements <file>` (compares the attestation to your build value first and
-refuses to register on a mismatch, printing the differing PCRs), `--expires` (default 2160h, that
+refuses to register on a mismatch, printing the differing PCRs), `--expires` (`Expires` in `Meta`, default 2160h, that
 is 90 days), `--platform` (default `aws-nitro`), `--format`, `--timeout`, `--nonce`, `--trusted-approvers`,
 `--out-dir`.
 
@@ -129,7 +129,7 @@ Verify the signature chain up to the platform root and the nonce, and extract PC
 att-vendor ra-parse --doc doc.cbor --out-file parsed.json
 ```
 
-Sign those measurements with your signing key and register them. The `record key` it prints is the lookup
+Sign those measurements with your signing key (`Signed`, whose `Approver` is the address of that key) and register them (`Registrar` in register.go, with the registry address in `RegistryAddr` and the key that pays for the transaction in `SenderKey`). The `record key` it prints (`RecordKey` in `Receipt`) is the lookup
 coordinate:
 
 ```
@@ -137,7 +137,7 @@ att-vendor register --rpc <url> --registry <0x...> --signing-key-file <key> \
     --measurements parsed.json --config build-config.json
 ```
 
-Read the registration back by measurement alone:
+Read the registration back by measurement alone (`Reader.FindRecordKeys` finds the record keys for the measurements and `Reader.Lookup` reads one record, both in [reader.go](../../internal/chain/lookup/Vendor/ether/reader.go)):
 
 ```
 att-vendor lookup --rpc <url> --registry <0x...> --measurements parsed.json
@@ -156,7 +156,7 @@ att-vendor compare --attested parsed.json --rpc <url> --registry <0x...> --recor
 
 The simplest hand-off is to tell the Auditor the repository and the commit, which is all it needs to rebuild.
 
-You can also hand over the build declaration as a file. You write `build-config.json`, and `send` commits it to
+You can also hand over the build declaration as a file. You write `build-config.json`, and `send` (`GitTransport.Send` in [git.go](../../internal/core/transfer/Vendor/git.go)) commits it to
 the root of the repository and pushes:
 
 ```
@@ -186,7 +186,7 @@ The Auditor must be able to read the repository. For a private one, give it read
 `build-config.json` at the repository root and push, and the Auditor clones it and reads the file.
 `--workdir` makes `send` work in an existing clone. Without it, `send` uses a temporary clone.
 
-When the Auditor has published its result, fetch it. `measurement-record.json` and the image
+When the Auditor has published its result, fetch it with `receive` (`GitTransport.Receive`). `measurement-record.json` and the image
 arrive with their hashes verified:
 
 ```
@@ -204,7 +204,7 @@ toolchain.
 
 ## Troubleshooting
 
-Errors print as `att-vendor: <message>`. The exit codes are listed in [Exit codes](../README.md#exit-codes).
+Errors print as `att-vendor: <message>`. The exit codes are listed in [Exit codes](../README.md#exit-codes) and `exitCode` in [main.go](main.go) maps each error to its code.
 Codes 8 to 11 are returned by `send` and `receive` for git failures, and code 4 from `register` and
 `self-register` means your key is not the registry's approver.
 
@@ -261,13 +261,13 @@ function per command. This folder holds the flag parsing and the chain commands.
 transfer, registration and comparison logic lives under [internal](../../internal), in packages named
 `Vendor` or `Vendor/aws`.
 
-- [selfRegisterCmd](self_register.go) runs the flow 2 sequence: request, parse, compare, register, read back, check.
-- [Build.Run](../../internal/setup/build/Vendor/aws/build.go) turns a Dockerfile or an existing image into an EIF and its PCR values.
-- [Launch.Run](../../internal/setup/launch/Vendor/aws/launch.go) starts the enclave and the TCP bridge to its vsock.
+- [selfRegisterCmd](self_register.go) runs the flow 2 sequence: request, parse, compare, register, read back, check. `exitCode` in [main.go](main.go) turns its errors into the exit codes.
+- [Build.Run](../../internal/setup/build/Vendor/aws/build.go) turns `AppDir` or `DockerImage` into an EIF and its PCR values in a `Result`, taking the responder from `ResponderPath` and writing to `OutDir`.
+- [Launch.Run](../../internal/setup/launch/Vendor/aws/launch.go) starts the enclave named `EnclaveName` from `EIF`, and runs the TCP bridge to its vsock through `ProxyBinary`.
 - [OpenPort](../../internal/setup/launch/Vendor/aws/port.go) opens the security-group port, or returns the command to run when permission is missing.
-- [BuildConfig](../../internal/core/transfer/Vendor/build_config.go) defines `build-config.json` and validates it.
+- [BuildConfig](../../internal/core/transfer/Vendor/build_config.go) defines `build-config.json`, and `Validate` checks it.
 - [GitTransport](../../internal/core/transfer/Vendor/git.go) implements `Send` and `Receive` for the hand-off.
-- [Registrar](../../internal/chain/register/Vendor/register.go) signs the measurements and sends the registration to the contract.
+- [Registrar](../../internal/chain/register/Vendor/register.go) signs the measurements into a `Signed` (with `Meta` and `Approver`) and sends it to the contract, which answers with a `Receipt` holding `RecordKey`. [Reader](../../internal/chain/lookup/Vendor/ether/reader.go) finds the record keys (`FindRecordKeys`) and reads a record (`Lookup`).
 - [Compare and Check](../../internal/core/compare/Vendor/compare.go) compare two sets of measurements, or a set against a registration (value, expiry on the chain's clock, approver).
 
 ### build-config.json fields

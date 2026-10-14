@@ -9,29 +9,32 @@ Build instructions: [Build the binaries](../README.md#build-the-binaries).
 att-user verify --tee-addr <vendor-public-ip>:5000 --rpc <url> --registry <0x...>
 ```
 
-`verify` asks the Vendor's enclave for an attestation, checks the document, finds who registered the
-measurement it contains, and checks each registration it finds.
+`verify` (`verifyCmd` in [verify.go](verify.go)) asks the Vendor's enclave for an attestation
+([`TCPRequester.RequestFresh`](../../internal/tee/request/user/tcp.go)), checks the document
+([`RADoc`](../../internal/tee/request/user/request.go) with `ExpectFormat`), finds who registered the
+measurement it contains ([`Reader.FindRecordKeys`](../../internal/chain/lookup/user/ether/reader.go)), and checks
+each registration it finds ([`Registration`](../../internal/chain/lookup/user/lookup.go), read with `Reader.Lookup`).
 
-A registration passes when all three hold:
+A registration passes when all three hold. [`Check`](../../internal/core/compare/check.go) decides:
 
-- its value equals what the enclave just attested,
-- it has not expired, judged on the chain's own clock,
-- its approver is the registry's approver, or one of the addresses you give with `--trusted-approvers`.
+- its measurement hash equals the hash of what the enclave just attested (`Registration.Values`, compared with the hash from `measurementHash` in [compare.go](../../internal/core/compare/user/compare.go)),
+- it has not expired (`Registration.Expires`), judged on the chain's own clock (`Clock`, which returns `Registration.ChainTime`),
+- its approver (`Registration.Approver`) is the registry's approver, or one of the addresses you give with `--trusted-approvers`.
 
-For one registry, `verify` exits 0 when at least one of its registrations passes. With several
-`--registry` flags, every one of those registries needs at least one passing registration. Otherwise it
-exits 1 and prints the reason.
+For one registry, `verify` exits 0 when at least one of its registrations passes (`Verdict.Pass`). With several
+`--registry` flags (collected in `registries`), every one of those registries needs at least one passing registration. Otherwise it
+exits 1 and prints the reason (`Verdict.Reason`).
 
 Flags:
 
 - `--tee-addr` is the enclave's `host:port`.
 - `--rpc` is the Ethereum RPC URL. If you leave it empty, `verify` asks for it and offers Ethereum mainnet.
 - `--registry` is the registry contract address. It is required and you can repeat it.
-- `--trusted-approvers <0x...,0x...>` is a comma separated list. The default is each registry's own approver.
-- `--format` is the expected document format. The default is `aws-nitro`.
+- `--trusted-approvers <0x...,0x...>` is a comma separated list. The default is each registry's own approver. The value is held in `trustedApprovers`.
+- `--format` is the expected document format (`format`, passed to `ExpectFormat`). The default is `aws-nitro`.
 - `--timeout` is the request timeout. The default is 30s.
 - `--nonce` pins the nonce, for tests.
-- `--out-dir <dir>` keeps the intermediate files. Without it, `verify` uses a temporary directory and removes it at the end.
+- `--out-dir <dir>` keeps the intermediate files. Without it, `verify` uses a temporary directory and removes it at the end. The variable is `outDir`.
 
 If you leave out `--tee-addr` or `--registry`, `verify` prompts for it.
 
@@ -50,7 +53,7 @@ trusted: this enclave runs exactly what 0x<approver> registered
 ```
 
 The dotted lines that start with `·` explain each step and are left out here. The registration line
-shows what the chain recorded for the registration, architecture included. Exit code: 0.
+shows what the chain recorded for the registration (`Registration.Meta`, architecture in `Meta.Arch`). Exit code: 0.
 
 If nobody registered the measurement, the lookup step ends in `✗` and the run stops with:
 
@@ -95,7 +98,7 @@ att-user ra-request --tee-addr <vendor-public-ip>:5000 --out-file doc.cbor --for
 
 `ra-request` writes the nonce it used to `<out-file>.nonce`.
 
-Verify the document and extract PCR0, PCR1 and PCR2. `ra-parse` checks the document against the nonce file:
+Verify the document and extract PCR0, PCR1 and PCR2 (`AWSParser` returns them as `Measurements`, a list of `Measurement` entries with `Name` and `Value`). `ra-parse` checks the document against the nonce file:
 
 ```
 att-user ra-parse --doc doc.cbor --out-file parsed.json
@@ -123,7 +126,7 @@ att-user compare --attested parsed.json --expected other.json
 ## Troubleshooting
 
 Every error is printed as `att-user: <text>` and sets the exit code described in
-[Exit codes](../README.md#exit-codes). This role returns 1 (any other error, including an untrusted
+[Exit codes](../README.md#exit-codes). The function `exitCode` in [main.go](main.go) maps the error to the code. This role returns 1 (any other error, including an untrusted
 result), 3 (network error), 4 (wrong format), 5 (invalid signature or certificate chain), 6 (nonce
 mismatch or bad response) and 7 (malformed document).
 
@@ -154,9 +157,9 @@ In verify order:
 - [`RADoc.ExpectFormat`](../../internal/tee/request/user/request.go) rejects a document in another format.
 - [`AWSParser`](../../internal/tee/parse/user/aws.go) verifies the signature chain and the nonce, and extracts PCR0, PCR1 and PCR2.
 - [`Reader.FindRecordKeys`](../../internal/chain/lookup/user/ether/reader.go) searches the registry by measurement hash.
-- [`Reader.Lookup`](../../internal/chain/lookup/user/ether/reader.go) reads one registration.
-- [`Impl.Check`](../../internal/core/compare/user/compare.go) hashes the attested values and uses `Clock` as the current time.
-- [`Check`](../../internal/core/compare/check.go) makes the trust decision.
+- [`Reader.Lookup`](../../internal/chain/lookup/user/ether/reader.go) reads one `Registration` (fields `RecordKey`, `Expires`, `ChainTime`, `Approver`, and `Meta.Arch`).
+- [`Impl.Check`](../../internal/core/compare/user/compare.go) hashes the attested values with `measurementHash` and passes `Clock` as the current time.
+- [`Check`](../../internal/core/compare/check.go) takes the hash, a `RegInfo` (`MeasurementHash`, `Expires`, `Approver`), the time and `trustedApprovers`, and returns a `Verdict` with `Pass` and `Reason`.
 
 `Check` passes a registration only when all three conditions hold. It lists every failure that applies.
 

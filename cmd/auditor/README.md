@@ -17,8 +17,10 @@ that the commit it names is in the history:
 att-auditor receive --repo <git url> --into work/src
 ```
 
-`--ref` picks a commit, branch or tag. `receive` also compares the Vendor's `build_env` with your
-instance and exits with an error if the OS, CPU architecture or Go version differ, because a build
+`--ref` picks a commit, branch or tag. `receive` (in [main.go](main.go)) also compares the
+Vendor's `build_env` (`BuildEnv` in [build_config.go](../../internal/core/transfer/auditor/build_config.go))
+with your instance (`CheckBuildEnv` in [build_env_check.go](../../internal/core/transfer/auditor/build_env_check.go))
+and exits with an error if the OS, CPU architecture or Go version differ, because a build
 on your instance would not reproduce the Vendor's measurements and the mismatch would look like a
 finding. Move to a matching instance, or pass `--ignore-env` to turn the error into a warning. If
 the Vendor built without `-trimpath`, you get a warning only.
@@ -26,9 +28,14 @@ the Vendor built without `-trimpath`, you get a warning only.
 ## Build and launch
 
 This is the Vendor's [build and launch](../vendor/README.md#build-pack-and-launch) with
-`att-auditor` in place of `att-vendor`, and the flags are the same. The same source, the same
-`att-ra-responder` and the same normalized layers give you the PCR0, PCR1 and PCR2 the Vendor got.
-If they differ, that is a finding, and you register nothing.
+`att-auditor` in place of `att-vendor`, and the flags are the same. The build config (`Build` in
+[build.go](../../internal/setup/build/auditor/aws/build.go)) takes the source directory (`AppDir`), or
+a docker image you built (`DockerImage`), the image and EIF name (`ImageName`), the enclave port
+(`Port`), the responder file (`ResponderPath`), the result directory (`OutDir`) and the rebuild
+check (`Verify`). The same source, the same `att-ra-responder` and the same normalized layers give
+you the PCR0, PCR1 and PCR2 the Vendor got, which are the names in the measurements (`Measurements`
+in [parse.go](../../internal/tee/parse/auditor/parse.go)). If they differ, that is a finding, and
+you register nothing.
 
 Rebuild from source:
 
@@ -41,7 +48,10 @@ att-auditor launch --eif out/<name>.eif
 ```
 
 If the Vendor hands over an image file, the Vendor sends the image and its measurements. `launch`
-measures the image itself and refuses it if the result does not match:
+measures the image itself and refuses it if the result does not match. The launch config (`Launch`
+in [launch.go](../../internal/setup/launch/auditor/aws/launch.go)) holds the enclave name
+(`EnclaveName`), the image file (`EIF`), the binary that runs the port bridge (`ProxyBinary`) and the received
+measurements (`BuildMeasurements`):
 
 ```
 att-auditor launch --eif <received.eif> --build-measurements <received measurements.json>
@@ -50,8 +60,9 @@ att-auditor launch --eif <received.eif> --build-measurements <received measureme
 ## Deploy the registry (once, first time only)
 
 A registry has one approver, and it accepts only registrations signed by that address. The deployer
-key pays gas only and can belong to anyone. The command prints the registry address, which everyone
-then uses:
+key pays gas only and can belong to anyone. The command (`registryDeploy` in [chain.go](chain.go),
+which calls `Deploy` in [deploy.go](../../internal/chain/register/auditor/ether/deploy.go)) prints
+the registry address, which everyone then uses:
 
 ```
 att-auditor registry-deploy --rpc <url> --deployer-key-file <deployer.key> --approver <my 0x...>
@@ -67,7 +78,7 @@ att-auditor audit --config work/src/build-config.json --tee-addr <my-instance>:5
     --build-measurements out/measurements.json --rpc <url> --registry <0x...> --signing-key-file <key>
 ```
 
-`--tee-addr` is your own enclave, running your own build of the Vendor's source. The value that goes
+The command is `auditCmd` in [audit.go](audit.go). `--tee-addr` is your own enclave, running your own build of the Vendor's source. The value that goes
 on the chain is the one you built from the source and ran yourself, checked against your build
 value. Nothing the Vendor reports enters the registration.
 
@@ -75,15 +86,22 @@ value. Nothing the Vendor reports enters the registration.
 version and build environment (`build_env`) come from it, so you do not type them again. `--service`,
 `--version` and `--arch` still work and override the file, with a warning when they differ. Without
 `--config` you need `--service` and `--version` (or an existing registration of the same value
-supplies them), and `--arch` defaults to your machine's.
+supplies them), and `--arch` defaults to your machine's. `loadBuildConfig` reads the file and
+`resolveRegistration` fills in what is missing.
 
 Further flags:
 
 - `--vendor-tee <host:port>` also asks the Vendor's running enclave and reports whether it runs the
   same value. What you register is still your value.
-- `--expires` sets the lifetime of the registration (default 2160h, which is 90 days).
+- `--expires` sets the lifetime of the registration (`Meta.Expires`, default 2160h, which is 90 days).
 - `--platform` (default `aws-nitro`), `--format`, `--timeout`, `--nonce`, `--trusted-approvers` and
   `--out-dir`.
+
+`audit` runs these steps in order, and each one is a function in the same package:
+`raRequest` fetches the attestation document, `raParse` verifies it, `Impl.Compare` checks it
+against your build value, `register` signs and sends the registration, `Reader.Lookup` reads it back
+and `Impl.Check` checks it. If you leave out the service and version, `Reader.FindRecordKeys` looks
+for an existing registration of the same value first.
 
 Without `--tee-addr`, `audit` registers `--build-measurements` as is, with no audit. Values you leave
 out are asked for interactively. An empty `--rpc` asks for `y` to use Ethereum mainnet, and any other
@@ -124,16 +142,17 @@ not running what you built, and nothing gets registered:
 att-auditor compare --attested parsed.json --expected out/measurements.json
 ```
 
-Register the build value with your signing key:
+Register the build value with your signing key (`register` signs it as a `Signed` with its
+`Approver`, sends it through a `Registrar`, and the `Receipt` it returns holds the `RecordKey`):
 
 ```
 att-auditor register --rpc <url> --registry <0x...> --signing-key-file <key> \
     --measurements out/measurements.json --config work/src/build-config.json
 ```
 
-Read it back by measurement. The chain reports which architecture the registration is for (for
-example `service nginx 1.31.6 (aws-nitro, amd64)`). The `arch` field is in the signed registration
-but not in the record key, so anyone can look the value up without knowing it:
+Read it back by measurement (`lookup` in [chain.go](chain.go)). The chain reports which architecture
+the registration is for (for example `service nginx 1.31.6 (aws-nitro, amd64)`). The `arch` field
+(`Meta.Arch`) is in the signed registration but not in the record key, so anyone can look the value up without knowing it:
 
 ```
 att-auditor lookup --rpc <url> --registry <0x...> --measurements out/measurements.json
@@ -151,7 +170,7 @@ extra step, and the registration always comes from your own enclave.
 
 ## Send the result back to the Vendor
 
-`measurement-record.json` carries the service and version, the PCRs, the build tool version and the
+`measurement-record.json` (`MeasurementRecord`) carries the service and version, the PCRs, the build tool version and the
 `build_env` the image was built in (OS, CPU architecture as `amd64` or `arm64`, Go toolchain,
 `-trimpath`). Everything except the PCRs and the build tool is in the Vendor's `build-config.json`,
 and the PCRs are in `out/measurements.json`. `send` builds the record from those two files, fills in
@@ -210,21 +229,22 @@ trust it. Ask the Vendor why.
 
 ## Reading the code
 
-Execution starts in `main` in [main.go](main.go), which switches on the first argument and maps the
-returned error to an exit code. `audit.go` holds the audit flow, `chain.go` the registry commands,
-`compare.go` and `parse.go` the comparison and attestation parsing. The packages under
-[internal](../../internal) hold the logic: `core/transfer` the build config, the record and the git
-exchange, `core/compare` the comparison, `chain/register` and `chain/lookup` the registry client, and
-`setup` the image build and launch.
+Execution starts in `main` in [main.go](main.go), which switches on the first argument, and
+`exitCode` there maps the returned error to an exit code. [audit.go](audit.go) holds `auditCmd`,
+[chain.go](chain.go) the registry commands, and [compare.go](compare.go) and [parse.go](parse.go)
+the comparison and attestation parsing. The packages under [internal](../../internal) hold the
+logic: `core/transfer` the build config, the record and the git exchange, `core/compare` the
+comparison, `chain/register` and `chain/lookup` the registry client, and `setup` the image build and
+launch.
 
-- [`auditCmd`](audit.go) runs the whole audit and stops at the first failure.
-- [`raRequest`](main.go) and [`raParse`](parse.go) fetch your enclave's attestation document and verify its signature, chain and nonce.
+- `raRequest` ([main.go](main.go)) and `raParse` ([parse.go](parse.go)) fetch your enclave's attestation document and verify its signature, chain and nonce.
 - [`Impl.Compare`](../../internal/core/compare/auditor/compare.go) is the audit gate, which checks the attested values equal your build.
 - [`register`](chain.go) signs your value with your signing key, registers it and returns the record key.
-- [`Reader.Lookup`](../../internal/chain/lookup/auditor/ether/reader.go) reads the registration back under the record key.
-- [`Impl.Check`](../../internal/core/compare/auditor/compare.go) checks value, expiry (on the chain's clock) and approver together.
+- [`Reader.Lookup`](../../internal/chain/lookup/auditor/ether/reader.go) reads the registration back under the record key, and `Reader.FindRecordKeys` in the same file finds the keys for a value.
+- [`Impl.Check`](../../internal/core/compare/auditor/compare.go) checks value, expiry (on the chain's clock, `Clock`) and approver together.
 - [`CheckBuildEnv`](../../internal/core/transfer/auditor/build_env_check.go) is the environment check `receive` runs.
 - [`buildRecord`](main.go) builds the measurement record that `send` pushes.
+- [`Meta`, `Signed`, `Receipt` and `Registrar`](../../internal/chain/register/auditor/register.go) are the registration types, and the [`Registrar`](../../internal/chain/register/auditor/ether/sign.go) implementation holds `RegistryAddr` and `SenderKey`.
 
 `measurement-record.json` is the type [`MeasurementRecord`](../../internal/core/transfer/auditor/measurement_record.go):
 

@@ -38,7 +38,7 @@ func registryDeploy(args []string) error {
 	if *rpc == "" || *deployerKeyFile == "" || !common.IsHexAddress(*approver) {
 		return errors.New("--rpc, --deployer-key-file and --approver are required")
 	}
-	deployerKey, err := readKey(*deployerKeyFile)
+	deployerKey, err := readPrivateKey(*deployerKeyFile)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func register(args []string) (string, error) {
 	if err := checkArch(*arch); err != nil {
 		return "", err
 	}
-	signingKey, err := readKey(*signingKeyFile)
+	signingKey, err := readPrivateKey(*signingKeyFile)
 	if err != nil {
 		return "", err
 	}
@@ -241,17 +241,17 @@ func lookup(args []string) ([]string, error) {
 	return recordKeys, nil
 }
 
-func readKey(path string) ([]byte, error) {
+func readPrivateKey(path string) ([]byte, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	s := strings.TrimPrefix(strings.TrimSpace(string(b)), "0x")
-	key, err := hex.DecodeString(s)
-	if err != nil || len(key) != 32 {
+	privateKey, err := hex.DecodeString(s)
+	if err != nil || len(privateKey) != 32 {
 		return nil, fmt.Errorf("%s: want a 32-byte hex private key", path)
 	}
-	return key, nil
+	return privateKey, nil
 }
 
 // readMeasurements accepts nitro-cli's measurements.json ({"Measurements":{"PCR0":...}}), a flat {"PCR0":...}, or NAME=hex,...

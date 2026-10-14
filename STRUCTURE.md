@@ -54,6 +54,26 @@ This page lists every folder in the repository, then explains the one idea that 
 ```
 
 
+## How a run moves through the folders
+
+Every command is a short walk through the same few packages. The folder names below are the ones in
+the tree above.
+
+1. Vendor, `att-vendor build` and `launch`: `internal/setup/build` turns the Dockerfile into an
+   enclave image and its measurements. `internal/setup/launch` starts the enclave and exposes its port.
+   `cmd/ra-responder` is the program inside the enclave that answers attestation requests.
+2. Vendor to Auditor, `send` and `receive`: `internal/core/transfer` writes and reads
+   `build-config.json` and `measurement-record.json` through git.
+3. Auditor, `att-auditor audit`: `internal/tee/request` fetches an attestation document from the
+   Auditor's own enclave, `internal/tee/parse` verifies it and extracts the measurements,
+   `internal/core/compare` checks them against the Auditor's build, and `internal/chain/register`
+   signs and registers them in the Registry contract (`contracts/evm`).
+4. User, `att-user verify`: `internal/tee/request` and `internal/tee/parse` do the same for the
+   Vendor's enclave, `internal/chain/lookup` finds the registrations for that measurement, and
+   `internal/core/compare` decides whether to trust them.
+
+In flow 2 the Vendor runs step 3 itself with `att-vendor self-register`.
+
 ### Inside `internal/<feature>/`
 
 Every feature folder under `internal/` (`tee/request`, `tee/parse`, `setup/build`, `setup/launch`,
@@ -82,22 +102,11 @@ three roles are Vendor (ships the software), Auditor (rebuilds it and registers 
 (verifies it). A role package is named after the role in lowercase (`package vendor`), and
 `cmd/<role>/main.go` imports only the matching role packages.
 
-Known inconsistency to fix: on disk the Vendor folders are capitalised (`Vendor`) while `auditor`
-and `user` are lowercase, and the Go package inside is lowercase `vendor` in all three cases. The
-capitalised folders are these eight:
-
-- `internal/tee/request/Vendor`
-- `internal/tee/parse/Vendor`
-- `internal/setup/build/Vendor`
-- `internal/setup/launch/Vendor`
-- `internal/chain/register/Vendor`
-- `internal/chain/lookup/Vendor`
-- `internal/core/compare/Vendor`
-- `internal/core/transfer/Vendor`
-
-Renaming them to `vendor` means changing the import paths in `cmd/vendor`, in the other role
-packages that import them, and in the tests. On Windows and macOS (case-insensitive by default) the
-difference is invisible, which is how it went unnoticed.
+Folder names: the Vendor folders are capitalised on disk (`Vendor`, in `tee/request`, `tee/parse`,
+`setup/build`, `setup/launch`, `chain/register`, `chain/lookup`, `core/compare` and `core/transfer`)
+while the `auditor` and `user` folders are lowercase. The Go package name inside is lowercase
+`vendor` in all three cases, so imports read the same. Renaming the folders to `vendor` touches the
+import paths in `cmd/vendor`, in the other role packages and in the tests.
 
 ### Platform modules: aws, gcp, azure
 
@@ -143,9 +152,6 @@ implementation cannot be imported by three roles without every binary linking ev
 commands and types. Instead, each role package is a copy (or a close copy) with its own types, and
 the role-neutral logic is pulled out into the shared pieces above wherever Go allows it.
 
-The copies were compared after renaming `Vendor`, `auditor` and `user` to one placeholder, so only
-real differences show.
-
 **Identical across roles (apart from the role name):**
 
 | Folder | Identical between |
@@ -177,7 +183,7 @@ Three tests sit directly in a feature folder because they cross roles:
 
 ### Which binary uses what
 
-Verified with `go list -deps` on each `cmd/*` package.
+The table is read from the imports of each `cmd/*` package (`go list -deps ./cmd/<role>`).
 
 | Module | Job | att-vendor | att-auditor | att-user | att-ra-responder |
 | --- | --- | :-: | :-: | :-: | :-: |
