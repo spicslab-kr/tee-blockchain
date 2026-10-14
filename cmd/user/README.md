@@ -80,3 +80,71 @@ att-user compare --attested parsed.json --rpc <url> --registry <0x...> --record-
 
 `ra-request` writes the nonce it used to `<out-file>.nonce`, and `ra-parse` checks the document against
 it. Exit codes: [Exit codes](../README.md#exit-codes).
+
+## Key types, fields and functions
+
+A map of the code a new reader should know. Links are relative to this file. This is not every identifier.
+
+### Command dispatch
+
+`main` in [main.go](main.go) switches on the first argument and calls one function per command. A missing or unknown command prints the usage text and exits 2. A returned error goes through `exitCode`.
+
+| Name | Where | What it is or does |
+|---|---|---|
+| `main`, `usage` | [main.go](main.go) | Dispatch (`ra-parse`, `ra-request`, `lookup`, `compare`, `verify`) and the help text. |
+| `verifyCmd` | [verify.go](verify.go) | `verify`: the whole trust decision in one command. |
+| `raRequest` | [main.go](main.go) | `ra-request`: sends a fresh nonce, saves the document and `<out-file>.nonce`. |
+| `raParse` | [parse.go](parse.go) | `ra-parse`: verifies the document and writes the measurements as JSON. |
+| `lookup` | [chain.go](chain.go) | `lookup`: reads one record key, or finds the record keys by measurements and reads them. Returns the record keys it found. |
+| `compareCmd`, `checkMode` | [compare.go](compare.go) | `compare`: either two measurement sets (`--expected`), or the attested measurements against a registration (`--record-key`). |
+| `resolveTrustedApprovers` | [compare.go](compare.go) | `--trusted-approvers` if given, else the registry's own approver. |
+| `readMeasurements` | [chain.go](chain.go) | Reads measurements from a `parsed.json` file or `NAME=hex,...`. |
+| `quiet` | [quiet.go](quiet.go) | Set by `verify` so the single-step functions print nothing and `verify` prints its own sentences. |
+
+### The verify flow, in order
+
+| Step | Function | Where |
+|---|---|---|
+| Make a nonce and request the document | `TCPRequester.RequestFresh` (random nonce from `CryptoRand`, then `Request`), called through `raRequest` | [tcp.go](../../internal/tee/request/user/tcp.go), [nonce.go](../../internal/tee/request/user/nonce.go) |
+| Check the format | `RADoc.ExpectFormat` | [request.go](../../internal/tee/request/user/request.go) |
+| Verify the signature chain to the platform root and the nonce | `AWSParser.VerifySig` and `AWSParser.CheckNonce`, called by `raParse` | [aws.go](../../internal/tee/parse/user/aws.go), [verify.go](../../internal/tee/parse/aws/verify.go), [nonce.go](../../internal/tee/parse/aws/nonce.go) |
+| Extract PCR0, PCR1, PCR2 | `AWSParser.Parse` (wraps `aws.Parser.Parse`) | [measure.go](../../internal/tee/parse/aws/measure.go) |
+| Find record keys by measurement | `Reader.FindRecordKeys`, via `lookup` | [reader.go](../../internal/chain/lookup/user/ether/reader.go) |
+| Read each registration | `Reader.Lookup`, returning a `Registration` | [reader.go](../../internal/chain/lookup/user/ether/reader.go), [lookup.go](../../internal/chain/lookup/user/lookup.go) |
+| Decide | `Impl.Check`, with `Clock(reg)` as the current time | [compare.go](../../internal/core/compare/user/compare.go) |
+
+`verify` repeats the last three steps for every `--registry` and trusts only if each registry has at least one passing registration. The chain types live in [lookup.go](../../internal/chain/lookup/user/lookup.go): `Registration` (`RecordKey`, `Values`, `Meta`, `Expires`, `ChainTime`, `Approver`, `Signature`) and `Meta` (`Service`, `Version`, `Platform`, `Arch`).
+
+### The trust decision
+
+`Impl.Check(attested, reg, now, trustedApprovers)` in [compare.go](../../internal/core/compare/user/compare.go) hashes the attested measurements and hands the rest to the shared `Check` in [check.go](../../internal/core/compare/check.go).
+
+| Input | Meaning |
+|---|---|
+| measurement hash | Hash of the attested PCRs (see below), compared with the hash stored in the registration. |
+| registration | `Approver` (who signed it) and `Expires` (unix seconds, chain clock). |
+| now | `Clock(reg)`: the time of the block the registration was read from (`ChainTime`), because the contract judges expiry by its own clock. It falls back to this machine's clock only if `ChainTime` is missing. |
+| trusted approvers | `--trusted-approvers`, else the registry's approver. Addresses compare case-insensitively. |
+
+The result is a `Verdict` (`Pass` plus a `Reason` list). It fails, listing every reason that applies, when:
+
+- `registration expired`: `Expires` is not after now.
+- `approver ... is not in the trusted list`.
+- `measurement hash differs from the chain registration`.
+- `could not compute the measurement hash`: no measurements, an empty name or value, or a duplicate name.
+
+### How the measurement hash is built
+
+`measurementHash` in [compare.go](../../internal/core/compare/user/compare.go) sorts the measurements by name (`PCR0`, `PCR1`, `PCR2`), writes one line `name=<hex value>` plus a newline for each, and takes the keccak256 of the result. The copy in [reader.go](../../internal/chain/lookup/user/ether/reader.go) must stay identical, because `FindRecordKeys` searches the registry with it. `Parse` leaves out an all-zero register (debug mode) and rejects the document if every PCR is zero.
+
+### Document formats
+
+`--format` names the attestation document format. `aws-nitro` is the only one that can be verified (`ra-parse`, `verify`). The `ra-request` help also lists `gcp-cs-jwt` and `azure-maa-jwt`, but those parsers ([gcp.go](../../internal/tee/parse/user/gcp.go), [azure.go](../../internal/tee/parse/user/azure.go)) are not implemented yet. An empty `--format` on `ra-request` accepts any format; `verify` defaults to `aws-nitro`.
+
+### Why the User never signs or registers
+
+`att-user` has no `register`, no key and no ETH. The chain side is read-only: `Reader` in [lookup.go](../../internal/chain/lookup/user/lookup.go) has only `FindRecordKeys` and `Lookup`. A User can check what an approver registered but cannot create or change a registration. That is also why the hash code is repeated here instead of imported from a register package.
+
+### Exit codes
+
+`exitCode` in [main.go](main.go) maps errors: 4 wrong format, 5 signature or certificate chain invalid (or no document extracted), 6 nonce mismatch or bad response, 7 malformed document, 3 network error, 1 anything else (including an untrusted `verify`). 0 is success and 2 a missing or unknown command. See [Exit codes](../README.md#exit-codes).

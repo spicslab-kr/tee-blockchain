@@ -62,7 +62,7 @@ type(scope): what changed, in the imperative
 
 - Branch from `main`, open a PR, get one review from the other person.
 - `go vet ./...` and `go test ./...` must pass. If you touched `build` or the responder, also
-  run the measurement check once on an instance (`e2e/arch-measurement-compare.sh`) — the
+  run the measurement check once on an instance (`e2e/arch-measurement-compare.sh`): the
   point of this project is that the bytes come out identical.
 - If you changed a command's flags or output, update the README section for that role.
 

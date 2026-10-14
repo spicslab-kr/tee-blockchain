@@ -76,3 +76,22 @@ the codes below. Codes 4 to 6 mean different things depending on where the error
 | 11 | push rejected: no write access, or the remote is ahead, so pull first (`send`) |
 
 `att-user` uses only 1 and 3 to 7. Codes 8 to 11 exist only in `att-vendor` and `att-auditor`.
+
+## Code layout of cmd/
+
+Each role is one `main` package. Files with the same name in different roles do the same job for that role.
+
+| Files | Job |
+|---|---|
+| [vendor/main.go](vendor/main.go), [auditor/main.go](auditor/main.go), [user/main.go](user/main.go) | Command dispatch, usage text, exit codes. `ra-request`. The Vendor and Auditor ones also hold the enclave-side commands (`build`, `pack`, `launch`, `ra-serve`, `ra-proxy`, `lo-up`, `send`, `receive`). |
+| [vendor/parse.go](vendor/parse.go), [auditor/parse.go](auditor/parse.go), [user/parse.go](user/parse.go) | `ra-parse`: verify an attestation document and extract the measurements. |
+| [vendor/chain.go](vendor/chain.go), [auditor/chain.go](auditor/chain.go), [user/chain.go](user/chain.go) | Registry commands: `registry-deploy`, `register`, `lookup` (User: `lookup` only) and measurement file reading. |
+| [vendor/compare.go](vendor/compare.go), [auditor/compare.go](auditor/compare.go), [user/compare.go](user/compare.go) | `compare`: two measurement sets, or measurements against a registration. |
+| [vendor/self_register.go](vendor/self_register.go) | Vendor `self-register`: register the Vendor's own measurements. |
+| [auditor/audit.go](auditor/audit.go) | Auditor `audit`: compare the rebuilt image with the Vendor's measurements and register. |
+| [user/verify.go](user/verify.go) | User `verify`: request, verify, look up and decide in one command. |
+| [vendor/arch.go](vendor/arch.go), [auditor/arch.go](auditor/arch.go) | CPU architecture handling (`amd64` or `arm64`) for `build`, `pack` and the build environment. |
+| [vendor/quiet.go](vendor/quiet.go), [auditor/quiet.go](auditor/quiet.go), [user/quiet.go](user/quiet.go) | The `quiet` flag that silences single-step commands when a bundled command calls them. |
+| [ra-responder/main.go](ra-responder/main.go) | `att-ra-responder`: the one binary layered into the enclave image; it only runs `lo-up` and `ra-serve`. |
+
+The `*_e2e_test.go` files in this folder are end-to-end tests that drive the built binaries.

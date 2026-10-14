@@ -82,3 +82,97 @@ emitted once per registration.
 Errors: `NotAnApprover(approver)`, `AlreadyRegistered(recordKey, expires)`, `MissingField(field)`
 and `ExpiryAlreadyPassed(expires, nowTime)`. The commands map the first three to exit codes 4, 5 and
 6 (see [Exit codes](../cmd/README.md#exit-codes)).
+
+## Key types, fields and functions
+
+Everything below is in [`evm/Registry.sol`](evm/Registry.sol). Names were checked against it and
+against the Go side.
+
+### Constructor and `APPROVER`
+
+`constructor(address approver)` sets the EIP-712 domain (`"Registry"`, `"1"`) and stores the approver
+in the immutable `APPROVER`. A zero address reverts with `MissingField("approver")`. Nothing can
+change it afterwards.
+
+### `Registration` (the signed value)
+
+| field | meaning | in the signed digest |
+|---|---|---|
+| `platform` | measurement format, for example `aws-nitro` | yes, and in the record key |
+| `arch` | CPU architecture of the build, `amd64` or `arm64` | yes, not in the record key |
+| `service` | service name | yes, not in the record key |
+| `version` | service version | yes, not in the record key |
+| `measurement` | keccak256 of the name-sorted measurements, 32 bytes | yes, and in the record key |
+| `expires` | unix seconds, must be after the block time | yes, not in the record key |
+
+Strings are hashed with keccak256 before they enter the digest, as EIP-712 requires.
+
+### `RegistrationInfo` and `registrations`
+
+`RegistrationInfo` is what storage keeps: `approver` (the recovered signer, always `APPROVER`),
+`expires` (copied from the registration) and `registeredAt` (the block time of the transaction).
+`registrations` is the public mapping from record key to `RegistrationInfo`. An entry with
+`expires == 0` means nothing is registered.
+
+### Functions
+
+| function | inputs | returns | notes |
+|---|---|---|---|
+| `register(Registration e, bytes signature)` | the registration and a 65-byte signature | the record key | checks the fields and expiry, recovers the signer, requires it to be `APPROVER`, rejects a key already used, stores the info, emits `Registered`. Any account may send it |
+| `digest(Registration e)` | the registration | the EIP-712 hash to sign | view; the Go side compares its own hash with it |
+| `recordKeyOf(approver, platform, measurement)` | any approver | the record key | pure |
+| `recordKeyFor(platform, measurement)` | no approver | the record key | same as `recordKeyOf(APPROVER, ...)`; works before anything is registered |
+| `lookup(recordKey)` | a record key | `approver, expires, registeredAt, chainTime` | view; zeros (except `chainTime`) for an unknown key |
+
+`lookup` returns `chainTime` (the current block timestamp) so the caller judges expiry on the chain's
+clock, not its own. Checks in `register` run in this order: empty `platform`, `arch`, `service`,
+`version`, zero `measurement`, zero `expires`, past `expires`, signer is not `APPROVER`, key already
+registered.
+
+### The `Registered` event
+
+`Registered(bytes32 indexed recordKey, address indexed approver, address registrant, string platform,
+string arch, string service, string version, bytes32 measurement, uint64 expires, bytes signature)`.
+`registrant` is `msg.sender`, who paid for the transaction; `approver` is the signer. The descriptive
+fields exist only here, not in storage.
+
+### Custom errors
+
+| error | thrown when |
+|---|---|
+| `MissingField(string field)` | the named field is empty or zero (`approver` in the constructor; `platform`, `arch`, `service`, `version`, `measurement`, `expires` in `register`) |
+| `ExpiryAlreadyPassed(uint64 expires, uint64 nowTime)` | `expires` is not after the block time |
+| `NotAnApprover(address approver)` | the recovered signer is not `APPROVER` |
+| `AlreadyRegistered(bytes32 recordKey, uint64 expires)` | the record key already has a registration |
+
+A malformed signature fails earlier, inside OpenZeppelin's `ECDSA.recover`, with its own errors.
+
+### EIP-712 domain and type string
+
+| part | value |
+|---|---|
+| name | `Registry` |
+| version | `1` |
+| chain id | the chain the contract is deployed on |
+| verifying contract | the Registry's own address |
+
+Type string: `Registration(string platform,string arch,string service,string version,bytes32 measurement,uint64 expires)`.
+Because the domain carries the chain id and the contract address, a signature made for one deployment
+is useless on another. The generated binding also exposes `Eip712Domain` (EIP-5267).
+
+### How the Go side mirrors it
+
+| Go | role |
+|---|---|
+| [`sign.go`](../internal/chain/register/auditor/ether/sign.go) | `Digest` builds the same typed data (same domain and type string) and `Sign` signs it, adding 27 to `v` as `ECDSA.recover` expects |
+| [`registry.go`](../internal/chain/register/auditor/ether/registry.go) | abigen binding generated from the contract by `go generate` (see `generate.go` next to it); `RegistryRegistration` is the struct above |
+| [`reader.go`](../internal/chain/lookup/user/ether/reader.go) | calls `RecordKeyFor` and `Lookup` and carries `ChainTime` into the result; the Auditor and Vendor have matching readers under `internal/chain/lookup/` |
+
+### Worked example: deriving a record key
+
+Take the approver address, the platform string `aws-nitro` and the 32-byte measurement of the image.
+First hash the platform text with keccak256 to get 32 bytes. Then lay three 32-byte words side by
+side: the approver address padded on the left with zeros, the platform hash, and the measurement.
+The keccak256 of those 96 bytes is the record key. Change any one of the three and the key is
+completely different; change the service, version, arch or expiry and it is unchanged, which is why
+the same measurement can be registered only once per approver and platform.
