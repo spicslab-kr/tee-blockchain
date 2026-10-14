@@ -6,7 +6,7 @@
   </defs>
   <rect width="900" height="230" fill="#fff"/>
 
-  <text x="40" y="34" font-weight="bold">tb-user verify</text>
+  <text x="40" y="34" font-weight="bold">att-user verify</text>
   <text x="150" y="34" fill="#666" font-size="11">아래 네 단계를 한 번에 수행한다. 각 단계는 따로 명령으로도 있다</text>
 
   <!-- enclave (source) -->

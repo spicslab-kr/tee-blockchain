@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1330 560" width="1330" height="560" role="img" aria-labelledby="t d">
+  <title id="t">How Attestamp works: an Auditor registers</title>
+  <desc id="d">The Vendor runs code in a TEE and sends the source and build info to the Auditor. The Auditor rebuilds the same source in its own TEE, gets the same hash, signs it and registers it on the blockchain. The User asks the Vendor's TEE for its hash, looks the hash up on the blockchain, and trusts the service only if the two are the same.</desc>
+  <style>
+    :root { --ink: #1f2937; --sub: #4b5563; --line: #8a94a6; --accent: #0d9488; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #f3f4f6; --sub: #cbd5e1; --line: #94a3b8; --accent: #2dd4bf; }
+    }
+    text { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; text-anchor: middle; fill: var(--ink); }
+    .box    { fill: none; stroke: var(--line); stroke-width: 3; }
+    .chain  { fill: none; stroke: var(--accent); stroke-width: 5; }
+    .tee    { fill: var(--accent); fill-opacity: 0.10; stroke: var(--accent); stroke-width: 3; }
+    .role   { font-size: 40px; font-weight: 800; }
+    .sub    { font-size: 22px; fill: var(--sub); }
+    .tag    { font-size: 28px; font-weight: 800; fill: var(--accent); }
+    .body   { font-size: 24px; font-weight: 600; }
+    .lbl    { font-size: 22px; font-weight: 600; fill: var(--sub); }
+    .arrow  { fill: none; stroke: var(--line); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+    .read   { fill: none; stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="var(--line)"/>
+    </marker>
+    <marker id="headA" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="var(--accent)"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="10" y="20" width="320" height="270" rx="18"/>
+  <text class="role" x="170" y="76">Vendor</text>
+  <text class="sub" x="170" y="108">runs the service</text>
+  <rect class="tee" x="35" y="135" width="270" height="130" rx="14"/>
+  <text class="tag" x="170" y="180">TEE</text>
+  <text class="body" x="170" y="228">Code  →  Hash</text>
+  <rect class="box" x="505" y="20" width="320" height="270" rx="18"/>
+  <text class="role" x="665" y="76">Auditor</text>
+  <text class="sub" x="665" y="108">rebuilds the source</text>
+  <rect class="tee" x="530" y="135" width="270" height="130" rx="14"/>
+  <text class="tag" x="665" y="180">TEE</text>
+  <text class="body" x="665" y="218">Same code</text>
+  <text class="body" x="665" y="248">→  same hash</text>
+  <rect class="chain" x="1000" y="20" width="320" height="270" rx="18"/>
+  <text class="role" x="1160" y="76">Blockchain</text>
+  <text class="sub" x="1160" y="108">Ethereum</text>
+  <rect class="tee" x="1025" y="135" width="270" height="130" rx="14"/>
+  <text class="tag" x="1160" y="180">Registry</text>
+  <text class="body" x="1160" y="218">Hash signed by</text>
+  <text class="body" x="1160" y="248">the Auditor</text>
+  <path class="arrow" d="M336 200H499" marker-end="url(#head)"/>
+  <text class="lbl" x="417" y="150">1. Send source</text>
+  <text class="lbl" x="417" y="176">+ build info</text>
+  <path class="arrow" d="M831 200H994" marker-end="url(#head)"/>
+  <text class="lbl" x="912" y="150">2. Sign and</text>
+  <text class="lbl" x="912" y="176">register hash</text>
+  <rect class="box" x="505" y="420" width="320" height="130" rx="18"/>
+  <text class="role" x="665" y="476">User</text>
+  <text class="sub" x="665" y="510">TEE hash = registry hash?</text>
+  <path class="read" d="M499 485H170 V298" marker-end="url(#headA)"/>
+  <text class="lbl" x="337" y="466">3. Ask the TEE for its hash</text>
+  <path class="read" d="M831 485H1160 V298" marker-end="url(#headA)"/>
+  <text class="lbl" x="992" y="466">4. Look up the hash</text>
+</svg>

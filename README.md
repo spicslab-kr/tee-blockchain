@@ -83,8 +83,20 @@ att-auditor audit   --config work/src/build-config.json --tee-addr <my-instance>
 
 ## Features
 
+### Two ways to register
+
+**Flow 1: an Auditor registers.** The Auditor rebuilds the Vendor's source in its own TEE and
+registers the hash it gets. The User trusts what the Auditor signed.
+
 <p align="center">
-  <img src="docs/img/roles.svg" alt="Three roles and the registry">
+  <img src="docs/img/flow-auditor.svg" alt="Flow 1: the Vendor sends source and build info, the Auditor rebuilds, signs and registers the hash on the blockchain, and the User compares the TEE's hash with the registry">
+</p>
+
+**Flow 2: the Vendor registers itself.** Without an Auditor, the Vendor signs and registers the hash
+of its own enclave. An Auditor can still check it later.
+
+<p align="center">
+  <img src="docs/img/flow-vendor.svg" alt="Flow 2: the Vendor signs and registers the hash on the blockchain, and the User compares the TEE's hash with the registry">
 </p>
 
 ### Three roles, four binaries

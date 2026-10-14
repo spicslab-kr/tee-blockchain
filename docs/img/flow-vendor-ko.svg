@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 910 560" width="910" height="560" role="img" aria-labelledby="t d">
+  <title id="t">Attestamp 동작 방식: 제공자가 직접 등록하는 경우</title>
+  <desc id="d">제공자는 TEE에서 코드를 실행하고, 그 코드의 해시에 서명해 블록체인에 등록한다. 사용자는 TEE에 해시를 요청하고, 블록체인에서 등록된 해시를 조회해 둘을 비교한다.</desc>
+  <style>
+    :root { --ink: #1f2937; --sub: #4b5563; --line: #8a94a6; --accent: #0d9488; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #f3f4f6; --sub: #cbd5e1; --line: #94a3b8; --accent: #2dd4bf; }
+    }
+    text { font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif; text-anchor: middle; fill: var(--ink); }
+    .box    { fill: none; stroke: var(--line); stroke-width: 3; }
+    .chain  { fill: none; stroke: var(--accent); stroke-width: 5; }
+    .tee    { fill: var(--accent); fill-opacity: 0.10; stroke: var(--accent); stroke-width: 3; }
+    .role   { font-size: 40px; font-weight: 800; }
+    .sub    { font-size: 22px; fill: var(--sub); }
+    .tag    { font-size: 28px; font-weight: 800; fill: var(--accent); }
+    .body   { font-size: 24px; font-weight: 600; }
+    .lbl    { font-size: 22px; font-weight: 600; fill: var(--sub); }
+    .arrow  { fill: none; stroke: var(--line); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+    .read   { fill: none; stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="var(--line)"/>
+    </marker>
+    <marker id="headA" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="var(--accent)"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="10" y="20" width="320" height="270" rx="18"/>
+  <text class="role" x="170" y="76">제공자</text>
+  <text class="sub" x="170" y="108">운영하고 직접 등록</text>
+  <rect class="tee" x="35" y="135" width="270" height="130" rx="14"/>
+  <text class="tag" x="170" y="180">TEE</text>
+  <text class="body" x="170" y="228">코드  →  해시</text>
+  <rect class="chain" x="580" y="20" width="320" height="270" rx="18"/>
+  <text class="role" x="740" y="76">블록체인</text>
+  <text class="sub" x="740" y="108">이더리움</text>
+  <rect class="tee" x="605" y="135" width="270" height="130" rx="14"/>
+  <text class="tag" x="740" y="180">레지스트리</text>
+  <text class="body" x="740" y="218">제공자가 서명한</text>
+  <text class="body" x="740" y="248">해시</text>
+  <path class="arrow" d="M336 200H574" marker-end="url(#head)"/>
+  <text class="lbl" x="455" y="150">1. 서명해서</text>
+  <text class="lbl" x="455" y="176">등록</text>
+  <rect class="box" x="295" y="420" width="320" height="130" rx="18"/>
+  <text class="role" x="455" y="476">사용자</text>
+  <text class="sub" x="455" y="510">TEE 해시 = 등록 해시?</text>
+  <path class="read" d="M289 485H170 V298" marker-end="url(#headA)"/>
+  <text class="lbl" x="88" y="380">2. TEE에</text>
+  <text class="lbl" x="88" y="406">해시 요청</text>
+  <path class="read" d="M621 485H740 V298" marker-end="url(#headA)"/>
+  <text class="lbl" x="818" y="380">3. 등록 해시</text>
+  <text class="lbl" x="818" y="406">조회</text>
+</svg>
