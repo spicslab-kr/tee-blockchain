@@ -93,10 +93,11 @@ registers the hash it gets. The User trusts what the Auditor signed.
 </p>
 
 **Flow 2: the Vendor registers itself.** Without an Auditor, the Vendor signs and registers the hash
-of its own enclave. An Auditor can still check it later.
+of its own enclave. An Auditor can check it later: rebuild the source, ask the Vendor's TEE for its
+hash, and register its own signed hash. The User can then require both registries to agree.
 
 <p align="center">
-  <img src="docs/img/flow-vendor.svg" alt="Flow 2: the Vendor signs and registers the hash on the blockchain, and the User compares the TEE's hash with the registry">
+  <img src="docs/img/flow-vendor.svg" alt="Flow 2: the Vendor signs and registers the hash on the blockchain, an Auditor can check and register later, and the User compares the TEE's hash with the registry">
 </p>
 
 ### Three roles, four binaries

@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 910 560" width="910" height="560" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1330 640" width="1330" height="640" role="img" aria-labelledby="t d">
   <title id="t">How Attestamp works: the Vendor registers itself</title>
-  <desc id="d">The Vendor runs code in a TEE, signs the hash of that code and registers it on the blockchain. The User asks the TEE for its hash, looks the hash up on the blockchain, and compares the two.</desc>
+  <desc id="d">The Vendor runs code in a TEE, signs the hash of that code and registers it on the blockchain. The User asks the TEE for its hash, looks the hash up on the blockchain, and compares the two. Later an Auditor can rebuild the source, ask the Vendor's TEE for its hash, and register its own signed hash, so the User can require both registries to agree.</desc>
   <style>
     :root { --ink: #1f2937; --sub: #4b5563; --line: #8a94a6; --accent: #0d9488; }
     @media (prefers-color-scheme: dark) {
@@ -8,6 +8,7 @@
     }
     text { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; text-anchor: middle; fill: var(--ink); }
     .box    { fill: none; stroke: var(--line); stroke-width: 3; }
+    .later  { stroke-dasharray: 10 8; }
     .chain  { fill: none; stroke: var(--accent); stroke-width: 5; }
     .tee    { fill: var(--accent); fill-opacity: 0.10; stroke: var(--accent); stroke-width: 3; }
     .role   { font-size: 40px; font-weight: 800; }
@@ -27,29 +28,41 @@
     </marker>
   </defs>
 
+  <g transform="translate(0 80)">
+  <path class="arrow" d="M170 14V-12Q170 -36 194 -36H1136 Q1160 -36 1160 -12V8" marker-end="url(#head)"/>
+  <text class="lbl" x="665" y="-48">1. Sign and register hash</text>
   <rect class="box" x="10" y="20" width="320" height="270" rx="18"/>
   <text class="role" x="170" y="76">Vendor</text>
   <text class="sub" x="170" y="108">runs and registers</text>
   <rect class="tee" x="35" y="135" width="270" height="130" rx="14"/>
   <text class="tag" x="170" y="180">TEE</text>
   <text class="body" x="170" y="228">Code  →  Hash</text>
-  <rect class="chain" x="580" y="20" width="320" height="270" rx="18"/>
-  <text class="role" x="740" y="76">Blockchain</text>
-  <text class="sub" x="740" y="108">Ethereum</text>
-  <rect class="tee" x="605" y="135" width="270" height="130" rx="14"/>
-  <text class="tag" x="740" y="180">Registry</text>
-  <text class="body" x="740" y="218">Hash signed by</text>
-  <text class="body" x="740" y="248">the Vendor</text>
-  <path class="arrow" d="M336 200H574" marker-end="url(#head)"/>
-  <text class="lbl" x="455" y="150">1. Sign and</text>
-  <text class="lbl" x="455" y="176">register hash</text>
-  <rect class="box" x="295" y="420" width="320" height="130" rx="18"/>
-  <text class="role" x="455" y="476">User</text>
-  <text class="sub" x="455" y="510">TEE hash = registry hash?</text>
-  <path class="read" d="M289 485H170 V298" marker-end="url(#headA)"/>
-  <text class="lbl" x="88" y="380">2. Ask the TEE</text>
-  <text class="lbl" x="88" y="406">for its hash</text>
-  <path class="read" d="M621 485H740 V298" marker-end="url(#headA)"/>
-  <text class="lbl" x="818" y="380">3. Look up</text>
-  <text class="lbl" x="818" y="406">the hash</text>
+  <rect class="box later" x="505" y="20" width="320" height="270" rx="18"/>
+  <text class="role" x="665" y="76">Auditor</text>
+  <text class="sub" x="665" y="108">checks it later</text>
+  <rect class="tee" x="530" y="135" width="270" height="130" rx="14"/>
+  <text class="tag" x="665" y="180">TEE</text>
+  <text class="body" x="665" y="218">Rebuilds and</text>
+  <text class="body" x="665" y="248">compares the hash</text>
+  <rect class="chain" x="1000" y="20" width="320" height="270" rx="18"/>
+  <text class="role" x="1160" y="76">Blockchain</text>
+  <text class="sub" x="1160" y="108">Ethereum</text>
+  <rect class="tee" x="1025" y="135" width="270" height="130" rx="14"/>
+  <text class="tag" x="1160" y="180">Registry</text>
+  <text class="body" x="1160" y="214">Signed by the Vendor,</text>
+  <text class="body" x="1160" y="242">later by the Auditor</text>
+  <path class="arrow" d="M499 200H336" marker-end="url(#head)"/>
+  <text class="lbl" x="417" y="134">Later: ask the</text>
+  <text class="lbl" x="417" y="158">TEE for its hash</text>
+  <path class="arrow" d="M831 200H994" marker-end="url(#head)"/>
+  <text class="lbl" x="912" y="134">Later: sign and</text>
+  <text class="lbl" x="912" y="158">register hash</text>
+  <rect class="box" x="505" y="420" width="320" height="130" rx="18"/>
+  <text class="role" x="665" y="476">User</text>
+  <text class="sub" x="665" y="510">TEE hash = registry hash?</text>
+  <path class="read" d="M499 485H170 V298" marker-end="url(#headA)"/>
+  <text class="lbl" x="337" y="466">2. Ask the TEE for its hash</text>
+  <path class="read" d="M831 485H1160 V298" marker-end="url(#headA)"/>
+  <text class="lbl" x="992" y="466">3. Look up the hash</text>
+  </g>
 </svg>
