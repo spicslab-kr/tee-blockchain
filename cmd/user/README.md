@@ -1,6 +1,6 @@
 # User guide (`att-user`)
 
-The User needs one binary, `att-user`, and network access. No key, no ETH, no Nitro, no Docker.
+You need one binary, `att-user`, and network access. You need no key, no ETH, no Nitro and no Docker.
 Build instructions: [Build the binaries](../README.md#build-the-binaries).
 
 ## verify
@@ -9,39 +9,70 @@ Build instructions: [Build the binaries](../README.md#build-the-binaries).
 att-user verify --tee-addr <vendor-public-ip>:5000 --rpc <url> --registry <0x...>
 ```
 
-What it does: asks the Vendor's enclave to attest, verifies the document, finds who registered
-that measurement, and checks each registration. Exit 0 if at least one registration matches on
-value, expiry and approver. Exit 1 with the reason if nobody registered the value or none check out.
-A matching registration is shown with what the chain recorded for it, architecture included:
+`verify` asks the Vendor's enclave for an attestation, checks the document, finds who registered the
+measurement it contains, and checks each registration it finds.
 
-```
-✓ matches  nginx 1.31.6 (amd64) by 0x..., expires ...
-```
-
-A registration passes only if all three hold:
+A registration passes when all three hold:
 
 - its value equals what the enclave just attested,
 - it has not expired, judged on the chain's own clock,
-- its approver is the registry's approver, or one of the addresses given with `--trusted-approvers`.
+- its approver is the registry's approver, or one of the addresses you give with `--trusted-approvers`.
 
-Flags: `--tee-addr`, `--rpc`, `--registry` (required, repeatable), `--trusted-approvers <0x...,0x...>` (comma
-separated; default is each registry's approver), `--format` (default `aws-nitro`), `--timeout`
-(default 30s), `--nonce` (pin the nonce, for tests), `--out-dir <dir>` (keep the intermediate files;
-otherwise a temporary directory is used and removed). A value you leave out is asked for; an empty
-`--rpc` defaults to Ethereum mainnet.
+For one registry, `verify` exits 0 when at least one of its registrations passes. With several
+`--registry` flags, every one of those registries needs at least one passing registration. Otherwise it
+exits 1 and prints the reason.
+
+Flags:
+
+- `--tee-addr` is the enclave's `host:port`.
+- `--rpc` is the Ethereum RPC URL. If you leave it empty, `verify` asks for it and offers Ethereum mainnet.
+- `--registry` is the registry contract address. It is required and you can repeat it.
+- `--trusted-approvers <0x...,0x...>` is a comma separated list. The default is each registry's own approver.
+- `--format` is the expected document format. The default is `aws-nitro`.
+- `--timeout` is the request timeout. The default is 30s.
+- `--nonce` pins the nonce, for tests.
+- `--out-dir <dir>` keeps the intermediate files. Without it, `verify` uses a temporary directory and removes it at the end.
+
+If you leave out `--tee-addr` or `--registry`, `verify` prompts for it.
+
+### What a trusted run prints
+
+```
+Asking the enclave at <host>:5000 for an attestation... ✓ aws-nitro document, <n> bytes
+Checking the attestation (signature chain to the platform root, nonce)... ✓ genuine
+    PCR0  <hex>
+    PCR1  <hex>
+    PCR2  <hex>
+Looking up who registered what this enclave runs, in the registry at 0x...... ✓ 1 registration(s)
+    checking each against the attestation (value, expiry, approver):
+    0x<record key>  ✓ matches  nginx 1.31.6 (amd64) by 0x<approver>, expires 2027-01-01T00:00:00Z
+trusted: this enclave runs exactly what 0x<approver> registered
+```
+
+The dotted lines that start with `·` explain each step and are left out here. The registration line
+shows what the chain recorded for the registration, architecture included. Exit code: 0.
+
+If nobody registered the measurement, the lookup step ends in `✗` and the run stops with:
+
+```
+att-user: nobody has registered these measurements on the chain, so there is no basis for trust
+```
+
+The exit code is 1.
 
 ### Several registries
 
-Repeat `--registry` (a comma separated list also works) to check several registries, for example
-the Vendor's and the Auditor's:
+Repeat `--registry` to check several registries, for example the Vendor's and the Auditor's. A comma
+separated list also works.
 
 ```
 att-user verify --tee-addr <vendor-public-ip>:5000 --rpc <url> \
     --registry <vendor registry 0x...> --registry <auditor registry 0x...>
 ```
 
-The registries are shown side by side and every one of them must vouch for what the enclave runs.
-If the Vendor's registry says yes and the Auditor's says no, the result is `not trusted` with exit 1.
+`verify` shows the registries side by side. If the Vendor's registry vouches and the Auditor's does not,
+the run prints `not trusted: only 1 of 2 registries vouch for what this enclave runs; the others never approved it`
+and exits 1.
 
 ### Naming other trusted approvers
 
@@ -49,102 +80,89 @@ If the Vendor's registry says yes and the Auditor's says no, the result is `not 
 att-user verify --tee-addr <host>:5000 --rpc <url> --registry <0x...> --trusted-approvers <0xApprover1>,<0xApprover2>
 ```
 
-`--trusted-approvers` replaces the default (the registry's approver), and applies to every `--registry`.
+`--trusted-approvers` replaces the default (the registry's approver) and applies to every `--registry`.
+Addresses compare case-insensitively.
 
 ## The steps it wraps
 
-Attestation document from the Vendor's enclave:
+Each step is a command of its own. You can run them one at a time.
+
+Request an attestation document from the Vendor's enclave:
 
 ```
 att-user ra-request --tee-addr <vendor-public-ip>:5000 --out-file doc.cbor --format aws-nitro
 ```
 
-Verify it and extract PCR0, PCR1, PCR2:
+`ra-request` writes the nonce it used to `<out-file>.nonce`.
+
+Verify the document and extract PCR0, PCR1 and PCR2. `ra-parse` checks the document against the nonce file:
 
 ```
 att-user ra-parse --doc doc.cbor --out-file parsed.json
 ```
 
-Find the registration by measurement alone. No key from anyone is needed:
+Find the registration by measurement alone. This needs no key from anyone:
 
 ```
 att-user lookup --rpc <url> --registry <0x...> --measurements parsed.json
 ```
 
-The trust decision, for each record key `lookup` found:
+Take the trust decision for each record key `lookup` found:
 
 ```
 att-user compare --attested parsed.json --rpc <url> --registry <0x...> --record-key <a record key lookup found> \
     [--trusted-approvers <0x...,0x...>]
 ```
 
-`ra-request` writes the nonce it used to `<out-file>.nonce`, and `ra-parse` checks the document against
-it. Exit codes: [Exit codes](../README.md#exit-codes).
+`compare` can also match two sets of measurements as they are:
 
-## Key types, fields and functions
+```
+att-user compare --attested parsed.json --expected other.json
+```
 
-A map of the code a new reader should know. Links are relative to this file. This is not every identifier.
+## Troubleshooting
 
-### Command dispatch
+Every error is printed as `att-user: <text>` and sets the exit code described in
+[Exit codes](../README.md#exit-codes). This role returns 1 (any other error, including an untrusted
+result), 3 (network error), 4 (wrong format), 5 (invalid signature or certificate chain), 6 (nonce
+mismatch or bad response) and 7 (malformed document).
 
-`main` in [main.go](main.go) switches on the first argument and calls one function per command. A missing or unknown command prints the usage text and exits 2. A returned error goes through `exitCode`.
+- `nobody: this registry's approver never registered the value this enclave runs`: The registry holds no record for the measurement the enclave attested. Check that `--registry` and `--rpc` point at the right registry and network. Compare the printed PCR0, PCR1 and PCR2 with the values the Vendor published, and ask the Vendor or Auditor to register them.
 
-| Name | Where | What it is or does |
-|---|---|---|
-| `main`, `usage` | [main.go](main.go) | Dispatch (`ra-parse`, `ra-request`, `lookup`, `compare`, `verify`) and the help text. |
-| `verifyCmd` | [verify.go](verify.go) | `verify`: the whole trust decision in one command. |
-| `raRequest` | [main.go](main.go) | `ra-request`: sends a fresh nonce, saves the document and `<out-file>.nonce`. |
-| `raParse` | [parse.go](parse.go) | `ra-parse`: verifies the document and writes the measurements as JSON. |
-| `lookup` | [chain.go](chain.go) | `lookup`: reads one record key, or finds the record keys by measurements and reads them. Returns the record keys it found. |
-| `compareCmd`, `checkMode` | [compare.go](compare.go) | `compare`: either two measurement sets (`--expected`), or the attested measurements against a registration (`--record-key`). |
-| `resolveTrustedApprovers` | [compare.go](compare.go) | `--trusted-approvers` if given, else the registry's own approver. |
-| `readMeasurements` | [chain.go](chain.go) | Reads measurements from a `parsed.json` file or `NAME=hex,...`. |
-| `quiet` | [quiet.go](quiet.go) | Set by `verify` so the single-step functions print nothing and `verify` prints its own sentences. |
+- `registration expired`: A registration exists and its value matches, but its expiry is not after the chain's current block time. Ask the approver to register the measurement again with a later expiry.
 
-### The verify flow, in order
+- `approver 0x... is not in the trusted approvers`: The registration was signed by an address that is neither the registry's approver nor in your `--trusted-approvers` list. If you know and trust that address, pass it with `--trusted-approvers`. Otherwise treat the registration as untrusted.
 
-| Step | Function | Where |
-|---|---|---|
-| Make a nonce and request the document | `TCPRequester.RequestFresh` (random nonce from `CryptoRand`, then `Request`), called through `raRequest` | [tcp.go](../../internal/tee/request/user/tcp.go), [nonce.go](../../internal/tee/request/user/nonce.go) |
-| Check the format | `RADoc.ExpectFormat` | [request.go](../../internal/tee/request/user/request.go) |
-| Verify the signature chain to the platform root and the nonce | `AWSParser.VerifySig` and `AWSParser.CheckNonce`, called by `raParse` | [aws.go](../../internal/tee/parse/user/aws.go), [verify.go](../../internal/tee/parse/aws/verify.go), [nonce.go](../../internal/tee/parse/aws/nonce.go) |
-| Extract PCR0, PCR1, PCR2 | `AWSParser.Parse` (wraps `aws.Parser.Parse`) | [measure.go](../../internal/tee/parse/aws/measure.go) |
-| Find record keys by measurement | `Reader.FindRecordKeys`, via `lookup` | [reader.go](../../internal/chain/lookup/user/ether/reader.go) |
-| Read each registration | `Reader.Lookup`, returning a `Registration` | [reader.go](../../internal/chain/lookup/user/ether/reader.go), [lookup.go](../../internal/chain/lookup/user/lookup.go) |
-| Decide | `Impl.Check`, with `Clock(reg)` as the current time | [compare.go](../../internal/core/compare/user/compare.go) |
+- `document nonce is not the one sent` (exit 6): The document does not carry the nonce you sent, so it may be a replay. Run `verify` again. If you passed `--nonce`, remove it, because `--nonce` replaces the nonce `verify` just sent.
 
-`verify` repeats the last three steps for every `--registry` and trusts only if each registry has at least one passing registration. The chain types live in [lookup.go](../../internal/chain/lookup/user/lookup.go): `Registration` (`RecordKey`, `Values`, `Meta`, `Expires`, `ChainTime`, `Approver`, `Signature`) and `Meta` (`Service`, `Version`, `Platform`, `Arch`).
+- `attestation document has a different format than expected: got "gcp-cs-jwt", want "aws-nitro"` (exit 4): The enclave answered in another format. Only `aws-nitro` can be verified. `ra-parse` reports `document format does not match this parser: no parser for "gcp-cs-jwt"`. `gcp-cs-jwt` and `azure-maa-jwt` can be requested with `ra-request` but have no verifier, so a host that answers in those formats cannot be checked with `att-user`.
 
-### The trust decision
+- `dial tcp <host>:5000: ...` such as `i/o timeout` (exit 3): `att-user` could not reach the enclave. Check `--tee-addr`, the Vendor's firewall and that the responder is running. Raise `--timeout` on a slow link. The same exit code applies when the `--rpc` endpoint is unreachable.
 
-`Impl.Check(attested, reg, now, trustedApprovers)` in [compare.go](../../internal/core/compare/user/compare.go) hashes the attested measurements and hands the rest to the shared `Check` in [check.go](../../internal/core/compare/check.go).
+## Reading the code
 
-| Input | Meaning |
-|---|---|
-| measurement hash | Hash of the attested PCRs (see below), compared with the hash stored in the registration. |
-| registration | `Approver` (who signed it) and `Expires` (unix seconds, chain clock). |
-| now | `Clock(reg)`: the time of the block the registration was read from (`ChainTime`), because the contract judges expiry by its own clock. It falls back to this machine's clock only if `ChainTime` is missing. |
-| trusted approvers | `--trusted-approvers`, else the registry's approver. Addresses compare case-insensitively. |
+Execution starts in `main` in [main.go](main.go), which switches on the first argument and calls one
+function per command. A missing or unknown command prints the usage text and exits 2. A returned error
+goes through `exitCode`. `att-user` has no signing key and no `register` command, and its chain reader
+has only `FindRecordKeys` and `Lookup`, so you can check what an approver registered and cannot create
+or change a registration.
 
-The result is a `Verdict` (`Pass` plus a `Reason` list). It fails, listing every reason that applies, when:
+In verify order:
 
-- `registration expired`: `Expires` is not after now.
-- `approver ... is not in the trusted list`.
-- `measurement hash differs from the chain registration`.
-- `could not compute the measurement hash`: no measurements, an empty name or value, or a duplicate name.
+- [`verifyCmd`](verify.go) runs the whole sequence and prints one line per step.
+- [`TCPRequester.RequestFresh`](../../internal/tee/request/user/tcp.go) creates a random nonce and fetches the document.
+- [`RADoc.ExpectFormat`](../../internal/tee/request/user/request.go) rejects a document in another format.
+- [`AWSParser`](../../internal/tee/parse/user/aws.go) verifies the signature chain and the nonce, and extracts PCR0, PCR1 and PCR2.
+- [`Reader.FindRecordKeys`](../../internal/chain/lookup/user/ether/reader.go) searches the registry by measurement hash.
+- [`Reader.Lookup`](../../internal/chain/lookup/user/ether/reader.go) reads one registration.
+- [`Impl.Check`](../../internal/core/compare/user/compare.go) hashes the attested values and uses `Clock` as the current time.
+- [`Check`](../../internal/core/compare/check.go) makes the trust decision.
 
-### How the measurement hash is built
+`Check` passes a registration only when all three conditions hold. It lists every failure that applies.
 
-`measurementHash` in [compare.go](../../internal/core/compare/user/compare.go) sorts the measurements by name (`PCR0`, `PCR1`, `PCR2`), writes one line `name=<hex value>` plus a newline for each, and takes the keccak256 of the result. The copy in [reader.go](../../internal/chain/lookup/user/ether/reader.go) must stay identical, because `FindRecordKeys` searches the registry with it. `Parse` leaves out an all-zero register (debug mode) and rejects the document if every PCR is zero.
+1. The expiry is after the chain's current time. Otherwise the reason is `registration expired`.
+2. The approver is in the trusted list. Otherwise the reason is `approver <address> is not in the trusted approvers`.
+3. The registration's measurement hash equals the hash of the attested values. Otherwise the reason is `measurement hash differs from the chain registration`.
 
-### Document formats
-
-`--format` names the attestation document format. `aws-nitro` is the only one that can be verified (`ra-parse`, `verify`). The `ra-request` help also lists `gcp-cs-jwt` and `azure-maa-jwt`, but those parsers ([gcp.go](../../internal/tee/parse/user/gcp.go), [azure.go](../../internal/tee/parse/user/azure.go)) are not implemented yet. An empty `--format` on `ra-request` accepts any format; `verify` defaults to `aws-nitro`.
-
-### Why the User never signs or registers
-
-`att-user` has no `register`, no key and no ETH. The chain side is read-only: `Reader` in [lookup.go](../../internal/chain/lookup/user/lookup.go) has only `FindRecordKeys` and `Lookup`. A User can check what an approver registered but cannot create or change a registration. That is also why the hash code is repeated here instead of imported from a register package.
-
-### Exit codes
-
-`exitCode` in [main.go](main.go) maps errors: 4 wrong format, 5 signature or certificate chain invalid (or no document extracted), 6 nonce mismatch or bad response, 7 malformed document, 3 network error, 1 anything else (including an untrusted `verify`). 0 is success and 2 a missing or unknown command. See [Exit codes](../README.md#exit-codes).
+If the attested values cannot be hashed (none, an empty name or value, or a duplicate name), `Impl.Check`
+fails with `could not compute the measurement hash: <detail>`.
