@@ -52,14 +52,14 @@ func registryDeploy(args []string) error {
 	return nil
 }
 
-// register returns the record key (lookup coordinate) used for the registration, so run can immediately self-check it with compare.
+// register returns the record key (lookup coordinate) of the registration, so the caller can read it back from the chain.
 func register(args []string) (string, error) {
 	fs := flag.NewFlagSet("register", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
 	registry := fs.String("registry", "", "Registry contract address")
 	signingKeyFile := fs.String("signing-key-file", "", "signing key file (hex): its signature authorises the registration, and the same key sends the transaction")
 	measurements := fs.String("measurements", "", "measurements: a nitro measurements.json file, or NAME=hex,NAME=hex")
-	platform := fs.String("platform", "aws-nitro", "measurement format")
+	platform := fs.String("platform", "aws-nitro", "platform value recorded in the registration")
 	config := fs.String("config", "", "my build-config.json (the one send pushes): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
 	service := fs.String("service", "", "service name")
 	version := fs.String("version", "", "version")
@@ -104,12 +104,10 @@ func register(args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// the build environment this registration is for: --arch says which machine the image was built for and measured
-	// on; the Go toolchain is this binary's — it is pinned project-wide (build.CheckToolchain at build start), so it is
-	// the one that compiled att-ra-responder into the image. with --config it is the config's build_env instead: that
-	// describes the build that was measured, whichever machine runs register. of it, only the arch goes into the chain
-	// registration (meta.Arch above) — display only, so a reader can tell the two architectures' registrations apart; the record key
-	// still splits by the measurement hash alone. the rest is said here and in measurement-record.json.
+	// env is the build environment of this registration. With --config it is the config's build_env. Without it, the
+	// Go toolchain is this binary's (pinned project-wide) and the arch is --arch. Only the arch goes on the chain
+	// (meta.Arch), so readers can tell the architectures apart; the record key depends on the measurement hash alone.
+	// The full env is printed here and belongs in measurement-record.json.
 	env := tr.CurrentBuildEnv()
 	if cfg != nil {
 		env = cfg.BuildEnv
@@ -181,8 +179,8 @@ func buildEnvJSON(env tr.BuildEnv) string {
 	return string(b)
 }
 
-// lookup: with --record-key, reads that record key directly. Otherwise it first finds the record keys via --measurements, then reads them all.
-// It returns the record keys it found, so run can compare each of them.
+// lookup reads one record key directly with --record-key. With --measurements it first finds the record keys for them, then reads them all.
+// It returns the record keys it found.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
@@ -314,9 +312,8 @@ func ask(dst *string, label, def string) {
 
 const mainnetRPC = "https://ethereum-rpc.publicnode.com"
 
-// askMainnetRPC: registration and deployment are transactions that move real funds, so mainnet is never reached by just pressing
-// Enter. A value given as a flag is used as is. If empty, typing y selects mainnet and any other
-// string is used as the RPC address (a testnet such as Sepolia is likewise given explicitly).
+// askMainnetRPC asks for the RPC URL when --rpc is empty. Registration and deployment are transactions that move real funds, so
+// mainnet needs an explicit y: any other input is used as the RPC address (a testnet such as Sepolia is given this way).
 func askMainnetRPC(dst *string) {
 	if *dst != "" {
 		return

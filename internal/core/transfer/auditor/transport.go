@@ -16,7 +16,7 @@ type Transport interface {
 	Send(ctx context.Context, rec MeasurementRecord, to string) (path string, err error)
 }
 
-// Received holds the parsed value and the original bytes.
+// Received holds the parsed build config, its original bytes, its path and SHA-256.
 type Received struct {
 	Value  BuildConfig
 	Raw    []byte
@@ -24,11 +24,12 @@ type Received struct {
 	SHA256 string
 }
 
+// FileTransport hands files over through a directory or file path.
 type FileTransport struct{}
 
 var _ Transport = (*FileTransport)(nil)
 
-// Receive checks the hash, then reads.
+// Receive reads the build config and checks it against its .sha256 sidecar when present.
 func (FileTransport) Receive(ctx context.Context, from string) (Received, error) {
 	if err := ctx.Err(); err != nil {
 		return Received{}, err
@@ -49,7 +50,9 @@ func (FileTransport) Receive(ctx context.Context, from string) (Received, error)
 	return Received{Value: cfg, Raw: raw, Path: src, SHA256: sum}, nil
 }
 
-// Send writes the record and, if there is an image file, copies it into the same directory. The record's sha256 must match the file.
+// Send validates rec and writes it with a .sha256 sidecar to measurement-record.json inside to, or to the file
+// path to. An image file is copied next to it; an empty rec.Image.SHA256 is filled in from the file, and a given
+// one must match.
 func (FileTransport) Send(ctx context.Context, rec MeasurementRecord, to string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -91,6 +94,7 @@ func (FileTransport) Send(ctx context.Context, rec MeasurementRecord, to string)
 	return dst, nil
 }
 
+// resolve returns target/defaultName when target is a directory, otherwise target.
 func resolve(target, defaultName string) string {
 	if fi, err := os.Stat(target); err == nil && fi.IsDir() {
 		return filepath.Join(target, defaultName)
@@ -98,6 +102,7 @@ func resolve(target, defaultName string) string {
 	return target
 }
 
+// checkSidecar compares sum with path+".sha256". A missing sidecar passes.
 func checkSidecar(path, sum string) error {
 	side, err := os.ReadFile(path + ".sha256")
 	if errors.Is(err, os.ErrNotExist) {
@@ -107,11 +112,12 @@ func checkSidecar(path, sum string) error {
 		return err
 	}
 	if strings.TrimSpace(string(side)) != sum {
-		return fmt.Errorf("%s: sha256 mismatch — file changed in transit", filepath.Base(path))
+		return fmt.Errorf("%s: sha256 mismatch: file changed in transit", filepath.Base(path))
 	}
 	return nil
 }
 
+// copyFile copies src to dst through a temporary file. Identical paths are a no-op.
 func copyFile(src, dst string) error {
 	if filepath.Clean(src) == filepath.Clean(dst) {
 		return nil
@@ -136,6 +142,7 @@ func copyFile(src, dst string) error {
 	return os.Rename(tmp, dst)
 }
 
+// writeAtomic writes through a temporary file and renames it into place.
 func writeAtomic(path string, b []byte) error {
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o644); err != nil {

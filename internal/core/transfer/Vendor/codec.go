@@ -8,7 +8,8 @@ import (
 	"strings"
 )
 
-// Encode uses fixed indentation.
+// Encode marshals v as JSON with two-space indentation and no HTML escaping, so the same value always
+// produces the same bytes.
 func Encode(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -20,6 +21,7 @@ func Encode(v any) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// DecodeBuildConfig parses and validates a build-config.json.
 func DecodeBuildConfig(b []byte) (BuildConfig, error) {
 	var c BuildConfig
 	if err := decodeStrict(b, &c); err != nil {
@@ -31,6 +33,7 @@ func DecodeBuildConfig(b []byte) (BuildConfig, error) {
 	return c, nil
 }
 
+// DecodeMeasurementRecord parses and validates a measurement-record.json.
 func DecodeMeasurementRecord(b []byte) (MeasurementRecord, error) {
 	var r MeasurementRecord
 	if err := decodeStrict(b, &r); err != nil {
@@ -42,7 +45,7 @@ func DecodeMeasurementRecord(b []byte) (MeasurementRecord, error) {
 	return r, nil
 }
 
-// decodeStrict rejects unknown fields.
+// decodeStrict decodes JSON and fails on unknown fields.
 func decodeStrict(b []byte, v any) error {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()

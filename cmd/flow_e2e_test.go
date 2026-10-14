@@ -1,4 +1,4 @@
-// run through the real CLI: what a person used to type by hand as separate steps (request, parse, register, lookup, compare), bundled into one command.
+// The one-command flows through the real CLI: auditor audit, vendor self-register and user verify, each bundling request, parse, register, lookup and compare.
 // One registry = one approver, so the Auditor and the Vendor each register on their own contract.
 // Skipped if anvil is not on PATH.
 package cmd_test
@@ -159,7 +159,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 	}
 }
 
-// Running User run against a TEE whose measurements nobody registered: the lookup finds nothing, so exit 1.
+// User verify against a TEE whose measurements nobody registered: the lookup finds nothing, so exit 1.
 func TestRun_E2E_User_NothingRegistered(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")

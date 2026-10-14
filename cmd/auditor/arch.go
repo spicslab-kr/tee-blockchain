@@ -34,7 +34,7 @@ func checkArch(s string) error {
 }
 
 // warnToolchain prints one line if the record's build_env.go differs from the Go this project pins (internal/setup/build/GO_TOOLCHAIN).
-// It is not an error (the record may come from another checkout or an older one), but a rebuild would produce different bytes.
+// It is a warning only, since the record may come from another checkout; a rebuild here would produce different bytes.
 func warnToolchain(env tr.BuildEnv) {
 	if env.Go != "" && env.Go != build.RequiredToolchain() {
 		cli.Errorf("warning: the record was produced with %s, but this project pins %s — a rebuild here will not reproduce its measurements", env.Go, build.RequiredToolchain())

@@ -1,4 +1,4 @@
-// Package vendor registers measurements on chain: it signs them and records them in the contract.
+// Package vendor signs registrations and records them in a Registry contract.
 package vendor
 
 import (
@@ -14,8 +14,8 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// Meta is the registration info attached to the measurements. Once Expires has passed the registration no longer
-// counts. There is no revocation.
+// Meta describes a registration. Expires is when it stops counting, on the chain's clock. Registrations are never
+// revoked or overwritten.
 type Meta struct {
 	l.Meta
 	Expires time.Time
@@ -25,33 +25,34 @@ type Meta struct {
 type Signed struct {
 	Values    p.Measurements
 	Meta      Meta
-	Approver  string // address of the signing key; equals the value the contract recovers from the signature
-	Digest    []byte // the hash that was signed; must equal the contract's digest()
+	Approver  string // address of the signing key; the contract recovers the same address from the signature
+	Digest    []byte // the EIP-712 hash that was signed; equals the contract's digest()
 	Signature []byte // 65 bytes, r‖s‖v
 }
 
-// Receipt confirms a registration. RecordKey locates it in the registry.
+// Receipt confirms a mined registration. RecordKey locates it in the registry.
 type Receipt struct {
 	RecordKey string // 0x…, 32 bytes
 	TxHash string
 	Block  uint64
 }
 
+// Registrar signs registrations and sends them to one registry.
 type Registrar interface {
-	// Sign signs the measurements and registration info with the signing key. This signature is what says who registered.
+	// Sign signs the registration with the signing key. The address recovered from the signature is the approver.
 	Sign(values p.Measurements, meta Meta, signingKey []byte) (Signed, error)
-	// Register sends the signed value to the contract, which checks the approver and then stores it.
+	// Register sends the signed registration to the contract, which checks the approver and stores it.
 	Register(ctx context.Context, s Signed) (Receipt, error)
 }
 
 var (
-	ErrNotAnApprover     = errors.New("the approver is not the one fixed in the contract")
-	ErrAlreadyRegistered = errors.New("this approver already registered this measurement")
+	ErrNotAnApprover     = errors.New("the signer is not the approver fixed in the registry")
+	ErrAlreadyRegistered = errors.New("this measurement is already registered on this platform")
 	ErrExpiryPassed      = errors.New("expiry is not in the future by the chain's clock")
 )
 
-// MeasurementHash reduces a set of measurements to a single 32-byte value, which is what goes into the contract.
-// It is keccak256 over "name=value(hex)\n" entries concatenated in name order, so anyone computing it from the same measurements gets the same result.
+// MeasurementHash reduces a set of measurements to the 32-byte value the contract stores as `measurement`.
+// It is keccak256 over "name=value(hex)\n" entries in name order.
 func MeasurementHash(values p.Measurements) ([32]byte, error) {
 	var out [32]byte
 	if len(values) == 0 {
@@ -77,6 +78,7 @@ func MeasurementHash(values p.Measurements) ([32]byte, error) {
 	return out, nil
 }
 
+// Validate checks that every field the contract requires is set.
 func (m Meta) Validate() error {
 	switch {
 	case m.Platform == "":

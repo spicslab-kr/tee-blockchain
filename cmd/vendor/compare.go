@@ -67,9 +67,8 @@ func compareCmd(args []string) error {
 	return printVerdict((cmp.Impl{}).Compare(attestedValues, expectedValues))
 }
 
-// checkMode accepts exactly one of --expected (plain mode) and --record-key (chain mode). Giving both is reported as an error
-// rather than silently ignoring one. --trusted-approvers only means something in chain mode; without --record-key it would
-// just be dropped, so that is rejected up front too.
+// checkMode accepts exactly one of --expected (plain mode) and --record-key (chain mode) and reports an error when both are given.
+// --rpc, --registry and --trusted-approvers belong to chain mode, so each is rejected without --record-key.
 func checkMode(expected, rpc, registry, recordKey, trustedApprovers string) error {
 	chainFlags := rpc != "" || registry != "" || recordKey != "" || trustedApprovers != ""
 	switch {

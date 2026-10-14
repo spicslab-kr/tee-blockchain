@@ -1,9 +1,9 @@
-// Package cli holds the few things every att command line shares: at the moment, painting
-// errors and FAIL verdicts red on a terminal.
+// Package cli holds the output helpers shared by the att-vendor, att-auditor, att-user and att-ra-responder
+// commands: red errors and FAIL verdicts, green success lines, and step progress with dots.
 //
-// Color is applied only when stderr is a character device and NO_COLOR is unset, so
-// anything captured through a pipe (tests use CombinedOutput, scripts grep the output)
-// sees plain text. No string that a test matches ever carries an escape code.
+// Color and animation apply when the stream is a character device and NO_COLOR is unset, so output
+// captured through a pipe (tests use CombinedOutput, scripts grep the output) is plain text and
+// the strings that tests match carry no escape codes.
 package cli
 
 import (

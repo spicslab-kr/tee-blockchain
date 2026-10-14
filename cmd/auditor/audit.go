@@ -18,27 +18,27 @@ import (
 )
 
 // auditCmd runs the Auditor's part in one command: request an attestation document from its own TEE and verify it, compare it with the values I built and measured,
-// register those values only if they match, then read the registration back and check it. The screen shows a sentence saying what is happening, not a step label.
+// register those values only if they match, then read the registration back and check it. The screen shows one sentence per step.
 //
 // With only --tee-addr, the attested values are registered as they are (no check). With only --build-measurements, that file is registered as it is.
 func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "my enclave's host:port — an attestation is requested from it first")
-	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port — also ask it, and say whether it runs the same value I built. it is registered either way: what I built, not what the Vendor runs")
-	format := fs.String("format", "aws-nitro", "expected document format")
+	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port — also ask it, and say whether it runs the same value I built. the value registered is always the one I built")
+	format := fs.String("format", "aws-nitro", "expected document format (only aws-nitro can be verified)")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
 	buildMeasurements := fs.String("build-measurements", "", "the value I built or measured myself (out/measurements.json). with --tee-addr the attested value must match it, or nothing is registered")
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
 	registry := fs.String("registry", "", "Registry contract address")
 	signingKeyFile := fs.String("signing-key-file", "", "signing key file (hex): its signature authorises the registration, and the same key sends the transaction")
-	platform := fs.String("platform", "aws-nitro", "measurement format")
+	platform := fs.String("platform", "aws-nitro", "platform value recorded in the registration")
 	config := fs.String("config", "", "the Vendor's build-config.json (receive puts it in the clone root): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
 	service := fs.String("service", "", "service name. empty takes it from --config, else from an existing registration of the same measurements (anyone's)")
 	version := fs.String("version", "", "version. empty takes it from --config, else from an existing registration, as above")
-	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). default: build-config.json's with --config, else this machine's — give the instance's if --measurements came from elsewhere")
+	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). default: build-config.json's with --config, else this machine's — give the instance's if the measurements file came from another machine")
 	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
-	trustedApprovers := fs.String("trusted-approvers", "", "trusted approver addresses, comma-separated. empty uses the registry's APPROVER")
+	trustedApprovers := fs.String("trusted-approvers", "", "trusted approver addresses, comma-separated. empty uses the approver fixed in the registry")
 	outDir := fs.String("out-dir", "", "directory for the intermediate files (document, parsed value). empty uses a temporary directory, removed at the end")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -141,11 +141,10 @@ func auditCmd(args []string) error {
 			return errors.New("the enclave is not running what I built — not registering")
 		}
 		t.Done("identical — the enclave runs exactly what I built")
-		cli.Why("this is the audit: the value I obtained myself and the value the running enclave attests to are the same, so the enclave is not running something else")
+		cli.Why("this is the audit: the value I obtained myself and the value the running enclave attests to are the same, so the enclave runs the image I built")
 	}
 
-	// Also ask what the Vendor is running right now. If it differs, say so, but the value registered is still the one I built:
-	// what goes on the chain must be "what I verified", not "what the Vendor runs".
+	// Also ask what the Vendor is running right now. If it differs, say so; the value registered is the one I verified.
 	vendorRunsSomethingElse := false
 	if *vendorTee != "" {
 		dir, err := os.MkdirTemp("", "att-auditor-vendor-*")
@@ -269,7 +268,7 @@ func auditCmd(args []string) error {
 	return nil
 }
 
-// fileSize returns the size of the received document. Errors are swallowed since a 0 is enough if it fails.
+// fileSize returns the size of the file at path, or 0 if it cannot be read.
 func fileSize(path string) int64 {
 	st, err := os.Stat(path)
 	if err != nil {

@@ -3,8 +3,8 @@
 //
 // One step goes in here beyond building the software: layering in the attestation responder. A Nitro enclave can open
 // /dev/nsm only from inside and has no network, so for a third party to request attestation the responder has to be
-// inside the image. The responder itself lives in internal/tee/request/Vendor/aws (Extractor, vsock), and this binary's ra-serve starts it.
-// The build only adds this binary and one entrypoint script on top of the software image. It never modifies the software image.
+// inside the image. The responder's code lives in internal/tee/request/Vendor/aws (Extractor, vsock), and its ra-serve command runs from the image's entrypoint.
+// The build adds the responder binary, an entrypoint script and the software's original command on top of the software image, and leaves the software's own files as they are.
 package aws
 
 import (
@@ -28,25 +28,22 @@ import (
 //go:embed entrypoint.sh
 var entrypointScript []byte
 
-// responderBinaryName is the file name cmd/ra-responder produces. Every role must run a file with exactly this
-// name placed next to its executable, so that builds by different roles put the same bytes in the image.
+// responderBinaryName is the file name cmd/ra-responder produces. Every role looks for a file with exactly this
+// name next to its executable, so that builds by different roles put the same bytes in the image.
 const responderBinaryName = "att-ra-responder"
 
 // Build is the input to one build. The Dockerfile in AppDir is the software.
 type Build struct {
-	AppDir      string // directory holding the software's Dockerfile (build). Exactly one of AppDir and DockerImage
+	AppDir      string // directory holding the software's Dockerfile (build). Set exactly one of AppDir and DockerImage
 	DockerImage string // a docker image the user already built (pack): the user runs docker build, att does the layering, normalizing and EIF
 	ImageName   string // image and EIF name. Defaults to the directory name (pack: the image name before the tag)
 	Port        int    // vsock port the responder listens on inside the enclave. 0 means 5000
 
 	// ResponderPath is the responder to layer in. If empty, att-ra-responder next to the executable is used.
 	//
-	// This used to default to the running executable itself (os.Executable(), i.e. att-vendor or att-auditor).
-	// That put a different CLI binary into the image for each role, so no amount of layer normalizing could make
-	// the Vendor's and the Auditor's images equal (measured on two real EC2 instances: the Vendor and the
-	// Auditor built the same Dockerfile, normalization included, and still got different PCR0 and PCR2, because
-	// the /att-ra file itself was two different binaries). Now every role must layer in the identical file
-	// built from cmd/ra-responder.
+	// Every role layers in the identical file built from cmd/ra-responder, so the Vendor's and the Auditor's
+	// images can be equal. Layering att-vendor or att-auditor themselves would put a different /att-ra binary
+	// in each role's image and give different PCR0 and PCR2 (measured on two EC2 instances).
 	ResponderPath string
 	OutDir        string // result directory. Defaults to out
 	Verify        bool   // build the same Dockerfile once more without cache and check that the PCRs match (verify.go)
@@ -64,7 +61,7 @@ type Result struct {
 
 var ErrNotLinux = errors.New("build runs on the Nitro parent instance (linux)")
 
-// Run goes through: tools, software image, responder layering, EIF and PCRs.
+// Run goes through the build steps: tools, software image, responder layering, normalizing, EIF and PCRs.
 //
 // There are two entry points. AppDir (build): att starts from docker build, so the Vendor and the Auditor running the
 // same command get the same values. DockerImage (pack): the user hands over an image built their own way and att only layers,
@@ -117,7 +114,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, fmt.Errorf("%s: attestation responder not found — build cmd/ra-responder and put it there, or point ResponderPath at it", b.ResponderPath)
 	}
 	// A file being there is not enough. What gets layered in and measured is this file's bytes, and those are fixed by
-	// the Go version, -trimpath and GOOS/GOARCH the responder was built with (CheckToolchain only looks at att itself).
+	// the Go version, -trimpath and GOOS/GOARCH the responder was built with (CheckToolchain covers the att binary only).
 	// Read the build info Go left in the binary and refuse a responder that cannot produce the same bytes as the other side.
 	responder, err := build.ReadResponder(b.ResponderPath)
 	if err != nil {
@@ -173,7 +170,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, fmt.Errorf("%s: no such docker image here — docker build it first, or docker load it", appImage)
 	}
 
-	step(fmt.Sprintf("Adding the attestation responder to the image: %s → %s", appImage, res.Image), "a small program that runs inside the enclave next to the software and hands out signed attestation documents on request — without it nobody could ask the enclave what it is running")
+	step(fmt.Sprintf("Adding the attestation responder to the image: %s → %s", appImage, res.Image), "a small program that runs inside the enclave next to the software and hands out signed attestation documents on request, which lets anyone ask the enclave what it is running")
 	appCmd, err := r.imageCommand(ctx, appImage)
 	if err != nil {
 		return res, err
@@ -215,8 +212,8 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	return res, nil
 }
 
-// layerResponder layers the att binary and the entrypoint on top of the software image. The original command is passed as a file,
-// because nitro-cli does not forward a Docker CMD behind a script entrypoint.
+// layerResponder layers the responder binary and the entrypoint on top of the software image. The original command is passed as a file,
+// because nitro-cli drops a Docker CMD behind a script entrypoint.
 func (b Build) layerResponder(ctx context.Context, r runner, from, to string, appCmd []string) error {
 	dir, err := os.MkdirTemp("", "att-ra-image")
 	if err != nil {
@@ -355,7 +352,7 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	return m, nil
 }
 
-// buildLogs are logs a package manager writes during docker build. They record when something was installed rather than what
+// buildLogs are logs a package manager writes during docker build. They record when something was installed, and say little about what
 // (apk: "Running `apk add ...` at 2026-09-26 08:14:36"), so their content differs on every build of the same source. Measured:
 // when the Vendor and the Auditor each built the official nginx alpine-slim Dockerfile, only /var/log/apk.log out of 725 files
 // differed, and PCR0 and PCR2 diverged. They measure a time, not a file, so they are left out of the measurement. The software's own logs are not touched.

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Vendor - launches the image the Auditor handed over as is, and checks for itself that my enclave really matches both that
-#    value and the registered value. Run here, on my machine - only the launch runs inside the Vendor instance, connected to
-#    automatically.
-#    Input: from-auditor/alpine-slim.eif, from-auditor/measurements.json (1-Auditor-build-audit-handoff uploads them to that instance)
-#    Run: bash "e2e/flow1-auditor-registers/2-Vendor-launch-check-record.sh"
+# Flow 1, Vendor - launches the image the Auditor handed over and checks that my enclave runs the value the Auditor measured
+#    and registered. Run on my machine; only the launch runs inside the Vendor instance, which the script connects to.
+#    Input: from-auditor/alpine-slim.eif and from-auditor/measurements.json on the Vendor instance, and
+#    e2e-work/from-auditor/measurement-record.json here (1-Auditor-build-audit-handoff.sh puts them there)
+#    Run from the repository root:  bash "e2e/flow1-auditor-registers/2-Vendor-launch-check-record.sh"
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
@@ -18,34 +18,34 @@ step() { printf '\033[1;32m==================== %s (in progress) ===============
 test -f from-auditor/alpine-slim.eif -a -f from-auditor/measurements.json || { echo "from-auditor/alpine-slim.eif and measurements.json are missing - the Auditor runs 1-Auditor-build-audit-handoff first"; exit 1; }
 
 step_start "CHECKING RECEIVED FILES"
-sha256sum from-auditor/alpine-slim.eif from-auditor/measurements.json  # hashes to check the received files
+sha256sum from-auditor/alpine-slim.eif from-auditor/measurements.json  # checksums of the received files
 step_stop "CHECKING RECEIVED FILES"
 
-# att command - measures the received image itself and launches it in my TEE only if it equals the measurements the Auditor handed over.
+# att-vendor launch - measures the received image and launches it in my TEE when the result equals the measurements the Auditor handed over.
 step "LAUNCHING ENCLAVE" ./att-vendor launch --eif from-auditor/alpine-slim.eif --build-measurements from-auditor/measurements.json
 REMOTE
 rc=$?
 [ $rc -eq 0 ] || exit $rc
 localBanner
 
-# Read the registration coordinates the Auditor left (which registry, which record key) from that record file.
+# Read the registration coordinates (RPC URL, registry, record key) from the measurement record.
 REC="$WORK/from-auditor/measurement-record.json"
 field() { grep -oE "\"$1\": *\"[^\"]*\"" "$REC" | head -1 | sed -E 's/.*": *"([^"]*)"$/\1/'; }
 R_RPC=$(field rpc); R_REGISTRY=$(field address); R_RECORD_KEY=$(field record_key)
 mkdir -p "$WORK/vendor-check"
 
-# att command - sends an RA request to my enclave and receives the attestation document.
+# att-vendor ra-request - requests an attestation document from my enclave.
 step "REQUESTING ATTESTATION" "$VENDOR_BIN" ra-request --tee-addr "$VENDOR_HOST:5000" --out-file "$WORK/vendor-check/doc.cbor" --format aws-nitro || exit 1
-# att command - verifies that document and extracts the measurements inside.
+# att-vendor ra-parse - verifies the document and extracts its measurements.
 step "PARSING ATTESTATION" "$VENDOR_BIN" ra-parse --doc "$WORK/vendor-check/doc.cbor" --out-file "$WORK/vendor-check/parsed.json" || exit 1
-# att command - compares my enclave's value with the value in the record the Auditor gave.
+# att-vendor compare - matches my enclave's value against the measurements the Auditor handed over.
 step "COMPARING TO AUDITOR'S RECORD" "$VENDOR_BIN" compare --attested "$WORK/vendor-check/parsed.json" --expected "$WORK/from-auditor/measurements.json"; a=$?
-# att command - compares my enclave's value with the actual chain registration (value, expiry, approver).
+# att-vendor compare - matches my enclave's value against the registration on the registry (value, expiry, approver).
 step "COMPARING TO CHAIN REGISTRATION" "$VENDOR_BIN" compare --attested "$WORK/vendor-check/parsed.json" --rpc "$R_RPC" --registry "$R_REGISTRY" --record-key "$R_RECORD_KEY"; b=$?
 if [ $a -eq 0 ] && [ $b -eq 0 ]; then
   echo "OK — what I run is exactly what the Auditor audited and registered. Users will get 'trusted'."
 else
-  echo "MISMATCH — what I run is not what the Auditor registered. Users will be told not to trust it."
+  echo "MISMATCH — what I run differs from what the Auditor registered. Users will be told not to trust it."
   exit 1
 fi
 echo "next: 3-User-verify"

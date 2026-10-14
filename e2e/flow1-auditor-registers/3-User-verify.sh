@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# User (any machine, no key) - RA to the Vendor enclave, look up the chain with that measurement, compare with the registration.
-#    Run: bash "e2e/flow1-auditor-registers/3-User-verify.sh" [REGISTRY]      if omitted, e2e-work/registry.txt is used
-#    To check several registries side by side, separate them with commas: 3-User-verify.sh 0xVendorRegistry,0xAuditorRegistry - all of them must vouch for it to be trusted
+# Flow 1, User (any machine, no key) - requests an attestation document from the Vendor's enclave, looks up that
+#    measurement on the registry, and compares it with the registration.
+#    Run from the repository root:  bash "e2e/flow1-auditor-registers/3-User-verify.sh" [REGISTRY]
+#      REGISTRY defaults to the address in e2e-work/registry.txt.
+#    Several registries are given as a comma-separated list: 3-User-verify.sh 0xVendorRegistry,0xAuditorRegistry
+#    The enclave is trusted when every listed registry vouches for it.
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
 need_host VENDOR_HOST
 REGISTRY=${1:-$(cat "$WORK/registry.txt")}
-# att command - this is the whole script: confirm the value by RA, look up the registration on the chain, compare, decide whether to trust.
+# att-user verify - requests the attestation document, finds the registrations of that value on the registry, checks each one, and decides whether to trust.
 step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"
 rc=$?
-echo "verify exit=$rc  (0 = trusted, 1 = nothing registered or nothing matches)"
+echo "verify exit=$rc  (0 = trusted, 1 = not trusted)"
 exit $rc

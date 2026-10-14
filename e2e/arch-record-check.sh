@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 # Build-environment record check. The same source gives different PCRs on x86_64 and arm64 (measured), and a different Go
-#    toolchain changes them too, so this checks that the registration and the handoff record (measurement-record.json) say
-#    which architecture and toolchain they came from (build_env). The on-chain registration is unchanged - the measurement hash
-#    already differs per architecture, so the keys separate by themselves. Only three things are checked, and no
-#    transaction is sent:
+#    toolchain changes them too, so registrations and the handoff record (measurement-record.json) name the architecture
+#    and toolchain they came from (build_env). The chain registration carries the architecture, and the record key depends
+#    on the measurement hash alone. Three groups of checks run, and no transaction is sent:
 #      1. the uname -m -> GOARCH mapping used by the flow scripts comes out right on the real instances (x86 Vendor -> amd64, arm64 host -> arm64)
-#      2. att-auditor send refuses a record without build_env, and for a record with it prints the build environment on one
-#         line and really sends it (to a local bare repository), and also builds the record itself from --config
-#         (build-config.json) + --measurements (measurements.json) without --record
-#      3. att-auditor register refuses the uname spelling (x86_64) - the refusal happens before reading the signing key or touching the chain
-#    That register --arch arm64 really registers is a chain transaction and is not checked here (cmd/buildenv_record_e2e_test.go checks it with anvil).
+#      2. att-auditor send refuses a record without build_env; for a record with it, send prints the build environment on
+#         one line and pushes it to a local bare repository; with --config (build-config.json) and --measurements
+#         (measurements.json) in place of --record, send builds the record itself
+#      3. att-auditor register refuses the uname spelling (x86_64) before it reads the signing key or contacts the chain
+#    A register --arch arm64 on the chain is a transaction; cmd/buildenv_record_e2e_test.go covers it with anvil.
 #
-#    Needs: ARM64_HOST in e2e/env.local.sh to check item 1 on the arm64 side too. If empty, only x86 is checked and a notice is printed.
-#    Run from TB-live:  bash "e2e/arch-record-check.sh"
+#    Needs: ARM64_HOST in e2e/env.local.sh to check item 1 on the arm64 side too. When empty, only x86 is checked and a notice is printed.
+#    Run from the repository root:  bash "e2e/arch-record-check.sh"
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
@@ -21,10 +20,10 @@ cd "$here/.."
 need_host VENDOR_HOST
 fail=0
 
-# Same mapping as the flow scripts (the 1-*.sh in flow1/flow2): uname spelling to the GOARCH spelling att uses.
+# The mapping the flow scripts use (the 1-*.sh in flow1 and flow2): uname -m name to the GOARCH name att uses.
 goarch_of() { case "$1" in x86_64) echo amd64;; aarch64|arm64) echo arm64;; *) echo "";; esac; }
 
-# 1. Take uname -m from the real instance and map it - this is the value the flow scripts write into measurement-record.json.
+# 1. Read uname -m on the real instance and map it; the result is the arch the flow scripts write into build-config.json and measurement-record.json.
 check_host() {  # <ssh-func> <label> <expected GOARCH>
   sshf=$1; label=$2; want=$3
   step "ARCH OF $label"
@@ -41,11 +40,11 @@ check_host V "Vendor (x86_64)" amd64
 if [ -n "$ARM64_HOST" ]; then
   check_host R "arm64 host" arm64
 else
-  echo "ARM64_HOST is empty - skipping the arm64 mapping (set it in e2e/env.local.sh to check it too)."
+  echo "ARM64_HOST is empty - skipping the arm64 mapping (set it in e2e/env.local.sh to check it)."
 fi
 
-# 2. send - against a local bare repository, end to end with no network or chain. Same as what the flow 1 handoff sends with the Go schema.
-#    The record's build_env.go is this machine's Go - the Go that built the att binaries (0-Setup accepts only the pinned one).
+# 2. send - against a local bare repository, with no network or chain. The record layout is the one att-auditor send pushes.
+#    The record's build_env.go is this machine's Go, the Go that built the att binaries (0-Setup-local-upload.sh accepts only the pinned one).
 GOVER=$(go env GOVERSION)
 step "SEND: RECORD WITHOUT BUILD_ENV IS REFUSED"
 WD="$WORK/build-env-check"; rm -rf "$WD"; mkdir -p "$WD"
@@ -93,8 +92,8 @@ else
   fail=1
 fi
 
-# 2b. send --config --measurements - the record is not written by hand but built from build-config.json and nitro-cli's measurements.json.
-#     The pushed record's service and build_env must be exactly those of the config.
+# 2b. send --config --measurements - send builds the record from build-config.json and nitro-cli's measurements.json.
+#     The pushed record's service and build_env equal those of the config.
 step "SEND: RECORD BUILT FROM BUILD-CONFIG AND MEASUREMENTS"
 pcr_hex() { head -c 48 /dev/zero | tr '\0' "$1" | od -An -v -tx1 | tr -d ' \n'; }
 cat > "$WD/build-config.json" <<EOF
@@ -124,7 +123,7 @@ else
   fail=1
 fi
 
-# 3. register - the uname spelling is refused. All required flags are given, but the --arch check runs before the signing key file is read or the chain is touched, so nothing is contacted.
+# 3. register - the uname spelling is refused. All required flags are given; the --arch check runs before the signing key file is read, so the RPC address and key file are placeholders.
 step "REGISTER: --arch x86_64 IS REFUSED BEFORE TOUCHING THE CHAIN"
 pcr_hex() { head -c 48 /dev/zero | tr '\0' "$1" | od -An -v -tx1 | tr -d ' \n'; }
 out=$("$AUDITOR_BIN" register --rpc http://127.0.0.1:1 --registry 0x0000000000000000000000000000000000000001 --signing-key-file "$WD/no-such.key" \

@@ -11,7 +11,7 @@ import (
 
 // checkoutForArchTest makes an independent copy of the module (cmd/, internal/, go.mod, go.sum)
 // at a uniquely-named temp directory, via `git archive` of the current commit. Two checkouts of
-// the same commit this way never share a path — exactly the scenario where the checkout path leaked into the binary
+// the same commit get different paths, which reproduces the case where the checkout path leaked into the binary
 // (Vendor and Auditor cloning the same source into different directories).
 func checkoutForArchTest(t *testing.T, name string) string {
 	t.Helper()

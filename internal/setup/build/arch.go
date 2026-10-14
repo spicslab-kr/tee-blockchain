@@ -1,18 +1,15 @@
 // Package build holds tooling shared by the Vendor and Auditor build packages (aws.Build lives
-// under Vendor/aws and auditor/aws — this file is the role-agnostic part).
+// under Vendor/aws and auditor/aws; this package is the role-agnostic part).
 //
 // Arch cross-builds att-ra-responder for every CPU architecture this project ships to, so the
-// per-architecture hash can be produced and compared the same way everywhere instead of each
-// caller re-typing the go build/sha256 incantation.
+// per-architecture hash can be produced and compared the same way everywhere.
 //
 // A different architecture is expected to produce a different att-ra-responder binary, and with
 // it different PCR0/PCR2 once it's layered into an enclave image — Nitro's kernel, the compiled
-// machine code, and the base image layers all differ per architecture. That is normal, not a
-// bug. What must NOT differ is the hash for one architecture built from
-// two different checkout paths, and Targets/BuildResponder deliberately
-// reuse -trimpath so it doesn't regress here.
+// machine code, and the base image layers all differ per architecture. That is expected. What must stay equal is the hash for one architecture built from two different checkout
+// paths, which is why every build here passes -trimpath.
 //
-// Add an architecture by adding one line to Targets; nothing else in this package changes.
+// Add an architecture by adding one line to ArchTargets; nothing else in this package changes.
 package build
 
 import (
@@ -32,7 +29,7 @@ type ArchTarget struct {
 }
 
 // ArchTargets — every architecture the project currently ships to. Extend this list to add
-// coverage for another architecture; BuildResponderAll and the reproducibility tests pick it up
+// coverage for another architecture; BuildResponderAllArches and the reproducibility tests pick it up
 // automatically.
 var ArchTargets = []ArchTarget{
 	{Name: "x86_64", GOARCH: "amd64"},
@@ -40,9 +37,8 @@ var ArchTargets = []ArchTarget{
 }
 
 // BuildResponderForArch cross-compiles cmd/ra-responder from repoRoot (a directory containing
-// go.mod) for target.GOARCH, with -trimpath so the checkout path never ends up baked into the
-// binary (the checkout path would otherwise leak into it). The responder only ever runs inside a Nitro enclave, so GOOS is always
-// linux.
+// go.mod) for target.GOARCH, with -trimpath, which keeps the checkout path out of the
+// binary. The responder only ever runs inside a Nitro enclave, so GOOS is always linux.
 func BuildResponderForArch(ctx context.Context, repoRoot string, target ArchTarget, outPath string) error {
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", outPath, "./cmd/ra-responder")
 	cmd.Dir = repoRoot

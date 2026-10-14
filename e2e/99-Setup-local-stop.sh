@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Cleanup - stop the enclaves and TCP bridges on both instances. (Stop the instances themselves from the console.)
+# Cleanup - stops the enclaves and the TCP bridge processes (att-vendor, att-auditor) on both instances.
+#    The instances themselves are stopped from the AWS console.
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
 . "$here/env.sh"

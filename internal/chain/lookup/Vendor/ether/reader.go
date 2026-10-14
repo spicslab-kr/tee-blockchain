@@ -1,5 +1,5 @@
-// Package ether only reads an Ethereum (EVM) chain. It uses the abigen binding (registry.go) produced by
-// chain/register/Vendor/ether as is; there is no reason to compile the same contract twice.
+// Package ether reads registrations from an Ethereum (EVM) chain. It uses the abigen binding (registry.go) from
+// chain/register/Vendor/ether, so the contract is compiled once.
 package ether
 
 import (
@@ -18,24 +18,23 @@ import (
 	p "attestamp/internal/tee/parse/Vendor"
 )
 
-// DefaultPlatform is the only measurement format supported for now. Once registrations start mixing platforms,
-// FindRecordKeys's signature itself will have to grow (the record key in Registry.sol differs per platform).
+// DefaultPlatform is the platform FindRecordKeys looks up. The record key includes the platform, so supporting more
+// platforms means passing one to FindRecordKeys.
 const DefaultPlatform = "aws-nitro"
 
-// defaultLogRangeChunk is the block range Lookup asks for in one event-log query. Public RPCs (Infura, Alchemy,
-// publicnode and the like) usually cap the fromBlock..toBlock range of eth_getLogs at a few thousand to tens of thousands
-// of blocks. A contract registered long ago (a Sepolia contract is already past block 11 million) would be rejected if
-// scanned from block 0 in one go, so the scan works backwards from the latest block in chunks of this size.
+// defaultLogRangeChunk is the block range Lookup asks for in one event-log query. Public RPCs cap the fromBlock..toBlock
+// range of eth_getLogs at a few thousand to tens of thousands of blocks, so the scan walks backwards from the latest
+// block in chunks of this size.
 const defaultLogRangeChunk = 4000
 
 // Backend is what a lookup needs. Both *ethclient.Client and *simulated.Backend.Client() satisfy it.
-// BlockNumber is needed because Lookup scans the event logs in chunks starting from the latest block.
+// BlockNumber gives the starting point of the backwards log scan.
 type Backend interface {
 	bind.ContractBackend
 	BlockNumber(ctx context.Context) (uint64, error)
 }
 
-// Reader reads the contract over RPC. It uses Backend if set (for tests on a simulated chain), otherwise connects to RPC.
+// Reader reads one Registry contract. It uses Backend if set (tests on a simulated chain), otherwise it connects to RPC.
 type Reader struct {
 	RPC          string
 	RegistryAddr common.Address
@@ -64,9 +63,9 @@ func (r Reader) client(ctx context.Context) (*regether.Registry, Backend, func()
 	return registry, backend, closeFn, nil
 }
 
-// FindRecordKeys hashes the measurements and finds the record key registered under DefaultPlatform. A contract has one approver,
-// so there is at most one record key. With no registration it returns an empty slice. (If an auditor and a vendor both
-// register, that is two contracts, each looked up separately.)
+// FindRecordKeys hashes the measurements and returns the record key registered for them under DefaultPlatform. A
+// registry has one approver, so there is at most one record key; with no registration the result is empty. An auditor
+// and a vendor each deploy their own registry and are looked up separately.
 func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]string, error) {
 	h, err := reg.MeasurementHash(values)
 	if err != nil {
@@ -81,8 +80,8 @@ func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]st
 	if err != nil {
 		return nil, err
 	}
-	// recordKeyFor is a pure computation, so it always yields a record key regardless of registration (and it is never zero).
-	// Whether it is actually registered is seen by calling lookup with that record key and checking that approver is filled in.
+	// recordKeyFor computes the key whether or not it is registered, so the lookup result tells which: a registered
+	// record has a non-zero approver.
 	rec, err := registry.Lookup(&bind.CallOpts{Context: ctx}, recordKey)
 	if err != nil {
 		return nil, err
@@ -93,9 +92,8 @@ func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]st
 	return []string{common.Hash(recordKey).Hex()}, nil
 }
 
-// parseRecordKey: recordKey must have the same shape FindRecordKeys returns (0x + 32 bytes of hex). Checking only the length
-// would let invalid hex (a typo or a broken paste) silently become the zero value in common.HexToHash and be mistaken for
-// "not registered", so it also checks that the string really decodes as hex.
+// parseRecordKey accepts the form FindRecordKeys returns (0x + 32 bytes of hex). It decodes the hex itself because
+// common.HexToHash turns invalid hex into the zero hash, which would read as "not registered".
 func parseRecordKey(recordKey string) (common.Hash, error) {
 	s := strings.TrimPrefix(recordKey, "0x")
 	if len(s) != 64 {
@@ -108,13 +106,13 @@ func parseRecordKey(recordKey string) (common.Hash, error) {
 	return common.BytesToHash(b), nil
 }
 
-// Lookup reads the registration for a record key (as returned by FindRecordKeys). The contract storage (registrations) holds only the
-// approver, expiry and registration time, so the metadata (service, version, platform) and the signature are filled in
-// from the Registered event log.
+// Lookup reads the registration for a record key (as returned by FindRecordKeys). The contract's registrations mapping
+// holds the approver, expiry and registration time; service, version, platform, arch and the signature come from the
+// Registered event.
 //
-// Values holds a single measurement hash rather than per-PCR values: the contract stores only that hash, so there is
-// no way to recover the individual PCRs. The comparison (compare.Check) must check this hash against one computed the
-// same way at build time.
+// Values holds the single measurement hash the contract stores, so the individual PCRs are not available. compare.Check
+// compares it with a hash computed the same way from the build's measurements. ChainTime is the time of the block that
+// served the lookup.
 func (r Reader) Lookup(ctx context.Context, recordKey string) (l.Registration, error) {
 	parsedKey, err := parseRecordKey(recordKey)
 	if err != nil {
@@ -150,9 +148,8 @@ func (r Reader) Lookup(ctx context.Context, recordKey string) (l.Registration, e
 	}, nil
 }
 
-// TrustedApprovers is the approver address (APPROVER) fixed in the contract. compare.Check uses it to see whether the
-// registration approver is this address.
-// It never changes after deployment (APPROVER in Registry.sol is immutable), so fetching it again always gives the same value.
+// TrustedApprovers returns the registry's APPROVER, which is immutable. compare.Check accepts a registration whose
+// approver is in the trusted list.
 func (r Reader) TrustedApprovers(ctx context.Context) ([]string, error) {
 	registry, _, done, err := r.client(ctx)
 	if err != nil {
@@ -166,9 +163,8 @@ func (r Reader) TrustedApprovers(ctx context.Context) ([]string, error) {
 	return []string{a.Hex()}, nil
 }
 
-// findRegisteredEvent finds the Registered event by scanning backwards from the latest block, chunk blocks at a time.
-// A record key has at most one registration (the contract rejects duplicates), so it returns as soon as it finds one. If the
-// scan reaches before the contract's deployment (from == 0 has been scanned and nothing found), it counts as not found.
+// findRegisteredEvent scans backwards from the latest block, chunk blocks at a time, for the Registered event of a record
+// key. The contract rejects duplicates, so the first match is the only one. Reaching block 0 without a match returns nil.
 func findRegisteredEvent(ctx context.Context, backend Backend, registry *regether.Registry, recordKey common.Hash, chunk uint64) (*regether.RegistryRegistered, error) {
 	if chunk == 0 {
 		chunk = defaultLogRangeChunk

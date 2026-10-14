@@ -3,12 +3,12 @@
 // att-ra-responder is layered straight into the enclave image, so the image's measurements
 // (PCR0/PCR2) depend on the exact bytes of that binary — and those bytes change with the Go
 // patch version (measured: go1.26.2 and go1.26.8 give different binaries even with -trimpath).
-// The Auditor must therefore receive the toolchain version together with the source, and att
-// itself must refuse to build under any other. GO_TOOLCHAIN in this directory is that pin: the
-// single source of truth, embedded here and checked at the start of every build, and read by the
-// e2e setup scripts. A `toolchain go1.26.1` line in go.mod was tried and rejected — `go mod tidy`
-// silently strips it even when it matches the go directive, so it does not persist. The file
-// lives inside this package directory because //go:embed cannot reach a parent directory.
+// The Auditor therefore receives the toolchain version together with the source, and every att
+// binary refuses to build under any other. GO_TOOLCHAIN in this directory is that pin: the
+// single source of truth, embedded here, checked at the start of every build and read by the
+// e2e setup scripts. A toolchain line in go.mod cannot hold the pin because `go mod tidy` strips
+// it even when it matches the go directive. The file lives inside this package directory because
+// //go:embed cannot reach a parent directory.
 
 package build
 

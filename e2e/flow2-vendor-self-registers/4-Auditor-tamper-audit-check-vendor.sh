@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Tamper, Auditor - registers the value I built, and also asks the Vendor's enclave directly to see whether it matches.
-#    If the Vendor launched a different image, "✗ the Vendor's enclave runs something else" is printed, and the value I
-#    verified is still registered normally. The Auditor instance must already have its own build value
-#    (out/measurements.json), i.e. flow 1's 1-Auditor-build-audit-handoff must have been run first.
-#    Run: bash "e2e/flow2-vendor-self-registers/4-Auditor-tamper-audit-check-vendor.sh" [-c 0xCONTRACT]
+# Flow 2 tamper, Auditor - registers the value I built and also asks the Vendor's enclave which value it runs.
+#    When the Vendor runs a different image, "✗ the Vendor's enclave runs something else" is printed, and my own value is
+#    registered as usual. The Auditor instance needs its own build value (out/measurements.json), so
+#    flow1-auditor-registers/1-Auditor-build-audit-handoff.sh must have run first.
+#    Run from the repository root:  bash "e2e/flow2-vendor-self-registers/4-Auditor-tamper-audit-check-vendor.sh" [-c 0xREGISTRY]
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
@@ -11,22 +11,22 @@ need_host VENDOR_HOST; need_host AUDITOR_HOST
 REGISTRY=""
 while getopts "c:" o; do case $o in c) REGISTRY=$OPTARG;; esac; done  # Parse options
 
-# Fetch the Auditor's own build value from the Auditor instance.
+# Copy the Auditor's own build value from the Auditor instance.
 step "FETCHING BUILD VALUE"
 $SCP "$SSH_USER@$AUDITOR_HOST:out/measurements.json" "$WORK/auditor-measured.json"
 echo "Auditor's own value:"; cat "$WORK/auditor-measured.json"
 
 if [ -z "$REGISTRY" ]; then
-  # att command - deploys a new registry (the Registry contract) on the chain.
+  # att-auditor registry-deploy - deploys a new Registry contract with the Auditor as its approver.
   step "DEPLOYING REGISTRY"
   out=$("$AUDITOR_BIN" registry-deploy --rpc "$RPC" --deployer-key-file "$DEPLOYER_KEY" --approver "$AUDITOR_ADDR" 2>&1); echo "$out"
-  REGISTRY=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # extract the address from the output
+  REGISTRY=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # address from the 'deployed at' line
   [ -n "$REGISTRY" ] || { echo "no registry address in registry-deploy output"; exit 1; }
 fi
-echo "$REGISTRY" > "$WORK/registry.txt"  # save it in the file the next step reads
+echo "$REGISTRY" > "$WORK/registry.txt"  # the later steps read the registry address from this file
 
-# att command - registers my value and, with --vendor-tee, also sends an RA request to the Vendor enclave to compare directly.
-#   This is the key command that catches the swap by measurement.
+# att-auditor audit - registers my value; with --vendor-tee it also requests an attestation document from the Vendor's
+#   enclave and compares it with my value. That comparison reports the swap.
 step "AUDITING (checking Vendor's enclave)"
 "$AUDITOR_BIN" audit --tee-addr "$AUDITOR_HOST:5000" --build-measurements "$WORK/auditor-measured.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$AUDITOR_SIGNING_KEY" --service "$SERVICE" --version "$VERSION" --vendor-tee "$VENDOR_HOST:5000"
 rc=$?

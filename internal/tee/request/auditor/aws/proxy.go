@@ -9,7 +9,7 @@ import (
 )
 
 // Proxy runs on the parent instance. It forwards each connection accepted on ln to the enclave at cid:port.
-// The enclave has no network and is reachable from outside only over vsock, hence this bridge. It stops when ctx ends.
+// The enclave has no network and is reachable only over vsock, so this bridge carries the traffic. It stops when ctx ends.
 func Proxy(ctx context.Context, ln net.Listener, cid, port uint32) error {
 	go func() {
 		<-ctx.Done()

@@ -2,9 +2,9 @@ package compare
 
 import "bytes"
 
-// Compare is the comparison with no chain value involved. It matches a and b by name; a name present on only
-// one side, or with different values, is recorded as a reason and the result is a mismatch. This covers parsed
-// values vs build values, and parsed values vs a measurement record (or another TEE's values).
+// Compare matches a and b by name for comparisons that involve no registration, such as parsed values vs
+// build values, or parsed values vs a measurement record. A name present on one side only, or with different
+// values, adds a reason and makes the verdict a mismatch.
 func Compare(a, b Items) Verdict {
 	av := map[string][]byte{}
 	for _, it := range a {

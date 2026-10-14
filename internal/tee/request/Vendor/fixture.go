@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// FixtureExtractor returns a stored document as is. It is not bound to the nonce, so it is not a real attestation; for tests and dry runs only.
+// FixtureExtractor returns a stored document as is. Its document does not depend on the nonce, so it serves tests and dry runs.
 type FixtureExtractor struct {
 	Format string
 	Doc    []byte

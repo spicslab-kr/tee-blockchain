@@ -9,26 +9,27 @@ import (
 	"strings"
 )
 
-// Transport sends the build config and receives the measurement record.
+// Transport sends the build config and receives the measurement record with its image.
 type Transport interface {
 	Send(ctx context.Context, cfg BuildConfig, to string) (path string, err error)
 	Receive(ctx context.Context, from string) (Received, error)
 }
 
-// Received holds the parsed value, the original bytes, and the path of the accompanying image file.
+// Received holds the parsed record, its original bytes, its path and SHA-256, and the image file path.
 type Received struct {
 	Value     MeasurementRecord
 	Raw       []byte
 	Path      string
 	SHA256    string
-	ImagePath string // image file whose hash has been checked
+	ImagePath string // image file next to the record, after its sha256 matched the record
 }
 
+// FileTransport hands files over through a directory or file path.
 type FileTransport struct{}
 
 var _ Transport = (*FileTransport)(nil)
 
-// Send writes to build-config.json if to is a directory, otherwise to that path.
+// Send validates cfg and writes it with a .sha256 sidecar to build-config.json inside to, or to the file path to.
 func (FileTransport) Send(ctx context.Context, cfg BuildConfig, to string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -53,7 +54,8 @@ func (FileTransport) Send(ctx context.Context, cfg BuildConfig, to string) (stri
 	return dst, nil
 }
 
-// Receive checks the hashes of the record and image file, then reads them.
+// Receive reads the measurement record, checks it against its .sha256 sidecar when present, then checks the
+// image file named by the record against the record's sha256.
 func (FileTransport) Receive(ctx context.Context, from string) (Received, error) {
 	if err := ctx.Err(); err != nil {
 		return Received{}, err
@@ -79,13 +81,14 @@ func (FileTransport) Receive(ctx context.Context, from string) (Received, error)
 			return Received{}, fmt.Errorf("image file %s: %w", filepath.Base(img), err)
 		}
 		if got != rec.Image.SHA256 {
-			return Received{}, fmt.Errorf("image file %s: sha256 mismatch — file changed in transit", filepath.Base(img))
+			return Received{}, fmt.Errorf("image file %s: sha256 mismatch: file changed in transit", filepath.Base(img))
 		}
 		out.ImagePath = img
 	}
 	return out, nil
 }
 
+// resolve returns target/defaultName when target is a directory, otherwise target.
 func resolve(target, defaultName string) string {
 	if fi, err := os.Stat(target); err == nil && fi.IsDir() {
 		return filepath.Join(target, defaultName)
@@ -93,6 +96,7 @@ func resolve(target, defaultName string) string {
 	return target
 }
 
+// checkSidecar compares sum with path+".sha256". A missing sidecar passes.
 func checkSidecar(path, sum string) error {
 	side, err := os.ReadFile(path + ".sha256")
 	if errors.Is(err, os.ErrNotExist) {
@@ -102,11 +106,12 @@ func checkSidecar(path, sum string) error {
 		return err
 	}
 	if strings.TrimSpace(string(side)) != sum {
-		return fmt.Errorf("%s: sha256 mismatch — file changed in transit", filepath.Base(path))
+		return fmt.Errorf("%s: sha256 mismatch: file changed in transit", filepath.Base(path))
 	}
 	return nil
 }
 
+// writeAtomic writes through a temporary file and renames it into place.
 func writeAtomic(path string, b []byte) error {
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o644); err != nil {

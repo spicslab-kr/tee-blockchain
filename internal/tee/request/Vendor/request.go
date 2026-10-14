@@ -8,7 +8,7 @@ import (
 )
 
 // RADoc is the original RA document the TEE returned. It is not opened here.
-// Format is the document format name, saying which parser should open it. For example aws-nitro, gcp-cs-jwt, azure-maa-jwt
+// Format names the document format and so the parser that opens it: aws-nitro (fully supported), gcp-cs-jwt or azure-maa-jwt (request side only).
 type RADoc struct {
 	Format string
 	Raw    []byte

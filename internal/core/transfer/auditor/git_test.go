@@ -39,7 +39,7 @@ func TestGitSend_PushesRecordAndImage(t *testing.T) {
 
 func TestGitReceive_ClonesAndChecksSourceCommit(t *testing.T) {
 	remote := newRemote(t)
-	// Act as the Vendor: commit and push build-config.json (source.commit = previous HEAD)
+	// Act as the Vendor: commit and push build-config.json (source.commit is the HEAD before that commit)
 	work := clientDir(t, remote)
 	prev := strings.TrimSpace(run(t, work, "rev-parse", "HEAD"))
 	cfg := cfgAWS()
@@ -62,7 +62,7 @@ func TestGitReceive_ClonesAndChecksSourceCommit(t *testing.T) {
 		t.Errorf("source.commit = %s, want %s", got.Value.Source.Commit, prev)
 	}
 	if _, err := os.Stat(filepath.Join(into, "main.go")); err != nil {
-		t.Error("vendor source must be present in the clone — auditor builds from here")
+		t.Error("vendor source must be present in the clone, since the auditor builds from it")
 	}
 }
 

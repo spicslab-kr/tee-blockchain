@@ -2,26 +2,25 @@ package compare
 
 import "bytes"
 
-// RegInfo is a role-independent summary of the on-chain registration that Check needs. It is filled in
-// from chain/lookup's Registration (measurement hash, expiry, approver).
+// RegInfo is the part of an on-chain registration that Check reads: the measurement hash, the expiry
+// and the approver. It is filled in from chain/lookup's Registration.
 type RegInfo struct {
 	MeasurementHash []byte
 	Expires         int64 // unix seconds, on the chain clock
 	Approver        string
 }
 
-// Check compares when one side is an on-chain registration. Such a comparison must look at expiry and the
-// approving signature as well as the values. It is used whenever a chain value is on one side, whatever the
-// role (an Auditor or Vendor checking its own lookup right after registering, or the User's final check).
-// It passes only if the values match, the registration has not expired, and the approver is in trustedApprovers
-// (normally the contract's AUDITOR and VENDOR addresses).
+// Check is the trust decision for a registration. It is used wherever a registration is on one side: an
+// Auditor or Vendor checking its own lookup right after registering, and the User's final check. It passes
+// when the measurement hash matches, the registration has not expired at now (the chain's clock), and the
+// approver is in trustedApprovers (normally the registry's AUDITOR and VENDOR addresses).
 func Check(measurementHash []byte, reg RegInfo, now int64, trustedApprovers []string) Verdict {
 	var reasons []string
 	if reg.Expires <= now {
 		reasons = append(reasons, "registration expired")
 	}
 	if !contains(trustedApprovers, reg.Approver) {
-		reasons = append(reasons, "approver "+reg.Approver+" is not in the trusted list")
+		reasons = append(reasons, "approver "+reg.Approver+" is not in the trusted approvers")
 	}
 	if !bytes.Equal(measurementHash, reg.MeasurementHash) {
 		reasons = append(reasons, "measurement hash differs from the chain registration")
@@ -38,7 +37,7 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// equalAddress compares Ethereum addresses case-insensitively: they may differ only in case (checksum) and still be the same address.
+// equalAddress compares Ethereum addresses case-insensitively, since checksum casing varies.
 func equalAddress(a, b string) bool {
 	return toLower(a) == toLower(b)
 }

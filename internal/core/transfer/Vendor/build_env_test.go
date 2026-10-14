@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// build_env — aws-nitro must declare os/arch/go; arch must be one the project builds for.
+// build_env: aws-nitro requires os, arch and go; arch is one the project builds for.
 func TestBuildConfig_BuildEnvRequiredOnAWS(t *testing.T) {
 	for _, field := range []string{"os", "arch", "go"} {
 		c := cfgAWS()
@@ -71,7 +71,7 @@ func TestCurrentBuildEnv(t *testing.T) {
 		t.Fatalf("empty field in %+v", e)
 	}
 	if e.IsZero() {
-		t.Fatal("current env is never zero")
+		t.Fatal("current env is non-zero")
 	}
 	if s := e.String(); !strings.HasPrefix(s, runtime.GOOS+"/"+runtime.GOARCH+" "+runtime.Version()+" trimpath=") {
 		t.Errorf("String() = %q", s)

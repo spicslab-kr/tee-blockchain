@@ -32,10 +32,10 @@ func TestParse_RealDocumentPCRs(t *testing.T) {
 			t.Errorf("%s has %d bytes", m.Name, len(m.Value))
 		}
 	}
-	// PCR4 (parent instance id) is non-zero on a real instance but says where it ran, not what ran —
+	// PCR4 (parent instance id) is non-zero on a real instance and identifies the machine that ran the image;
 	// it must not enter a comparison against nitro-cli build values, which only have PCR0·1·2.
 	if ms.Get("PCR4") != nil {
-		t.Error("PCR4 (parent instance id) must be dropped — it is not an image measurement")
+		t.Error("PCR4 (parent instance id) must be dropped because it is not an image measurement")
 	}
 	if len(ms) != 3 {
 		t.Errorf("want exactly PCR0·1·2, got %d registers", len(ms))

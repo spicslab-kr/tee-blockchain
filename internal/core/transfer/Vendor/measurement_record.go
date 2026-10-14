@@ -17,37 +17,41 @@ var MeasurementNames = map[string][]string{
 	"azure":     {}, // digest (container) or image_id (VM); see Image
 }
 
-// Image: aws-nitro is a file plus sha256, gcp is a digest, azure is a digest or an image_id.
+// Image identifies the measured image: aws-nitro uses a file plus sha256, gcp a digest, azure a digest or an image_id.
 type Image struct {
 	Path    string `json:"path,omitempty"`
 	SHA256  string `json:"sha256,omitempty"`
-	Digest  string `json:"digest,omitempty"` // "sha256:<hex>", not a tag
+	Digest  string `json:"digest,omitempty"` // "sha256:<hex>"
 	ImageID string `json:"image_id,omitempty"`
 }
 
+// BuildTool names the tool that built the image and its version.
 type BuildTool struct {
 	Name    string `json:"name"`
 	Version string `json:"version,omitempty"`
 }
 
-// Registration is where it was registered on the chain. Optional.
+// Registration names the chain and registry address where the measurement was registered. It is optional.
 type Registration struct {
 	Chain   string `json:"chain"`
 	Address string `json:"address"`
 }
 
+// MeasurementRecord is the measurement-record.json the Auditor hands to the Vendor: the image, its
+// measurements and the build environment they came from.
 type MeasurementRecord struct {
 	Schema       string         `json:"schema"`
 	Service      string         `json:"service"`
 	Version      string         `json:"version"`
 	Platform     string         `json:"platform"`
-	BuildEnv     BuildEnv       `json:"build_env"` // the environment the image was built in and measured on — same shape as build-config.json's. Measurements differ per architecture and per Go toolchain, so one service/version has one record per architecture.
+	BuildEnv     BuildEnv       `json:"build_env"` // the environment the image was built and measured in, in the shape of build-config.json's build_env. Measurements differ per architecture and Go toolchain, so each service/version has one record per architecture.
 	Image        Image          `json:"image"`
 	Values       p.Measurements `json:"values"`
 	BuildTool    BuildTool      `json:"build_tool"`
 	Registration *Registration  `json:"registration,omitempty"`
 }
 
+// Validate lists every problem found, joined with "; ".
 func (r MeasurementRecord) Validate() error {
 	var errs []string
 	if r.Schema != SchemaMeasurementRecord {
@@ -65,8 +69,8 @@ func (r MeasurementRecord) Validate() error {
 	}
 	switch r.Platform {
 	case "aws-nitro":
-		// build_env: the record is what the Vendor reads to learn which architecture and which
-		// Go toolchain the measured image came from, so on aws-nitro it must be declared in full.
+		// The Vendor reads build_env to learn the architecture and Go toolchain of the measured image,
+		// so aws-nitro requires all of it.
 		if r.BuildEnv.OS == "" {
 			errs = append(errs, "build_env.os: required for aws-nitro")
 		}
@@ -87,14 +91,14 @@ func (r MeasurementRecord) Validate() error {
 		}
 	case "gcp":
 		if !isDigest(r.Image.Digest) {
-			errs = append(errs, "image.digest: want sha256:<64 hex> — a digest, not a tag")
+			errs = append(errs, "image.digest: want sha256:<64 hex> (an image digest)")
 		}
 	case "azure":
 		if !isDigest(r.Image.Digest) && r.Image.ImageID == "" {
 			errs = append(errs, "image: digest (container) or image_id (VM) required for azure")
 		}
 	}
-	// as in build-config: an architecture the project does not build for is refused on any platform.
+	// As in build-config, every platform accepts only architectures the project builds for.
 	if r.Platform != "aws-nitro" && r.BuildEnv.Arch != "" && !validArch(r.BuildEnv.Arch) {
 		errs = append(errs, "build_env.arch: unknown "+quote(r.BuildEnv.Arch)+" (want one of "+archList()+")")
 	}
@@ -122,7 +126,7 @@ func (r MeasurementRecord) Validate() error {
 	return join(errs)
 }
 
-// archNames are the GOARCH names of the architectures this project builds. build.ArchTargets is the only source.
+// archNames returns the GOARCH names listed in build.ArchTargets.
 func archNames() []string {
 	out := make([]string, 0, len(build.ArchTargets))
 	for _, t := range build.ArchTargets {

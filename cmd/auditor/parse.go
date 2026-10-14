@@ -21,7 +21,7 @@ func raParse(args []string) error {
 	fs := flag.NewFlagSet("ra-parse", flag.ContinueOnError)
 	docPath := fs.String("doc", "", "RA document file (as saved by ra-request)")
 	noncePath := fs.String("nonce", "", "the nonce that was sent, as hex or a file. empty uses <doc>.nonce; if that is missing too, the nonce check is skipped")
-	format := fs.String("format", p.AWSFormat, "document format")
+	format := fs.String("format", p.AWSFormat, "document format (only aws-nitro can be parsed)")
 	rootPath := fs.String("root", "", "platform verification key (root certificate PEM). empty uses the built-in one")
 	outFile := fs.String("out-file", "", "file to save the measurements to (default: <doc>.measurements.json)")
 	at := fs.String("at", "", "time at which to judge the certificate chain (RFC3339). empty uses the document's time")

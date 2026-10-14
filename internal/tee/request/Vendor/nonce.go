@@ -10,7 +10,7 @@ const NonceSize = 32
 
 type Nonce []byte
 
-// NonceSource is a nonce generator. It can be swapped for an HSM, a KMS or an external RNG as required.
+// NonceSource generates nonces. A caller can supply an HSM, a KMS or an external RNG.
 type NonceSource interface {
 	Generate(ctx context.Context) (Nonce, error)
 }

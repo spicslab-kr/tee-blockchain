@@ -1,5 +1,5 @@
 // Compare is a pure function and is tested directly. Check is tested against a registration actually made on the
-// simulated chain and read back with chain/lookup. The User never registers, so there is no register/user:
+// simulated chain and read back with chain/lookup. The User has no register/user package:
 // the test registers through the auditor package and reads with the user's Reader (which borrows the auditor binding).
 package user
 

@@ -43,22 +43,22 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `att-user — RA request
+	fmt.Fprintln(os.Stderr, `att-user — check an enclave against the registry
 
   ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out-file <file>] [--at <RFC3339>]
-              verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements
+              verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output file can be passed to compare --attested or lookup --measurements
   ra-request  --tee-addr <host:port> [--out-file <file>] [--format <name>] [--timeout 30s]
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
-              with --format, accepts only a document of that format (aws-nitro · gcp-cs-jwt · azure-maa-jwt)
+              with --format, accepts only a document of that format. only aws-nitro documents can be parsed and verified; gcp-cs-jwt and azure-maa-jwt exist only on the request side
   lookup      --rpc <url> --registry <0x…> (--record-key <0x…> | --measurements <measurements.json | NAME=hex,…>)
-              read one record key directly, or find the record key(s) for the measurements first and read them all. a User only looks up, never registers
+              read one record key directly, or find the record key(s) for the measurements first and read them all. a User reads the registry only
   compare     --attested <measurements.json | NAME=hex,…> --rpc <url> --registry <0x…> --record-key <0x…> [--trusted-approvers <0x…,0x…>]
               match the value from ra-parse against the chain registration — value, expiry and approver. exit 1 on failure
   compare     --attested <measurements.json | NAME=hex,…> --expected <same shape>
               match two sets of measurements as they are. prints PASS/FAIL with the reasons
   verify      --tee-addr <the Vendor's enclave host:port> --rpc <url> --registry <0x…> [--registry <0x…> …] [--trusted-approvers <0x…,0x…>]
               the trust decision in one go: request and verify the enclave's attestation document, find who registered that measurement, check each
-              registration. exit 0 if at least one PASSes, 1 with the reason otherwise. no key, no ETH. --nonce pins the nonce.
+              registration. exit 0 when every --registry given has a matching registration, 1 with the reason otherwise. no key, no ETH. --nonce pins the nonce.
               several --registry (e.g. the Vendor's and the Auditor's registry): each is shown side by side and every one must vouch`)
 }
 
@@ -66,8 +66,8 @@ func raRequest(args []string) error {
 	fs := flag.NewFlagSet("ra-request", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "TEE address host:port")
 	outFile := fs.String("out-file", "ra-doc.cbor", "file to save the document to")
-	format := fs.String("format", "", "expected document format. empty accepts any")
-	timeout := fs.Duration("timeout", 30*time.Second, "")
+	format := fs.String("format", "", "expected document format (only aws-nitro can be verified). empty accepts any")
+	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

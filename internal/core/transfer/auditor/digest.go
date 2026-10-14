@@ -8,12 +8,13 @@ import (
 	"strings"
 )
 
+// Digest returns the hex SHA-256 of b.
 func Digest(b []byte) string {
 	s := sha256.Sum256(b)
 	return hex.EncodeToString(s[:])
 }
 
-// FileDigest returns the SHA-256 of a file.
+// FileDigest returns the hex SHA-256 of a file.
 func FileDigest(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -35,6 +36,7 @@ func isHex(s string, n int) bool {
 	return err == nil
 }
 
+// isDigest reports whether s is "sha256:" followed by 64 hex characters.
 func isDigest(s string) bool {
 	return strings.HasPrefix(s, "sha256:") && isHex(strings.TrimPrefix(s, "sha256:"), 64)
 }

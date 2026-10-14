@@ -19,15 +19,15 @@ import (
 )
 
 // verifyCmd runs the User's part in one command: request an attestation document from the enclave and verify it, use its values to find the registration in the registry,
-// then compare value, expiry and approver for each one found. The screen shows a sentence saying what is happening, not a step label.
+// then compare value, expiry and approver for each one found. The screen shows one sentence per step.
 //
 // --registry may be given several times (for example the Vendor's registry and the Auditor's side by side). One registry = one approver, so
 // for each registry it separately shows whether that approver registered what this enclave runs, and trust requires a matching registration in **every registry given**.
-// With just one, it is as before: trusted if at least one registration matches.
+// With one registry, one matching registration in it gives trust.
 func verifyCmd(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "the enclave's host:port")
-	format := fs.String("format", "aws-nitro", "expected document format")
+	format := fs.String("format", "aws-nitro", "expected document format (only aws-nitro can be verified)")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
@@ -40,7 +40,7 @@ func verifyCmd(args []string) error {
 		}
 		return nil
 	})
-	trustedApprovers := fs.String("trusted-approvers", "", "trusted approver addresses, comma-separated. empty uses each registry's APPROVER")
+	trustedApprovers := fs.String("trusted-approvers", "", "trusted approver addresses, comma-separated. empty uses the approver fixed in each registry")
 	outDir := fs.String("out-dir", "", "directory for the intermediate files (document, measurements). empty uses a temporary directory, removed at the end")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -131,7 +131,7 @@ func verifyCmd(args []string) error {
 		}
 		t.Done(fmt.Sprintf("%d registration(s)", len(recordKeys)))
 		if !several {
-			cli.Why("the registry is searched by the measurement itself — no need to know who registered it or to trust the Vendor's word")
+			cli.Why("the registry is searched by the measurement itself, so the registrant need not be known in advance")
 		}
 		fmt.Println("    checking each against the attestation (value, expiry, approver):")
 		okHere := false
@@ -189,7 +189,7 @@ func uniq(ss []string) []string {
 	return out
 }
 
-// fileSize returns the size of the received document. Errors are swallowed since a 0 is enough if it fails.
+// fileSize returns the size of the file at path, or 0 if it cannot be read.
 func fileSize(path string) int64 {
 	st, err := os.Stat(path)
 	if err != nil {

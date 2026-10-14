@@ -7,7 +7,7 @@ import (
 	r "attestamp/internal/tee/request/auditor"
 )
 
-// AzureParser is for Azure Confidential VM (MAA JWT) documents. Not implemented yet.
+// AzureParser is a placeholder for Azure Confidential VM (MAA JWT) documents. Every method returns an error: these documents cannot be verified yet.
 type AzureParser struct{}
 
 var _ Parser = (*AzureParser)(nil)

@@ -134,7 +134,7 @@ func usage() {
               verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements
   ra-request  --tee-addr <host:port> [--out-file <file>] [--format <name>] [--timeout 30s]
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
-              with --format, accepts only a document of that format (aws-nitro · gcp-cs-jwt · azure-maa-jwt)
+              with --format, accepts only a document of that format. only aws-nitro documents can be parsed and verified; gcp-cs-jwt and azure-maa-jwt exist only on the request side
 
 to do it by hand: commit build-config.json at the repository root and push; the other side clones it.`)
 }
@@ -142,7 +142,7 @@ to do it by hand: commit build-config.json at the repository root and push; the 
 func receive(args []string) error {
 	fs := flag.NewFlagSet("receive", flag.ContinueOnError)
 	repo := fs.String("repo", "", "Vendor source repository URL")
-	ref := fs.String("ref", "", "commit, branch or tag")
+	ref := fs.String("ref", "", "commit, branch or tag (default: the default branch)")
 	into := fs.String("into", "", "directory to clone into")
 	ignoreEnv := fs.Bool("ignore-env", false, "only warn when this instance's OS/architecture/Go differ from the Vendor's build_env")
 	if err := fs.Parse(args); err != nil {
@@ -316,8 +316,8 @@ func raRequest(args []string) error {
 	fs := flag.NewFlagSet("ra-request", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "TEE address host:port")
 	outFile := fs.String("out-file", "ra-doc.cbor", "file to save the document to")
-	format := fs.String("format", "", "expected document format. empty accepts any")
-	timeout := fs.Duration("timeout", 30*time.Second, "")
+	format := fs.String("format", "", "expected document format (only aws-nitro can be verified). empty accepts any")
+	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -444,7 +444,7 @@ func launchCmd(args []string) error {
 	l := launch.Launch{}
 	fs.StringVar(&l.EIF, "eif", "", "EIF file to run")
 	fs.StringVar(&l.EnclaveName, "enclave-name", "", "enclave name (default: the EIF file name)")
-	fs.IntVar(&l.Port, "port", 5000, "RA port. must match the value given to build")
+	fs.IntVar(&l.Port, "port", 5000, "RA port. must match the value given to build or pack")
 	fs.IntVar(&l.Memory, "memory", 0, "enclave memory in MiB (0: sized from the EIF)")
 	fs.IntVar(&l.CPUs, "cpus", 2, "enclave CPU count")
 	fs.IntVar(&l.CID, "cid", 16, "enclave vsock CID")

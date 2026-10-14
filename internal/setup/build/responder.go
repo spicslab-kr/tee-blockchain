@@ -1,12 +1,11 @@
 // Responder build-info check.
 //
-// att-ra-responder is a separate binary from a separate `go build`: CheckToolchain guards the Go
-// version att itself was built with, but nothing about att says how the responder file next to it
-// was built — and it is the responder's bytes, not att's, that get layered into the enclave image
-// and measured (PCR0/PCR2). Those bytes depend on the Go patch version, on -trimpath (without it
-// the absolute checkout path is baked in), and on GOOS/GOARCH. Go records all of that inside every
-// binary it produces (debug/buildinfo), so instead of trusting the file name we read the artifact
-// and refuse one that could not possibly match what the other side builds.
+// att-ra-responder comes from a separate `go build`. CheckToolchain guards the Go version of the
+// att binary itself, and the responder's bytes are what get layered into the enclave image and
+// measured (PCR0/PCR2). Those bytes depend on the Go patch version, on -trimpath (which keeps the
+// absolute checkout path out of the binary) and on GOOS/GOARCH. Go records all of that inside every
+// binary it produces (debug/buildinfo), so the file is read and a responder that cannot match
+// what the other side builds is refused.
 
 package build
 
@@ -16,7 +15,7 @@ import (
 	"os"
 )
 
-// ResponderInfo — what the att-ra-responder file next to att was built with, read from the Go
+// ResponderInfo is what the att-ra-responder file next to att was built with, read from the Go
 // build info the compiler leaves inside every binary.
 type ResponderInfo struct {
 	Go       string // GoVersion, e.g. "go1.26.1"
@@ -26,7 +25,7 @@ type ResponderInfo struct {
 	SHA256   string // lowercase hex sha256 of the whole file
 }
 
-// String — one line for the build log: name, hash prefix, and the build facts, so Vendor and
+// String is one line for the build log: name, hash prefix, and the build facts, so Vendor and
 // Auditor can compare their responders by eye.
 func (i ResponderInfo) String() string {
 	trim := "-trimpath"

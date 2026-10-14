@@ -9,7 +9,7 @@ import (
 
 const Format = "azure-maa-jwt"
 
-// Extractor reads the HCL report from the vTPM, sends it to MAA and receives a JWT. It needs go-tpm and is still empty.
+// Extractor reads the HCL report from the vTPM, sends it to MAA and receives a JWT. Extract returns an error: the azure-maa-jwt request side is scaffolding.
 type Extractor struct {
 	MAAEndpoint string
 }
@@ -17,5 +17,5 @@ type Extractor struct {
 var _ auditor.Extractor = (*Extractor)(nil)
 
 func (Extractor) Extract(context.Context, auditor.Nonce) (auditor.RADoc, error) {
-	return auditor.RADoc{}, errors.New("azure extractor not implemented — needs vTPM (go-tpm) and MAA")
+	return auditor.RADoc{}, errors.New("azure extractor not implemented: azure-maa-jwt requests are scaffolding")
 }

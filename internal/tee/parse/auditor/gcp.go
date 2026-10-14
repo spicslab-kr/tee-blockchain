@@ -7,7 +7,7 @@ import (
 	r "attestamp/internal/tee/request/auditor"
 )
 
-// GCPParser is for GCP Confidential Space (JWT) documents. Not implemented yet.
+// GCPParser is a placeholder for GCP Confidential Space (JWT) documents. Every method returns an error: these documents cannot be verified yet.
 type GCPParser struct{}
 
 var _ Parser = (*GCPParser)(nil)

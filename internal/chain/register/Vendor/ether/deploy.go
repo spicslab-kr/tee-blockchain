@@ -10,9 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// Deploy deploys Registry. The approver address cannot be changed after deployment; to change it, deploy anew.
-// One contract, one approver: each role deploys its own contract with its own address.
-// If backend is nil it connects to rpc.
+// Deploy deploys a Registry whose single approver is fixed at deployment, and returns its address and the deployment
+// transaction hash. The deployer key pays for the deployment. If backend is nil it connects to rpc.
 func Deploy(ctx context.Context, rpc string, backend Backend, deployerKey []byte, approver common.Address) (common.Address, string, error) {
 	deployer, err := crypto.ToECDSA(deployerKey)
 	if err != nil {

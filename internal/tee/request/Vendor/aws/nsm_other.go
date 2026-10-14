@@ -9,6 +9,7 @@ import (
 	"attestamp/internal/tee/request/Vendor"
 )
 
+// Extractor is a stub on this platform; Extract always returns an error.
 type Extractor struct {
 	Device   string
 	UserData []byte

@@ -9,7 +9,7 @@ import (
 )
 
 // TCPRequester connects to teeAddr (host:port), sends a nonce and receives the RA document.
-// On Nitro the parent instance bridges TCP and vsock, so every platform is reached over TCP.
+// A Nitro enclave is reached through the parent instance, which bridges TCP to vsock.
 type TCPRequester struct {
 	Timeout time.Duration // 30s if 0
 	Nonces  NonceSource   // DefaultNonceSource if nil

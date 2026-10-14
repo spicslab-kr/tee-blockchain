@@ -5,11 +5,11 @@
 #    build compares it with the toolchain it was built with, refusing if they differ. This script checks that the
 #    refusal really happens on a real Nitro host:
 #      1. your machine's go version equals the pin file exactly
-#      2. a att-vendor-wrongtc cross-built on purpose with another patch version (GOTOOLCHAIN=$WRONG) is uploaded to the
-#         Vendor host; running `build` gives exit != 0 and stderr contains "pins <pinned version>"
-#      3. a correctly built att-vendor passes that check (it may fail later for another reason - only the toolchain message is checked)
-#    Step 2 is skipped with a notice if another toolchain cannot be downloaded (offline).
-#    Run from TB-live:  bash "e2e/toolchain-pin-check.sh"
+#      2. an att-vendor-wrongtc cross-built with another patch version (GOTOOLCHAIN=$WRONG) is uploaded to the
+#         Vendor host; running `build` gives exit != 0 and the output contains "pins <pinned version>"
+#      3. a correctly built att-vendor passes that check (the build may fail later for another reason; only the toolchain message is checked)
+#    Step 2 is skipped with a notice when the other toolchain cannot be downloaded (offline).
+#    Run from the repository root:  bash "e2e/toolchain-pin-check.sh"
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
@@ -18,7 +18,7 @@ cd "$here/.."
 need_host VENDOR_HOST
 PIN_FILE=internal/setup/build/GO_TOOLCHAIN
 WANT="$(tr -d '[:space:]' < "$PIN_FILE")"
-WRONG=go1.26.2   # any patch version other than the pin works; go.mod requires >= 1.26.1, so it must be newer
+WRONG=go1.26.2   # any patch version other than the pin works; go.mod requires go 1.26.1 or newer, so choose a newer one
 fail=0
 
 step "1. LOCAL GO VERSION vs $PIN_FILE"
@@ -59,7 +59,7 @@ if [ $HAVE_WRONG = 1 ]; then
   if [ "${ec:-0}" != 0 ] && echo "$out" | grep -q "pins $WANT"; then
     echo "✅ refused (exit $ec) - 'built with $WRONG but the project pins $WANT'"
   else
-    echo "❌ a att-vendor built with another toolchain was not refused (exit ${ec:-?}) - CheckToolchain is not running at the start of build"
+    echo "❌ an att-vendor built with another toolchain was not refused (exit ${ec:-?}) - CheckToolchain is not running at the start of build"
     fail=1
   fi
 fi
@@ -68,10 +68,10 @@ step "5. build WITH THE CORRECTLY BUILT att-vendor ($WANT) - MUST PASS THE TOOLC
 out="$(remote_build att-vendor)"
 echo "$out" | sed 's/^/    /'
 if echo "$out" | grep -q "pins $WANT"; then
-  echo "❌ a att-vendor built with the pinned toolchain was refused by the toolchain check - GO_TOOLCHAIN and the real build toolchain disagree"
+  echo "❌ an att-vendor built with the pinned toolchain was refused by the toolchain check - GO_TOOLCHAIN and the real build toolchain disagree"
   fail=1
 else
-  echo "✅ toolchain check passed (a later failure for another reason is outside this test)"
+  echo "✅ toolchain check passed (a later failure for another reason is not part of this test)"
 fi
 localBanner
 

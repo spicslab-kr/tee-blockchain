@@ -11,25 +11,25 @@ import (
 	"strings"
 )
 
-// This runs the installed git as is. Authentication follows the user's git configuration.
+// These helpers run the installed git. Authentication comes from the user's git configuration.
 
 var (
 	ErrGitMissing      = errors.New("git is not installed or not on PATH")
-	ErrRepoAccess      = errors.New("cannot access the repository — wrong URL or no read permission; ask the repository owner for access")
+	ErrRepoAccess      = errors.New("cannot access the repository: check the URL and read permission, or ask the repository owner for access")
 	ErrCommitNotFound  = errors.New("the given commit is not in the repository")
-	ErrPushRejected    = errors.New("push rejected — no write permission, or the remote is ahead (pull first)")
+	ErrPushRejected    = errors.New("push rejected: no write permission, or the remote is ahead (pull first)")
 	ErrNothingToCommit = errors.New("nothing changed, nothing to commit")
 )
 
 type gitRunner struct{ dir string }
 
 func (g gitRunner) run(ctx context.Context, args ...string) (string, error) {
-	// If autocrlf changes the bytes, the hash no longer matches
+	// autocrlf off keeps file bytes identical to the committed ones, so hashes match
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-c", "core.autocrlf=false"}, args...)...)
 	if g.dir != "" {
 		cmd.Dir = g.dir
 	}
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0") // never block on a credential prompt
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0") // git fails when it needs credentials
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
 	err := cmd.Run()
@@ -43,7 +43,7 @@ func (g gitRunner) run(ctx context.Context, args ...string) (string, error) {
 	return strings.TrimSpace(out.String()), nil
 }
 
-// classify sorts git stderr into an error kind.
+// classify maps git's stderr text to one of the Err values above.
 func classify(stderr string, err error) error {
 	s := strings.ToLower(stderr)
 	switch {
@@ -62,7 +62,8 @@ func classify(stderr string, err error) error {
 	return fmt.Errorf("git: %w: %s", err, strings.TrimSpace(stderr))
 }
 
-// cloneAt clones, checks out ref, and returns the commit hash.
+// cloneAt clones repo into dir, checks out ref when given, and returns the HEAD commit. An empty
+// repository returns an empty commit.
 func cloneAt(ctx context.Context, repo, ref, dir string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return "", err
@@ -78,7 +79,7 @@ func cloneAt(ctx context.Context, repo, ref, dir string) (string, error) {
 	}
 	sha, err := g.run(ctx, "rev-parse", "HEAD")
 	if err != nil && ref == "" {
-		// A new repository with no commits. That is fine: the send will become the first commit.
+		// An empty repository: the send becomes its first commit.
 		if out, e2 := g.run(ctx, "rev-list", "-n", "1", "--all"); e2 == nil && strings.TrimSpace(out) == "" {
 			return "", nil
 		}
@@ -86,7 +87,7 @@ func cloneAt(ctx context.Context, repo, ref, dir string) (string, error) {
 	return sha, err
 }
 
-// commitAndPush runs add, commit and push, and returns the commit hash.
+// commitAndPush stages paths, commits, pushes HEAD to origin and returns the commit.
 func commitAndPush(ctx context.Context, dir, message string, paths ...string) (string, error) {
 	g := gitRunner{dir: dir}
 	if _, err := g.run(ctx, append([]string{"add", "--"}, paths...)...); err != nil {

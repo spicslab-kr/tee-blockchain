@@ -1,23 +1,16 @@
-// att-ra-responder — the one binary every role's build layers into the enclave image.
+// att-ra-responder is the one binary every role's build layers into the enclave image.
 //
-// att-vendor build and att-auditor build used to embed the CLI that was running the build
-// (att-vendor or att-auditor). Those are compiled from different source (cmd/vendor vs
-// cmd/auditor) and are never byte-identical, so the image PCR0/PCR2 could never match
-// between Vendor's and Auditor's independent builds even after layer normalization —
-// confirmed on two real EC2 Nitro instances (Vendor and Auditor built the same
-// Dockerfile, normalized, and still got different PCR0/PCR2; the embedded /att-ra files
-// were literally different files).
+// att-vendor and att-auditor are compiled from different source (cmd/vendor and cmd/auditor),
+// so a shared responder keeps the image PCR0/PCR2 identical between their independent
+// builds of the same Dockerfile.
 //
-// Inside the enclave, only two commands ever run (see internal/setup/build's
-// entrypoint.sh): "lo-up" and "ra-serve --extractor nsm". Neither depends on which role
-// built the image, so this binary carries just those two, built once from one source,
-// so every role's build embeds the exact same bytes.
+// Inside the enclave only two commands run (see internal/setup/build's entrypoint.sh):
+// "lo-up" and "ra-serve --extractor nsm". Neither depends on the role that built the image,
+// so this binary carries just those two, built once from one source.
 //
-// It imports att/internal/tee/request/Vendor and its aws package rather than a
-// role-neutral one because none exists — Nonce/RADoc/Extractor are duplicated per role
-// the same way as everywhere else in this codebase (distinct named types, see that
-// package's doc comment). Vendor's copy was picked arbitrarily; auditor's or user's
-// would compile to the same behavior.
+// It imports attestamp/internal/tee/request/Vendor and its aws package because each role has
+// its own copy of Nonce/RADoc/Extractor and no shared one exists. The Vendor copy was picked
+// arbitrarily; the Auditor or User copy would behave the same.
 package main
 
 import (

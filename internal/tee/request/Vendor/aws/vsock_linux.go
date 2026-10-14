@@ -116,7 +116,7 @@ func (l *vsockListener) closed() bool {
 	return err != nil
 }
 
-// vsockConn wraps an accepted connection as a net.Conn. Deadlines are handled by os.File.
+// vsockConn wraps a vsock connection as a net.Conn. Deadlines are handled by os.File.
 type vsockConn struct {
 	f             *os.File
 	local, remote vsockAddr

@@ -1,6 +1,6 @@
 // The responder build-info check (internal/setup/build/responder.go) through the real CLI: actually builds and runs att-vendor.
 //   - Off Linux, `build --responder <unrelated file>` ends first with a GOOS error (order: GOOS check, toolchain check,
-//     responder check). So on Windows/macOS it only confirms that the responder message never appears.
+//     responder check). So on Windows/macOS it confirms that the responder message does not appear.
 //   - On Linux, given a responder cross-built for another architecture (an arm64 responder on an amd64 host, or the reverse), it refuses naming both architectures,
 //     and a responder built without -trimpath is refused naming -trimpath. The real measurement on an actual Nitro host is
 //     e2e/responder-check.sh.

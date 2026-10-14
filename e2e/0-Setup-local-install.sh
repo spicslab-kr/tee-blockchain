@@ -4,14 +4,14 @@
 # The environment is detected automatically and each case uses its own installer:
 #   - Ubuntu/Debian family (apt)
 #   - Fedora/RHEL/Amazon Linux family (dnf)
-#   - macOS (Homebrew; if missing, only prints instructions and points to https://brew.sh)
-#   - Windows (Git Bash): git and ssh ship with Git for Windows so they normally pass; only Go is installed, via winget
-#    Run: bash "e2e/0-Setup-local-install.sh"
+#   - macOS (git ships with the system; Homebrew installs it when absent, see https://brew.sh)
+#   - Windows (Git Bash): git and ssh ship with Git for Windows; Go is installed with winget
+#    Run from the repository root:  bash "e2e/0-Setup-local-install.sh"
 set -euo pipefail
 
-# Exactly this version - any other one (lower or higher) breaks the reproducible-build values, so it is forced back here.
-# The version is not written here: the file internal/setup/build/GO_TOOLCHAIN is the only source (the att binary
-# also embeds that file and checks it at build time). To change it, edit only that file.
+# Go must match the pin exactly: any other version, lower or higher, changes the reproducible-build values.
+# internal/setup/build/GO_TOOLCHAIN is the single source of the version (the att binaries embed that file and check
+# it at build time). To change the version, edit that file.
 here="$(cd "$(dirname "$0")" && pwd)"
 GO_VERSION="$(sed 's/^go//' "$here/../internal/setup/build/GO_TOOLCHAIN" | tr -d '[:space:]')"
 
@@ -30,14 +30,14 @@ esac
 echo "== detected environment: $(uname -s) -> $OS_KIND"
 
 go_version_ok() {
-  # Exact match, not "at least" - the reproducible-build comparison needs the identical compiler version.
+  # Exact match: the reproducible-build comparison needs the identical compiler version.
   command -v go >/dev/null 2>&1 || return 1
   have="$(go version | awk '{print $3}' | sed 's/^go//')"
   [ "$have" = "$GO_VERSION" ]
 }
 
 install_go_tarball() {
-  # Shared by apt/dnf/yum - the golang package in apt repos is often outdated, so fetch the official tar.gz directly.
+  # Shared by apt/dnf/yum. The distribution golang packages are often outdated, so this fetches the official tar.gz.
   local os arch tarball url tmp
   os="$1"; arch="$2"
   tarball="go${GO_VERSION}.${os}-${arch}.tar.gz"
@@ -88,8 +88,8 @@ case "$OS_KIND" in
     if go_version_ok; then
       echo "== Go is already exactly $GO_VERSION - skipping"
     else
-      # brew only installs the latest version and cannot pin one - fetch the official pkg from go.dev instead.
-      echo "== downloading Go $GO_VERSION (official pkg; Homebrew cannot pin a version, so it is not used)"
+      # Homebrew installs the latest Go and cannot pin a version, so the official pkg from go.dev is used.
+      echo "== downloading Go $GO_VERSION (official pkg from go.dev)"
       tmp=$(mktemp -d)
       curl -fsSL "https://go.dev/dl/go${GO_VERSION}.darwin-$(uname -m | sed 's/x86_64/amd64/').pkg" -o "$tmp/go.pkg"
       sudo installer -pkg "$tmp/go.pkg" -target /
@@ -102,16 +102,16 @@ case "$OS_KIND" in
     if go_version_ok; then
       echo "== Go is already exactly $GO_VERSION - skipping"
     elif command -v winget >/dev/null 2>&1; then
-      # Go's official installer (.msi) is machine-wide under Program Files, so it always needs administrator rights
-      # (winget has no per-user option for it). If not elevated, say so and stop here - otherwise winget fails with an
-      # obscure error (1603/1618).
+      # Go's official installer (.msi) installs machine-wide under Program Files and needs administrator rights
+      # (winget has no per-user option for it). Without them winget fails with error 1603 or 1618, so the script
+      # checks first and explains.
       if ! net session >/dev/null 2>&1; then
-        echo "Installing Go needs administrator rights (that is how the Go installer is built)."
+        echo "Installing Go needs administrator rights (the Go installer is machine-wide)."
         echo "Open a new Git Bash or PowerShell as administrator (search in the Start menu, right-click,"
         echo "'Run as administrator') and run this script again."
         exit 1
       fi
-      echo "== installing Go $GO_VERSION (winget, version pinned - without --version winget just takes the latest)"
+      echo "== installing Go $GO_VERSION (winget, version pinned with --version)"
       winget install --id GoLang.Go --version "$GO_VERSION" --silent --accept-package-agreements --accept-source-agreements
       echo "Open a new Git Bash window so go shows up on PATH."
     else
@@ -130,22 +130,22 @@ echo
 echo "== verifying install"
 git --version
 ssh -V
-# If Go was just installed in this very window, Windows does not refresh PATH of an already-open window, so
-# 'go' may not be found yet - look in the places each install method actually puts the file instead of PATH.
+# A window that was open during the Go install keeps its old PATH, so 'go' may not be found yet.
+# Look in the install locations of each method directly.
 GOBIN=go
 for cand in /usr/local/go/bin/go "/c/Program Files/Go/bin/go.exe"; do
   [ -x "$cand" ] && GOBIN="$cand" && break
 done
 if ! "$GOBIN" version >/dev/null 2>&1; then
-  echo "Go was just installed but this window cannot see it yet - open a new Git Bash window and"
-  echo "check with 'go version' (the install itself is done)."
+  echo "Go is installed and this window does not see it yet. Open a new Git Bash window and"
+  echo "check with 'go version'."
   exit 0
 fi
 "$GOBIN" version
 HAVE_GO="$("$GOBIN" version | awk '{print $3}' | sed 's/^go//')"
 if [ "$HAVE_GO" != "$GO_VERSION" ]; then
   echo
-  echo "WARNING: Go is $HAVE_GO, not exactly $GO_VERSION - it must match exactly for the reproducible-build comparison."
+  echo "WARNING: Go is $HAVE_GO and the pin is $GO_VERSION. The reproducible-build comparison needs an exact match."
   echo "  Prefix the command with GOTOOLCHAIN=go${GO_VERSION} to force it for this run only."
   exit 1
 fi

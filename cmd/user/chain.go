@@ -18,9 +18,8 @@ import (
 	p "attestamp/internal/tee/parse/user"
 )
 
-// lookup: the User does not register, so there is no registry-deploy or register. With --record-key, reads that record key directly.
-// Otherwise it first finds the record keys via --measurements, then reads them all. It returns the record keys it found, so run
-// can compare each of them.
+// lookup reads one record key directly with --record-key. With --measurements it first finds the record keys for them, then
+// reads them all. It returns the record keys it found, so verify can check each of them.
 func lookup(args []string) ([]string, error) {
 	fs := flag.NewFlagSet("lookup", flag.ContinueOnError)
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")

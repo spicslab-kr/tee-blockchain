@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Vendor - with no Auditor, builds and launches the source alone, and registers the value I made on the chain with my own key.
-#    Run here, on my machine - only the build runs inside the Vendor instance, connected to automatically.
-#    Run: bash "e2e/flow2-vendor-self-registers/1-Vendor-build-self-register.sh" [-c 0xCONTRACT]
+# Flow 2, Vendor - builds and launches the source and registers the value on a registry with my own signing key. No
+#    Auditor takes part in this step. Run on my machine; only the build and launch run inside the Vendor instance, which
+#    the script connects to.
+#    Run from the repository root:  bash "e2e/flow2-vendor-self-registers/1-Vendor-build-self-register.sh" [-c 0xREGISTRY]
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
 need_host VENDOR_HOST
 
-# The att binaries on the instance were cross-built with this machine's Go (0-Setup refuses anything but the pinned Go),
-#   and that Go compiled att-ra-responder. So the value for build_env.go in build-config.json is this machine's Go version.
+# 0-Setup-local-upload.sh cross-builds the att binaries and att-ra-responder with this machine's Go, and accepts only the
+#   pinned version. build_env.go in build-config.json is therefore this machine's Go version.
 GOVER=$(go env GOVERSION)
 
 nitroBanner "Vendor"
@@ -22,7 +23,7 @@ SRC_COMMIT=ef5a25a6314e652a2dcfbce6074bef729f4d9639
 SRC_DIR=mainline/alpine-slim
 umask 022
 
-# Fetch the test source and set file modes as recorded in the source repository (git index), so they are the same whichever shell fetched it.
+# Fetch the test source and set file modes to those recorded in the git index, so the modes are the same whichever shell fetched it.
 fix_modes() { (cd "$1" && git ls-files -s | while read -r mode _ _ path; do case $mode in 100755) chmod 755 "$path";; 100644) chmod 644 "$path";; esac; done && find . -type d -not -path './.git*' -exec chmod 755 {} +); }
 step_start "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
 [ -d src/docker-nginx ] || git clone -q $SRC_REPO src/docker-nginx
@@ -30,9 +31,9 @@ git -C src/docker-nginx checkout -q $SRC_COMMIT
 fix_modes src/docker-nginx
 step_stop "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
 
-# Write a build-config.json in the clone root in the same shape the Vendor hands to the Auditor via send (kept as is if it already exists).
-#   So the self-register below reads it with --config and service, version and arch need not be typed again. It is outside the
-#   app directory ($SRC_DIR), so it does not enter the measurement. tee_info comes from the instance metadata (unknown if unreadable).
+# Write build-config.json in the clone root, in the shape att-vendor send pushes to the Auditor (an existing file is kept).
+#   The self-register below takes service, version and arch from it with --config. The file sits outside the app directory
+#   ($SRC_DIR), so it is not part of the measurement. tee_info comes from the instance metadata ("unknown" when unreadable).
 step_start "WRITING BUILD CONFIG"
 if [ -f src/docker-nginx/build-config.json ]; then
   echo "build-config.json already in the clone root - keeping it"
@@ -55,11 +56,11 @@ fi
 cat src/docker-nginx/build-config.json
 step_stop "WRITING BUILD CONFIG"
 
-# att command - builds the source twice (--verify) to make the image and measurements, and checks for itself that the same value comes out.
-#   Like the Auditor, the Vendor must confirm its own build is reproducible before registering.
+# att-vendor build - builds the source into the image and measurements, and with --verify builds it a second time to
+#   confirm the same value comes out. The Vendor checks reproducibility itself before registering.
 step "BUILDING SOURCE (checking reproducibility)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out-dir out --verify
 
-# att command - launches that image in my TEE.
+# att-vendor launch - runs that image as an enclave in my TEE.
 step "LAUNCHING ENCLAVE" ./att-vendor launch --eif out/alpine-slim.eif
 
 echo
@@ -73,9 +74,9 @@ localBanner
 REGISTRY=""
 while getopts "c:" o; do case $o in c) REGISTRY=$OPTARG;; esac; done
 
-# Fetch the measurements file just made on the Vendor instance and the build-config.json from the clone root to my machine.
-#   self-register reads service, version and arch from build-config.json (the same source gives different PCRs on x86_64 and
-#   arm64, so which architecture the value is for is written there too - on the instance, uname -m was converted to the GOARCH spelling).
+# Copy the measurements file and the build-config.json from the Vendor instance to this machine.
+#   self-register reads service, version and arch from build-config.json. The same source gives different PCRs on x86_64 and
+#   arm64, so build_env.arch (amd64 or arm64, converted from uname -m on the instance) says which one the value is for.
 step_start "FETCHING BUILD VALUE"
 $SCP "$SSH_USER@$VENDOR_HOST:out/measurements.json" "$WORK/vendor-build.json"
 $SCP "$SSH_USER@$VENDOR_HOST:src/docker-nginx/build-config.json" "$WORK/vendor-build-config.json"
@@ -84,21 +85,23 @@ echo "Vendor's build value:"; cat "$WORK/vendor-build.json"
 echo "build config:"; cat "$WORK/vendor-build-config.json"
 
 if [ -z "$REGISTRY" ]; then
-  # att command - deploys a new registry (the Registry contract) on the chain. The approver is the Vendor itself.
+  # att-vendor registry-deploy - deploys a new Registry contract with the Vendor as its approver.
   step_start "DEPLOYING REGISTRY"
   out=$("$VENDOR_BIN" registry-deploy --rpc "$RPC" --deployer-key-file "$DEPLOYER_KEY" --approver "$VENDOR_ADDR" 2>&1)
   step_stop "DEPLOYING REGISTRY"
   echo "$out"
-  REGISTRY=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # extract the address from the output
+  REGISTRY=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')  # address from the 'deployed at' line
   [ -n "$REGISTRY" ] || { echo "no registry address in registry-deploy output"; exit 1; }
 fi
-echo "$REGISTRY" > "$WORK/registry-flow2.txt"  # save it in the file the next step reads
+echo "$REGISTRY" > "$WORK/registry-flow2.txt"  # the later steps read the registry address from this file
 
-# att command - signs the value I built with my key and registers it on the chain as is (with no third-party comparison).
-#   service, version and arch come from the --config build-config.json - a different value given as a flag wins, but a warning is printed.
+# att-vendor self-register - requests the attestation document from my enclave, signs the attested value with my signing
+#   key, registers it, and reads the registration back. --build-measurements makes it register only a value that equals
+#   my build. service, version and arch come from the build-config.json given with --config; a flag with another value
+#   overrides it and prints a warning.
 step "SELF-REGISTERING" "$VENDOR_BIN" self-register --config "$WORK/vendor-build-config.json" --tee-addr "$VENDOR_HOST:5000" --build-measurements "$WORK/vendor-build.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$VENDOR_SIGNING_KEY"
 echo "self-register exit=$?"
-# att command - verifies, from the User's side, whether what was just registered is actually trustworthy.
+# att-user verify - runs the User's trust decision on what was just registered.
 step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"
 echo "verify exit=$?"
 echo "next: 2-User-verify"

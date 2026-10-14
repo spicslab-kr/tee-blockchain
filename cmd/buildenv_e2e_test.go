@@ -244,7 +244,7 @@ func TestBuildEnv_ReceiveWarnsOnNoTrimpath(t *testing.T) {
 	}
 }
 
-// An (old) build-config.json with no build_env at all is not accepted on aws.
+// A build-config.json with no build_env is rejected for aws-nitro.
 func TestBuildEnv_ReceiveRejectsConfigWithoutBuildEnv(t *testing.T) {
 	dir := t.TempDir()
 	auditor := build(t, dir, "./cmd/auditor")

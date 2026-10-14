@@ -5,11 +5,10 @@ import (
 	"fmt"
 )
 
-// ResolveRegistration — what register needs to name the build it registers (service, version,
-// arch), from build-config.json when the Vendor handed one over, or from the flags typed by hand.
-// The Vendor already said all three in the config, so with cfg the flags are optional; a flag that
-// is given anyway wins, with one warning line per flag that differs from the config. Without cfg,
-// service and version are required and arch is taken as given (the caller defaulted it).
+// ResolveRegistration returns the service, version and arch that register uses to name the build. With a
+// build-config.json (cfg) the flags are optional and fill in from the config; a flag that is given wins,
+// with one warning per flag that differs from the config. Without cfg, service and version are required
+// and arch is used as given (the caller supplies its default).
 func ResolveRegistration(cfg *BuildConfig, service, version, arch string) (svc, ver, archOut string, warnings []string, err error) {
 	if cfg == nil {
 		if service == "" || version == "" {

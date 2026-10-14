@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// build_env — aws-nitro must declare os/arch/go; arch must be one the project builds for.
+// build_env: aws-nitro requires os, arch and go; arch is one the project builds for.
 func TestBuildConfig_BuildEnvRequiredOnAWS(t *testing.T) {
 	for _, field := range []string{"os", "arch", "go"} {
 		c := cfgAWS()
@@ -70,7 +70,7 @@ func TestCurrentBuildEnv(t *testing.T) {
 		t.Fatalf("empty field in %+v", e)
 	}
 	if e.IsZero() {
-		t.Fatal("current env is never zero")
+		t.Fatal("current env is non-zero")
 	}
 }
 
@@ -83,8 +83,8 @@ func TestBuildEnv_String(t *testing.T) {
 	}
 }
 
-// receive — the Vendor's declared env against this instance's. os/arch/go differing is an
-// error (or a warning with --ignore-env); trimpath=false is only ever a warning.
+// CheckBuildEnv compares the Vendor's declared env with this instance's. A differing os, arch or go is an
+// error (a warning with --ignore-env); trimpath=false gives a warning.
 func TestCheckBuildEnv(t *testing.T) {
 	have := BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true}
 
@@ -158,7 +158,7 @@ func TestCheckBuildEnv(t *testing.T) {
 		want.Trimpath = false
 		w, err := CheckBuildEnv(want, have, false)
 		if err != nil {
-			t.Fatalf("trimpath is never an error: %v", err)
+			t.Fatalf("trimpath gives no error: %v", err)
 		}
 		if len(w) != 1 || !strings.Contains(w[0], "trimpath") {
 			t.Fatalf("want a trimpath warning, got %v", w)

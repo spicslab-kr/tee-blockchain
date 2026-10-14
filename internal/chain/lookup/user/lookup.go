@@ -1,13 +1,10 @@
-// Package user reads registrations from the chain. It only reads.
+// Package user reads registrations from the chain.
 //
-// The auditor, vendor and user roles each have an identical copy of this file. Registration.Values and
-// Reader.FindRecordKeys use this role's tee/parse/user.Measurements. The other roles' Measurements have the same fields
-// (Name, Value) but live in different packages, so Go treats them as different types and one interface
-// cannot be shared by the three roles. Meta has no role-specific type and could have been shared, but it sits more
-// naturally in the same file as Registration and Reader, so it was left here.
-//
-// The implementation (ether/reader.go) is per role for the same reason. The user role does not register, so there is
-// no chain/register/user; the reason ether/reader.go borrows the auditor's contract binding is in the comment of that file.
+// The auditor, vendor and user roles each have an identical copy of this file. Each copy uses its own role's
+// tee/parse/user.Measurements, which Go treats as a different type from the other roles' Measurements even though the
+// fields match. The reader in ether/reader.go is also per role, so a logic change goes into every copy.
+// The user role has no registrar, so there is no chain/register/user. Its reader borrows the auditor's contract binding;
+// ether/reader.go explains why.
 package user
 
 import (
@@ -16,24 +13,30 @@ import (
 	"attestamp/internal/tee/parse/user"
 )
 
+// Meta is the descriptive part of a registration, read from the Registered event.
 type Meta struct {
 	Service  string
 	Version  string
 	Platform string
-	Arch     string // CPU architecture the image was built for (amd64 | arm64); informational, not in the record key
+	Arch     string // CPU architecture the image was built for (amd64 | arm64); informational and not part of the record key
 }
 
+// Registration is a registration as stored in the registry (approver, expiry) plus its event data.
+// Values holds the single measurement hash the contract stores.
 type Registration struct {
 	RecordKey string
 	Values    user.Measurements
 	Meta      Meta
-	Expires   int64 // by the chain's clock
-	ChainTime int64 // unix time of the block that served the lookup; expiry is judged against this, not the verifier's clock
+	Expires   int64 // unix seconds; the registration counts until the chain's time reaches this
+	ChainTime int64 // unix time of the block that served the lookup; expiry is judged against this value
 	Approver  string
 	Signature []byte
 }
 
+// Reader looks up registrations in one registry.
 type Reader interface {
+	// FindRecordKeys returns the record keys registered for the measurements, empty if none.
 	FindRecordKeys(ctx context.Context, values user.Measurements) ([]string, error)
+	// Lookup returns the registration stored under a record key.
 	Lookup(ctx context.Context, recordKey string) (Registration, error)
 }

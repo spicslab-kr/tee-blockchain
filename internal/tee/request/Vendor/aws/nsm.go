@@ -9,6 +9,7 @@ import (
 	"attestamp/internal/tee/request/Vendor"
 )
 
+// Format is the document format name of Nitro attestation documents.
 const Format = "aws-nitro"
 
 // NSM request: {"Attestation": {"user_data": .., "nonce": .., "public_key": ..}}

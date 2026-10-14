@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
 # Per-architecture measurement comparison. The same source and Dockerfile are built on two x86_64 machines
-#    (the existing VENDOR/AUDITOR) and one arm64 machine (ARM64_HOST), and PCR0/1/2 are measured on each.
-#    Expected: the two x86_64 machines give identical values (reproducible - evidence it is not tied to the checkout
-#    path); arm64 gives different values (normal - kernel, machine code and base image layers differ per architecture,
-#    so the PCRs differ even for the same source; this is not a defect). The script judges at the end and prints
-#    whether values that must differ are equal (a bug) or values that must match differ.
+#    (VENDOR_HOST and AUDITOR_HOST) and one arm64 machine (ARM64_HOST), and PCR0/1/2 are measured on each.
+#    Expected: the two x86_64 machines give identical values, which shows the measurement is independent of the checkout
+#    path. arm64 gives different values, because kernel, machine code and base image layers differ per architecture.
+#    The script ends with a verdict on both expectations.
 #
 #    Needs: launch an arm64 (Graviton) Nitro instance and put its public IP in ARM64_HOST in e2e/env.local.sh.
 #    Spec:
 #      - type    c7g.xlarge (Graviton, 4 vCPU) - the arm64 counterpart of the m6i.xlarge (x86) used for VENDOR/AUDITOR
 #      - OS      Amazon Linux 2023 (arm64 AMI - a different image from the x86 one, so set the console architecture filter to arm64)
 #      - options Nitro Enclaves enabled; the rest (region eu-north-1, security group, key pair) same as VENDOR/AUDITOR
-#      - setup   git, docker and nitro-cli are installed by the first run of att-vendor build, so nothing needs to be
-#                installed on the instance beforehand
-#    Run from TB-live:  bash "e2e/arch-measurement-compare.sh"
+#      - setup   the first run of att-vendor build installs docker and nitro-cli; git must be present for the source clone
+#    Run from the repository root:  bash "e2e/arch-measurement-compare.sh"
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
@@ -30,8 +28,8 @@ SRC_REPO=https://github.com/qixiangme/docker-nginx
 SRC_COMMIT=ef5a25a6314e652a2dcfbce6074bef729f4d9639
 SRC_DIR=mainline/alpine-slim
 
-# Build the att executables - cross-compiled separately for x86_64 (amd64) and arm64.
-#   -trimpath: keeps the checkout path out of the binary. To add an architecture, add one line to GOARCH_OF.
+# Cross-compile att-vendor and att-ra-responder for x86_64 (amd64) and arm64.
+#   -trimpath keeps the checkout path out of the binary. GOARCH_OF maps uname -m names to GOARCH names; add one entry per architecture.
 step "CROSS-BUILDING PER ARCHITECTURE"
 declare -A GOARCH_OF=( [x86_64]=amd64 [arm64]=arm64 )
 mkdir -p "$WORK/arch"
@@ -44,8 +42,8 @@ done
 
 host_of() { case $1 in V) echo "$VENDOR_HOST";; A) echo "$AUDITOR_HOST";; R) echo "$ARM64_HOST";; esac; }
 
-# measure_on <ssh-func> <storage-key> <label> <arch> - storage-key must be distinct per host
-# (Vendor and Auditor are both arch="x86_64" but their result files must not overlap).
+# measure_on <ssh-func> <storage-key> <label> <arch> - uploads the binaries, builds on that host, and copies the
+# measurements to $WORK/arch/<storage-key>/. The key is unique per host, since Vendor and Auditor are both x86_64.
 measure_on() {
   sshf=$1; key=$2; label=$3; arch=$4
   nitroBanner "$label"
@@ -92,16 +90,16 @@ echo
 
 fail=0
 if [ "$(triplet vendor-x86)" != "$(triplet auditor-x86)" ]; then
-  echo "❌ reproducibility regression - same architecture (x86_64) but Vendor and Auditor PCRs differ. -trimpath or normalization is broken."
+  echo "❌ reproducibility regression - same architecture (x86_64) but Vendor and Auditor PCRs differ. Check -trimpath and the file-mode normalization."
   fail=1
 else
   echo "✅ x86_64: Vendor and Auditor reproduce - same source, same values"
 fi
 if [ "$(triplet vendor-x86)" = "$(triplet arm64-host)" ]; then
-  echo "❌ anomaly - x86_64 and arm64 PCRs are identical. GOARCH may not have actually changed (suspect a cached measurement or a skipped build)."
+  echo "❌ anomaly - x86_64 and arm64 PCRs are identical. GOARCH may be unchanged (check for a cached measurement or a skipped build)."
   fail=1
 else
-  echo "✅ arm64: differs from x86_64 - expected (not a defect)"
+  echo "✅ arm64: differs from x86_64 as expected"
 fi
 echo "next: none - this script is the end of this test"
 exit $fail

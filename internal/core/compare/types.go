@@ -1,13 +1,13 @@
-// Package compare holds the actual comparison and verdict logic, independent of role. The per-role packages
-// core/compare/<role> (auditor, Vendor, user) are thin delegates that only convert their own
-// tee/parse.Measurements type into the shape used here (Items). To change the logic, edit only this package
-// (compare.go and check.go).
+// Package compare holds the comparison and verdict logic shared by all roles. The per-role packages
+// core/compare/<role> (auditor, Vendor, user) are thin delegates that convert their tee/parse.Measurements
+// type into Items. The logic lives in this package (compare.go and check.go).
 //
-// compare.go is the comparison with no chain value (parsed vs build values, etc.). check.go is used when a chain
-// registration is on either side; it checks expiry and the approver (trustedApprovers) as well as value equality.
+// Compare (compare.go) matches two sets of values by name. Check (check.go) is the trust decision for a
+// registration: the measurement matches, the registration has not expired on the chain's clock, and the
+// approver is in trustedApprovers.
 package compare
 
-// Item is one named measurement and Items is a set of them. The fields match the per-role Measurement/Measurements.
+// Item is one named measurement and Items is a set of them, mirroring the per-role Measurement and Measurements.
 type Item struct {
 	Name  string
 	Value []byte
@@ -24,7 +24,7 @@ func (items Items) Get(name string) []byte {
 	return nil
 }
 
-// Verdict is the result and its reasons. It is a pass if Reason is empty.
+// Verdict is the result of a comparison. Pass is true exactly when Reason is empty.
 type Verdict struct {
 	Pass   bool
 	Reason []string

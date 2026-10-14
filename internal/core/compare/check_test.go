@@ -5,7 +5,7 @@ import "testing"
 func TestCheck_AllGood(t *testing.T) {
 	h := []byte{0xaa, 0xbb}
 	reg := RegInfo{MeasurementHash: h, Expires: 200, Approver: "0xAbCd"}
-	v := Check(h, reg, 100, []string{"0xabcd"}) // trustedApprovers is lower case, Approver is checksummed; case must not matter
+	v := Check(h, reg, 100, []string{"0xabcd"}) // trustedApprovers is lower case and Approver is mixed case; case does not matter
 	if !v.Pass {
 		t.Fatalf("Check = %+v, want Pass", v)
 	}
@@ -14,7 +14,7 @@ func TestCheck_AllGood(t *testing.T) {
 func TestCheck_Expired(t *testing.T) {
 	h := []byte{0xaa}
 	reg := RegInfo{MeasurementHash: h, Expires: 100, Approver: "0xabcd"}
-	v := Check(h, reg, 100, []string{"0xabcd"}) // now == Expires counts as expired (not valid at that exact moment)
+	v := Check(h, reg, 100, []string{"0xabcd"}) // now == Expires counts as expired
 	if v.Pass {
 		t.Fatal("expires <= now must fail")
 	}
@@ -25,7 +25,7 @@ func TestCheck_UntrustedApprover(t *testing.T) {
 	reg := RegInfo{MeasurementHash: h, Expires: 200, Approver: "0xdead"}
 	v := Check(h, reg, 100, []string{"0xabcd", "0xbeef"})
 	if v.Pass {
-		t.Fatal("a approver outside the trusted list must fail")
+		t.Fatal("an approver outside the trusted approvers must fail")
 	}
 }
 

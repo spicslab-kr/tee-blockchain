@@ -1,5 +1,5 @@
-// Package aws launches the EIF a build produced as an enclave, sets up a TCP-to-vsock bridge on the parent instance,
-// and opens the security group port (port.go). Result holds the RA address to write into the configuration once everything is up.
+// Package aws launches the EIF a build produced as an enclave, sets up a TCP-to-vsock bridge on the parent instance.
+// OpenPort (port.go) opens the security group port. Result holds the RA address to write into the configuration once everything is up.
 //
 // The instance itself is created by the user, who enables Nitro Enclaves and logs in. This package only calls
 // nitro-cli from there, touches the security group only when it has permission, and uses no cloud credentials.
@@ -32,7 +32,7 @@ type Launch struct {
 	CPUs        int    // 0 means 2
 	CID         int    // enclave vsock address. 0 means 16
 	Listen      string // address the bridge accepts on. Defaults to 0.0.0.0
-	ProxyBinary string // att binary to start as ra-proxy. Defaults to itself
+	ProxyBinary string // att binary that runs ra-proxy. Defaults to the running executable
 	OutDir      string // bridge log directory. Defaults to out
 
 	// BuildMeasurements is the measurements.json that came with an EIF received from someone else. If measuring the EIF directly gives a different value, it is not launched.
@@ -148,7 +148,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 		return res, err
 	}
 
-	launchStep(log, 4, fmt.Sprintf("Opening TCP %s:%d → the enclave (vsock %d:%d)", l.Listen, l.Port, l.CID, l.Port), "an enclave has no network of its own; this bridge on the host forwards port 5000 to it so the Auditor and Users can ask it for attestations")
+	launchStep(log, 4, fmt.Sprintf("Opening TCP %s:%d → the enclave (vsock %d:%d)", l.Listen, l.Port, l.CID, l.Port), "an enclave has no network of its own; this bridge on the host forwards that port to it so the Auditor and Users can ask it for attestations")
 	if err := l.startProxy(ctx, log); err != nil {
 		return res, err
 	}
@@ -156,7 +156,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 	return res, nil
 }
 
-// startProxy starts the att binary separately as ra-proxy. It keeps running after launch ends.
+// startProxy starts ProxyBinary as a detached ra-proxy process that keeps running after launch ends.
 func (l Launch) startProxy(ctx context.Context, log io.Writer) error {
 	_ = exec.CommandContext(ctx, "pkill", "-f", fmt.Sprintf("^%s ra-proxy --listen %s:%d", l.ProxyBinary, l.Listen, l.Port)).Run()
 	logPath := filepath.Join(l.OutDir, "proxy.log")
@@ -181,7 +181,8 @@ func (l Launch) startProxy(ctx context.Context, log io.Writer) error {
 	return nil
 }
 
-// MemoryFor: the EIF is unpacked entirely into RAM and the software runs on top of it. Four times its size, rounded up to 512 MiB units.
+// MemoryFor sizes enclave memory for an EIF: the EIF is unpacked entirely into RAM and the software runs on top of it,
+// so it returns four times the EIF size, rounded up to 512 MiB units (minimum 512).
 func MemoryFor(eif string) int {
 	st, err := os.Stat(eif)
 	if err != nil {

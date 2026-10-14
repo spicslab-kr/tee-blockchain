@@ -16,14 +16,14 @@ func Green(s string) string {
 	return "\x1b[32m" + s + "\x1b[0m"
 }
 
-// Okln prints a line to stdout, green on a terminal — for the final "it worked" line.
+// Okln prints a line to stdout, green on a terminal, for the final success line.
 func Okln(a ...any) {
 	fmt.Println(Green(fmt.Sprint(a...)))
 }
 
 // Task is one step in progress. Start prints "message"; on a terminal it then adds dots (. .. ...) to show it is
 // waiting, and Done/Fail finish the same line as "message... ✓ result" or "message... ✗ reason". When output is piped
-// (tests, scripts) there is no animation, only the single line "message... ✓ result".
+// (tests, scripts) the output is the single line "message... ✓ result".
 type Task struct {
 	msg  string
 	tty  bool
@@ -82,8 +82,7 @@ func (t *Task) Done(detail string) { t.end(Green("✓"), detail) }
 // Fail closes the step as a failure: "msg... ✗ detail" (red).
 func (t *Task) Fail(detail string) { t.end(Red("✗"), detail) }
 
-// Why prints one sentence on why the step that just finished is needed, as an indented line, so readers who do not
-// know our terms can still follow.
+// Why prints one sentence on why the step that just finished is needed, as an indented line, to help readers new to the terms.
 func Why(s string) {
 	fmt.Println("      · " + s)
 }

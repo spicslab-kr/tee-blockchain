@@ -23,7 +23,7 @@ func (ms Measurements) Get(name string) []byte {
 	return nil
 }
 
-// Info is what the document says besides the measurements. Comparison uses it to check expiry, freshness and debug mode.
+// Info is what the document says besides the measurements: time, nonce, user data, module and debug mode.
 type Info struct {
 	Format    string
 	Timestamp time.Time // when the document was created; certificates are judged valid as of this time
@@ -34,9 +34,9 @@ type Info struct {
 }
 
 // imagePCRs are the registers that describe the image (the code). They are the same three that nitro-cli
-// build-enclave outputs, so values from here compare directly against the build values, the measurement record
-// and the on-chain registration. PCR3 (IAM role), PCR4 (parent instance ID) and PCR8 (signing certificate) say
-// which machine it ran on, not what ran, so they are left out; the instance is available as Info.Module.
+// build-enclave outputs, so values from here compare directly with the build values and the registration.
+// PCR3 (IAM role), PCR4 (parent instance ID) and PCR8 (signing certificate) identify the machine that
+// ran the image, so they are left out; the instance is available as Info.Module.
 var imagePCRs = []uint{0, 1, 2}
 
 // Parse returns PCR0, 1 and 2 under the names PCR<n>. An all-zero register (debug mode) is left out.
@@ -59,7 +59,7 @@ func (a Parser) Parse(format string, raw []byte) (Measurements, error) {
 	return out, nil
 }
 
-// Info returns the time, nonce and debug flag. A debug-mode enclave has an all-zero PCR0.
+// Info returns the document time, nonce, user data, module ID and debug flag. A debug-mode enclave has an all-zero PCR0.
 func (a Parser) Info(format string, raw []byte) (Info, error) {
 	_, doc, err := decode(format, raw)
 	if err != nil {

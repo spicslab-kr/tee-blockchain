@@ -19,20 +19,20 @@ import (
 	p "attestamp/internal/tee/parse/auditor"
 )
 
-// Registrar talks to a single Registry contract over RPC.
+// Registrar signs for and sends transactions to one Registry contract.
 type Registrar struct {
-	RPC      string         // e.g. https://ethereum-sepolia-rpc.publicnode.com
+	RPC          string         // e.g. https://ethereum-sepolia-rpc.publicnode.com
 	RegistryAddr common.Address // the deployed Registry
-	// SenderKey is the key that sends the transaction and pays gas. It may or may not be the approver.
+	// SenderKey is the sender key: it sends the transaction and pays gas. Any account may send.
 	SenderKey []byte
 	Timeout   time.Duration // how long to wait for mining; 0 means 2 minutes
-	// If Backend is set it is used instead of RPC. Tests inject a simulated backend.
+	// Backend, if set, is used instead of RPC. Tests inject a simulated backend.
 	Backend Backend
 }
 
 var _ reg.Registrar = (*Registrar)(nil)
 
-// toRegistration converts our types into the contract's Registration. The measurements are reduced to a single 32-byte hash.
+// toRegistration builds the contract's Registration from the measurements and meta, hashing the measurements into one value.
 func toRegistration(values p.Measurements, meta reg.Meta) (RegistryRegistration, error) {
 	if err := meta.Validate(); err != nil {
 		return RegistryRegistration{}, err
@@ -44,8 +44,8 @@ func toRegistration(values p.Measurements, meta reg.Meta) (RegistryRegistration,
 	return RegistryRegistration{Platform: meta.Platform, Arch: meta.Arch, Service: meta.Service, Version: meta.Version, Measurement: h, Expires: uint64(meta.Expires.Unix())}, nil
 }
 
-// Digest is the hash to sign, the same value as the contract's digest(e). It includes the chain ID and registry address,
-// so it cannot be reused on another deployment.
+// Digest is the EIP-712 hash the approver signs, equal to the contract's digest(e). It covers the chain ID and registry
+// address, so a signature is valid for one deployment.
 func Digest(chainID *big.Int, registryAddr common.Address, e RegistryRegistration) ([]byte, error) {
 	td := apitypes.TypedData{
 		Types: apitypes.Types{
@@ -72,7 +72,7 @@ func Digest(chainID *big.Int, registryAddr common.Address, e RegistryRegistratio
 	return digest, err
 }
 
-// Sign reads the chain ID and signs. The signing key is a 32-byte secp256k1 private key.
+// Sign reads the chain ID and signs the registration. The signing key is a 32-byte secp256k1 private key.
 func (r Registrar) Sign(values p.Measurements, meta reg.Meta, signingKey []byte) (reg.Signed, error) {
 	priv, err := crypto.ToECDSA(signingKey)
 	if err != nil {
@@ -114,7 +114,7 @@ func (r Registrar) signWith(chainID *big.Int, values p.Measurements, meta reg.Me
 	}, nil
 }
 
-// backend returns Backend if set, otherwise connects to RPC. done closes the connection.
+// backend returns Backend if set, otherwise a client connected to RPC. done closes that client.
 func (r Registrar) backend(ctx context.Context) (Backend, func(), error) {
 	if r.Backend != nil {
 		return r.Backend, func() {}, nil

@@ -1,22 +1,21 @@
 #!/usr/bin/env bash
 # Build-environment declaration and check. The Vendor records the environment it built in (OS, CPU architecture, Go
-#    toolchain, -trimpath) as build_env in build-config.json, and the Auditor compares it with its own instance on
-#    receipt. If they differ it refuses (exit != 0): that instance cannot produce the Vendor's measurement (PCRs differ
-#    per architecture and Go version), and building anyway would look exactly as if the Vendor had lied.
-#    With --ignore-env it only warns and carries on.
+#    toolchain, -trimpath) as build_env in build-config.json, and att-auditor receive compares it with the Auditor's own
+#    instance. A difference makes receive exit non-zero: that instance cannot produce the Vendor's measurement (PCRs differ
+#    per architecture and Go version), and a rebuild there would look like a dishonest Vendor.
+#    With --ignore-env, receive prints a warning and continues.
 #
-#    Measured on real instances. On each host a local bare repository is created and used as the Vendor repository
-#    (no external git remote needed), and build-config.json is pushed in three variants to see the verdict of
-#    att-auditor receive:
-#      1. declares another architecture -> must be refused (arm64 on the x86_64 host, amd64 on the arm64 host)
-#      2. same, with --ignore-env       -> only a warning, exit 0
+#    Runs on real instances. On each host a local bare repository serves as the Vendor repository (no external git
+#    remote needed), and build-config.json is pushed in three variants to see the verdict of att-auditor receive:
+#      1. declares another architecture -> refused (arm64 on the x86_64 host, amd64 on the arm64 host)
+#      2. same, with --ignore-env       -> warning, exit 0
 #      3. declares its own architecture -> passes, "build env matches" is printed
-#    x86_64 runs on VENDOR_HOST (V) and arm64 on ARM64_HOST (R), mirror-style. If ARM64_HOST is empty only the
-#    x86_64 side runs and that is reported.
+#    x86_64 runs on VENDOR_HOST (V) and arm64 on ARM64_HOST (R). When ARM64_HOST is empty only the x86_64 side runs
+#    and that is reported.
 #
-#    Go version: the runtime.Version() of the att-auditor cross-compiled here equals this machine's go, so the config
-#    gets `go env GOVERSION` as is. That way only the architecture can be made to differ.
-#    Run from TB-live:  bash "e2e/build-env-check.sh"
+#    Go version: the att-auditor cross-compiled here reports the same runtime.Version() as this machine's go, so the config
+#    carries `go env GOVERSION` and only the architecture differs between the variants.
+#    Run from the repository root:  bash "e2e/build-env-check.sh"
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
@@ -25,7 +24,7 @@ cd "$here/.."
 need_host VENDOR_HOST
 GOVER=$(go env GOVERSION)
 
-# Cross-compile att-auditor per architecture. -trimpath: keeps the checkout path out of the binary.
+# Cross-compile att-auditor for each architecture. -trimpath keeps the checkout path out of the binary.
 step "CROSS-BUILDING att-auditor PER ARCHITECTURE ($GOVER)"
 declare -A GOARCH_OF=( [x86_64]=amd64 [arm64]=arm64 )
 mkdir -p "$WORK/arch"
@@ -36,7 +35,7 @@ done
 host_of() { case $1 in V) echo "$VENDOR_HOST";; A) echo "$AUDITOR_HOST";; R) echo "$ARM64_HOST";; esac; }
 
 fail=0
-# check_on <ssh-func> <label> <arch> - run the three verdicts on that host. The remote script returns the number of wrong verdicts as its exit code.
+# check_on <ssh-func> <label> <arch> - runs the three verdicts on that host. The remote script exits with the number of wrong verdicts.
 check_on() {
   sshf=$1; label=$2; arch=$3
   mine=${GOARCH_OF[$arch]}

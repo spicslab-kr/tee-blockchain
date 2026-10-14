@@ -5,12 +5,11 @@ import (
 	"strings"
 )
 
-// CheckBuildEnv — compares the environment the Vendor declared (want) with the one this
-// instance has (have). OS, architecture and Go version each change the measurements, so a
-// difference in any of them is an error: this instance cannot produce the Vendor's PCRs, and a
-// rebuild here would look exactly like a lying Vendor. With ignore set, those become warnings.
-// A Vendor that built without -trimpath is only ever a warning — its measurements may then
-// depend on its checkout path, which no Auditor can be expected to match.
+// CheckBuildEnv compares the environment the Vendor declared (want) with this instance's (have). OS,
+// architecture and Go version each change the measurements, so a difference in any of them is an error:
+// this instance cannot produce the Vendor's PCRs, and a rebuild here would look like a lying Vendor. With
+// ignore set, the error becomes a warning. A Vendor build without -trimpath always gives a warning, since
+// its measurements may depend on the checkout path.
 func CheckBuildEnv(want, have BuildEnv, ignore bool) (warnings []string, err error) {
 	var diffs []string
 	if want.OS != have.OS {
@@ -31,7 +30,7 @@ func CheckBuildEnv(want, have BuildEnv, ignore bool) (warnings []string, err err
 	msg := "build env differs from the Vendor's (" + strings.Join(diffs, "; ") +
 		"): this instance cannot produce the Vendor's measurements"
 	if ignore {
-		return append(warnings, msg+" — continuing because of --ignore-env"), nil
+		return append(warnings, msg+" (continuing because of --ignore-env)"), nil
 	}
 	return warnings, errors.New(msg)
 }

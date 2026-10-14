@@ -133,8 +133,8 @@ func TestReader_FindRecordKeysAndLookup(t *testing.T) {
 
 // TestReader_Lookup_ScansMultipleLogChunks imitates a real chain where blocks keep piling up after the registration.
 // LogRangeChunk is made very small so the event cannot be found in one query from the latest block and the scan has to step
-// back several times, exercising that path (with the default chunk of 4000, a simulated chain's few blocks are always found
-// in one go, so that path would never be checked).
+// back several times, exercising that path. With the default chunk of 4000, a simulated chain's few blocks are always found
+// in one query.
 func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	auditorKey, auditorAddr := newKey(t)

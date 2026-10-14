@@ -1,4 +1,4 @@
-// Package aws reads AWS Nitro attestation documents. A document is COSE_Sign1 (CBOR) containing the PCRs, a nonce
+// Package aws reads AWS Nitro attestation documents (format aws-nitro). A document is COSE_Sign1 (CBOR) containing the PCRs, a nonce
 // and a certificate chain. The signature is ES384 (ECDSA P-384 + SHA-384), and the leaf certificate must chain up to the AWS Nitro root.
 //
 // The logic is identical for every role (auditor, Vendor, user), so it lives here once. Each role's
@@ -36,7 +36,7 @@ var (
 	ErrNonce       = errors.New("document nonce is not the one sent")
 )
 
-// coseSign1 — [protected, unprotected, payload, signature]
+// coseSign1 is [protected, unprotected, payload, signature]
 type coseSign1 struct {
 	_           struct{} `cbor:",toarray"`
 	Protected   []byte

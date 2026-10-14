@@ -76,9 +76,10 @@ func TestMeasurementRecord_Registration(t *testing.T) {
 	}
 }
 
-// The same source gives different PCRs on x86_64 and arm64, and under a different Go toolchain. So an aws-nitro record must say which build environment it comes from
-// (build_env: os, arch, go, trimpath) must be recorded; it has the same shape as build_env in build-config.json.
-// The arch spelling is GOARCH only (amd64, arm64); uname spellings such as x86_64 and aarch64 are rejected. The source is build.ArchTargets.
+// The same source gives different PCRs on x86_64 and arm64, and under a different Go toolchain. An aws-nitro
+// record therefore names its build environment (build_env: os, arch, go, trimpath), in the shape of build_env
+// in build-config.json. The arch spelling is GOARCH (amd64, arm64) from build.ArchTargets; x86_64 and aarch64
+// are rejected.
 func TestMeasurementRecord_BuildEnvArch(t *testing.T) {
 	for _, ok := range []string{"amd64", "arm64"} {
 		r := recAWS()
@@ -92,19 +93,19 @@ func TestMeasurementRecord_BuildEnvArch(t *testing.T) {
 		r.BuildEnv.Arch = bad
 		mustErr(t, r, "build_env.arch: want one of amd64|arm64")
 	}
-	// gcp and azure do not require build_env yet (the measurement is an image digest, so there is no separate architecture).
+	// gcp and azure do not require build_env: their measurement is an image digest.
 	for _, r := range []MeasurementRecord{recGCP(), recAzure()} {
 		if err := r.Validate(); err != nil {
 			t.Errorf("%s without build_env must still validate: %v", r.Platform, err)
 		}
 	}
-	// If it is present, though, it must be an architecture this project builds, on any platform.
+	// When present, build_env.arch must be an architecture this project builds, on any platform.
 	r := recGCP()
 	r.BuildEnv.Arch = "mips"
 	mustErr(t, r, "build_env.arch: unknown")
 }
 
-// An aws-nitro record cannot leave the OS or Go toolchain empty either; the Vendor uses the record to learn which toolchain built the image.
+// An aws-nitro record requires the OS and Go toolchain too; the Vendor reads them to learn which toolchain built the image.
 func TestMeasurementRecord_BuildEnvRequiresOSAndGoOnAWS(t *testing.T) {
 	r := recAWS()
 	r.BuildEnv.OS = ""
@@ -112,13 +113,13 @@ func TestMeasurementRecord_BuildEnvRequiresOSAndGoOnAWS(t *testing.T) {
 	r = recAWS()
 	r.BuildEnv.Go = ""
 	mustErr(t, r, "build_env.go: required for aws-nitro")
-	// trimpath=false is allowed: it records a fact, not a requirement.
+	// trimpath=false is allowed; it records how the image was built.
 	r = recAWS()
 	r.BuildEnv.Trimpath = false
 	if err := r.Validate(); err != nil {
 		t.Errorf("trimpath=false must validate: %v", err)
 	}
-	// A build_env missing entirely names all three fields.
+	// A missing build_env reports all three required fields.
 	r = recAWS()
 	r.BuildEnv = BuildEnv{}
 	for _, want := range []string{"build_env.os", "build_env.arch", "build_env.go"} {
@@ -126,7 +127,7 @@ func TestMeasurementRecord_BuildEnvRequiresOSAndGoOnAWS(t *testing.T) {
 	}
 }
 
-// build_env must round-trip through the file unchanged, so the receiver (Vendor) can tell which architecture and toolchain the record is for.
+// build_env round-trips through the file unchanged, so the receiving Vendor can tell which architecture and toolchain the record is for.
 func TestMeasurementRecord_BuildEnvRoundTrip(t *testing.T) {
 	r := recAWS()
 	r.BuildEnv = BuildEnv{OS: "linux", Arch: "arm64", Go: "go1.26.1", Trimpath: true}
@@ -144,7 +145,7 @@ func TestMeasurementRecord_BuildEnvRoundTrip(t *testing.T) {
 	if got.BuildEnv != r.BuildEnv {
 		t.Fatalf("build_env lost in round trip: %+v", got.BuildEnv)
 	}
-	// A file without build_env is rejected by the receiver, and the message names build_env.
+	// The receiver rejects a file without build_env, and the message names build_env.
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)

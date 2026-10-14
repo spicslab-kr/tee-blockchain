@@ -12,20 +12,22 @@ const (
 	MeasurementRecordFile = "measurement-record.json"
 )
 
-// GitTransport: Send commits and pushes the build config; Receive clones the repository and reads the measurement record and image.
+// GitTransport is the git hand-off. Send commits and pushes the build config; Receive clones the repository
+// and reads the measurement record and its image.
 type GitTransport struct {
-	// WorkDir is an already-cloned source working tree. If empty, Send clones Repo into a temporary directory.
+	// WorkDir is an already-cloned source working tree. When empty, Send clones repo into a temporary directory.
 	WorkDir string
 }
 
-// SendResult is the repository and commit that were pushed.
+// SendResult is the repository, the pushed commit and the file path within it.
 type SendResult struct {
 	Repo   string
 	Commit string
 	Path   string
 }
 
-// Send commits and pushes build-config.json at the repository root. source.commit is filled in with the previous HEAD.
+// Send commits and pushes build-config.json at the repository root. An empty source.repo and source.commit
+// are filled in from repo and the HEAD before this commit.
 func (g GitTransport) Send(ctx context.Context, cfg BuildConfig, repo string) (SendResult, error) {
 	if err := ctx.Err(); err != nil {
 		return SendResult{}, err
@@ -70,7 +72,7 @@ func (g GitTransport) Send(ctx context.Context, cfg BuildConfig, repo string) (S
 	return SendResult{Repo: repo, Commit: sha, Path: BuildConfigFile}, nil
 }
 
-// Receive clones repo into into and verifies the measurement record and image.
+// Receive clones repo at ref into the directory into, then reads the measurement record and checks the image against its sha256.
 func (g GitTransport) Receive(ctx context.Context, repo, ref, into string) (Received, error) {
 	if err := ctx.Err(); err != nil {
 		return Received{}, err

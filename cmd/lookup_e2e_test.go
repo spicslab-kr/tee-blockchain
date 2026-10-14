@@ -52,7 +52,7 @@ func TestLookup_E2E_FindAddressAndRead(t *testing.T) {
 	recordKey := string(recordKeyLineRe.FindSubmatch(regOut)[1])
 
 	// The Vendor registers the same measurements on its own contract: the contracts differ, so each is queried separately. The architecture is deliberately different,
-	// so the lookup output shows whether the chain says which architecture each registration is for (it is not in the key, so record keys still differ only by approver).
+	// so the lookup output shows whether the chain says which architecture each registration is for (the arch is display only, so record keys still differ only by approver).
 	vReg := exec.Command(vendorBin, "register", "--rpc", rpc, "--registry", vendorRegistryAddr, "--signing-key-file", vendorFile,
 		"--measurements", measurements, "--service", "lookup-e2e", "--version", "2.0.0", "--platform", "aws-nitro", "--arch", "amd64")
 	vRegOut, err := vReg.CombinedOutput()

@@ -26,13 +26,13 @@ func (ms Measurements) Get(name string) []byte {
 	return nil
 }
 
-// There is one Parser per platform. rootCert is that platform's root certificate (e.g. the Nitro root certificate PEM); if empty, the built-in one is used.
+// Parser reads one attestation format. Only the aws-nitro parser (AWSParser) is complete. rootCert is that platform's root certificate (e.g. the Nitro root certificate PEM); if empty, the built-in one is used.
 type Parser interface {
 	// VerifySig checks that the platform signed the document: the signature and the certificate chain.
 	VerifySig(ctx context.Context, ra r.RADoc, rootCert []byte) error
 	// CheckNonce checks that the nonce inside the document is the one I sent.
 	CheckNonce(ra r.RADoc, nonce r.Nonce) error
-	// Parse extracts the measurements. It does not check the signature; run VerifySig first.
+	// Parse extracts the measurements. Call it after VerifySig succeeds.
 	Parse(ra r.RADoc) (Measurements, error)
 }
 
@@ -42,7 +42,7 @@ type Info struct {
 	Timestamp time.Time // when the document was created; certificates are judged valid as of this time
 	Nonce     []byte
 	UserData  []byte
-	Debug     bool // debug-mode TEE: the measurements are meaningless
+	Debug     bool // debug-mode TEE: its measurements carry no trust
 	Module    string
 }
 

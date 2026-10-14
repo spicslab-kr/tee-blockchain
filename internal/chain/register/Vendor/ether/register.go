@@ -15,14 +15,14 @@ import (
 	reg "attestamp/internal/chain/register/Vendor"
 )
 
-// Backend is what is needed to talk to the chain. Both *ethclient.Client and simulated.Client satisfy it.
+// Backend is what Registrar and Deploy need from the chain. Both *ethclient.Client and simulated.Client satisfy it.
 type Backend interface {
 	bind.ContractBackend
 	bind.DeployBackend
 	ChainID(ctx context.Context) (*big.Int, error)
 }
 
-// Register sends the register(registration, signature) transaction and waits for it to be mined. If the contract rejects it, the reason is returned as an error.
+// Register sends the register(registration, signature) transaction and waits for it to be mined. A contract rejection is returned as the matching error.
 func (r Registrar) Register(ctx context.Context, s reg.Signed) (reg.Receipt, error) {
 	if len(r.SenderKey) == 0 {
 		return reg.Receipt{}, errors.New("sender key is required to pay for the transaction")
@@ -78,7 +78,7 @@ func (r Registrar) Register(ctx context.Context, s reg.Signed) (reg.Receipt, err
 	return reg.Receipt{}, errors.New("Registered event not found in receipt")
 }
 
-// classify turns the revert data returned by the contract into our errors.
+// classify maps the contract's revert data to the errors in the register package.
 func classify(err error) error {
 	var de interface{ ErrorData() interface{} }
 	if !errors.As(err, &de) {

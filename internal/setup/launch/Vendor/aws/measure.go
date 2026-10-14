@@ -13,7 +13,7 @@ import (
 var imagePCRs = []string{"PCR0", "PCR1", "PCR2"}
 
 // measureEIF measures the EIF file directly with nitro-cli. When the image arrives as a file (pack), this is the step where the
-// Auditor measures the file itself instead of trusting the Vendor's measurements.json. For an EIF built here, it gives the same values build measured.
+// Auditor measures the file itself and compares the result with the Vendor's measurements.json. For an EIF built here, it gives the same values build measured.
 func measureEIF(ctx context.Context, r runner, eif string) (map[string]string, error) {
 	out, err := r.output(ctx, "nitro-cli", "describe-eif", "--eif-path", eif)
 	if err != nil {
@@ -89,4 +89,4 @@ func head(s string) string {
 	return s
 }
 
-var errMeasurementMismatch = errors.New("the EIF does not measure to what --measurements claims — not launching")
+var errMeasurementMismatch = errors.New("the EIF does not measure to what --build-measurements claims — not launching")

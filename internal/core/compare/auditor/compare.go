@@ -1,10 +1,9 @@
 // Package auditor compares two sets of values and reports match or mismatch with reasons.
 //
-// The actual logic (per-item comparison, expiry and trustedApprovers checks) lives once, role-independent, in
+// The logic (per-item comparison, and the trust decision on expiry and trustedApprovers) lives in
 // internal/core/compare. This package is a thin delegate that converts this role's tee/parse/auditor.Measurements
-// into the shape that logic takes (compare.Items). The same delegate exists for auditor, Vendor and user,
-// because the Comparer interface takes a Measurements type and Go cannot share one interface across the
-// three per-role types.
+// into compare.Items. Each role has its own copy because the Comparer interface takes the role's own
+// Measurements type.
 package auditor
 
 import (
@@ -20,9 +19,10 @@ import (
 type Verdict = compare.Verdict
 
 type Comparer interface {
-	// Compare matches two sets of measurements directly, e.g. parsed vs build values, or lookup vs registered values.
+	// Compare matches two sets of measurements, e.g. parsed values vs build values.
 	Compare(a, b p.Measurements) Verdict
-	// Check compares against an on-chain registration. Besides equal values it checks expiry and the approver (trustedApprovers).
+	// Check is the trust decision against a registration. It passes when the measurement matches, the
+	// registration has not expired at now, and the approver is in trustedApprovers.
 	Check(a p.Measurements, reg l.Registration, now int64, trustedApprovers []string) Verdict
 }
 
@@ -54,11 +54,10 @@ func (Impl) Check(a p.Measurements, r l.Registration, now int64, trustedApprover
 	}, now, trustedApprovers)
 }
 
-// Clock returns the time to use as Check's now: the time of the block the registration was read from
-// (Registration.ChainTime) if present, otherwise (old lookup results, test stubs) this machine's clock. The
-// contract judges expiry by block.timestamp, so the verifier must use the same clock. With no revocation,
-// expiry is the only way an approval dies, and a slow clock on the verifier's laptop would make a dead
-// approval look alive.
+// Clock returns the time to pass as Check's now: the time of the block the registration was read from
+// (Registration.ChainTime), or this machine's clock when ChainTime is unset (test stubs). The registry
+// judges expiry by block.timestamp, so the check uses the same clock. Expiry is the only way an approval
+// ends, and a slow local clock would keep an expired approval looking valid.
 func Clock(r l.Registration) int64 {
 	if r.ChainTime > 0 {
 		return r.ChainTime

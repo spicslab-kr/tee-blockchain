@@ -1,5 +1,4 @@
 // Tools shared by the e2e tests under cmd: building binaries, finding the repository root, starting ra-serve with a fixture.
-// Gathered into one place from what request_e2e_test.go and parse_e2e_test.go each used to carry.
 package cmd_test
 
 import (

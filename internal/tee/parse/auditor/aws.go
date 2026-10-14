@@ -1,6 +1,6 @@
-// AWS Nitro parser. It wraps att/internal/tee/parse/aws (the role-independent logic: CBOR decoding, certificate
+// AWS Nitro parser for the aws-nitro format. It wraps attestamp/internal/tee/parse/aws (the role-independent logic: CBOR decoding, certificate
 // chain and signature verification, PCR extraction) with auditor's RADoc and Measurements types. The logic is identical
-// for all three roles and lives in one place; this is a thin adapter that only converts types.
+// for all three roles and lives in one place; this adapter converts the types and errors.
 package auditor
 
 import (
@@ -19,7 +19,7 @@ const AWSFormat = shared.Format
 // AWSRootPEM is the built-in AWS Nitro Enclaves root certificate. It is used when AWSParser.VerifySig is given an empty certificate.
 func AWSRootPEM() []byte { return shared.RootPEM() }
 
-// AWSParser: if Now is zero, the certificate chain is judged at the document's own time.
+// AWSParser parses aws-nitro documents. If Now is zero, the certificate chain is judged at the document's own time.
 type AWSParser struct {
 	Now time.Time
 }

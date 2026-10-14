@@ -1,6 +1,5 @@
-// Package ether only reads an Ethereum (EVM) chain. The user role does not register, so there is no chain/register/user;
-// the contract binding (registry.go) is just a stateless client, so the auditor's is borrowed as is. There is no reason to
-// compile the contract a third time.
+// Package ether reads registrations from an Ethereum (EVM) chain. The user role has no registrar, so it uses the
+// abigen binding from chain/register/auditor/ether, so the contract is compiled once.
 package ether
 
 import (
@@ -21,12 +20,12 @@ import (
 	p "attestamp/internal/tee/parse/user"
 )
 
-// DefaultPlatform is the only measurement format supported for now.
+// DefaultPlatform is the platform FindRecordKeys looks up.
 const DefaultPlatform = "aws-nitro"
 
-// defaultLogRangeChunk is the block range Lookup asks for in one event-log query. For the reason, see the same constant
-// in auditor/ether: public RPCs cap the block range of eth_getLogs, so scanning an old contract from block 0 in one go
-// is rejected.
+// defaultLogRangeChunk is the block range Lookup asks for in one event-log query. Public RPCs cap the fromBlock..toBlock
+// range of eth_getLogs at a few thousand to tens of thousands of blocks, so the scan walks backwards from the latest
+// block in chunks of this size.
 const defaultLogRangeChunk = 4000
 
 // Backend is what a lookup needs. Both *ethclient.Client and *simulated.Backend.Client() satisfy it.
@@ -35,12 +34,12 @@ type Backend interface {
 	BlockNumber(ctx context.Context) (uint64, error)
 }
 
-// Reader reads the contract over RPC. It uses Backend if set (for tests on a simulated chain), otherwise connects to RPC.
+// Reader reads one Registry contract. It uses Backend if set (tests on a simulated chain), otherwise it connects to RPC.
 type Reader struct {
 	RPC          string
 	RegistryAddr common.Address
 	Backend      Backend
-	// LogRangeChunk: if 0, defaultLogRangeChunk.
+	// LogRangeChunk: if 0, defaultLogRangeChunk. Tests lower it to exercise the multi-chunk scan.
 	LogRangeChunk uint64
 }
 
@@ -64,8 +63,8 @@ func (r Reader) client(ctx context.Context) (*regether.Registry, Backend, func()
 	return registry, backend, closeFn, nil
 }
 
-// measurementHash is the same computation as MeasurementHash in chain/register (keccak256 over "name=value(hex)\n" in name order).
-// The user role does not register, so there is no register package and it is written out again here. If the computation changes, change both.
+// measurementHash is the same computation as MeasurementHash in chain/register/auditor (keccak256 over "name=value(hex)\n"
+// in name order), repeated here because the user role has no register package. A change goes into both.
 func measurementHash(values p.Measurements) ([32]byte, error) {
 	var out [32]byte
 	if len(values) == 0 {
@@ -91,7 +90,8 @@ func measurementHash(values p.Measurements) ([32]byte, error) {
 	return out, nil
 }
 
-// FindRecordKeys hashes the measurements and finds the record key registered under DefaultPlatform.
+// FindRecordKeys hashes the measurements and returns the record key registered for them under DefaultPlatform, or an
+// empty result if there is none.
 func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]string, error) {
 	h, err := measurementHash(values)
 	if err != nil {
@@ -118,8 +118,8 @@ func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]st
 	return []string{common.Hash(recordKey).Hex()}, nil
 }
 
-// parseRecordKey: checking only the length would let invalid hex (a typo or a broken paste) silently become the zero value in
-// common.HexToHash and be mistaken for "not registered", so it also checks that the string really decodes as hex.
+// parseRecordKey accepts the form FindRecordKeys returns (0x + 32 bytes of hex). It decodes the hex itself because
+// common.HexToHash turns invalid hex into the zero hash, which would read as "not registered".
 func parseRecordKey(recordKey string) (common.Hash, error) {
 	s := strings.TrimPrefix(recordKey, "0x")
 	if len(s) != 64 {
@@ -132,8 +132,10 @@ func parseRecordKey(recordKey string) (common.Hash, error) {
 	return common.BytesToHash(b), nil
 }
 
-// Lookup reads the registration for a record key (as returned by FindRecordKeys). For the reason, see the comment in auditor/ether:
-// the contract storage holds only the approver, expiry and registration time, so the rest is filled in from the event log.
+// Lookup reads the registration for a record key (as returned by FindRecordKeys). The contract's registrations mapping
+// holds the approver, expiry and registration time; service, version, platform, arch and the signature come from the
+// Registered event. Values holds the single measurement hash the contract stores. ChainTime is the time of the block
+// that served the lookup.
 func (r Reader) Lookup(ctx context.Context, recordKey string) (l.Registration, error) {
 	parsedKey, err := parseRecordKey(recordKey)
 	if err != nil {
@@ -169,8 +171,8 @@ func (r Reader) Lookup(ctx context.Context, recordKey string) (l.Registration, e
 	}, nil
 }
 
-// TrustedApprovers is the approver address (APPROVER) fixed in the contract. compare.Check uses it to see whether the
-// registration approver is this address.
+// TrustedApprovers returns the registry's APPROVER, which is immutable. compare.Check accepts a registration whose
+// approver is in the trusted list.
 func (r Reader) TrustedApprovers(ctx context.Context) ([]string, error) {
 	registry, _, done, err := r.client(ctx)
 	if err != nil {
@@ -185,7 +187,8 @@ func (r Reader) TrustedApprovers(ctx context.Context) ([]string, error) {
 }
 
 // findRegisteredEvent finds the Registered event by scanning backwards from the latest block, chunk blocks at a time.
-// For the reason, see the same function in auditor/ether.
+// findRegisteredEvent scans backwards from the latest block, chunk blocks at a time, for the Registered event of a record
+// key. The contract rejects duplicates, so the first match is the only one. Reaching block 0 without a match returns nil.
 func findRegisteredEvent(ctx context.Context, backend Backend, registry *regether.Registry, recordKey common.Hash, chunk uint64) (*regether.RegistryRegistered, error) {
 	if chunk == 0 {
 		chunk = defaultLogRangeChunk

@@ -15,7 +15,7 @@ import (
 
 const Format = "gcp-cs-jwt"
 
-// Extractor asks the Confidential Space launcher socket for a token. The JWT that comes back is the RA document.
+// Extractor asks the Confidential Space launcher socket for a token and returns the JWT as the gcp-cs-jwt document. The parse side cannot verify this format.
 type Extractor struct {
 	Socket   string // default /run/container_launcher/teeserver.sock
 	Audience string // default att

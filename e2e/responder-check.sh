@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-# Responder build-info check. What gets measured inside the enclave image is not att but the att-ra-responder file next
-#    to it, and that file's bytes are determined by the Go patch version it was built with, whether -trimpath was used,
-#    and GOOS/GOARCH. The toolchain-pin check (toolchain-pin-check.sh) only looks at which Go built att itself, so a
-#    responder file produced by some other go build passes it. So at the start of build/pack, att reads the build info Go
-#    left inside the responder binary (the same thing go version -m shows) and refuses if: it is not the pinned
-#    toolchain, -trimpath is missing, it is not linux, or the architecture differs from this instance. This script checks
-#    that the refusal really happens on a real Nitro host:
-#      1. cross-build three responders on your machine - a correct one (linux/amd64 -trimpath), one without -trimpath, one for arm64
+# Responder build-info check. The enclave image measurement covers the att-ra-responder file that sits next to att, and
+#    that file's bytes depend on the Go patch version, on -trimpath, and on GOOS/GOARCH. The toolchain-pin check
+#    (toolchain-pin-check.sh) covers the Go version that built att itself. At the start of build and pack, att reads the
+#    build info Go left inside the responder binary (the output of go version -m) and refuses when the toolchain differs
+#    from the pin, -trimpath is missing, the OS is not linux, or the architecture differs from this instance. This
+#    script checks that the refusal happens on a real Nitro host:
+#      1. cross-build three responders on your machine: a correct one (linux/amd64 -trimpath), one without -trimpath, one for arm64
 #      2. upload the three to the Vendor host under different names and run `build --responder <file>` with each
 #      3. the one without -trimpath is refused with "without -trimpath", the arm64 one with "GOARCH=arm64 ... this instance is amd64"
 #         (exit != 0), and the correct one passes the responder check and the build log gets one line
-#         "responder: att-ra-responder sha256 ... -trimpath" (it may fail later for another reason - only the responder line is checked)
-#    Run from TB-live:  bash "e2e/responder-check.sh"
+#         "responder: att-ra-responder sha256 ... -trimpath" (the build may fail later for another reason; only the responder line is checked)
+#    Run from the repository root:  bash "e2e/responder-check.sh"
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
@@ -77,7 +76,7 @@ step "6. build WITH att-ra-responder-ok - MUST PASS THE RESPONDER CHECK"
 out="$(remote_build att-ra-responder-ok)"
 echo "$out" | sed 's/^/    /'
 if echo "$out" | grep -q "responder: att-ra-responder sha256 $OK_SHA .* -trimpath"; then
-  echo "✅ responder check passed - the sha256 $OK_SHA in the build log equals the value measured on your machine (a later failure for another reason is outside this test)"
+  echo "✅ responder check passed - the sha256 $OK_SHA in the build log equals the value measured on your machine (a later failure for another reason is not part of this test)"
 else
   echo "❌ the correctly built responder did not pass the check, or the log has no 'responder: ... -trimpath' line"
   fail=1

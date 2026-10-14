@@ -7,12 +7,12 @@ import (
 )
 
 // request:  "TBRA" · version(1) · nonce(32)
-// response: "TBRA" · version(1) · status(1) · platform len(1) · platform · doc len(4, big-endian) · doc
+// response: "TBRA" · version(1) · status(1) · format len(1) · format name · doc len(4, big-endian) · doc
 //        status 0 = ok, 1 = error (the doc field carries the message)
 
 const (
 	wireVersion = 1
-	MaxDocSize  = 1 << 20 // 1 MiB; RA documents are a few KB, JWTs tens of KB
+	MaxDocSize  = 1 << 20 // 1 MiB; Nitro documents are a few KB, JWTs tens of KB
 )
 
 var magic = [4]byte{'T', 'B', 'R', 'A'}
