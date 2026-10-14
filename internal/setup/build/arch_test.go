@@ -66,13 +66,13 @@ func TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	if shaA != shaB {
-		t.Fatalf("same source (%s), different checkout paths, different hash: %s vs %s — -trimpath regression",
+		t.Fatalf("same source (%s), different checkout paths, different hash: %s vs %s (-trimpath regression)",
 			target.Name, shaA, shaB)
 	}
 }
 
 // TestBuildResponderAllArches_DiffersAcrossArchitectures documents and checks the per-architecture behaviour:
-// building the same source for two different architectures must NOT collide on the same hash —
+// building the same source for two different architectures must NOT collide on the same hash:
 // each architecture's machine code is genuinely different, so a collision would mean the build
 // silently produced the wrong architecture's binary (or GOARCH was ignored).
 func TestBuildResponderAllArches_DiffersAcrossArchitectures(t *testing.T) {
@@ -90,7 +90,7 @@ func TestBuildResponderAllArches_DiffersAcrossArchitectures(t *testing.T) {
 	seen := map[string]string{}
 	for _, r := range reports {
 		if prev, ok := seen[r.SHA256]; ok {
-			t.Errorf("%s and %s produced the same responder hash %s — expected different machine code per architecture",
+			t.Errorf("%s and %s produced the same responder hash %s (expected different machine code per architecture)",
 				prev, r.Target.Name, r.SHA256)
 		}
 		seen[r.SHA256] = r.Target.Name

@@ -83,7 +83,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `att-auditor
 
   version          print the pinned Go toolchain (internal/setup/build/GO_TOOLCHAIN) and the one this binary was built with;
-                   exit 1 if they differ — build/pack refuse to run in that case, since the responder's bytes and the measurements depend on it
+                   exit 1 if they differ. build/pack refuse to run in that case, since the responder's bytes and the measurements depend on it
   registry-deploy  --rpc <url> --deployer-key-file <file> --approver <0x…>
                    deploy the Registry contract. one approver per registry, fixed at deploy time. the deployer key only pays gas
   register         --rpc <url> --registry <0x…> --signing-key-file <file> --measurements <measurements.json | NAME=hex,…>
@@ -114,7 +114,7 @@ func usage() {
                    --build-tool-version is nitro-cli's; without it, what nitro-cli --version says here
   send             --repo <url> --record <measurement-record.json> [--eif <file>] [--workdir <clone>]
                    the same with a hand-written record. it must say which build environment it is for ("build_env": os,
-                   arch amd64 | arm64, go, trimpath) — measurements differ per architecture and per Go toolchain
+                   arch amd64 | arm64, go, trimpath). measurements differ per architecture and per Go toolchain
   build       --app-dir <dir with the software's Dockerfile>  [--image-name <n>] [--port 5000] [--out-dir out] [--responder <att-ra-responder>] [--verify]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
               for source that the Auditor rebuilds
@@ -162,7 +162,7 @@ func receive(args []string) error {
 		fmt.Printf("  tee_info.%s = %s\n", k, v)
 	}
 	// the Vendor said which environment it built in. this instance must be the same one, or
-	// a rebuild here can't reproduce its measurements — and would look like a lying Vendor.
+	// a rebuild here can't reproduce its measurements, and would look like a lying Vendor.
 	have := tr.CurrentBuildEnv()
 	fmt.Printf("build env: %s (Vendor)\n", c.BuildEnv)
 	fmt.Printf("build env: %s (this instance)\n", have)
@@ -226,7 +226,7 @@ func send(args []string) error {
 	fmt.Printf("record %s %s %s · build env: %s\n", rec.Service, rec.Version, rec.Platform, rec.BuildEnv)
 	warnToolchain(rec.BuildEnv)
 	if *recPath == "" {
-		// the record was built here — leave it on disk next to the measurements too, with the image's sha256 filled in,
+		// the record was built here. leave it on disk next to the measurements too, with the image's sha256 filled in,
 		// so the Vendor-side file exists as it does after a hand-written send
 		written, err := writeRecordBeside(rec, *measurements)
 		if err != nil {
@@ -242,7 +242,7 @@ func send(args []string) error {
 	return nil
 }
 
-// buildRecord — send --config --measurements: the measurement record from what is already on disk. service, version,
+// buildRecord handles --config --measurements: the measurement record from what is already on disk. service, version,
 // platform and build_env are the Vendor's build-config.json (the build that was measured); values are nitro-cli's
 // measurements.json (PCR0·1·2); image.path is --eif; build_tool is nitro-cli with --build-tool-version, or the
 // version `nitro-cli --version` reports on this instance. Send fills in image.sha256.
@@ -274,7 +274,7 @@ func buildRecord(configPath, measPath, eif, toolVersion string) (tr.MeasurementR
 	}, nil
 }
 
-// nitroCLIVersion — the version number in `nitro-cli --version` ("Amazon Web Services Nitro CLI 1.3.0"). Empty if
+// nitroCLIVersion returns the version number in `nitro-cli --version` ("Amazon Web Services Nitro CLI 1.3.0"). Empty if
 // nitro-cli is not here or says nothing that looks like a version.
 func nitroCLIVersion() string {
 	out, err := exec.Command("nitro-cli", "--version").Output()
@@ -290,7 +290,7 @@ func nitroCLIVersion() string {
 	return ""
 }
 
-// writeRecordBeside — the built record as a file next to measurements.json (or in the working directory when
+// writeRecordBeside writes the built record as a file next to measurements.json (or in the working directory when
 // --measurements was NAME=hex,…), with image.sha256 filled and image.path as the bare file name, as Send pushes it.
 func writeRecordBeside(rec tr.MeasurementRecord, measPath string) (string, error) {
 	if rec.Image.Path != "" {
@@ -365,7 +365,7 @@ func raServe(args []string) error {
 			return err
 		}
 		ex = fx
-		fmt.Fprintln(os.Stderr, "warning: fixture extractor — the document is not bound to the nonce; test use only")
+		fmt.Fprintln(os.Stderr, "warning: fixture extractor: the document is not bound to the nonce; test use only")
 	default:
 		return errors.New("--extractor: nsm or fixture=<doc>")
 	}

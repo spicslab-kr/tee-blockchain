@@ -23,8 +23,8 @@ import (
 // With only --tee-addr, the attested values are registered as they are (no check). With only --build-measurements, that file is registered as it is.
 func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
-	teeAddr := fs.String("tee-addr", "", "my enclave's host:port — an attestation is requested from it first")
-	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port — also ask it, and say whether it runs the same value I built. the value registered is always the one I built")
+	teeAddr := fs.String("tee-addr", "", "my enclave's host:port, from which an attestation is requested first")
+	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port. also ask it, and say whether it runs the same value I built. the value registered is always the one I built")
 	format := fs.String("format", "aws-nitro", "expected document format (only aws-nitro can be verified)")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
@@ -36,7 +36,7 @@ func auditCmd(args []string) error {
 	config := fs.String("config", "", "the Vendor's build-config.json (receive puts it in the clone root): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
 	service := fs.String("service", "", "service name. empty takes it from --config, else from an existing registration of the same measurements (anyone's)")
 	version := fs.String("version", "", "version. empty takes it from --config, else from an existing registration, as above")
-	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). default: build-config.json's with --config, else this machine's — give the instance's if the measurements file came from another machine")
+	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). default: build-config.json's with --config, else this machine's. give the instance's if the measurements file came from another machine")
 	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
 	trustedApprovers := fs.String("trusted-approvers", "", "trusted approver addresses, comma-separated. empty uses the approver fixed in the registry")
 	outDir := fs.String("out-dir", "", "directory for the intermediate files (document, parsed value). empty uses a temporary directory, removed at the end")
@@ -118,7 +118,7 @@ func auditCmd(args []string) error {
 			measPath = parsedPath
 		}
 	} else {
-		fmt.Printf("No enclave given — registering %s as it is, without checking it against a running enclave\n", measPath)
+		fmt.Printf("No enclave given: registering %s as it is, without checking it against a running enclave\n", measPath)
 	}
 
 	values, err := readMeasurements(measPath)
@@ -138,9 +138,9 @@ func auditCmd(args []string) error {
 			for _, r := range v.Reason {
 				cli.Errorln("    ", r)
 			}
-			return errors.New("the enclave is not running what I built — not registering")
+			return errors.New("the enclave is not running what I built, so this audit is not registering anything")
 		}
-		t.Done("identical — the enclave runs exactly what I built")
+		t.Done("identical: the enclave runs exactly what I built")
 		cli.Why("this is the audit: the value I obtained myself and the value the running enclave attests to are the same, so the enclave runs the image I built")
 	}
 
@@ -168,7 +168,7 @@ func auditCmd(args []string) error {
 		}
 		v := (cmp.Impl{}).Compare(vendorValues, values)
 		if v.Pass {
-			t.Done("same — the Vendor's enclave runs exactly what I built")
+			t.Done("same: the Vendor's enclave runs exactly what I built")
 		} else {
 			vendorRunsSomethingElse = true
 			t.Fail("the Vendor's enclave runs something else")
@@ -182,7 +182,7 @@ func auditCmd(args []string) error {
 	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry)}
 
 	if *service == "" || *version == "" {
-		t := cli.Start("No service/version given — looking for an existing registration of the same value")
+		t := cli.Start("No service/version given: looking for an existing registration of the same value")
 		ictx, icancel := context.WithTimeout(context.Background(), time.Minute)
 		recordKeys, err := reader.FindRecordKeys(ictx, values)
 		if err != nil {
@@ -208,7 +208,7 @@ func auditCmd(args []string) error {
 		}
 		icancel()
 		if !resolved {
-			t.Fail("none — enter them by hand")
+			t.Fail("none: enter them by hand")
 		}
 		ask(service, "service name", "")
 		ask(version, "version", "")
@@ -260,8 +260,8 @@ func auditCmd(args []string) error {
 	}
 	t.Done("value, expiry and approver all check out")
 	cli.Why("the same check a User will run: read the registration back and make sure it matches, is not expired, and was signed by the approver this registry trusts")
-	cli.Okln("PASS — audited and registered. Users can now verify against registry ", *registry)
-	fmt.Printf("this registration is for %s only — put \"arch\": \"%s\" in measurement-record.json; a build for the other architecture measures differently and is registered on its own\n", *arch, *arch)
+	cli.Okln("PASS: audited and registered. Users can now verify against registry ", *registry)
+	fmt.Printf("this registration is for %s only. Put \"arch\": \"%s\" in measurement-record.json; a build for the other architecture measures differently and is registered on its own\n", *arch, *arch)
 	if vendorRunsSomethingElse {
 		cli.Errorln("but note: the Vendor's enclave at ", *vendorTee, " does NOT run this value. a User verifying that enclave against this registry will be told not to trust it")
 	}

@@ -5,7 +5,7 @@
 // per-architecture hash can be produced and compared the same way everywhere.
 //
 // A different architecture is expected to produce a different att-ra-responder binary, and with
-// it different PCR0/PCR2 once it's layered into an enclave image — Nitro's kernel, the compiled
+// it different PCR0/PCR2 once it's layered into an enclave image. Nitro's kernel, the compiled
 // machine code, and the base image layers all differ per architecture. That is expected. What must stay equal is the hash for one architecture built from two different checkout
 // paths, which is why every build here passes -trimpath.
 //
@@ -24,11 +24,11 @@ import (
 
 // ArchTarget is one CPU architecture this project builds att-ra-responder for.
 type ArchTarget struct {
-	Name   string // human label, e.g. "x86_64" — used in reports and instance-spec docs
+	Name   string // human label, e.g. "x86_64", used in reports and instance-spec docs
 	GOARCH string // Go's GOARCH value for cross-compiling
 }
 
-// ArchTargets — every architecture the project currently ships to. Extend this list to add
+// ArchTargets lists every architecture the project currently ships to. Extend this list to add
 // coverage for another architecture; BuildResponderAllArches and the reproducibility tests pick it up
 // automatically.
 var ArchTargets = []ArchTarget{

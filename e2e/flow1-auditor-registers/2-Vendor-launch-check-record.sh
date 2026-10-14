@@ -43,9 +43,9 @@ step "COMPARING TO AUDITOR'S RECORD" "$VENDOR_BIN" compare --attested "$WORK/ven
 # att-vendor compare - matches my enclave's value against the registration on the registry (value, expiry, approver).
 step "COMPARING TO CHAIN REGISTRATION" "$VENDOR_BIN" compare --attested "$WORK/vendor-check/parsed.json" --rpc "$R_RPC" --registry "$R_REGISTRY" --record-key "$R_RECORD_KEY"; b=$?
 if [ $a -eq 0 ] && [ $b -eq 0 ]; then
-  echo "OK — what I run is exactly what the Auditor audited and registered. Users will get 'trusted'."
+  echo "OK: what I run is exactly what the Auditor audited and registered. Users will get 'trusted'."
 else
-  echo "MISMATCH — what I run differs from what the Auditor registered. Users will be told not to trust it."
+  echo "MISMATCH: what I run differs from what the Auditor registered. Users will be told not to trust it."
   exit 1
 fi
 echo "next: 3-User-verify"

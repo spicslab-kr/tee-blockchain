@@ -126,7 +126,7 @@ func verifyCmd(args []string) error {
 			return err
 		}
 		if len(recordKeys) == 0 {
-			t.Fail("nobody — this registry's approver never registered the value this enclave runs")
+			t.Fail("nobody: this registry's approver never registered the value this enclave runs")
 			continue
 		}
 		t.Done(fmt.Sprintf("%d registration(s)", len(recordKeys)))
@@ -158,21 +158,21 @@ func verifyCmd(args []string) error {
 		}
 	}
 	if several {
-		cli.Why("with several registries, every one of them has to vouch for what this enclave runs — if the Vendor's registry says yes but the Auditor's says no, the Auditor never approved what is running")
+		cli.Why("with several registries, every one of them has to vouch for what this enclave runs. If the Vendor's registry says yes but the Auditor's says no, the Auditor never approved what is running")
 	} else {
 		cli.Why("a registration counts only if its value equals what the enclave attested, it has not expired, and it was signed by the approver this registry trusts")
 	}
 	if vouched == 0 {
-		return errors.New("nobody has registered these measurements on the chain — no basis for trust")
+		return errors.New("nobody has registered these measurements on the chain, so there is no basis for trust")
 	}
 	if vouched < len(registries) {
-		cli.Errorln(fmt.Sprintf("not trusted — only %d of %d registries vouch for what this enclave runs; the others never approved it", vouched, len(registries)))
+		cli.Errorln(fmt.Sprintf("not trusted: only %d of %d registries vouch for what this enclave runs; the others never approved it", vouched, len(registries)))
 		os.Exit(1)
 	}
 	if several {
-		cli.Okln("trusted — every registry given vouches for what this enclave runs (", strings.Join(uniq(approversSeen), ", "), ")")
+		cli.Okln("trusted: every registry given vouches for what this enclave runs (", strings.Join(uniq(approversSeen), ", "), ")")
 	} else {
-		cli.Okln("trusted — this enclave runs exactly what ", strings.Join(uniq(approversSeen), ", "), " registered")
+		cli.Okln("trusted: this enclave runs exactly what ", strings.Join(uniq(approversSeen), ", "), " registered")
 	}
 	return nil
 }

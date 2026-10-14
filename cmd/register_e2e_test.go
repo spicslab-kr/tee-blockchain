@@ -82,7 +82,7 @@ func startAnvil(t *testing.T) (rpc string, stop func()) {
 	t.Helper()
 	anvilPath, err := findAnvil()
 	if err != nil {
-		t.Skip("anvil not found (foundry) — skipping chain/register cmd e2e")
+		t.Skip("anvil not found (foundry), skipping chain/register cmd e2e")
 	}
 	// anvil does not auto-assign port 0, so borrow a free port.
 	port := freePort(t)

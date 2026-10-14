@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// TestCheckResponder_Rules — the four rules on hand-made values, so `-short` still covers them
+// TestCheckResponder_Rules checks the four rules on hand-made values, so `-short` still covers them
 // without compiling anything. Each refusal must name the actual and the expected value and say
 // how to rebuild.
 func TestCheckResponder_Rules(t *testing.T) {
@@ -80,7 +80,7 @@ func TestReadResponder_NotAGoBinary(t *testing.T) {
 	}
 }
 
-// buildResponderNoTrimpath — like BuildResponderForArch but deliberately without -trimpath, to
+// buildResponderNoTrimpath is like BuildResponderForArch but deliberately without -trimpath, to
 // produce the artifact the check must refuse.
 func buildResponderNoTrimpath(t *testing.T, repoRoot, goarch, out string) {
 	t.Helper()

@@ -109,7 +109,7 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 	// Only an EIF received from someone else (it comes with --build-measurements) is measured again. For one built or packed here, the values measured then are already in out/.
 	if l.BuildMeasurements != "" {
-		launchStep(log, 2, "Measuring the received enclave image myself (nitro-cli describe-eif)", "the sender's measurements.json is only a claim — the file itself is measured here and must say the same")
+		launchStep(log, 2, "Measuring the received enclave image myself (nitro-cli describe-eif)", "the sender's measurements.json is only a claim. the file itself is measured here and must say the same")
 		if res.PCR, err = measureEIF(ctx, r, l.EIF); err != nil {
 			return res, err
 		}
@@ -121,20 +121,20 @@ func (l Launch) Run(ctx context.Context, log io.Writer) (Result, error) {
 			return res, err
 		}
 		if len(reasons) > 0 {
-			fmt.Fprintln(log, cli.Red("✗ it does NOT measure to what "+l.BuildMeasurements+" says — not running it"))
+			fmt.Fprintln(log, cli.Red("✗ it does NOT measure to what "+l.BuildMeasurements+" says; not running it"))
 			for _, why := range reasons {
 				fmt.Fprintln(log, cli.Red("    "+why))
 			}
 			return res, errMeasurementMismatch
 		}
-		fmt.Fprintln(log, cli.Green("✓ it measures exactly what "+l.BuildMeasurements+" says"), "— the file is what the sender described; safe to run")
+		fmt.Fprintln(log, cli.Green("✓ it measures exactly what "+l.BuildMeasurements+" says")+":", "the file is what the sender described; safe to run")
 		res.Measurements = filepath.Join(l.OutDir, "measurements.json")
 		if _, err := writeMeasurements(res.Measurements, res.PCR); err != nil {
 			return res, err
 		}
 		fmt.Fprintf(log, "    → %s (what I measured myself; this is the value to register)\n", res.Measurements)
 	} else {
-		launchStep(log, 2, "Skipping the measurement", "this is my own enclave image — build/pack measured it when it was made, and that value is already in out/measurements.json")
+		launchStep(log, 2, "Skipping the measurement", "this is my own enclave image: build/pack measured it when it was made, and that value is already in out/measurements.json")
 	}
 
 	launchStep(log, 3, fmt.Sprintf("Starting the enclave (cid %d)", l.CID), "the image boots inside the Nitro enclave; from here on nothing on this host can read or change its memory")
@@ -258,7 +258,7 @@ func (r runner) enclaveRunning(ctx context.Context, name string) error {
 			return nil
 		}
 	}
-	return errors.New("enclave is not running — the software may have exited at once; run nitro-cli run-enclave with --debug-mode --attach-console to see why")
+	return errors.New("enclave is not running: the software may have exited at once; run nitro-cli run-enclave with --debug-mode --attach-console to see why")
 }
 
 const allocatorFile = "/etc/nitro_enclaves/allocator.yaml"

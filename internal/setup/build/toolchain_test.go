@@ -20,7 +20,7 @@ func TestRequiredToolchain(t *testing.T) {
 // every measurement it produces is off. That is the point of the pin, so it must fail, not skip.
 func TestCheckToolchainMatchesRunningGo(t *testing.T) {
 	if err := CheckToolchain(); err != nil {
-		t.Fatalf("this Go (%s) is not the pinned toolchain (%s) — install it, or run tests with GOTOOLCHAIN=%s: %v",
+		t.Fatalf("this Go (%s) is not the pinned toolchain (%s); install it, or run tests with GOTOOLCHAIN=%s: %v",
 			runtime.Version(), RequiredToolchain(), RequiredToolchain(), err)
 	}
 }

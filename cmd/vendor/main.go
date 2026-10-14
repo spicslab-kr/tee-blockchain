@@ -81,7 +81,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `att-vendor
 
   version          print the pinned Go toolchain (internal/setup/build/GO_TOOLCHAIN) and the one this binary was built with;
-                   exit 1 if they differ — build/pack refuse to run in that case, since the responder's bytes and the measurements depend on it
+                   exit 1 if they differ. build/pack refuse to run in that case, since the responder's bytes and the measurements depend on it
   registry-deploy  --rpc <url> --deployer-key-file <file> --approver <0x…>
                    deploy the Registry contract. one approver per registry, fixed at deploy time. the deployer key only pays gas
   register         --rpc <url> --registry <0x…> --signing-key-file <file> --measurements <measurements.json | NAME=hex,…>
@@ -240,7 +240,7 @@ func raServe(args []string) error {
 			return err
 		}
 		ex = fx
-		fmt.Fprintln(os.Stderr, "warning: fixture extractor — the document is not bound to the nonce; test use only")
+		fmt.Fprintln(os.Stderr, "warning: fixture extractor: the document is not bound to the nonce; test use only")
 	default:
 		return errors.New("--extractor: nsm or fixture=<doc>")
 	}
@@ -309,7 +309,7 @@ func packCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	cli.Okln("\n✓ enclave image ready: ", built.EIF, "   measurements: ", built.Measurements, "   — hand both to the Auditor")
+	cli.Okln("\n✓ enclave image ready: ", built.EIF, "   measurements: ", built.Measurements, "   hand both to the Auditor")
 	fmt.Printf("next:  att-vendor launch --eif %s --port %d\n", built.EIF, b.Port)
 	return nil
 }

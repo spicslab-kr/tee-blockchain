@@ -89,4 +89,4 @@ func head(s string) string {
 	return s
 }
 
-var errMeasurementMismatch = errors.New("the EIF does not measure to what --build-measurements claims — not launching")
+var errMeasurementMismatch = errors.New("the EIF does not measure to what --build-measurements claims; not launching")

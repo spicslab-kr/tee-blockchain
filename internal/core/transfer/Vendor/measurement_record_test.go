@@ -53,7 +53,7 @@ func TestMeasurementRecord_PerPlatform(t *testing.T) {
 	mustErr(t, r, "values[3]")
 }
 
-// Providing the image file and the registration. The registration is optional, but if present both of its fields must be filled.
+// The registration (chain and registry address) is optional. When present, both fields must be filled, and it is encoded only then.
 func TestMeasurementRecord_Registration(t *testing.T) {
 	r := recAWS()
 	r.Registration = &Registration{Chain: "ether", Address: "0xabc"}

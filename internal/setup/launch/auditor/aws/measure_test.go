@@ -38,7 +38,7 @@ func TestWriteMeasurements_LeavesBuildFileAlone(t *testing.T) {
 	pcr := map[string]string{"PCR0": "aa00", "PCR1": "bb11", "PCR2": "cc22"}
 	wrote, err := writeMeasurements(p, pcr)
 	if err != nil || wrote {
-		t.Fatalf("same values: wrote=%v err=%v — build's file must be kept", wrote, err)
+		t.Fatalf("same values: wrote=%v err=%v: build's file must be kept", wrote, err)
 	}
 	b, _ := os.ReadFile(p)
 	if string(b) != nitroOut {

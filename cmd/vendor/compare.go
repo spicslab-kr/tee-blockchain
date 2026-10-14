@@ -20,7 +20,7 @@ import (
 func compareCmd(args []string) error {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
 	attested := fs.String("attested", "", "the attested measurements: a measurements.json file, or NAME=hex,NAME=hex")
-	expected := fs.String("expected", "", "the expected measurements, same shape — required unless --record-key is used")
+	expected := fs.String("expected", "", "the expected measurements, same shape, required unless --record-key is used")
 	rpc := fs.String("rpc", "", "chain mode: Ethereum RPC URL")
 	registry := fs.String("registry", "", "chain mode: Registry contract address")
 	recordKey := fs.String("record-key", "", "chain mode: record key (the one register printed)")
@@ -73,9 +73,9 @@ func checkMode(expected, rpc, registry, recordKey, trustedApprovers string) erro
 	chainFlags := rpc != "" || registry != "" || recordKey != "" || trustedApprovers != ""
 	switch {
 	case expected != "" && recordKey != "":
-		return errors.New("--expected (plain compare) and --record-key (chain lookup) cannot be given together — pick one")
+		return errors.New("--expected (plain compare) and --record-key (chain lookup) cannot be given together, pick one")
 	case expected != "" && chainFlags:
-		return errors.New("--expected was given along with --rpc/--registry/--trusted-approvers — without --record-key this is not chain mode, drop them")
+		return errors.New("--expected was given along with --rpc/--registry/--trusted-approvers. Without --record-key chain mode is off, so drop them")
 	case recordKey == "" && (rpc != "" || registry != ""):
 		return errors.New("--rpc or --registry needs --record-key as well to be chain mode")
 	case recordKey == "" && trustedApprovers != "":

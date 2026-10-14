@@ -81,11 +81,11 @@ func TestToolchain_E2E_WrongToolchainRefused(t *testing.T) {
 	}
 	want := toolchain.RequiredToolchain()
 	if want == wrongToolchain {
-		t.Fatalf("test constant wrongToolchain=%s equals the pin — change it", wrongToolchain)
+		t.Fatalf("test constant wrongToolchain=%s equals the pin, so change it", wrongToolchain)
 	}
 	bin, ok := buildWith(t, t.TempDir(), "./cmd/vendor", wrongToolchain)
 	if !ok {
-		t.Skipf("cannot obtain %s here (offline?) — the refusal path is covered by internal/setup/build's unit test", wrongToolchain)
+		t.Skipf("cannot obtain %s here (offline?), and the refusal path is covered by internal/setup/build's unit test", wrongToolchain)
 	}
 
 	out, err := exec.Command(bin, "version").CombinedOutput()
@@ -99,7 +99,7 @@ func TestToolchain_E2E_WrongToolchainRefused(t *testing.T) {
 	}
 
 	if runtime.GOOS != "linux" {
-		t.Logf("not linux — build's own refusal is exercised on the Nitro host by e2e/toolchain-pin-check.sh")
+		t.Logf("not linux: build's own refusal is exercised on the Nitro host by e2e/toolchain-pin-check.sh")
 		return
 	}
 	app := t.TempDir()

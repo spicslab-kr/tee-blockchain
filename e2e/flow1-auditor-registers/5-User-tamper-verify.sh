@@ -8,7 +8,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
 need_host VENDOR_HOST
-echo "the Vendor's enclave now runs a value the Auditor did not register — the same verify as 3-User-verify must turn red:"
+echo "the Vendor's enclave now runs a value the Auditor did not register. The same verify as 3-User-verify must turn red:"
 REGISTRY=$(cat "$WORK/registry.txt")
 # att-user verify - requests the attestation document, looks up that value on the registry, and decides whether to trust.
 step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"

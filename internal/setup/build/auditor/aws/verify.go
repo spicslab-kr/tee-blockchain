@@ -11,11 +11,12 @@ import (
 	"attestamp/internal/cli"
 )
 
-// manifest is a per-file summary of the rootfs just before normalization: path -> "mode kind content-hash (or link target)". It is exactly what goes into the measurement
-// (file content and mode; times and owners are left out because repacking fixes them to 0). When two builds differ, this shows which file differed.
+// manifest is a per-path summary of the extracted rootfs after normalization's cleanups and just before repacking: path -> "mode f sha256" for files,
+// "mode l → target" for links and "mode d" for directories. It covers what goes into the measurement (content and mode; repacking sets times and owners
+// to 0). When two builds differ, it names the paths that differ.
 type manifest map[string]string
 
-// readManifest runs find through the runner (sudo) because the extracted tree is root-owned. Files get a sha256, links their target, directories only their mode.
+// readManifest runs find through the runner (sudo) because the extracted tree is root-owned. Every entry gets its mode, files also a sha256, links their target.
 func readManifest(ctx context.Context, r runner, root string) (manifest, error) {
 	m := manifest{}
 	out, err := r.output(ctx, "find", root, "-mindepth", "1", "(", "-type", "f", "-o", "-type", "l", "-o", "-type", "d", ")",
@@ -57,7 +58,7 @@ func readManifest(ctx context.Context, r runner, root string) (manifest, error) 
 	return m, nil
 }
 
-// diff lists where b differs from a: what is only on one side, and what differs in content, mode or link. In path order.
+// diff lists where b differs from a: paths present on one side alone, and paths whose content, mode or link target differs. The result is sorted by path.
 func (a manifest) diff(b manifest) []string {
 	var out []string
 	for p, va := range a {
@@ -78,6 +79,7 @@ func (a manifest) diff(b manifest) []string {
 	return out
 }
 
+// short abbreviates the sha256 in a "mode f sha256" entry to 12 characters for display.
 func short(v string) string {
 	f := strings.Fields(v)
 	if len(f) == 3 && len(f[2]) > 12 {
@@ -86,10 +88,10 @@ func short(v string) string {
 	return strings.Join(f, " ")
 }
 
-// verify builds the same Dockerfile once more without cache and checks that the same PCRs come out. The static check (lint) only says "may differ";
-// this says whether it really does. Two equal builds on one host do not guarantee equality on another host, but a difference here means
-// it will not match anywhere, and it names the file responsible (measured: redis, the redis-server binary; haproxy, two apk db files).
-// On a difference it returns an error: the EIF and measurements of the first build are already in out/, but handing those values over would not let an Auditor reproduce them.
+// verify builds the same Dockerfile once more without cache and checks that the same PCRs come out. The static check (lint) says "may differ";
+// this shows whether the builds do differ. Two equal builds on one host do not guarantee equality on another host, and a difference here means
+// no host will match; the report names the paths responsible (measured: redis, the redis-server binary; haproxy, two apk db files).
+// On a difference it returns an error. The first build's EIF and measurements are already in out/, and an Auditor could not reproduce them.
 func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, first manifest, firstPCR map[string]string) error {
 	checkApp := appImage + "-verify"
 	checkImage := b.ImageName + ":att-verify"
@@ -129,11 +131,11 @@ func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, fi
 		}
 	}
 	if same {
-		fmt.Fprintln(r.log, cli.Green("✓ reproducible on this host"), "— a second build from scratch gave the same PCR0·1·2")
+		fmt.Fprintln(r.log, cli.Green("✓ reproducible on this host")+": a second build from scratch gave the same PCR0·1·2")
 		return nil
 	}
 	d := first.diff(second)
-	fmt.Fprintf(r.log, "%s %d path(s) differ between the two builds (mode type sha256):\n", cli.Red("✗ not reproducible —"), len(d))
+	fmt.Fprintf(r.log, "%s %d path(s) differ between the two builds (mode type sha256):\n", cli.Red("✗ not reproducible."), len(d))
 	for i, line := range d {
 		if i == 40 {
 			fmt.Fprintf(r.log, "  … %d more\n", len(d)-i)
@@ -141,5 +143,5 @@ func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, fi
 		}
 		fmt.Fprintln(r.log, "  "+line)
 	}
-	return fmt.Errorf("not reproducible: the same Dockerfile built twice on this host gave different measurements (%d path(s) above). fix the Dockerfile before handing the value on — the Auditor's rebuild will not match either", len(d))
+	return fmt.Errorf("not reproducible: the same Dockerfile built twice on this host gave different measurements (%d path(s) above). fix the Dockerfile before handing the value on; the Auditor's rebuild will not match either", len(d))
 }

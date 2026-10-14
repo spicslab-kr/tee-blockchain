@@ -131,12 +131,12 @@ func register(args []string) (string, error) {
 	lastRegistered.Expires, lastRegistered.Approver, lastRegistered.BuildEnv = meta.Expires.UTC().Format(time.RFC3339), signed.Approver, env
 	if !quiet {
 		fmt.Printf("registered %s %s (%s, %s)\n  record key  %s\n  tx          %s\n  block       %d\n  expires     %s\n  build env   %s\n", *service, *version, *arch, goVer, receipt.RecordKey, receipt.TxHash, receipt.Block, lastRegistered.Expires, env)
-		fmt.Printf("  this registration is for %s only — put \"build_env\": %s in measurement-record.json, and register the other architecture's build separately\n", *arch, buildEnvJSON(env))
+		fmt.Printf("  this registration is for %s only. Put \"build_env\": %s in measurement-record.json, and register the other architecture's build separately\n", *arch, buildEnvJSON(env))
 	}
 	return receipt.RecordKey, nil
 }
 
-// loadBuildConfig — --config: the build-config.json the Vendor handed over. Empty path → nil (flags only).
+// loadBuildConfig: --config, the build-config.json the Vendor handed over. Empty path → nil (flags only).
 // DecodeBuildConfig validates it, so a config that lacks service, version or build_env is refused here.
 func loadBuildConfig(path string) (*tr.BuildConfig, error) {
 	if path == "" {
@@ -153,7 +153,7 @@ func loadBuildConfig(path string) (*tr.BuildConfig, error) {
 	return &c, nil
 }
 
-// resolveRegistration — fills service/version/arch in place from the config when the flags are empty; a flag that is
+// resolveRegistration fills service/version/arch in place from the config when the flags are empty; a flag that is
 // given and differs from the config wins, with one warning line. Without a config, --arch defaults to this machine's.
 func resolveRegistration(cfg *tr.BuildConfig, service, version, arch *string) error {
 	if cfg == nil && *arch == "" {
@@ -170,7 +170,7 @@ func resolveRegistration(cfg *tr.BuildConfig, service, version, arch *string) er
 	return nil
 }
 
-// buildEnvJSON — the record's build_env object on one line, as it should be pasted into measurement-record.json.
+// buildEnvJSON returns the record's build_env object on one line, as it should be pasted into measurement-record.json.
 func buildEnvJSON(env tr.BuildEnv) string {
 	b, err := json.Marshal(env)
 	if err != nil {
@@ -318,7 +318,7 @@ func askMainnetRPC(dst *string) {
 	if *dst != "" {
 		return
 	}
-	fmt.Fprintf(os.Stderr, "RPC URL — this sends a real transaction to mainnet (%s). y to use it, or type another RPC URL: ", mainnetRPC)
+	fmt.Fprintf(os.Stderr, "RPC URL: this sends a real transaction to mainnet (%s). y to use it, or type another RPC URL: ", mainnetRPC)
 	line, _ := stdin.ReadString('\n')
 	line = strings.TrimSpace(line)
 	if strings.EqualFold(line, "y") {

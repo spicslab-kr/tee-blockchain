@@ -53,7 +53,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `att-ra-responder — runs only inside the enclave. every role's build layers this one binary as is
+	fmt.Fprintln(os.Stderr, `att-ra-responder runs inside the enclave. every role's build layers this one binary as is
 
   ra-serve  --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
             takes a nonce per request and returns an RA document
@@ -82,7 +82,7 @@ func raServe(args []string) error {
 			return err
 		}
 		ex = fx
-		fmt.Fprintln(os.Stderr, "warning: fixture extractor — the document is not bound to the nonce; test use only")
+		fmt.Fprintln(os.Stderr, "warning: fixture extractor: the document is not bound to the nonce; test use only")
 	default:
 		return errors.New("--extractor: nsm or fixture=<doc>")
 	}

@@ -111,7 +111,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		b.ResponderPath = filepath.Join(filepath.Dir(exe), responderBinaryName)
 	}
 	if _, err := os.Stat(b.ResponderPath); err != nil {
-		return res, fmt.Errorf("%s: attestation responder not found — build cmd/ra-responder and put it there, or point ResponderPath at it", b.ResponderPath)
+		return res, fmt.Errorf("%s: attestation responder not found (build cmd/ra-responder and put it there, or point ResponderPath at it)", b.ResponderPath)
 	}
 	// A file being there is not enough. What gets layered in and measured is this file's bytes, and those are fixed by
 	// the Go version, -trimpath and GOOS/GOARCH the responder was built with (CheckToolchain covers the att binary only).
@@ -162,12 +162,12 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	res.Image = b.ImageName + ":att"
 	if b.DockerImage == "" {
 		appImage = b.ImageName + ":app"
-		step(fmt.Sprintf("Building the software image from %s → %s", appDir, appImage), "the software exactly as its own Dockerfile makes it — nothing of ours inside yet. an Auditor runs this same step on the same source")
+		step(fmt.Sprintf("Building the software image from %s → %s", appDir, appImage), "the software exactly as its own Dockerfile makes it, with nothing of ours inside yet. an Auditor runs this same step on the same source")
 		if err := r.run(ctx, "docker", "build", "-q", "-t", appImage, appDir); err != nil {
 			return res, err
 		}
 	} else if _, err := r.output(ctx, "docker", "image", "inspect", appImage); err != nil {
-		return res, fmt.Errorf("%s: no such docker image here — docker build it first, or docker load it", appImage)
+		return res, fmt.Errorf("%s: no such docker image here (docker build it first, or docker load it)", appImage)
 	}
 
 	step(fmt.Sprintf("Adding the attestation responder to the image: %s → %s", appImage, res.Image), "a small program that runs inside the enclave next to the software and hands out signed attestation documents on request, which lets anyone ask the enclave what it is running")
@@ -189,7 +189,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 
 	res.EIF = filepath.Join(b.OutDir, b.ImageName+".eif")
 	res.Measurements = filepath.Join(b.OutDir, "measurements.json")
-	step("Making the enclave image (EIF) → "+res.EIF, "nitro-cli produces the bootable enclave image and its measurements PCR0·1·2 — the fingerprint that the enclave will attest to and that goes on the chain")
+	step("Making the enclave image (EIF) → "+res.EIF, "nitro-cli produces the bootable enclave image and its measurements PCR0·1·2, the fingerprint that the enclave will attest to and that goes on the chain")
 	out, err := r.output(ctx, "nitro-cli", "build-enclave", "--docker-uri", res.Image, "--output-file", res.EIF)
 	if err != nil {
 		return res, err
@@ -200,7 +200,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if res.PCR, err = ReadPCR(out); err != nil {
 		return res, err
 	}
-	fmt.Fprintln(log, cli.Green("✓ measured"), "— these three values identify the image:")
+	fmt.Fprintln(log, cli.Green("✓ measured")+":", "these three values identify the image")
 	for _, k := range []string{"PCR0", "PCR1", "PCR2"} {
 		fmt.Fprintf(log, "    %s %s\n", k, res.PCR[k])
 	}
@@ -373,7 +373,7 @@ func stripBuildLogs(ctx context.Context, r runner, root string) []string {
 		}
 		if err := os.RemoveAll(full); err != nil {
 			if err := r.cmd(ctx, "rm", "-rf", full).Run(); err != nil {
-				fmt.Fprintf(r.log, "warning: could not remove %s — the build time stays in the measurements: %v\n", p, err)
+				fmt.Fprintf(r.log, "warning: could not remove %s (the build time stays in the measurements): %v\n", p, err)
 				continue
 			}
 		}

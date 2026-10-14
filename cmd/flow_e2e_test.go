@@ -150,7 +150,7 @@ func TestRun_E2E_AuditorVendorUser(t *testing.T) {
 		if err != nil {
 			t.Fatalf("user run (%s): %v\n%s", registryAddr, err, uOut)
 		}
-		if !strings.Contains(string(uOut), "trusted —") {
+		if !strings.Contains(string(uOut), "trusted:") {
 			t.Fatalf("user run must say it is trusted on the registered contract:\n%s", uOut)
 		}
 		if want := "run-e2e 1.0.0 (" + arch + ") by"; !strings.Contains(string(uOut), want) {

@@ -37,7 +37,7 @@ ENV X=1
 		}
 		return false
 	}
-	if !has(1, "tag, not digest") {
+	if !has(1, "by tag") {
 		t.Errorf("FROM by tag not flagged: %v", got[1])
 	}
 	if len(got[2]) != 0 {

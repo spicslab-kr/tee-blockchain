@@ -48,7 +48,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 		if strings.Contains(out, "Go build info") || strings.Contains(out, "att-ra-responder was built") {
 			t.Fatalf("responder check ran before the GOOS check:\n%s", out)
 		}
-		t.Logf("not linux — the responder refusal itself is exercised on the Nitro host by e2e/responder-check.sh")
+		t.Logf("not linux: the responder refusal itself is exercised on the Nitro host by e2e/responder-check.sh")
 		return
 	}
 

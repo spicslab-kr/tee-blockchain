@@ -37,6 +37,6 @@ func checkArch(s string) error {
 // It is a warning only, since the record may come from another checkout; a rebuild here would produce different bytes.
 func warnToolchain(env tr.BuildEnv) {
 	if env.Go != "" && env.Go != build.RequiredToolchain() {
-		cli.Errorf("warning: the record was produced with %s, but this project pins %s — a rebuild here will not reproduce its measurements", env.Go, build.RequiredToolchain())
+		cli.Errorf("warning: the record was produced with %s, but this project pins %s. A rebuild here will not reproduce its measurements", env.Go, build.RequiredToolchain())
 	}
 }

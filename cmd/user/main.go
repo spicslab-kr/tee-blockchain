@@ -43,7 +43,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `att-user — check an enclave against the registry
+	fmt.Fprintln(os.Stderr, `att-user checks an enclave against the registry
 
   ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out-file <file>] [--at <RFC3339>]
               verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output file can be passed to compare --attested or lookup --measurements
@@ -53,7 +53,7 @@ func usage() {
   lookup      --rpc <url> --registry <0x…> (--record-key <0x…> | --measurements <measurements.json | NAME=hex,…>)
               read one record key directly, or find the record key(s) for the measurements first and read them all. a User reads the registry only
   compare     --attested <measurements.json | NAME=hex,…> --rpc <url> --registry <0x…> --record-key <0x…> [--trusted-approvers <0x…,0x…>]
-              match the value from ra-parse against the chain registration — value, expiry and approver. exit 1 on failure
+              match the value from ra-parse against the chain registration: value, expiry and approver. exit 1 on failure
   compare     --attested <measurements.json | NAME=hex,…> --expected <same shape>
               match two sets of measurements as they are. prints PASS/FAIL with the reasons
   verify      --tee-addr <the Vendor's enclave host:port> --rpc <url> --registry <0x…> [--registry <0x…> …] [--trusted-approvers <0x…,0x…>]

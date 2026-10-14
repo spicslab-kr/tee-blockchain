@@ -43,7 +43,7 @@ step_stop "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
 #   tee_info comes from the instance metadata ("unknown" when unreadable).
 step_start "WRITING BUILD CONFIG"
 if [ -f src/docker-nginx/build-config.json ]; then
-  echo "build-config.json already in the clone root — keeping it"
+  echo "build-config.json already in the clone root: keeping it"
 else
   case "$(uname -m)" in x86_64) GOARCH=amd64;; aarch64|arm64) GOARCH=arm64;; *) GOARCH=unknown;; esac
   TOK=$(curl -s -m 2 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null || true)

@@ -41,7 +41,7 @@ func (i ResponderInfo) String() string {
 
 // ReadResponder reads the Go build info embedded in the binary at path and hashes the file.
 // A file with no Go build info (not a Go binary, or one whose build info was stripped) is an
-// error — there is no way to tell what it is.
+// error, since nothing says what it is.
 func ReadResponder(path string) (ResponderInfo, error) {
 	var info ResponderInfo
 	bi, err := buildinfo.ReadFile(path)
@@ -69,7 +69,7 @@ func ReadResponder(path string) (ResponderInfo, error) {
 }
 
 // CheckResponder returns an error unless the responder was built with the pinned toolchain, with
-// -trimpath, for linux, and for hostGOARCH — the architecture of the parent instance, which is
+// -trimpath, for linux, and for hostGOARCH, the architecture of the parent instance, which is
 // what the enclave runs. Callers pass runtime.GOARCH.
 func CheckResponder(info ResponderInfo, hostGOARCH string) error {
 	want := RequiredToolchain()
@@ -77,16 +77,16 @@ func CheckResponder(info ResponderInfo, hostGOARCH string) error {
 		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s GOOS=linux GOARCH=%s go build -trimpath -o att-ra-responder ./cmd/ra-responder", want, goarch)
 	}
 	if info.Go != want {
-		return fmt.Errorf("att-ra-responder was built with %s but the project pins %s (internal/setup/build/GO_TOOLCHAIN) — its bytes, and so the measurements, depend on the exact toolchain; %s", info.Go, want, rebuild(hostGOARCH))
+		return fmt.Errorf("att-ra-responder was built with %s but the project pins %s (internal/setup/build/GO_TOOLCHAIN); its bytes, and so the measurements, depend on the exact toolchain; %s", info.Go, want, rebuild(hostGOARCH))
 	}
 	if !info.Trimpath {
-		return fmt.Errorf("att-ra-responder was built without -trimpath — the absolute checkout path is baked into it, so the same source built from another folder gives different bytes and different measurements; %s", rebuild(hostGOARCH))
+		return fmt.Errorf("att-ra-responder was built without -trimpath: the absolute checkout path is baked into it, so the same source built from another folder gives different bytes and different measurements; %s", rebuild(hostGOARCH))
 	}
 	if info.GOOS != "linux" {
 		return fmt.Errorf("att-ra-responder was built for GOOS=%s but the enclave runs linux; %s", info.GOOS, rebuild(hostGOARCH))
 	}
 	if info.GOARCH != hostGOARCH {
-		return fmt.Errorf("att-ra-responder was built for GOARCH=%s but this instance is %s — the enclave runs the parent instance's architecture; %s", info.GOARCH, hostGOARCH, rebuild(hostGOARCH))
+		return fmt.Errorf("att-ra-responder was built for GOARCH=%s but this instance is %s; the enclave runs the parent instance's architecture; %s", info.GOARCH, hostGOARCH, rebuild(hostGOARCH))
 	}
 	return nil
 }

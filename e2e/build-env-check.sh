@@ -73,7 +73,7 @@ CFG
 n=0
 echo "this host: \$(uname -m), att-auditor built for $arch ($mine), $GOVER"
 
-step "1. VENDOR DECLARES $other — MUST BE REFUSED ($label)"
+step "1. VENDOR DECLARES $other, MUST BE REFUSED ($label)"
 push_cfg $other true
 rm -rf src1; ~/att-auditor receive --repo "\$PWD/remote.git" --into src1 > out1.txt 2> err1.txt; rc=\$?
 cat out1.txt err1.txt
@@ -83,7 +83,7 @@ else
   echo "❌ expected refusal naming $other and $mine, got exit \$rc"; n=\$((n+1))
 fi
 
-step "2. SAME, WITH --ignore-env — WARNING ONLY ($label)"
+step "2. SAME, WITH --ignore-env: WARNING ONLY ($label)"
 rm -rf src2; ~/att-auditor receive --repo "\$PWD/remote.git" --into src2 --ignore-env > out2.txt 2> err2.txt; rc=\$?
 cat out2.txt err2.txt
 if [ \$rc -eq 0 ] && grep -q "warning:" err2.txt && grep -q "$other" err2.txt; then
@@ -92,7 +92,7 @@ else
   echo "❌ expected exit 0 plus a warning, got exit \$rc"; n=\$((n+1))
 fi
 
-step "3. VENDOR DECLARES $mine — MUST PASS ($label)"
+step "3. VENDOR DECLARES $mine, MUST PASS ($label)"
 push_cfg $mine true
 rm -rf src3; ~/att-auditor receive --repo "\$PWD/remote.git" --into src3 > out3.txt 2> err3.txt; rc=\$?
 cat out3.txt err3.txt
@@ -121,7 +121,7 @@ echo "===================== build env check ====================="
 if [ $fail -eq 0 ]; then
   echo "✅ Auditor refuses to rebuild on an instance whose OS/architecture/Go differ from what the Vendor declared, and passes on a match"
 else
-  echo "❌ $fail verdict(s) wrong — see the ❌ lines above"
+  echo "❌ $fail verdict(s) wrong; see the ❌ lines above"
 fi
 echo "next: none - this script is the end of this test"
 exit $fail

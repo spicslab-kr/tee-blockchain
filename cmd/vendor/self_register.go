@@ -21,7 +21,7 @@ import (
 // compare it with my build values if --build-measurements is given, register, then read back and check. Mirrors audit.
 func selfRegisterCmd(args []string) error {
 	fs := flag.NewFlagSet("self-register", flag.ContinueOnError)
-	teeAddr := fs.String("tee-addr", "", "my enclave's host:port — an attestation is requested from it first")
+	teeAddr := fs.String("tee-addr", "", "my enclave's host:port, from which an attestation is requested first")
 	format := fs.String("format", "aws-nitro", "expected document format (only aws-nitro can be verified)")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
@@ -33,7 +33,7 @@ func selfRegisterCmd(args []string) error {
 	config := fs.String("config", "", "my build-config.json (the one send pushes): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
 	service := fs.String("service", "", "service name. empty takes it from --config, else from an existing registration of the same measurements (anyone's)")
 	version := fs.String("version", "", "version. empty takes it from --config, else from an existing registration, as above")
-	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). default: build-config.json's with --config, else this machine's — give the instance's if the measurements file came from another machine")
+	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). default: build-config.json's with --config, else this machine's. give the instance's if the measurements file came from another machine")
 	expires := fs.Duration("expires", 90*24*time.Hour, "how long from now until the registration expires")
 	trustedApprovers := fs.String("trusted-approvers", "", "trusted approver addresses, comma-separated. empty uses the approver fixed in the registry")
 	outDir := fs.String("out-dir", "", "directory for the intermediate files (document, parsed value). empty uses a temporary directory, removed at the end")
@@ -115,7 +115,7 @@ func selfRegisterCmd(args []string) error {
 			measPath = parsedPath
 		}
 	} else {
-		fmt.Printf("No enclave given — registering %s as it is, without checking it against a running enclave\n", measPath)
+		fmt.Printf("No enclave given: registering %s as it is, without checking it against a running enclave\n", measPath)
 	}
 
 	values, err := readMeasurements(measPath)
@@ -135,15 +135,15 @@ func selfRegisterCmd(args []string) error {
 			for _, r := range v.Reason {
 				cli.Errorln("    ", r)
 			}
-			return errors.New("the enclave is not running what I built — not registering")
+			return errors.New("the enclave is not running what I built, so this audit is not registering anything")
 		}
-		t.Done("identical — the enclave runs exactly what I built")
+		t.Done("identical: the enclave runs exactly what I built")
 		cli.Why("the same check an Auditor would do: the value I obtained myself and the value the running enclave attests to are the same, so the enclave runs the image I built")
 	}
 	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry)}
 
 	if *service == "" || *version == "" {
-		t := cli.Start("No service/version given — looking for an existing registration of the same value")
+		t := cli.Start("No service/version given: looking for an existing registration of the same value")
 		ictx, icancel := context.WithTimeout(context.Background(), time.Minute)
 		recordKeys, err := reader.FindRecordKeys(ictx, values)
 		if err != nil {
@@ -169,7 +169,7 @@ func selfRegisterCmd(args []string) error {
 		}
 		icancel()
 		if !resolved {
-			t.Fail("none — enter them by hand")
+			t.Fail("none: enter them by hand")
 		}
 		ask(service, "service name", "")
 		ask(version, "version", "")
@@ -221,7 +221,7 @@ func selfRegisterCmd(args []string) error {
 	}
 	t.Done("value, expiry and approver all check out")
 	cli.Why("the same check a User will run: read the registration back and make sure it matches, is not expired, and was signed by the approver this registry trusts")
-	cli.Okln("PASS — registered by myself (no Auditor). Users can verify against registry ", *registry)
+	cli.Okln("PASS: registered by myself (no Auditor). Users can verify against registry ", *registry)
 	return nil
 }
 
