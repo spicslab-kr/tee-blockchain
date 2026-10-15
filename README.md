@@ -185,19 +185,19 @@ needed for any test.
   <tr>
     <td align="center" width="25%">
       <a href="https://github.com/qixiangme"><img src="https://github.com/qixiangme.png" width="80" alt=""><br><b>Changmin Lee</b></a><br>
-      <sub><a href="https://spicslab.kr">SPICS Lab</a>, Kyung Hee University</sub>
+      <sub>Intern at <a href="https://spicslab.kr">SPICS Lab</a></sub>
     </td>
     <td align="center" width="25%">
       <a href="https://github.com/bagss3366"><img src="https://github.com/bagss3366.png" width="80" alt=""><br><b>Sunghyun Park</b></a><br>
-      <sub><a href="https://spicslab.kr">SPICS Lab</a>, Kyung Hee University</sub>
+      <sub>M.S. student at <a href="https://spicslab.kr">SPICS Lab</a></sub>
     </td>
     <td align="center" width="25%">
       <a href="https://github.com/rallykevin"><img src="https://github.com/rallykevin.png" width="80" alt=""><br><b>Kevin Nam</b></a><br>
-      <sub><a href="https://spicslab.kr">SPICS Lab</a>, Kyung Hee University</sub>
+      <sub>Principal Investigator of <a href="https://spicslab.kr">SPICS Lab</a></sub>
     </td>
     <td align="center" width="25%">
       <a href="https://github.com/junbumshin-armor"><img src="https://github.com/junbumshin-armor.png" width="80" alt=""><br><b>Junbum Shin</b></a><br>
-      <sub><a href="https://datarmor.ai">Datarmor</a></sub>
+      <sub>CEO of <a href="https://datarmor.ai">Datarmor</a></sub>
     </td>
   </tr>
 </table>
