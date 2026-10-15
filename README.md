@@ -10,7 +10,8 @@
   <sub>CREATED AND MAINTAINED BY</sub><br>
   SPICS Lab, Kyung Hee University<br>
   <a href="https://github.com/spicslab-kr/tee-blockchain/issues">GitHub issues</a> &nbsp;·&nbsp;
-  <a href="CONTRIBUTING.md">Contributing</a>
+  <a href="CONTRIBUTING.md">Contributing</a> &nbsp;·&nbsp;
+  <a href="#contributors">Contributors</a>
 </p>
 
 Software runs in a TEE (AWS Nitro Enclaves today). An independent Auditor rebuilds it, confirms the
@@ -177,3 +178,26 @@ go test ./...
 Unit tests run anywhere. `cmd/*_e2e_test.go` build the real binaries and drive them against a local
 [anvil](https://getfoundry.sh) chain and a recorded Nitro attestation document. No Nitro hardware is
 needed for any test.
+
+## Contributors
+
+<table>
+  <tr>
+    <td align="center" width="25%">
+      <a href="https://github.com/qixiangme"><img src="https://github.com/qixiangme.png" width="80" alt=""><br><b>Changmin Lee</b></a><br>
+      <sub><a href="https://spicslab.kr">SPICS Lab</a>, Kyung Hee University</sub>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://github.com/bagss3366"><img src="https://github.com/bagss3366.png" width="80" alt=""><br><b>Sunghyun Park</b></a><br>
+      <sub><a href="https://spicslab.kr">SPICS Lab</a>, Kyung Hee University</sub>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://github.com/rallykevin"><img src="https://github.com/rallykevin.png" width="80" alt=""><br><b>Kevin Nam</b></a><br>
+      <sub><a href="https://spicslab.kr">SPICS Lab</a>, Kyung Hee University</sub>
+    </td>
+    <td align="center" width="25%">
+      <a href="https://github.com/junbumshin-armor"><img src="https://github.com/junbumshin-armor.png" width="80" alt=""><br><b>Junbum Shin</b></a><br>
+      <sub><a href="https://datarmor.ai">Datarmor</a></sub>
+    </td>
+  </tr>
+</table>
