@@ -10,7 +10,6 @@
   <sub>CREATED AND MAINTAINED BY</sub><br>
   SPICS Lab, Kyung Hee University<br>
   <a href="https://github.com/spicslab-kr/tee-blockchain/issues">GitHub issues</a> &nbsp;·&nbsp;
-  <a href="CONTRIBUTING.md">Contributing</a> &nbsp;·&nbsp;
   <a href="#contributors">Contributors</a>
 </p>
 
@@ -29,8 +28,7 @@ without a key from anyone.
   <a href="#install">Install</a> &nbsp;·&nbsp;
   <a href="#quick-start">Quick start</a> &nbsp;·&nbsp;
   <a href="#features">Features</a> &nbsp;·&nbsp;
-  <a href="#project-resources">Project resources</a> &nbsp;·&nbsp;
-  <a href="CONTRIBUTING.md">Contributing</a>
+  <a href="#project-resources">Project resources</a>
 </p>
 
 ---
@@ -165,7 +163,6 @@ hash, and register its own signed hash. The User can then require both registrie
 ## Project resources
 
 - [Project structure](STRUCTURE.md): every folder and module, and how the roles fit together
-- [Contributing](CONTRIBUTING.md): build, test, layout, commit conventions
 - [End-to-end scripts](e2e/README.md): our runs against real Nitro instances
 - [Releases](../../releases)
 
