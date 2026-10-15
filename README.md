@@ -179,6 +179,12 @@ Unit tests run anywhere. `cmd/*_e2e_test.go` build the real binaries and drive t
 [anvil](https://getfoundry.sh) chain and a recorded Nitro attestation document. No Nitro hardware is
 needed for any test.
 
+## License
+
+The code is licensed under the [Apache License, Version 2.0](LICENSE). The documentation and
+images (`*.md` files and `docs/`) are licensed under
+[Creative Commons Attribution 4.0 International](LICENSE-CC-BY) (CC BY 4.0).
+
 ## Contributors
 
 <table>

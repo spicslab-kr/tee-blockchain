@@ -65,6 +65,8 @@ type(scope): what changed, in the imperative
   run the measurement check once on an instance (`e2e/arch-measurement-compare.sh`): the
   point of this project is that the bytes come out identical.
 - If you changed a command's flags or output, update the README section for that role.
+- Unless you say otherwise, code you contribute is licensed as Apache-2.0 and
+  documentation as CC BY 4.0, the same as the rest of the project.
 
 ## Releases
 
