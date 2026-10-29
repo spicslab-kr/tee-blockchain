@@ -2,7 +2,10 @@
 
 att-auditor rebuilds the Vendor's source in the same environment, checks the result against your own
 enclave, and registers the hash on the chain. `att-ra-responder` must sit in the same directory as
-`att-auditor` on your Nitro instance. For the binaries, see [Build the binaries](../README.md#build-the-binaries).
+`att-auditor` on your Nitro instance.
+
+**What you build:** `att-auditor`, `att-ra-responder` and the Vendor's enclave image, rebuilt from its
+source. See [Build](../../README.md#build).
 
 ## Receive the source
 

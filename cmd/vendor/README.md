@@ -2,8 +2,10 @@
 
 `att-vendor` is the Vendor's tool. It packs or builds your software into an enclave image, launches it
 on a Nitro instance, and registers its measurements, either through an Auditor or yourself.
-`att-ra-responder` must sit in the same directory as `att-vendor`. To get both binaries, see
-[Build the binaries](../README.md#build-the-binaries).
+`att-ra-responder` must sit in the same directory as `att-vendor`.
+
+**What you build:** `att-vendor`, `att-ra-responder` and your enclave image. The image must give the
+same PCR0, PCR1 and PCR2 when the Auditor rebuilds it. See [Build](../../README.md#build).
 
 ## Build and launch
 

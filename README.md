@@ -25,7 +25,7 @@ without a key from anyone.
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> &nbsp;·&nbsp;
+  <a href="#build">Build</a> &nbsp;·&nbsp;
   <a href="#quick-start">Quick start</a> &nbsp;·&nbsp;
   <a href="#features">Features</a> &nbsp;·&nbsp;
   <a href="#project-resources">Project resources</a>
@@ -33,7 +33,9 @@ without a key from anyone.
 
 ---
 
-## Install
+## Build
+
+### The binaries
 
 Download the Linux binaries for your architecture (`amd64` or `arm64`) from the
 [latest release](../../releases/latest). They are built with the pinned toolchain and `-trimpath`,
@@ -48,7 +50,42 @@ go build -trimpath -o att-ra-responder ./cmd/ra-responder
 
 The toolchain is pinned to exactly go1.26.1. `build` refuses any other version, because a
 different patch version produces a different `att-ra-responder` and therefore different
-measurements. Details: [Build the binaries](cmd/README.md#build-the-binaries).
+measurements.
+
+### The TEE image, with the same measurements every time
+
+The Vendor and the Auditor each build the same source on their own instance. Whoever registers the
+value, it can only be trusted if both builds give the same measurements.
+
+**What to watch when building.** Anything that differs between the two builds changes the
+measurements. The most important:
+
+1. The same CPU architecture (`amd64` or `arm64`) on both sides.
+2. The same Go toolchain (pinned, go1.26.1) with `-trimpath`, and one and the same
+   `att-ra-responder` file on both sides.
+3. A base image pinned by digest (`FROM nginx@sha256:…`), and every package, dependency and
+   `git clone` pinned to an exact version or commit.
+4. No time, host name or random value written into a file at build time.
+5. The same AMI and the same `docker` and `nitro-cli` versions. Write them down: they are not
+   recorded anywhere.
+6. Docker itself: `docker build` decides file order and timestamps in each layer anew on every
+   run, so two builds of the same files still differ.
+
+**What we provide.** `att-vendor build` and `att-auditor build` take care of part of this:
+
+- They repack the image files in a fixed order with fixed times and owners, and remove what only
+  records when it was built (package-manager logs, apk install times, build caches, `/tmp`).
+- They refuse an `att-ra-responder` built with another Go version, without `-trimpath`, or for
+  another OS or architecture.
+- They warn about each Dockerfile line that breaks items 3 and 4. Fixing those lines is up to you.
+- `--verify` builds a second time from scratch and fails unless the measurements match.
+- `att-auditor receive` stops if the OS, architecture or Go version differs from the Vendor's.
+
+```
+att-vendor build --app-dir <dir with Dockerfile> --out-dir out --verify
+```
+
+All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md).
 
 ## Quick start
 

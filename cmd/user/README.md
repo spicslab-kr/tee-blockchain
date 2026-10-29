@@ -1,7 +1,7 @@
 # att-user
 
 You need the `att-user` binary and network access. You need no key, no ETH, no Nitro and no Docker.
-Build it as described in [Build the binaries](../README.md#build-the-binaries).
+**What you build:** `att-user` only. See [Build](../../README.md#build).
 
 ## verify
 
