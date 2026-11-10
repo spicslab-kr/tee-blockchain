@@ -7,3 +7,5 @@
 *.cbor   -text
 *.nonce  -text
 *.pem    -text
+*.bin    -text
+*.cpio   -text
