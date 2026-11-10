@@ -15,8 +15,11 @@ const SchemaBuildConfig = "attestamp.build-config/1"
 var TEEInfoKeys = map[string][]string{
 	"aws-nitro": {"instance_id", "region", "ami_id"},
 	"intel-tdx": {"instance_name", "project_id", "zone", "image"},
-	"gcp":       {"instance_name", "project_id", "container_image"},
-	"azure":     {"vm_name", "region", "maa_endpoint"},
+	// SEV-SNP runs on GCP like TDX, so it needs the same keys to reach the instance.
+	"amd-sev-snp-initrd": {"instance_name", "project_id", "zone", "image"},
+	"amd-sev-snp-verity": {"instance_name", "project_id", "zone", "image"},
+	"gcp":                {"instance_name", "project_id", "container_image"},
+	"azure":              {"vm_name", "region", "maa_endpoint"},
 }
 
 // Source locates the code to build: repository, commit and an optional path inside it.
@@ -142,8 +145,12 @@ func (c BuildConfig) Validate() error {
 }
 
 // needsBuildEnv reports whether a platform's measurements depend on the build environment. On aws-nitro the
-// EIF, and on intel-tdx the application initrd, contain att-ra-responder, whose bytes change with the CPU
-// architecture and the Go toolchain.
+// EIF, on intel-tdx and amd-sev-snp-initrd the application initrd, and on amd-sev-snp-verity the application
+// disk image contain att-ra-responder, whose bytes change with the CPU architecture and the Go toolchain.
 func needsBuildEnv(platform string) bool {
-	return platform == "aws-nitro" || platform == "intel-tdx"
+	switch platform {
+	case "aws-nitro", "intel-tdx", "amd-sev-snp-initrd", "amd-sev-snp-verity":
+		return true
+	}
+	return false
 }

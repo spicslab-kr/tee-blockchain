@@ -92,7 +92,7 @@ func TestDecode_RoundTrip_AllPlatforms(t *testing.T) {
 			t.Errorf("%s: round trip changed the config", c.Platform)
 		}
 	}
-	for _, r := range []MeasurementRecord{recAWS(), recGCP(), recAzure(), recTDX()} {
+	for _, r := range []MeasurementRecord{recAWS(), recGCP(), recAzure(), recTDX(), recSNPInitrd(), recSNPVerity()} {
 		b, _ := Encode(r)
 		got, err := DecodeMeasurementRecord(b)
 		if err != nil {

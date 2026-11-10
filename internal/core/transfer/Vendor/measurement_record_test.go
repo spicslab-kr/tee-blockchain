@@ -7,7 +7,7 @@ import (
 )
 
 func TestMeasurementRecord_PerPlatform(t *testing.T) {
-	for _, r := range []MeasurementRecord{recAWS(), recGCP(), recAzure(), recTDX()} {
+	for _, r := range []MeasurementRecord{recAWS(), recGCP(), recAzure(), recTDX(), recSNPInitrd(), recSNPVerity()} {
 		if err := r.Validate(); err != nil {
 			t.Errorf("%s: complete record must validate: %v", r.Platform, err)
 		}

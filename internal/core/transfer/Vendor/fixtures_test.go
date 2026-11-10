@@ -69,3 +69,22 @@ func recTDX() MeasurementRecord {
 		Values:    p.Measurements{{Name: "MRTD", Value: pcr(1)}, {Name: "RTMR0", Value: pcr(2)}, {Name: "RTMR1", Value: pcr(3)}, {Name: "RTMR2", Value: pcr(4)}},
 		BuildTool: BuildTool{Name: "attestamp-cpio"}}
 }
+
+func recSNPInitrd() MeasurementRecord {
+	return MeasurementRecord{Schema: SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "amd-sev-snp-initrd", BuildEnv: envAWS(),
+		Image: Image{Path: "svc-initrd.img", SHA256: strings.Repeat("ab", 32)},
+		Values: p.Measurements{{Name: "MEASUREMENT", Value: pcr(1)}, {Name: "PCR4", Value: pcr(2)[:32]}, {Name: "KERNEL", Value: pcr(3)[:32]},
+			{Name: "CMDLINE", Value: pcr(4)[:32]}, {Name: "INITRD", Value: pcr(5)[:32]}},
+		BuildTool: BuildTool{Name: "attestamp-cpio"}}
+}
+
+func recSNPVerity() MeasurementRecord {
+	r := recSNPInitrd()
+	r.Platform = "amd-sev-snp-verity"
+	r.Image.Path = "svc-app.img"
+	r.Values = append(r.Values, struct {
+		Name  string `json:"name"`
+		Value []byte `json:"value"`
+	}{Name: "PCR12", Value: pcr(6)[:32]})
+	return r
+}

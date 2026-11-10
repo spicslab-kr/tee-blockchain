@@ -14,8 +14,11 @@ const SchemaMeasurementRecord = "attestamp.measurement-record/1"
 var MeasurementNames = map[string][]string{
 	"aws-nitro": {"PCR0", "PCR1", "PCR2"},
 	"intel-tdx": {"MRTD", "RTMR0", "RTMR1", "RTMR2"},
-	"gcp":       {"image_digest"},
-	"azure":     {}, // digest (container) or image_id (VM); see Image
+	// Kept equal to internal/tee/parse/snp MeasurementNames.
+	"amd-sev-snp-initrd": {"MEASUREMENT", "PCR4", "KERNEL", "CMDLINE", "INITRD"},
+	"amd-sev-snp-verity": {"MEASUREMENT", "PCR4", "KERNEL", "CMDLINE", "INITRD", "PCR12"},
+	"gcp":                {"image_digest"},
+	"azure":              {}, // digest (container) or image_id (VM); see Image
 }
 
 // Image identifies the measured image: aws-nitro uses a file plus sha256, gcp a digest, azure a digest or an image_id.
@@ -69,10 +72,11 @@ func (r MeasurementRecord) Validate() error {
 		errs = append(errs, "platform: unknown "+quote(r.Platform))
 	}
 	switch r.Platform {
-	case "aws-nitro", "intel-tdx":
+	case "aws-nitro", "intel-tdx", "amd-sev-snp-initrd", "amd-sev-snp-verity":
 		// The Vendor reads build_env to learn the architecture and Go toolchain of the measured image,
-		// so both require all of it (see needsBuildEnv). The image is the EIF on aws-nitro and the
-		// application initrd on intel-tdx; either way it is one file the Auditor hands over.
+		// so these platforms require all of it (see needsBuildEnv). The image is the EIF on aws-nitro, the
+		// application initrd on intel-tdx and amd-sev-snp-initrd, and the application disk image on
+		// amd-sev-snp-verity; either way it is one file the Auditor hands over.
 		if r.BuildEnv.OS == "" {
 			errs = append(errs, "build_env.os: required for "+r.Platform)
 		}
@@ -139,8 +143,11 @@ func archNames() []string {
 
 // imageKind names the image file a platform's record points to, for error messages.
 func imageKind(platform string) string {
-	if platform == "intel-tdx" {
+	switch platform {
+	case "intel-tdx", "amd-sev-snp-initrd":
 		return "application initrd"
+	case "amd-sev-snp-verity":
+		return "application disk image"
 	}
 	return "EIF file"
 }
