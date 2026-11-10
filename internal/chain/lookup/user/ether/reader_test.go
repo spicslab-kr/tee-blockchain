@@ -186,3 +186,46 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 		t.Fatalf("Lookup = %+v", got)
 	}
 }
+
+// The record key includes the platform, so a registration made under intel-tdx is invisible to a Reader looking under
+// the default (aws-nitro) and found by one whose Platform names it.
+func TestReader_FindRecordKeys_PerPlatform(t *testing.T) {
+	deployerKey, deployer := newKey(t)
+	auditorKey, auditorAddr := newKey(t)
+	client := chain(t, deployer, auditorAddr).Client()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	contract, _, err := audether.Deploy(ctx, "", client, deployerKey, auditorAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aValues := ap.Measurements{
+		{Name: "MRTD", Value: bytes.Repeat([]byte{0x44}, 48)},
+		{Name: "RTMR0", Value: bytes.Repeat([]byte{0x55}, 48)},
+		{Name: "RTMR1", Value: bytes.Repeat([]byte{0x66}, 48)},
+		{Name: "RTMR2", Value: bytes.Repeat([]byte{0x77}, 48)},
+	}
+	registrar := audether.Registrar{Backend: client, RegistryAddr: contract, SenderKey: auditorKey}
+	meta := aud.Meta{Meta: al.Meta{Service: "tdx-test", Version: "0.1.0", Platform: "intel-tdx", Arch: "amd64"}, Expires: time.Now().Add(time.Hour)}
+	signed, err := registrar.Sign(aValues, meta, auditorKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := registrar.Register(ctx, signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uValues := make(up.Measurements, len(aValues))
+	for i, m := range aValues {
+		uValues[i] = up.Measurement{Name: m.Name, Value: m.Value}
+	}
+
+	if got, err := (Reader{RegistryAddr: contract, Backend: client}).FindRecordKeys(ctx, uValues); err != nil || len(got) != 0 {
+		t.Fatalf("under the default platform the intel-tdx registration must not be found: %v, %v", got, err)
+	}
+	got, err := (Reader{RegistryAddr: contract, Backend: client, Platform: "intel-tdx"}).FindRecordKeys(ctx, uValues)
+	if err != nil || len(got) != 1 || got[0] != receipt.RecordKey {
+		t.Fatalf("FindRecordKeys under intel-tdx = %v, %v, want [%s]", got, err, receipt.RecordKey)
+	}
+}

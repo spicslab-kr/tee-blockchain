@@ -173,3 +173,42 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 		t.Fatalf("Lookup = %+v", got)
 	}
 }
+
+// The record key includes the platform, so a registration made under intel-tdx is invisible to a Reader looking under
+// the default (aws-nitro) and found by one whose Platform names it.
+func TestReader_FindRecordKeys_PerPlatform(t *testing.T) {
+	deployerKey, deployer := newKey(t)
+	approverKey, approverAddr := newKey(t)
+	client := chain(t, deployer, approverAddr).Client()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	contract, _, err := regether.Deploy(ctx, "", client, deployerKey, approverAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := p.Measurements{
+		{Name: "MRTD", Value: bytes.Repeat([]byte{0x44}, 48)},
+		{Name: "RTMR0", Value: bytes.Repeat([]byte{0x55}, 48)},
+		{Name: "RTMR1", Value: bytes.Repeat([]byte{0x66}, 48)},
+		{Name: "RTMR2", Value: bytes.Repeat([]byte{0x77}, 48)},
+	}
+	registrar := regether.Registrar{Backend: client, RegistryAddr: contract, SenderKey: approverKey}
+	meta := reg.Meta{Meta: l.Meta{Service: "tdx-test", Version: "0.1.0", Platform: "intel-tdx", Arch: "amd64"}, Expires: time.Now().Add(time.Hour)}
+	signed, err := registrar.Sign(values, meta, approverKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := registrar.Register(ctx, signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := (Reader{RegistryAddr: contract, Backend: client}).FindRecordKeys(ctx, values); err != nil || len(got) != 0 {
+		t.Fatalf("under the default platform the intel-tdx registration must not be found: %v, %v", got, err)
+	}
+	got, err := (Reader{RegistryAddr: contract, Backend: client, Platform: "intel-tdx"}).FindRecordKeys(ctx, values)
+	if err != nil || len(got) != 1 || got[0] != receipt.RecordKey {
+		t.Fatalf("FindRecordKeys under intel-tdx = %v, %v, want [%s]", got, err, receipt.RecordKey)
+	}
+}

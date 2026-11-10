@@ -20,7 +20,7 @@ import (
 	p "attestamp/internal/tee/parse/user"
 )
 
-// DefaultPlatform is the platform FindRecordKeys looks up.
+// DefaultPlatform is the platform FindRecordKeys looks up when Reader.Platform is empty.
 const DefaultPlatform = "aws-nitro"
 
 // defaultLogRangeChunk is the block range Lookup asks for in one event-log query. Public RPCs cap the fromBlock..toBlock
@@ -39,6 +39,9 @@ type Reader struct {
 	RPC          string
 	RegistryAddr common.Address
 	Backend      Backend
+	// Platform is the format name FindRecordKeys looks registrations up under (the recordKey includes it). Empty means
+	// DefaultPlatform, so existing callers keep looking up aws-nitro.
+	Platform string
 	// LogRangeChunk: if 0, defaultLogRangeChunk. Tests lower it to exercise the multi-chunk scan.
 	LogRangeChunk uint64
 }
@@ -90,7 +93,7 @@ func measurementHash(values p.Measurements) ([32]byte, error) {
 	return out, nil
 }
 
-// FindRecordKeys hashes the measurements and returns the record key registered for them under DefaultPlatform, or an
+// FindRecordKeys hashes the measurements and returns the record key registered for them under r.Platform (DefaultPlatform if empty), or an
 // empty result if there is none.
 func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]string, error) {
 	h, err := measurementHash(values)
@@ -102,7 +105,7 @@ func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]st
 		return nil, err
 	}
 	defer done()
-	recordKey, err := registry.RecordKeyFor(&bind.CallOpts{Context: ctx}, DefaultPlatform, h)
+	recordKey, err := registry.RecordKeyFor(&bind.CallOpts{Context: ctx}, r.platform(), h)
 	if err != nil {
 		return nil, err
 	}
@@ -227,4 +230,12 @@ func findRegisteredEvent(ctx context.Context, backend Backend, registry *regethe
 		}
 		to = from - 1
 	}
+}
+
+// platform is the platform FindRecordKeys looks under: r.Platform, or DefaultPlatform when it is not set.
+func (r Reader) platform() string {
+	if r.Platform == "" {
+		return DefaultPlatform
+	}
+	return r.Platform
 }

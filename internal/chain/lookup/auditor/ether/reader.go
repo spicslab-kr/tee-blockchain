@@ -18,8 +18,8 @@ import (
 	p "attestamp/internal/tee/parse/auditor"
 )
 
-// DefaultPlatform is the platform FindRecordKeys looks up. The record key includes the platform, so supporting more
-// platforms means passing one to FindRecordKeys.
+// DefaultPlatform is the platform FindRecordKeys looks up when Reader.Platform is empty. The record key includes the
+// platform, so a registration made under another platform is found only by setting Reader.Platform to it.
 const DefaultPlatform = "aws-nitro"
 
 // defaultLogRangeChunk is the block range Lookup asks for in one event-log query. Public RPCs cap the fromBlock..toBlock
@@ -39,6 +39,9 @@ type Reader struct {
 	RPC          string
 	RegistryAddr common.Address
 	Backend      Backend
+	// Platform is the format name FindRecordKeys looks registrations up under (the recordKey includes it). Empty means
+	// DefaultPlatform, so existing callers keep looking up aws-nitro.
+	Platform string
 	// LogRangeChunk: if 0, defaultLogRangeChunk. Exposed so tests can exercise the multi-chunk scan path.
 	LogRangeChunk uint64
 }
@@ -63,7 +66,7 @@ func (r Reader) client(ctx context.Context) (*regether.Registry, Backend, func()
 	return registry, backend, closeFn, nil
 }
 
-// FindRecordKeys hashes the measurements and returns the record key registered for them under DefaultPlatform. A
+// FindRecordKeys hashes the measurements and returns the record key registered for them under r.Platform (DefaultPlatform if empty). A
 // registry has one approver, so there is at most one record key; with no registration the result is empty. An auditor
 // and a vendor each deploy their own registry and are looked up separately.
 func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]string, error) {
@@ -76,7 +79,7 @@ func (r Reader) FindRecordKeys(ctx context.Context, values p.Measurements) ([]st
 		return nil, err
 	}
 	defer done()
-	recordKey, err := registry.RecordKeyFor(&bind.CallOpts{Context: ctx}, DefaultPlatform, h)
+	recordKey, err := registry.RecordKeyFor(&bind.CallOpts{Context: ctx}, r.platform(), h)
 	if err != nil {
 		return nil, err
 	}
@@ -203,4 +206,12 @@ func findRegisteredEvent(ctx context.Context, backend Backend, registry *regethe
 		}
 		to = from - 1
 	}
+}
+
+// platform is the platform FindRecordKeys looks under: r.Platform, or DefaultPlatform when it is not set.
+func (r Reader) platform() string {
+	if r.Platform == "" {
+		return DefaultPlatform
+	}
+	return r.Platform
 }
