@@ -86,3 +86,15 @@ func TestBuildEnv_String(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// intel-tdx needs build_env for the same reason as aws-nitro: the application initrd carries att-ra-responder.
+func TestBuildConfig_BuildEnvRequiredOnTDX(t *testing.T) {
+	c := cfgTDX()
+	c.BuildEnv = BuildEnv{}
+	err := c.Validate()
+	for _, field := range []string{"os", "arch", "go"} {
+		if err == nil || !strings.Contains(err.Error(), "build_env."+field+": required for intel-tdx") {
+			t.Errorf("missing build_env.%s must be rejected on intel-tdx, got %v", field, err)
+		}
+	}
+}

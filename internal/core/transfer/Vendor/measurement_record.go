@@ -13,6 +13,7 @@ const SchemaMeasurementRecord = "attestamp.measurement-record/1"
 // MeasurementNames lists the required measurement names per platform.
 var MeasurementNames = map[string][]string{
 	"aws-nitro": {"PCR0", "PCR1", "PCR2"},
+	"intel-tdx": {"MRTD", "RTMR0", "RTMR1", "RTMR2"},
 	"gcp":       {"image_digest"},
 	"azure":     {}, // digest (container) or image_id (VM); see Image
 }
@@ -68,25 +69,26 @@ func (r MeasurementRecord) Validate() error {
 		errs = append(errs, "platform: unknown "+quote(r.Platform))
 	}
 	switch r.Platform {
-	case "aws-nitro":
+	case "aws-nitro", "intel-tdx":
 		// The Vendor reads build_env to learn the architecture and Go toolchain of the measured image,
-		// so aws-nitro requires all of it.
+		// so both require all of it (see needsBuildEnv). The image is the EIF on aws-nitro and the
+		// application initrd on intel-tdx; either way it is one file the Auditor hands over.
 		if r.BuildEnv.OS == "" {
-			errs = append(errs, "build_env.os: required for aws-nitro")
+			errs = append(errs, "build_env.os: required for "+r.Platform)
 		}
 		if !validArch(r.BuildEnv.Arch) {
 			errs = append(errs, "build_env.arch: want one of "+strings.Join(archNames(), "|")+" (GOARCH spelling), got "+quote(r.BuildEnv.Arch))
 		}
 		if r.BuildEnv.Go == "" {
-			errs = append(errs, "build_env.go: required for aws-nitro")
+			errs = append(errs, "build_env.go: required for "+r.Platform)
 		}
 		if r.Image.Path == "" {
-			errs = append(errs, "image.path: EIF file required for aws-nitro")
+			errs = append(errs, "image.path: "+imageKind(r.Platform)+" required for "+r.Platform)
 		}
 		if !isHex(r.Image.SHA256, 64) {
 			errs = append(errs, "image.sha256: want 64 hex chars")
 		}
-		if r.BuildTool.Version == "" {
+		if r.Platform == "aws-nitro" && r.BuildTool.Version == "" {
 			errs = append(errs, "build_tool.version: required for aws-nitro")
 		}
 	case "gcp":
@@ -99,7 +101,7 @@ func (r MeasurementRecord) Validate() error {
 		}
 	}
 	// As in build-config, every platform accepts only architectures the project builds for.
-	if r.Platform != "aws-nitro" && r.BuildEnv.Arch != "" && !validArch(r.BuildEnv.Arch) {
+	if !needsBuildEnv(r.Platform) && r.BuildEnv.Arch != "" && !validArch(r.BuildEnv.Arch) {
 		errs = append(errs, "build_env.arch: unknown "+quote(r.BuildEnv.Arch)+" (want one of "+archList()+")")
 	}
 	if len(r.Values) == 0 {
@@ -133,4 +135,12 @@ func archNames() []string {
 		out = append(out, t.GOARCH)
 	}
 	return out
+}
+
+// imageKind names the image file a platform's record points to, for error messages.
+func imageKind(platform string) string {
+	if platform == "intel-tdx" {
+		return "application initrd"
+	}
+	return "EIF file"
 }

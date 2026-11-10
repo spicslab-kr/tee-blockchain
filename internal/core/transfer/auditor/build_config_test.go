@@ -17,6 +17,8 @@ func TestBuildConfig_TEEInfoKeysPerPlatform(t *testing.T) {
 		"gcp needs project_id":        {cfgGCP(), "project_id"},
 		"azure needs maa_endpoint":    {cfgAzure(), "maa_endpoint"},
 		"azure needs vm_name":         {cfgAzure(), "vm_name"},
+		"intel-tdx needs zone":        {cfgTDX(), "zone"},
+		"intel-tdx needs image":       {cfgTDX(), "image"},
 	}
 	for name, tc := range cases {
 		c := tc.cfg
@@ -30,7 +32,7 @@ func TestBuildConfig_TEEInfoKeysPerPlatform(t *testing.T) {
 			t.Errorf("%s: want tee_info.%s error, got %v", name, tc.drop, err)
 		}
 	}
-	for _, c := range []BuildConfig{cfgAWS(), cfgGCP(), cfgAzure()} {
+	for _, c := range []BuildConfig{cfgAWS(), cfgGCP(), cfgAzure(), cfgTDX()} {
 		if err := c.Validate(); err != nil {
 			t.Errorf("%s: complete config must validate: %v", c.Platform, err)
 		}

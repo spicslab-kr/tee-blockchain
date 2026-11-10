@@ -82,7 +82,7 @@ func TestEncode_MatchesSpec(t *testing.T) {
 }
 
 func TestDecode_RoundTrip_AllPlatforms(t *testing.T) {
-	for _, c := range []BuildConfig{cfgAWS(), cfgGCP(), cfgAzure()} {
+	for _, c := range []BuildConfig{cfgAWS(), cfgGCP(), cfgAzure(), cfgTDX()} {
 		b, _ := Encode(c)
 		got, err := DecodeBuildConfig(b)
 		if err != nil {
@@ -92,7 +92,7 @@ func TestDecode_RoundTrip_AllPlatforms(t *testing.T) {
 			t.Errorf("%s: round trip changed the config", c.Platform)
 		}
 	}
-	for _, r := range []MeasurementRecord{recAWS(), recGCP(), recAzure()} {
+	for _, r := range []MeasurementRecord{recAWS(), recGCP(), recAzure(), recTDX()} {
 		b, _ := Encode(r)
 		got, err := DecodeMeasurementRecord(b)
 		if err != nil {

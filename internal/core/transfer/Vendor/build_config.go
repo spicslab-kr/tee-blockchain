@@ -14,6 +14,7 @@ const SchemaBuildConfig = "attestamp.build-config/1"
 // TEEInfoKeys lists the tee_info keys each platform requires.
 var TEEInfoKeys = map[string][]string{
 	"aws-nitro": {"instance_id", "region", "ami_id"},
+	"intel-tdx": {"instance_name", "project_id", "zone", "image"},
 	"gcp":       {"instance_name", "project_id", "container_image"},
 	"azure":     {"vm_name", "region", "maa_endpoint"},
 }
@@ -120,21 +121,29 @@ func (c BuildConfig) Validate() error {
 			errs = append(errs, "tee_info."+k+": required for "+c.Platform)
 		}
 	}
-	// The Auditor rebuilds to build_env, so aws-nitro (measurements differ per architecture and
-	// toolchain) requires it. trimpath=false passes validation and the Auditor warns about it.
-	if c.Platform == "aws-nitro" {
+	// The Auditor rebuilds to build_env, so aws-nitro and intel-tdx (measurements differ per architecture
+	// and toolchain, because the image carries att-ra-responder) require it. trimpath=false passes
+	// validation and the Auditor warns about it.
+	if needsBuildEnv(c.Platform) {
 		if c.BuildEnv.OS == "" {
-			errs = append(errs, "build_env.os: required for aws-nitro")
+			errs = append(errs, "build_env.os: required for "+c.Platform)
 		}
 		if c.BuildEnv.Arch == "" {
-			errs = append(errs, "build_env.arch: required for aws-nitro")
+			errs = append(errs, "build_env.arch: required for "+c.Platform)
 		}
 		if c.BuildEnv.Go == "" {
-			errs = append(errs, "build_env.go: required for aws-nitro")
+			errs = append(errs, "build_env.go: required for "+c.Platform)
 		}
 	}
 	if c.BuildEnv.Arch != "" && !validArch(c.BuildEnv.Arch) {
 		errs = append(errs, "build_env.arch: unknown "+quote(c.BuildEnv.Arch)+" (want one of "+archList()+")")
 	}
 	return join(errs)
+}
+
+// needsBuildEnv reports whether a platform's measurements depend on the build environment. On aws-nitro the
+// EIF, and on intel-tdx the application initrd, contain att-ra-responder, whose bytes change with the CPU
+// architecture and the Go toolchain.
+func needsBuildEnv(platform string) bool {
+	return platform == "aws-nitro" || platform == "intel-tdx"
 }

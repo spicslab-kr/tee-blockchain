@@ -7,7 +7,7 @@ import (
 )
 
 func TestMeasurementRecord_PerPlatform(t *testing.T) {
-	for _, r := range []MeasurementRecord{recAWS(), recGCP(), recAzure()} {
+	for _, r := range []MeasurementRecord{recAWS(), recGCP(), recAzure(), recTDX()} {
 		if err := r.Validate(); err != nil {
 			t.Errorf("%s: complete record must validate: %v", r.Platform, err)
 		}
@@ -44,6 +44,16 @@ func TestMeasurementRecord_PerPlatform(t *testing.T) {
 	if err := r.Validate(); err != nil {
 		t.Errorf("azure container digest must validate: %v", err)
 	}
+	// intel-tdx: initrd file, MRTD and RTMR0-2, build_env; no tool version
+	r = recTDX()
+	r.Image.Path = ""
+	mustErr(t, r, "image.path: application initrd required for intel-tdx")
+	r = recTDX()
+	r.Values = r.Values[:3] // RTMR2 missing
+	mustErr(t, r, "missing RTMR2")
+	r = recTDX()
+	r.BuildEnv.Go = ""
+	mustErr(t, r, "build_env.go: required for intel-tdx")
 	// common
 	r = recAWS()
 	r.Values = append(r.Values, struct {

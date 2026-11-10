@@ -55,3 +55,17 @@ func recAzure() MeasurementRecord {
 		Values:    p.Measurements{{Name: "snp_digest", Value: bytes.Repeat([]byte{0xee}, 48)}},
 		BuildTool: BuildTool{Name: "packer"}}
 }
+
+func cfgTDX() BuildConfig {
+	return BuildConfig{Schema: SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "intel-tdx",
+		Source:   Source{Repo: "https://example.com/svc.git", Commit: commit},
+		TEEInfo:  map[string]string{"instance_name": "svc-tdx", "project_id": "proj", "zone": "us-central1-a", "image": "ubuntu-2404-noble-amd64-v20261101"},
+		BuildEnv: envAWS()}
+}
+
+func recTDX() MeasurementRecord {
+	return MeasurementRecord{Schema: SchemaMeasurementRecord, Service: "svc", Version: "1.2.0", Platform: "intel-tdx", BuildEnv: envAWS(),
+		Image:     Image{Path: "svc-initrd.img", SHA256: strings.Repeat("ab", 32)},
+		Values:    p.Measurements{{Name: "MRTD", Value: pcr(1)}, {Name: "RTMR0", Value: pcr(2)}, {Name: "RTMR1", Value: pcr(3)}, {Name: "RTMR2", Value: pcr(4)}},
+		BuildTool: BuildTool{Name: "attestamp-cpio"}}
+}
