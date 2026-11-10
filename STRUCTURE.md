@@ -122,9 +122,13 @@ What is implemented, checked against the code:
 | aws (Nitro Enclaves) | Yes. | Request (NSM, vsock, proxy), document verification against the AWS Nitro root, measurement extraction, image build, enclave launch. |
 | gcp (Confidential Space) | No. | `tee/request/<role>/gcp` can fetch a token from the launcher socket and has a test. `tee/parse/<role>/gcp.go` returns "not implemented" for every method. Nothing in `cmd/*` constructs either. There is no gcp folder under `setup/`. |
 | azure (Confidential VM) | No. | `tee/request/<role>/azure` returns "not implemented" (it needs a vTPM library and MAA). `tee/parse/<role>/azure.go` returns "not implemented". Nothing in `cmd/*` constructs either. No azure folder under `setup/`. |
+| tdx (Intel TDX on GCP) | Verification only. | `tee/parse/tdx` (shared) and `tee/parse/<role>/tdx.go`; `cmd/*` parse, audit and verify `intel-tdx`. Tested on a recorded quote. No `tee/request/<role>/tdx`, nothing under `setup/`. |
+| snp (AMD SEV-SNP on GCP) | Verification only. | `tee/parse/snp` (shared) and `tee/parse/<role>/snp.go`; `cmd/*` parse `amd-sev-snp-initrd` and `amd-sev-snp-verity`. Tested on recorded evidence. No `tee/request/<role>/snp`, nothing under `setup/`. |
 
-Only **aws** is a working platform. gcp and azure exist so the format names, the Parser interface
-and the folder layout are already in place when someone adds them.
+Only **aws** is a working platform end to end. tdx and snp verify recorded evidence; gcp and azure
+exist so the format names, the Parser interface and the folder layout are already in place.
+
+`internal/setup/build/cpio` is shared: the deterministic cpio writer for confidential-VM initrds.
 
 `ether` plays the same part for chains: `chain/register/<role>/ether` and `chain/lookup/<role>/ether`
 are the only chain modules, and they talk to any Ethereum-compatible chain.

@@ -1,6 +1,9 @@
 # Porting Attestamp from Nitro to confidential VMs
 
-Status: planning. Nothing below is implemented yet.
+Status (2026-11-11): Phase 0.3 and 0.4 are done (fixtures recorded). Phase 1 (TDX parse) and phase 4a (SEV-SNP
+parse, D3 decided in `docs/build/sev-snp.md`) are implemented and tested on those fixtures; the anvil chain test for
+TDX is written but has not run. D4 is decided in `docs/build/tdx.md`. Everything needing a running guest is not
+started. See `docs/plan/night-log.md`.
 
 Order: **Intel TDX first, AMD SEV-SNP second.** TDX attestation has the same shape as Nitro's —
 one request, one signed document, measurements inside it. SEV-SNP is the exception: two documents
@@ -11,7 +14,8 @@ joining step on top of a route that already works.
 
 | | |
 |---|---|
-| **Unchanged** | `contracts/evm/Registry.sol`, `internal/chain/register`, `internal/chain/lookup`, `internal/core/compare`, `internal/cli`, the wire protocol in `tee/request/*/wire.go` |
+| **Unchanged** | `contracts/evm/Registry.sol`, `internal/chain/register`, `internal/core/compare`, `internal/cli`, the wire protocol in `tee/request/*/wire.go` |
+| **Changed after all** | `internal/chain/lookup`: `Reader` always looked up under `aws-nitro`, and the record key includes the platform, so it gained `Reader.Platform` |
 | **New platform module** | `tee/parse/<plat>`, `tee/request/<role>/<plat>` |
 | **Rewritten, not swapped** | `setup/build` (Nitro's is Docker + `nitro-cli` end to end), `setup/launch` (on a CVM, booting the VM *is* the launch), `cmd/ra-responder` (vsock and `/dev/nsm` are Nitro-only) |
 | **Changed assumption** | the hand-off. See "Open decisions" below. |

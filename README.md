@@ -85,7 +85,8 @@ measurements. The most important:
 att-vendor build --app-dir <dir with Dockerfile> --out-dir out --verify
 ```
 
-All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md). What changed the hashes in our SEV-SNP tests (not supported yet): [AMD SEV-SNP](docs/build/sev-snp.md).
+All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md), [Intel TDX](docs/build/tdx.md),
+[AMD SEV-SNP](docs/build/sev-snp.md). The last two cover verification only so far.
 
 ## Quick start
 
@@ -185,11 +186,16 @@ hash, and register its own signed hash. The User can then require both registrie
 
 ### Platform and registry
 
-- **AWS Nitro Enclaves today.** Request, document verification against the AWS Nitro root, and
-  measurement extraction are implemented end to end. GCP and Azure have request-side scaffolding
-  only. Confidential VMs that measure a guest OS (AMD SEV-SNP, Intel TDX) are not covered.
-- **The measurement is the identity.** The enclave image hash (PCR0·1·2) is what gets registered
-  and looked up, so no name, version or key has to be known in advance.
+- **AWS Nitro Enclaves end to end.** Request, document verification against the AWS Nitro root,
+  measurement extraction, image build and launch.
+- **Intel TDX and AMD SEV-SNP on GCP: verification only.** `ra-parse`, `audit` and `verify` check a
+  TDX quote (`intel-tdx`: MRTD, RTMR0–2) or SEV-SNP evidence (`amd-sev-snp-initrd`,
+  `amd-sev-snp-verity`), tested against evidence recorded on GCP. Requesting evidence from a running
+  guest, building and launching are not implemented yet. SEV-SNP evidence is two documents from two
+  signers, and nothing proves they come from the same VM; see [AMD SEV-SNP](docs/build/sev-snp.md#same-vm).
+- **GCP Confidential Space and Azure** have request-side scaffolding only.
+- **The measurement is the identity.** The image hash (PCR0·1·2 on Nitro, MRTD and RTMR0–2 on TDX)
+  is what gets registered and looked up, so no name, version or key has to be known in advance.
 - **One architecture, one registration.** x86_64 and arm64 builds measure differently, so each
   registration says which architecture it is for.
 - **A deliberately simple contract.** `Registry.sol` never overwrites and never revokes. Expiry is
