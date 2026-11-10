@@ -43,8 +43,18 @@ func repoRoot(t *testing.T) string {
 // startServe starts ra-serve from the vendor binary with a fixture extractor and returns the address it announces.
 func startServe(t *testing.T, bin, fixture string) (addr string, stop func()) {
 	t.Helper()
+	return startServeAs(t, bin, fixture, "")
+}
+
+// startServeAs is startServe with the fixture served as the given format (empty: ra-serve's default, aws-nitro).
+func startServeAs(t *testing.T, bin, fixture, format string) (addr string, stop func()) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, bin, "ra-serve", "--listen", "tcp:127.0.0.1:0", "--extractor", "fixture="+fixture)
+	args := []string{"ra-serve", "--listen", "tcp:127.0.0.1:0", "--extractor", "fixture=" + fixture}
+	if format != "" {
+		args = append(args, "--format", format)
+	}
+	cmd := exec.CommandContext(ctx, bin, args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
