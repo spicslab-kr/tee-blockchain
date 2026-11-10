@@ -85,7 +85,7 @@ measurements. The most important:
 att-vendor build --app-dir <dir with Dockerfile> --out-dir out --verify
 ```
 
-All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md).
+All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md). What changed the hashes in our SEV-SNP tests (not supported yet): [AMD SEV-SNP](docs/build/sev-snp.md).
 
 ## Quick start
 
