@@ -1,0 +1,53 @@
+package aws
+
+import (
+	"errors"
+	"fmt"
+
+	"github.com/fxamacker/cbor/v2"
+
+	"attestamp/internal/tee/request/Vendor"
+)
+
+// Format is the document format name of Nitro attestation documents.
+const Format = "aws-nitro"
+
+// NSM request: {"Attestation": {"user_data": .., "nonce": .., "public_key": ..}}
+type nsmRequest struct {
+	Attestation nsmAttestationReq `cbor:"Attestation"`
+}
+
+type nsmAttestationReq struct {
+	UserData  []byte `cbor:"user_data"`
+	Nonce     []byte `cbor:"nonce"`
+	PublicKey []byte `cbor:"public_key"`
+}
+
+// NSM response: {"Attestation": {"document": ..}} or {"Error": "..."}
+type nsmResponse struct {
+	Attestation *struct {
+		Document []byte `cbor:"document"`
+	} `cbor:"Attestation,omitempty"`
+	Error *string `cbor:"Error,omitempty"`
+}
+
+func encodeAttestationRequest(nonce vendor.Nonce, userData []byte) ([]byte, error) {
+	if err := nonce.Validate(); err != nil {
+		return nil, err
+	}
+	return cbor.Marshal(nsmRequest{Attestation: nsmAttestationReq{UserData: userData, Nonce: nonce}})
+}
+
+func decodeAttestationResponse(b []byte) ([]byte, error) {
+	var r nsmResponse
+	if err := cbor.Unmarshal(b, &r); err != nil {
+		return nil, fmt.Errorf("nsm response: %w", err)
+	}
+	if r.Error != nil {
+		return nil, fmt.Errorf("nsm: %s", *r.Error)
+	}
+	if r.Attestation == nil || len(r.Attestation.Document) == 0 {
+		return nil, errors.New("nsm response: no document")
+	}
+	return r.Attestation.Document, nil
+}
