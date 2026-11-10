@@ -126,3 +126,153 @@ aws ones do. Commit `9efeb31`.
   (`e31241db9bc6ebdccaf1bcee9ee57e5896120166cfc5711570d280beb051982e`). Extracting `anvil.exe` into
   `~/.foundry/bin` was **refused by the permission classifier** (external code). Nothing was installed.
   To finish: install anvil, then `go test -run TDX ./cmd/`.
+
+### 16:15 — B, deterministic cpio writer
+
+- `internal/setup/build/cpio`: `Entry`, `Write`, `Bytes`, `FromDir`, `Placement` (`AppFirst`, `AppLast`), `Join`. No aws
+  counterpart exists for any of these; the names describe what they hold. `AppFirst` (TDX) and `AppLast` (SEV-SNP)
+  carry the reason in their comments: on TDX the appended archive failed to decompress (cvm-port.md 3.2); on SEV-SNP
+  the 2026-11 runs appended and booted. Why they differ is not established, and the docs say so.
+- Tests: same input → same bytes; reversed input order → same bytes; one byte or the execute bit changed → different
+  bytes; header fields read back independently; duplicates and `\` in names refused.
+- **mkcpio.py equality, proved two ways:**
+  - `testdata/mkcpio-golden-app.cpio`: the `opt/app/app` layout, written by `mkcpio.py` on **WSL 2 Ubuntu**
+    (Python 3.14.4, umask 022). WSL was already installed; nothing was installed for this.
+  - `testdata/mkcpio-golden-flat.cpio`: written by `mkcpio.py` on Windows Python 3.14.6. This is only valid for a tree
+    with no subdirectories and only executable files: on Windows `os.path.relpath` uses `\` and every file passes
+    `os.access(X_OK)`. This was checked: both files came out `0100755`.
+  - `TestWrite_MatchesMkcpioLive` (with `ATTESTAMP_MKCPIO` set) **passed** against the script on Windows.
+- `.gitattributes` gained `*.bin -text`, `*.cpio -text` (and later `*.pb -text`) so fixtures are never converted.
+  The committed TDX quote was checked to be byte-identical (`git cat-file` → same sha256).
+- Commits `987cb50`, `88fc9f6`.
+
+### 16:20 — C, research delegated
+
+A background agent read the AMD ABI spec (56860 rev 1.59), the VLEK spec (58369), the TCG TPM 2.0 spec (r1.59),
+go-sev-guest v0.15.0 and go-tpm v0.9.8, and fetched AMD's KDS chains. It ran no cloud command and edited nothing. Its
+findings, each with a source, are written up in `docs/build/sev-snp.md`, "Time and freshness". Not obtained: AMD's
+KDS spec (57230), so what it says about VCEK lifetime is marked "not confirmed".
+
+### 16:35 — D1, SEV-SNP instance and evidence
+
+- **Created `attestamp-snp-vendor`** (n2d-standard-2, us-central1-a, SEV_SNP) with `e2e/cloud/gcp-cvm.sh snp create
+  vendor`, as the brief asked. The firewall rule `attestamp-ra` already existed; **no firewall rule was created**.
+  Set `sudo shutdown -h +240` on it. Instances running at the same time: 1 (TDX was stopped).
+- Guest: Ubuntu 24.04.5, kernel `7.0.0-1017-gcp` (the 2026-11 scripts hard-code `7.0.0-1014-gcp`), `/dev/sev-guest`,
+  `/dev/tpm0`, ConfigFS TSM. No tpm2-tools, no Go, no `snpguest`, no `gotpm` on the image.
+- **Blocked:** getting `gotpm`. The published module `github.com/google/go-tpm-tools/cmd` (latest v0.4.5) does not
+  resolve (`verifier/v0.4.4` tag is missing), and cloning the repository to build it was **refused by the permission
+  classifier** (external code). `snpguest` was therefore not attempted either.
+- **Decision:** record the evidence without those tools. I wrote a small recorder (now committed as
+  `internal/tee/parse/snp/testdata/record/main.go`): the go-tpm-tools client library (the same module proxy path
+  `verify_att` uses) for an RSA GCE-AK attestation over a fixed nonce, and ConfigFS TSM (no tool) for the SNP report,
+  REPORT_DATA = SHA-512 of the attestation — the 2026-11 binding.
+- Recorded on the first try at 17:23 UTC. Fixed nonce: SHA-256 of `attestamp-snp-fixture-0001`.
+  Report: VERSION 5, POLICY `0x30000` (not debug), SIGNING_KEY 0 (VCEK). The host returned a certificate table.
+- **Identifying data:** `gcp-n2d-att.pb` carries the project ID, zone, instance name, numeric instance ID and project
+  number in the Google-signed AK certificate. I stopped before committing it, as CLAUDE.md rule 4 and the
+  record-fixture command require.
+
+### 17:30 — E started, then stopped by the user
+
+- Copied `build_app.sh`, `app_main.go`, `mkcpio.py` to the instance. Running `build_app.sh` through `gcloud.cmd` failed
+  twice (Windows `cmd` splits a quoted program path when an argument is also quoted). The user then stopped the turn.
+  `build_app.sh` never ran on the instance (no result file, no process).
+- The user added shell-command rules to CLAUDE.md (one command per call, no loops or variable assignments, gcloud and
+  aws by name). Commits `31f55a3`, `87040bf`.
+- Commit `feee2c1` (`.claude/settings.json`: gcloud compute ssh and scp no longer ask) was **not made by me**; it
+  appeared during the pause.
+
+### 2026-11-11 — after the user's go-ahead
+
+- **Stopped `attestamp-snp-vendor`** after checking that nothing ran on it (`pgrep` found nothing).
+- **SNP fixture committed** on the user's decision: the Nitro fixture already carries an EC2 instance ID and its test
+  asserts it, and without a committed fixture the tests do not run in CI. `testdata/README.md` lists every identifier
+  in each file. Commit `4bfdb53`.
+
+### D2/D3, SEV-SNP parser
+
+- **Dependencies:** go-tpm-tools v0.4.11 (vTPM quote, event log, GRUB parsing; the version `verify_att` used) and
+  go-sev-guest v0.15.0 (report, certificate table, AMD chain and signature). go-tpm-tools requires go-tdx-guest
+  `v0.3.2-0.20250814004405-ffb0869e6f4d`, so **my v0.3.1 choice for TDX was raised by Go's version selection**. That
+  revision still decodes QuoteV4 only and takes `Options.Now` as a `*TimeSet`; the TDX parser was adapted in the same
+  commit and its tests pass.
+- **What the recorded evidence showed** (read with a throwaway test, removed): both chains verify offline; the
+  guest booted **without an initrd** — GCP's Ubuntu image sets `GRUB_FORCE_PARTUUID` and GRUB logs "attempting
+  initrdless boot". This is the cvm-port.md 3.3 problem, now confirmed on GCP.
+- **D3a, container:** one CBOR map `{report, certs, vtpm}`, core deterministic encoding, unknown or duplicate keys
+  refused. Reasons: one byte string on the wire; CBOR already used for Nitro; no base64; the host's certificate table
+  lets the AMD chain be checked offline.
+- **D3b, format strings:** two, `amd-sev-snp-initrd` and `amd-sev-snp-verity`, because `measurementHash` covers the
+  name list and the two options register different numbers of values.
+- **Values decided:** MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD (+ PCR12 for verity), SHA-256 bank. The brief framed
+  Option 1 as one value and Option 2 as two; I added the boot-chain values for the same reason as TDX's D4 (a changed
+  GRUB or kernel could otherwise report the expected initrd). SHA-256 because the verity hook extends only that bank
+  and the 2026-11 Auditor scripts computed SHA-256.
+- **Root:** `internal/tee/parse/snp/root.pem` is Google's "EK/AK CA Root" (go-tpm-tools
+  `server/ca-certs/gcp_ek_ak_ca_root.crt`, converted from DER; sha256 `59:47:59:59:…:BE:B2`). Our AK chains to it, not
+  to the older `tpm_ek_root_1.cer` that go-tpm-tools' `GceEKRoots` uses. AMD roots: go-sev-guest's embedded ones.
+  `.gitignore` gained `!internal/tee/parse/snp/root.pem`.
+- **Names:** `FormatInitrd`/`FormatVerity` (two formats, so `Format` alone would not do), `Encode` (the Vendor side
+  needs to pack; no aws counterpart), `MeasurementNames` (exported so `core/transfer` can be tested against it); role
+  adapters `SNPInitrdFormat`, `SNPVerityFormat`, `SNPRootPEM()`, `SNPParser`, `snpTranslate`.
+- **Tested on the recording:** verify passes; wrong cloud root → `ErrChain`; before the AK was issued → `ErrChain`;
+  tampered report → `ErrSignature`; a vTPM attestation the report does not cover → `ErrSignature`; nonce; debug policy
+  refused; both formats refuse the initrdless boot; MEASUREMENT, PCR4, KERNEL, CMDLINE asserted (CMDLINE also
+  recomputed with `sha256sum`). **Not testable on this recording:** INITRD and PCR12 extraction.
+- Wiring: adapters (3 roles), `core/transfer` keys and names (with a test tying them to the parser), `ra-parse` case,
+  `cmd/snp_e2e_test.go`. Commits `6d512e0` … `5de41a2`.
+
+### Docs
+
+`docs/build/tdx.md` (new), `docs/build/sev-snp.md` (rewritten: values, D3, time and freshness, variables, instance,
+procedure, same-VM limit, not done), README Platform section, STRUCTURE.md platform table, cvm-port.md status and the
+`chain/lookup` correction. Commits `9c92d45`, `e84e79f`.
+
+### E, the seven SEV-SNP tests — not run
+
+Not run on a new instance, by the user's instruction after the pause (only work that needs no VM). The scripts need
+`snpguest` and `gotpm`, which could not be installed (above). `e2e-work/results/amd-sev-snp.jsonl` was not written.
+
+## A person must install these
+
+| what | why | command |
+|---|---|---|
+| anvil (Foundry) | `TestRun_E2E_TDX_AuditorUser` and every other anvil test skip without it | Foundry v1.8.0 for Windows is already downloaded and checked (sha256 `e31241db…982e`) at `C:\Users\bags3\AppData\Local\Temp\claude\640ae8d0b7d67827\31cf8d4a-0cc0-465b-bf27-e1c70ff9dce1\scratchpad\foundry-dl\foundry.zip`. Extract `anvil.exe` into `%USERPROFILE%\.foundry\bin\` (where `cmd/register_e2e_test.go` looks), then `go test -run TDX ./cmd/` |
+| `gotpm` on the SEV-SNP instance | the 2026-11 scripts call `~/gotpm attest --key gceAK` | on any machine with Go: `git clone --branch v0.4.11 https://github.com/google/go-tpm-tools`, `cd go-tpm-tools/cmd`, `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o gotpm ./gotpm`, then `gcloud compute scp gotpm attestamp-snp-vendor:gotpm --zone us-central1-a` |
+| `snpguest` on the SEV-SNP instance | the scripts call `~/snpguest report`, `certificates`, `fetch ca`, `verify attestation` | on the instance: `curl -L -o ~/snpguest https://github.com/virtee/snpguest/releases/download/v0.11.0/snpguest` and `chmod +x ~/snpguest`. Which version the 2026-11 runs used is unknown; `userverify_grub.py` expects the output line `VEK signed the Attestation Report` |
+| apt packages on the instance | the verity and in-VM check scripts | `sudo apt-get install -y tpm2-tools squashfs-tools cryptsetup-bin` (not blocked; not attempted because E was not run) |
+
+`verify_att` (the scripts' vTPM verifier) is already cross-compiled at
+`C:\Users\bags3\AppData\Local\Temp\claude\640ae8d0b7d67827\31cf8d4a-0cc0-465b-bf27-e1c70ff9dce1\scratchpad\vmtools\verify_att`;
+copy it to `~/verify_att` on the instance.
+
+## To run E on a new instance
+
+Replace the hard-coded values in the 2026-11 scripts with this instance's (read from the recorded event log of
+`attestamp-snp-vendor`; they belong to that instance's disk and change for a new one):
+
+| in the scripts | 2026-11 value | `attestamp-snp-vendor` |
+|---|---|---|
+| `search --fs-uuid` (`gcp_boot_option1.sh`, `gcp_boot_option2.sh`) | `6a4d7abf-…9962` | `653dd231-d061-4b9e-bc8b-6d2ac57dffe4` |
+| `root=PARTUUID=` (same, and `vendor_publish.sh`) | `10c90fd7-…cf47` | `27c09ec4-48e8-4dfd-be36-678080b236c7` |
+| kernel (same, `auditor_publish.sh`) | `7.0.0-1014-gcp` | `7.0.0-1017-gcp` |
+| `/home/chang/` (`vendor_evidence.sh`) | | `/home/bags3/` |
+| `efibootmgr -n 0002` / `-n 0003` | the UEFI boot entry for GRUB | read with `efibootmgr` on the instance; not checked |
+| VM IPs (`run_round.sh`, `relay_attack.sh`) | | read with `gcloud compute instances list` after each start; do not write them into a committed file |
+
+Then: two instances (vendor, auditor), `build_app.sh 1.22.2` on both (T1 same hash), `build_app.sh` with another Go
+version (T2), the same build as a second Linux user so the path differs (T3), then the Option 1 and Option 2 boot,
+tamper and check scripts (T4–T7). After each reboot, check that `/proc/sys/kernel/random/boot_id` changed. Write one
+JSONL line per test to `e2e-work/results/amd-sev-snp.jsonl` (format in `docs/plan/test-matrix.md`).
+
+## Final state
+
+- `gcloud compute instances list` at the end:
+  `attestamp-snp-vendor` (us-central1-a, n2d-standard-2) **TERMINATED**,
+  `attestamp-tdx-vendor` (us-central1-a, c3-standard-4) **TERMINATED**. Both are kept (stop, not delete).
+- Cloud changes made: one instance created (`attestamp-snp-vendor`); two instances stopped. No firewall rule, quota
+  request or other GCP/AWS setting was changed. The SSH key gcloud manages in project metadata was already there.
+- AWS: read only. The vCPU request in eu-north-1 is `CASE_CLOSED`, not `PENDING`.
+- Local: nothing installed. Go 1.26.1 was fetched into the module cache by `GOTOOLCHAIN`.
+- Gate at the end: `gofmt -l .` clean, `go vet ./...` clean, `go test ./...` all `ok`.
