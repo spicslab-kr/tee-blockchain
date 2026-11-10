@@ -51,7 +51,8 @@ const measurementSize = 48
 // decode unpacks the quote and checks the required values. It does not check the signature.
 //
 // Only quote version 4 is accepted. It is what GCP TDX guests return through ConfigFS TSM today, and the only
-// version go-tdx-guest v0.3.1 decodes; version 5 needs a newer library and its own fixture.
+// version the go-tdx-guest in go.mod decodes (the 2025-08 revision go-tpm-tools requires); version 5 needs a newer
+// library and its own fixture.
 func decode(format string, raw []byte) (*pb.QuoteV4, error) {
 	if format != "" && format != Format {
 		return nil, fmt.Errorf("%w: %s", ErrWrongFormat, format)

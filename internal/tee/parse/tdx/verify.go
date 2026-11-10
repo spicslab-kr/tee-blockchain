@@ -53,7 +53,10 @@ func (a Parser) VerifySig(ctx context.Context, format string, raw []byte, rootCe
 	if _, err := leaf.Verify(opts); err != nil {
 		return fmt.Errorf("%w: %v", ErrChain, err)
 	}
-	if err := verify.TdxQuote(q, &verify.Options{Now: at, TrustedRoots: roots}); err != nil {
+	// Collateral and CRLs are not fetched, so only PckCertChain matters; the others are set so no field falls back to
+	// the library's own clock.
+	now := &verify.TimeSet{PckCertChain: at, TcbInfo: at, QeIdentity: at, PckCrl: at, RootCaCrl: at}
+	if err := verify.TdxQuote(q, &verify.Options{Now: now, TrustedRoots: roots}); err != nil {
 		return fmt.Errorf("%w: %v", ErrSignature, err)
 	}
 	return nil

@@ -17,6 +17,7 @@ pem2.pem
 *.key
 !internal/tee/parse/aws/root.pem
 !internal/tee/parse/tdx/root.pem
+!internal/tee/parse/snp/root.pem
 
 # Local instance addresses (copy e2e/env.local.example.sh)
 e2e/env.local.sh

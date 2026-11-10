@@ -5,13 +5,17 @@ go 1.26.1
 require (
 	github.com/ethereum/go-ethereum v1.17.5
 	github.com/fxamacker/cbor/v2 v2.9.3
-	github.com/google/go-tdx-guest v0.3.1
+	github.com/google/go-sev-guest v0.15.0
+	github.com/google/go-tdx-guest v0.3.2-0.20250814004405-ffb0869e6f4d
+	github.com/google/go-tpm-tools v0.4.11
 	github.com/hf/nitrite v0.0.0-20241225144000-c2d5d3c4f303
 	golang.org/x/crypto v0.57.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
 	github.com/DataDog/zstd v1.5.7 // indirect
+	github.com/GoogleCloudPlatform/confidential-space/server v0.0.0-20260915221818-a6c0685fb9fc // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/RaduBerinde/axisds v0.1.0 // indirect
@@ -33,7 +37,7 @@ require (
 	github.com/consensys/gnark-crypto v0.18.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/crate-crypto/go-eth-kzg v1.5.0 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dchest/siphash v1.2.3 // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
@@ -52,6 +56,9 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.1-0.20260716114414-9ae09f520e93 // indirect
+	github.com/google/go-configfs-tsm v0.3.3 // indirect
+	github.com/google/go-eventlog v0.0.3-0.20261001001437-1991f15bc4b0 // indirect
+	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/logger v1.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
@@ -105,7 +112,6 @@ require (
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

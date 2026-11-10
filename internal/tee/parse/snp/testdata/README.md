@@ -43,7 +43,7 @@ The values cannot be removed without breaking the signatures over them.
 
 | File | Contains |
 |---|---|
-| `gcp-n2d-att.pb` | In the Google-signed AK certificate: the GCP **project ID**, the **zone**, the **instance name** (`attestamp-snp-vendor`) and the numeric **instance ID**, all found as text. The project number was not found as text; whether the certificate carries it in binary form was not checked. The event log describes the boot of that instance. |
+| `gcp-n2d-att.pb` | In the Google-signed AK certificate: the GCP **project ID**, the **zone**, the **instance name** (`attestamp-snp-vendor`) and the numeric **instance ID**, found as text in the subject. The certificate's GCE instance-information extension (OID 1.3.6.1.4.1.11129.2.1.21) also carries the **project number** and the **instance ID** as integers; go-tpm-tools reads them as `gceInstanceInfo` (`server/verify.go`). The event log describes the boot of that instance, including the root partition's PARTUUID and the boot disk's file-system UUID. |
 | `gcp-n2d-report.bin` | `CHIP_ID`, which identifies the physical AMD processor of the Google host, and that host's TCB versions. No project or instance identifiers (searched for). |
 | `gcp-n2d-auxblob.bin` | The VCEK certificate, which carries the same chip ID and TCB. No project or instance identifiers (searched for). |
 
