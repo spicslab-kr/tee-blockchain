@@ -47,11 +47,12 @@ create)
 
   # Confirm the chosen image family really carries the guest OS feature this platform needs.
   if ! gcloud compute images describe-from-family "$IMAGE_FAMILY" --project "$IMAGE_PROJECT" \
-        --format='value(guestOsFeatures[].type)' 2>/dev/null | tr ',' '\n' | grep -qx "$FEATURE"; then
+        --flatten="guestOsFeatures[]" --format='value(guestOsFeatures.type)' 2>/dev/null \
+        | grep -qx "$FEATURE"; then
     echo "warning: $IMAGE_PROJECT/$IMAGE_FAMILY does not advertise $FEATURE."
     echo "Pick one of these instead and re-run with IMAGE_PROJECT=… IMAGE_FAMILY=…:"
     gcloud compute images list --filter="guestOsFeatures[].type:($FEATURE)" \
-      --format='table(name,family,selfLink.map().scope(projects).segment(0):label=PROJECT)' | head -20
+      --format='value(family)' | sort -u
     die "image does not support $FEATURE"
   fi
 

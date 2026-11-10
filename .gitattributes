@@ -1,1 +1,9 @@
-*.sh text eol=lf
+# This project's premise is byte-identical builds, so every text file is LF on every
+# platform. A CRLF checkout on Windows would change the bytes of cmd/ra-responder — its
+# usage text is a multi-line raw string literal — and with them PCR0 and PCR2.
+* text=auto eol=lf
+
+# Files that are embedded verbatim, or recorded from hardware. Never touch their bytes.
+*.cbor   -text
+*.nonce  -text
+*.pem    -text
