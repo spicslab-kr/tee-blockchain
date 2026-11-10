@@ -25,7 +25,7 @@ func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "my enclave's host:port, from which an attestation is requested first")
 	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port. also ask it, and say whether it runs the same value I built. the value registered is always the one I built")
-	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro or intel-tdx")
+	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
 	buildMeasurements := fs.String("build-measurements", "", "the value I built or measured myself (out/measurements.json). with --tee-addr the attested value must match it, or nothing is registered")

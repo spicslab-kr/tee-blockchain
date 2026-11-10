@@ -124,7 +124,7 @@ func usage() {
               verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements
   ra-request  --tee-addr <host:port> [--out-file <file>] [--format <name>] [--timeout 30s]
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
-              with --format, accepts only a document of that format. aws-nitro and intel-tdx documents can be parsed and verified; gcp-cs-jwt and azure-maa-jwt exist only on the request side
+              with --format, accepts only a document of that format. aws-nitro, intel-tdx and amd-sev-snp-* documents can be parsed and verified; gcp-cs-jwt and azure-maa-jwt exist only on the request side
 
 to do it by hand: commit build-config.json at the repository root and push; the other side clones it.`)
 }
@@ -191,7 +191,7 @@ func raRequest(args []string) error {
 	fs := flag.NewFlagSet("ra-request", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "TEE address host:port")
 	outFile := fs.String("out-file", "ra-doc.cbor", "file to save the document to")
-	format := fs.String("format", "", "expected document format (aws-nitro and intel-tdx can be verified). empty accepts any")
+	format := fs.String("format", "", "expected document format (aws-nitro, intel-tdx and amd-sev-snp-* can be verified). empty accepts any")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	if err := fs.Parse(args); err != nil {
 		return err

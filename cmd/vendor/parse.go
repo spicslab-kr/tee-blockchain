@@ -21,7 +21,7 @@ func raParse(args []string) error {
 	fs := flag.NewFlagSet("ra-parse", flag.ContinueOnError)
 	docPath := fs.String("doc", "", "RA document file (as saved by ra-request)")
 	noncePath := fs.String("nonce", "", "the nonce that was sent, as hex or a file. empty uses <doc>.nonce; if that is missing too, the nonce check is skipped")
-	format := fs.String("format", p.AWSFormat, "document format: aws-nitro or intel-tdx")
+	format := fs.String("format", p.AWSFormat, "document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity")
 	rootPath := fs.String("root", "", "platform verification key (root certificate PEM). empty uses the built-in one")
 	outFile := fs.String("out-file", "", "file to save the measurements to (default: <doc>.measurements.json)")
 	at := fs.String("at", "", "time at which to judge the certificate chain (RFC3339). empty uses the document's time on aws-nitro and the current time on intel-tdx, whose quote carries no time")
@@ -52,6 +52,14 @@ func raParse(args []string) error {
 		parser = a
 	case p.TDXFormat:
 		a := p.TDXParser{}
+		if *at != "" {
+			if a.Now, err = time.Parse(time.RFC3339, *at); err != nil {
+				return fmt.Errorf("--at: %w", err)
+			}
+		}
+		parser = a
+	case p.SNPInitrdFormat, p.SNPVerityFormat:
+		a := p.SNPParser{}
 		if *at != "" {
 			if a.Now, err = time.Parse(time.RFC3339, *at); err != nil {
 				return fmt.Errorf("--at: %w", err)

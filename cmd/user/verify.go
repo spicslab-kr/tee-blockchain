@@ -27,7 +27,7 @@ import (
 func verifyCmd(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "the enclave's host:port")
-	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro or intel-tdx")
+	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
