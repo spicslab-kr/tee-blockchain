@@ -115,7 +115,7 @@ func usage() {
               on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock,
               requests RA from itself to confirm, then opens the security-group port (when permitted).
               --build-measurements is for a received EIF: the file it came with. the EIF is then measured itself (→ out/measurements.json) and launched only if it measures to that
-  ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
+  ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc> [--format <fmt>]  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
   lo-up       brings up loopback inside the enclave. once, before starting the software
   ra-proxy    --listen <host:port>  --vsock <cid>:<port>
@@ -124,7 +124,7 @@ func usage() {
               verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output goes straight into register --measurements
   ra-request  --tee-addr <host:port> [--out-file <file>] [--format <name>] [--timeout 30s]
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
-              with --format, accepts only a document of that format. only aws-nitro documents can be parsed and verified; gcp-cs-jwt and azure-maa-jwt exist only on the request side
+              with --format, accepts only a document of that format. aws-nitro and intel-tdx documents can be parsed and verified; gcp-cs-jwt and azure-maa-jwt exist only on the request side
 
 to do it by hand: commit build-config.json at the repository root and push; the other side clones it.`)
 }
@@ -191,7 +191,7 @@ func raRequest(args []string) error {
 	fs := flag.NewFlagSet("ra-request", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "TEE address host:port")
 	outFile := fs.String("out-file", "ra-doc.cbor", "file to save the document to")
-	format := fs.String("format", "", "expected document format (only aws-nitro can be verified). empty accepts any")
+	format := fs.String("format", "", "expected document format (aws-nitro and intel-tdx can be verified). empty accepts any")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -222,6 +222,7 @@ func raServe(args []string) error {
 	fs := flag.NewFlagSet("ra-serve", flag.ContinueOnError)
 	listen := fs.String("listen", "tcp:127.0.0.1:5000", "tcp:<host:port> or vsock:<port>")
 	extractor := fs.String("extractor", "nsm", "nsm or fixture=<doc file>")
+	fixtureFormat := fs.String("format", awsra.Format, "format the fixture document is served as (fixture extractor only), e.g. intel-tdx")
 	userData := fs.String("user-data", "", "value to bind into the document (hex)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -235,7 +236,7 @@ func raServe(args []string) error {
 		}
 		ex = awsra.Extractor{UserData: ud}
 	case strings.HasPrefix(*extractor, "fixture="):
-		fx, err := ra.LoadFixture(awsra.Format, strings.TrimPrefix(*extractor, "fixture="))
+		fx, err := ra.LoadFixture(*fixtureFormat, strings.TrimPrefix(*extractor, "fixture="))
 		if err != nil {
 			return err
 		}

@@ -25,14 +25,14 @@ func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "my enclave's host:port, from which an attestation is requested first")
 	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port. also ask it, and say whether it runs the same value I built. the value registered is always the one I built")
-	format := fs.String("format", "aws-nitro", "expected document format (only aws-nitro can be verified)")
+	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro or intel-tdx")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
 	buildMeasurements := fs.String("build-measurements", "", "the value I built or measured myself (out/measurements.json). with --tee-addr the attested value must match it, or nothing is registered")
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
 	registry := fs.String("registry", "", "Registry contract address")
 	signingKeyFile := fs.String("signing-key-file", "", "signing key file (hex): its signature authorises the registration, and the same key sends the transaction")
-	platform := fs.String("platform", "aws-nitro", "platform value recorded in the registration")
+	platform := fs.String("platform", "", "platform value recorded in the registration. empty uses --format")
 	config := fs.String("config", "", "the Vendor's build-config.json (receive puts it in the clone root): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
 	service := fs.String("service", "", "service name. empty takes it from --config, else from an existing registration of the same measurements (anyone's)")
 	version := fs.String("version", "", "version. empty takes it from --config, else from an existing registration, as above")
@@ -42,6 +42,10 @@ func auditCmd(args []string) error {
 	outDir := fs.String("out-dir", "", "directory for the intermediate files (document, parsed value). empty uses a temporary directory, removed at the end")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	// The record key includes the platform, so registering under one name and looking up under another finds nothing.
+	if *platform == "" {
+		*platform = *format
 	}
 	// With --config, service, version and arch come from it (a flag overrides it, with a one-line warning). Without it, service and version are
 	// found in an existing registration below or asked for, and arch is this machine's.
@@ -103,7 +107,7 @@ func auditCmd(args []string) error {
 		cli.Why("an attestation is a document the enclave hardware signs on the spot, stating which image is running; the fresh nonce inside proves it was made just now")
 
 		t = cli.Start("Checking the attestation (signature chain to the platform root, nonce)")
-		parseArgs := []string{"--doc", docPath, "--out-file", parsedPath}
+		parseArgs := []string{"--doc", docPath, "--format", *format, "--out-file", parsedPath}
 		if *nonce != "" {
 			parseArgs = append(parseArgs, "--nonce", *nonce)
 		}
@@ -112,7 +116,7 @@ func auditCmd(args []string) error {
 			return err
 		}
 		t.Done("genuine")
-		cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from an enclave; PCR0·1·2 below are the image it runs")
+		cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from an enclave; the values below are the image it runs")
 		printPCRs(parsedPath)
 		if measPath == "" {
 			measPath = parsedPath
@@ -158,7 +162,7 @@ func auditCmd(args []string) error {
 			t.Fail("no answer")
 			return err
 		}
-		if err := raParse([]string{"--doc", vDoc, "--out-file", vParsed}); err != nil {
+		if err := raParse([]string{"--doc", vDoc, "--format", *format, "--out-file", vParsed}); err != nil {
 			t.Fail("invalid attestation")
 			return err
 		}
@@ -179,7 +183,7 @@ func auditCmd(args []string) error {
 		}
 		cli.Why("the Vendor claims to run this source; the only way to know is to ask its enclave and compare with what the source really builds to")
 	}
-	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry)}
+	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry), Platform: *platform}
 
 	if *service == "" || *version == "" {
 		t := cli.Start("No service/version given: looking for an existing registration of the same value")

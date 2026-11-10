@@ -21,10 +21,10 @@ func raParse(args []string) error {
 	fs := flag.NewFlagSet("ra-parse", flag.ContinueOnError)
 	docPath := fs.String("doc", "", "RA document file (as saved by ra-request)")
 	noncePath := fs.String("nonce", "", "the nonce that was sent, as hex or a file. empty uses <doc>.nonce; if that is missing too, the nonce check is skipped")
-	format := fs.String("format", p.AWSFormat, "document format (only aws-nitro can be parsed)")
+	format := fs.String("format", p.AWSFormat, "document format: aws-nitro or intel-tdx")
 	rootPath := fs.String("root", "", "platform verification key (root certificate PEM). empty uses the built-in one")
 	outFile := fs.String("out-file", "", "file to save the measurements to (default: <doc>.measurements.json)")
-	at := fs.String("at", "", "time at which to judge the certificate chain (RFC3339). empty uses the document's time")
+	at := fs.String("at", "", "time at which to judge the certificate chain (RFC3339). empty uses the document's time on aws-nitro and the current time on intel-tdx, whose quote carries no time")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -44,6 +44,14 @@ func raParse(args []string) error {
 	switch *format {
 	case p.AWSFormat:
 		a := p.AWSParser{}
+		if *at != "" {
+			if a.Now, err = time.Parse(time.RFC3339, *at); err != nil {
+				return fmt.Errorf("--at: %w", err)
+			}
+		}
+		parser = a
+	case p.TDXFormat:
+		a := p.TDXParser{}
 		if *at != "" {
 			if a.Now, err = time.Parse(time.RFC3339, *at); err != nil {
 				return fmt.Errorf("--at: %w", err)
@@ -82,7 +90,7 @@ func raParse(args []string) error {
 	if err != nil {
 		return err
 	}
-	say(fmt.Sprintf("module     %s\ntimestamp  %s\ndebug      %v", info.Module, info.Timestamp.Format(time.RFC3339), info.Debug))
+	say(fmt.Sprintf("module     %s\ntimestamp  %s\ndebug      %v", info.Module, docTime(info.Timestamp), info.Debug))
 	ms, err := parser.Parse(doc)
 	if err != nil {
 		return err
@@ -126,4 +134,12 @@ func say(line string) {
 	if !quiet {
 		fmt.Println(line)
 	}
+}
+
+// docTime formats the document's own time. An intel-tdx quote has none, so it says so instead of printing year 1.
+func docTime(t time.Time) string {
+	if t.IsZero() {
+		return "none in the document"
+	}
+	return t.Format(time.RFC3339)
 }

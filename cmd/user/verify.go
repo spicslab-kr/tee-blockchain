@@ -27,7 +27,7 @@ import (
 func verifyCmd(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "the enclave's host:port")
-	format := fs.String("format", "aws-nitro", "expected document format (only aws-nitro can be verified)")
+	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro or intel-tdx")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
@@ -88,7 +88,7 @@ func verifyCmd(args []string) error {
 	cli.Why("an attestation is a document the enclave hardware signs on the spot, stating which image is running; the fresh nonce inside proves it was made just now")
 
 	t = cli.Start("Checking the attestation (signature chain to the platform root, nonce)")
-	parseArgs := []string{"--doc", docPath, "--out-file", measPath}
+	parseArgs := []string{"--doc", docPath, "--format", *format, "--out-file", measPath}
 	if *nonce != "" {
 		parseArgs = append(parseArgs, "--nonce", *nonce)
 	}
@@ -97,7 +97,7 @@ func verifyCmd(args []string) error {
 		return err
 	}
 	t.Done("genuine")
-	cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from an enclave; PCR0·1·2 below are the image it runs")
+	cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from an enclave; the values below are the image it runs")
 	printPCRs(measPath)
 	values, err := readMeasurements(measPath)
 	if err != nil {
@@ -120,7 +120,7 @@ func verifyCmd(args []string) error {
 			label = fmt.Sprintf("registry %s (approver %s)", c, strings.Join(approvers, ","))
 		}
 		t = cli.Start("Looking up who registered what this enclave runs, in " + label)
-		recordKeys, err := lookup([]string{"--rpc", *rpc, "--registry", c, "--measurements", measPath})
+		recordKeys, err := lookup([]string{"--rpc", *rpc, "--registry", c, "--measurements", measPath, "--platform", *format})
 		if err != nil {
 			t.Fail("chain error")
 			return err

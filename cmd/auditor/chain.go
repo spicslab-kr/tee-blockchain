@@ -187,6 +187,7 @@ func lookup(args []string) ([]string, error) {
 	registry := fs.String("registry", "", "Registry contract address")
 	recordKey := fs.String("record-key", "", "record key (0x…, the one register printed). with it, --measurements is not needed")
 	measurements := fs.String("measurements", "", "measurements: a measurements.json file, or NAME=hex,NAME=hex")
+	platform := fs.String("platform", lether.DefaultPlatform, "platform the registration was made under (the record key includes it), e.g. aws-nitro or intel-tdx")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
@@ -195,7 +196,7 @@ func lookup(args []string) ([]string, error) {
 	if *rpc == "" || !common.IsHexAddress(*registry) {
 		return nil, errors.New("--rpc and --registry are required")
 	}
-	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry)}
+	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry), Platform: *platform}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
