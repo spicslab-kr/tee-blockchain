@@ -33,6 +33,13 @@ go build -trimpath -buildvcs=false -o "$AUDITOR_BIN" ./cmd/auditor
 go build -trimpath -buildvcs=false -o "$USER_BIN" ./cmd/user
 echo "responder sha256: $(sha256 att-ra-responder | cut -c1-64)"  # compared with the checksum printed on each instance after the upload
 
+# The flow and arch scripts clone the test application with git on the instances, and nothing installed it before.
+#   (Whether the Amazon Linux image ships git was never checked; this step makes it not matter.) Installed only when
+#   missing; git is outside the enclave image, so it does not touch the measurement.
+step "INSTALLING GIT"
+V 'command -v git >/dev/null || sudo dnf install -y -q git; git --version'
+A 'command -v git >/dev/null || sudo dnf install -y -q git; git --version'
+
 # A running att-vendor or att-auditor process (the ra-proxy bridge) locks its binary, so stop it and the enclave before uploading.
 step "STOPPING OLD ENCLAVES"
 V 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x att-vendor; true'

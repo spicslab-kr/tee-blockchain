@@ -35,7 +35,7 @@ Most important first.
 | 8 | **Fixture READMEs for Nitro**: `internal/tee/parse/aws/testdata/` and `internal/tee/request/testdata/` have none (date, AMI, `nitro-cli` version, image, nonce source) | person | a `README.md` in each, like the TDX and SEV-SNP ones |
 | 9 | **Packing SEV-SNP evidence for `ra-parse`** needs hand-written Go (`snp.Encode`); there is no command | repo | a small command next to `snp/testdata/record` or an `att-user` subcommand |
 | 10 | **GCP prerequisites**: the default network's `default-allow-ssh` rule, the Compute Engine API enabled, `xxd` on the guest for the TDX recording | repo | `e2e/cloud/README.md` |
-| 11 | **git on the Nitro instances**: no script installs it | repo | the remote setup script |
+| 11 | **git on the Nitro instances.** Done 2026-11-12 in the script, **not run**: `0-Setup-local-upload.sh` installs git with `dnf` on both instances when it is missing (`bash -n` only; the first Nitro run tests it) | — | `e2e/0-Setup-local-upload.sh` |
 | 12 | **arm64 Nitro host**: no create script; `aws-nitro.sh` filters x86_64 images | repo | `e2e/cloud/aws-nitro.sh` |
 | 13 | **vsock port, CID, enclave memory and CPUs.** Done 2026-11-12: defaults, flags and where each goes, including that `launch` opens the port from `0.0.0.0/0` when the role allows it | — | `docs/build/aws-nitro.md`, "Ports, vsock address and enclave resources" |
 | 14 | **Intel SGX Root CA.** Done 2026-11-12: identical to Intel's published `Intel_SGX_Provisioning_Certification_RootCA.cer` (serial and full sha256 fingerprint) | — | `docs/build/tdx.md` |
