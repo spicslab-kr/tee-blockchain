@@ -7,7 +7,8 @@ Status (2026-11-11, evening):
   - Phase 1 (TDX parse) and phase 4a (SEV-SNP parse), with D3, D4 and D5 decided.
   - The anvil chain tests, which run.
   - Application fixtures for all four platform/option cells, which make T5 a code test (`docs/plan/app-fixture-recording.md`).
-  - Phase 2 code (TDX and SEV-SNP request), tested on the recorded evidence; its run on a live guest (2.3) is pending.
+  - Phase 2 code (TDX and SEV-SNP request), tested on the recorded evidence. Its live run (2.3) passed on the SEV-SNP
+    guest on 2026-11-12, with everything on one guest; TDX is in the night log.
 - Phase 3 is partly done: 3.2–3.4 were measured in the recording session.
 - Phase 5 (a locked guest) is designed below, not started.
 - See `docs/plan/night-log.md`.
@@ -95,8 +96,20 @@ adapters in `internal/tee/request/{Vendor,auditor}/{tdx,snp}`, and `request/{Ven
 | # | Task | Pass criterion | State |
 |---|---|---|---|
 | 2.1 | `internal/tee/request/tdx` (ConfigFS TSM, REPORTDATA = nonce then zeros) and `internal/tee/request/snp` (GCE vTPM attestation, SHA3-512 into REPORT_DATA, SNP report and certificate table, the parse/snp container), with role adapters | the returned evidence parses with the Phase 1 and 4a parsers | **done, without hardware**: a fake TSM (go-configfs-tsm `faketsm`) answers only for the REPORTDATA each recording was made for, and the quote and evidence produced verify with the parsers |
-| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done; not run on a guest |
-| 2.3 | End to end: `att-user verify` against a running TDX and SEV-SNP instance | exit 0 and a `✓ matches` line | needs instances |
+| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **SEV-SNP: answered on the guest over 127.0.0.1, 2026-11-12** (`snp-initrd`); not yet from another machine |
+| 2.3 | End to end: `att-user verify` against a running TDX and SEV-SNP instance | exit 0 and a `✓ matches` line | **SEV-SNP `amd-sev-snp-initrd`: passed 2026-11-12, all on one guest** (`e2e/cvm/in-guest-verify.sh`, 11 of 11 checks). TDX: see the night log |
+
+**How 2.3 was run.** Without a firewall rule, everything runs on the guest and talks over `127.0.0.1`: the responder
+(as root), anvil 1.8.0, `att-auditor registry-deploy` and `audit`, `att-user verify`. Two consequences to keep in mind:
+
+- The Auditor's "build" values are the first live document's own values, because no build exists on the guest yet
+  (Phase 3.5). The run proves request, verification, registration and lookup on fresh evidence; it does not prove a
+  rebuild.
+- The verifier ran inside the attested guest. A verifier on another machine is the remaining part of 2.2.
+
+`amd-sev-snp-verity` was refused on the same boot, as it must be: the boot had no `attestamp.roothash=` on the command
+line, and `ra-parse` says "the kernel command line has no attestamp.roothash=, so no disk image was checked". Passing it
+needs a verity boot.
 
 **Listening.** `--listen` defaults to `tcp:127.0.0.1:5000`. A confidential VM is reached over its own network, so the
 responder has to be started with `--listen tcp:0.0.0.0:5000` explicitly, and the firewall must allow port 5000 only

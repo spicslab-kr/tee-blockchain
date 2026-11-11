@@ -694,3 +694,49 @@ home paths, disk UUIDs, PARTUUIDs, kernel version and IP addresses were not brou
   - `docs/plan/cvm-port.md`: why Phase 2 comes first (layer 2 removes `sshd`), the firewall narrowing, and Phase 5
     (lock the guest, with the tamper case).
   - README, STRUCTURE, tdx.md, sev-snp.md updated.
+
+## Overnight 2026-11-12
+
+Brief: scrub identifiers, run Phase 2.3 inside the guests, mount the dm-verity image at boot on TDX, fill the
+repository-only build-info gaps. No new instances, no push, no AWS, no firewall change.
+
+### 1. Identifiers (`3dbb04f`)
+
+The project ID and local paths are gone from `night-log.md`. The project ID remains inside the eight SEV-SNP
+`*-att.pb` fixtures, signed by Google, and their README says so first. **Earlier commits of this file still contain
+the project ID in git history**; rewriting history before the first push is a decision for the user.
+
+### 2. Phase 2.3 on SEV-SNP: passed
+
+`attestamp-snp-vendor`, kernel `7.0.0-1017-gcp`, stock boot (no application in the initrd; INITRD measured
+`4703ec07…`, the distribution initrd). Binaries built locally with `-trimpath -buildvcs=false`, sha256 checked on the
+guest after copying. anvil 1.8.0 from the Foundry v1.8.0 release tarball, its sha256 checked against the release's
+`foundry_v1.8.0_linux_amd64.sha256`.
+
+`sh in-guest-verify.sh snp-initrd amd-sev-snp-initrd` (`2406073`): **11 passed, 0 failed.**
+
+| check | result |
+|---|---|
+| two requests answered, 67,810 bytes each | PASS |
+| each verifies (VCEK chain, vTPM, SHA3-512 binding, nonce) | PASS |
+| the nonce check ran ("nonce      ok") | PASS |
+| the two documents differ | PASS |
+| document 1 against request 2's nonce | refused, exit 6 (T9 live) |
+| registry deployed on anvil | PASS |
+| `att-auditor audit` registered | PASS |
+| `att-user verify` | exit 0, `✓ matches  in-guest 1.0.0 (amd64) by 0x7099…79C8` |
+
+The Auditor's expected values were the first document's, not a rebuild's (no Phase 3.5 yet); the verifier ran on the
+guest itself.
+
+`sh in-guest-verify.sh snp-verity amd-sev-snp-verity` on the same boot: refused, correctly, with "the kernel command line
+has no attestamp.roothash=, so no disk image was checked". The verity format needs a verity boot; not run tonight.
+
+**Stopped** `attestamp-snp-vendor` at about 15:37 UTC by the guest's clock; `gcloud compute instances list` shows it
+TERMINATED.
+
+### TDX VM: no capacity
+
+`gcloud compute instances start attestamp-tdx-vendor` failed with `ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS`: no
+c3-standard-4 in us-central1-a; GCP suggested us-central1-f. Moving zones means a new instance, which the brief does
+not allow. Attempt 1 of 2; tasks 2 (TDX) and 3 wait for the second attempt.
