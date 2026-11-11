@@ -147,3 +147,15 @@ not depend on go-tpm-tools yet.) `crypto/sha3` needs Go 1.24 or later; the pinne
 To record evidence with an application in the initrd, see `docs/plan/app-fixture-recording.md`.
 
 Then on an SEV-SNP guest booted with an initrd: `sudo ./record-snp -out fx -nonce-text attestamp-snp-fixture-0001`.
+
+## Checking a recording with `ra-parse`
+
+A recording is three files; `att-user ra-parse` reads the one CBOR container the responder sends. `pack/main.go` joins
+them with `snp.Encode`:
+
+```
+go run ./internal/tee/parse/snp/testdata/pack -fixture internal/tee/parse/snp/testdata/gcp-n2d-opt1p-v1 -out doc.cbor
+go run ./cmd/user ra-parse --doc doc.cbor --format amd-sev-snp-initrd
+```
+
+Since 2026-11-12, evidence fetched from a running guest with `att-user ra-request` is already in that form.
