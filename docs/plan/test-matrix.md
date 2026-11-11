@@ -21,7 +21,7 @@ Each cell says how far the row is proven, and by what:
 
 | id | test | expected | Nitro | TDX | SEV-SNP (GCP) |
 |---|---|---|---|---|---|
-| T1 | same source built on two machines | identical measurement | **script, never run** (`arch-measurement-compare.sh`) | **needs VM** | **2026-11 run**: the application, its cpio archive and the dm-verity image hashed the same on two GCP machines ¹ |
+| T1 | same source built on two machines | identical measurement | **script, never run** (`arch-measurement-compare.sh`) | **measured 2026-11-11** for the application image ⁹ | **measured 2026-11-11** for the application image ⁹; also **2026-11 run**: the application, its cpio archive and the dm-verity image hashed the same on two GCP machines ¹ |
 | T2 | only the Go version differs | different measurement (Nitro: `build` refuses) | **code**: `TestToolchain_E2E_WrongToolchainRefused` (refused). The differing measurement itself: **script, never run** (`toolchain-pin-check.sh`) ² | **needs VM** | **2026-11 run**: Go 1.22.2 and 1.23.4 gave different binaries ¹ |
 | T3 | only the build path differs, with `-trimpath` | identical measurement | **code** for the responder: `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`. The whole EIF: **script, never run** ³ | **needs VM** | **2026-11 run** (without `-trimpath`, two folders gave two binaries) ¹ |
 | T4 | normal flow: Auditor rebuilds, registers, User verifies | trusted, exit 0 | **code**: `TestRun_E2E_AuditorVendorUser` (recorded document, anvil). Real instances: **script, never run** (`flow1-auditor-registers/1,2,3`) | **code**: `TestRun_E2E_TDX_AuditorUser` (recorded quote, anvil; first passed 2026-11-11). Real instance: **needs VM** | **code** for verification only: `TestCmd_E2E_SNP_ParseInitrdBoot`. No audit/verify chain test yet. Real instance: **needs VM** |
@@ -59,6 +59,14 @@ against a live verifier.
 evidence twice on the same guest, with the application changed by one byte, then register one and present the other
 in a chain test. After that it is proved by `go test` with no VM. The procedure, ready to run, is
 `docs/plan/app-fixture-recording.md` (prepared 2026-11-11, not run yet).
+
+⁹ The dm-verity application image built on `attestamp-snp-vendor` and on `attestamp-tdx-vendor` was byte-identical:
+two machines, two platforms, one image (`app.img` sha256 `28bdfcff…ec1c`, root hash `e29ec085…af0c9` for v1;
+`b8e2656f…fb27` and `a2f4df92…51e1` for v2). Settings that made it reproducible: squashfs with `-mkfs-time 0
+-all-time 0`, veritysetup with a fixed `--salt` and `--uuid`, and a fixed umask, **`umask 022`**, with every folder
+and file set to mode 755 (`internal/setup/build/cpio/testdata/make-verity-image.sh`; squashfs-tools 4.6.1, cryptsetup
+2.7.0 on both). This covers the image, not a whole measurement: the base initrd and the boot chain were the
+distribution's on both guests.
 
 ⁷ A vTPM attestation from an approved VM plus an SNP report from a different VM passes verification. This row is the
 honest reason SEV-SNP is weaker than the other two, and it has to appear in the table rather than in a footnote. The

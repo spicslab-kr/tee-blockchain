@@ -185,7 +185,7 @@ Each row changed a hash in the 2026-11 tests, with the same source code (observe
 | build path | without `-trimpath`, two folders gave two different binaries | `-trimpath` |
 | cpio tool | GNU cpio 2.13 (Amazon Linux 2023) and 2.15 (Ubuntu) packed the same files into different bytes (directory link counts) | our own cpio writer: `internal/setup/build/cpio` (sorted names, time 0, owner 0, fixed inode numbers), byte-identical to the scripts' `mkcpio.py` |
 | distribution base initrd | `mkinitramfs` and `dracut` build a different file every time (it contains a random seed) | none possible. The Auditor uses the base initrd the Vendor publishes and rebuilds only the application part |
-| folder permissions (umask) | the same files in a squashfs image gave a different image and root hash under umask 022 (folders 755) and umask 002 (folders 775) | build under the same umask. The script fixes file modes but not folder modes, so this is still open |
+| folder permissions (umask) | the same files in a squashfs image gave a different image and root hash under umask 022 (folders 755) and umask 002 (folders 775) | **fixed (2026-11-11):** `internal/setup/build/cpio/testdata/make-verity-image.sh` sets **`umask 022`** and sets every folder and file to mode **755** explicitly. With it, the image built on `attestamp-snp-vendor` and on `attestamp-tdx-vendor` was byte-identical (`app.img` sha256 `28bdfcff…ec1c`, root hash `e29ec085…af0c9`). A build that sets neither still depends on the caller's umask |
 | squashfs timestamps | `mksquashfs` writes the build time by default | `-mkfs-time 0 -all-time 0`, file times set to 0 |
 | dm-verity salt and UUID | `veritysetup format` picks them at random | fixed `--salt` and `--uuid` |
 

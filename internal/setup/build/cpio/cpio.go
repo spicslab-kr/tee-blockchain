@@ -148,8 +148,10 @@ func FromDir(root string) ([]Entry, error) {
 type Placement int
 
 const (
-	// AppFirst puts the application archive before the base initrd. This is what the Intel TDX runs on GCP use: an
-	// unpadded append failed there (docs/plan/cvm-port.md, Phase 3.2), for the alignment reason given under AppLast.
+	// AppFirst puts the application archive before the base initrd. This is what the Intel TDX fixtures were recorded
+	// with (no padding needed: the archive is padded to 512 bytes, so the base starts aligned). An unpadded append
+	// failed on TDX in 2026-10 (docs/plan/cvm-port.md, Phase 3.2); that was not repeated, and the alignment reason under
+	// AppLast, measured on SEV-SNP with the same base initrd, is the likely cause.
 	AppFirst Placement = iota
 	// AppLast appends the application archive after the base initrd, zero-padding the base to a multiple of 4 bytes
 	// first. The kernel only recognises an uncompressed archive after a compressed segment at a 4-byte-aligned offset

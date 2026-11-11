@@ -42,7 +42,13 @@ Intel.
 | RTMR2 | the kernel command line and the initrd, where the application archive is |
 
 The firmware extends what a TPM would put in PCR1 and 7 into RTMR0, PCR2–6 into RTMR1 and PCR8–15 into RTMR2. That
-mapping is the TDVF design; **it has not been confirmed on GCP** by changing each part in turn.
+mapping is the TDVF design.
+
+Measured on four recordings from `attestamp-tdx-vendor` (Option 1 v1/v2 and Option 2 v1/v2, 2026-11-11): MRTD,
+RTMR0 and RTMR1 were identical across all four, and only RTMR2 changed with the application. This confirms the
+assumed mapping of GRUB's measurements into RTMR2, and it is also why TDX needs no second format for Option 2: both
+options move the same single register. (`internal/tee/parse/tdx/app_fixture_test.go`. The rest of the mapping, which
+of RTMR0 and RTMR1 holds what, was not tested: nothing in those registers was changed.)
 
 Why all four, not RTMR2 alone: the firmware, boot loader and kernel extend RTMR2 themselves, so a changed kernel could
 extend the expected RTMR2 while running something else, and only MRTD and RTMR0–1 would show it. Nitro registers PCR0,
@@ -97,7 +103,7 @@ SEV-SNP runs measured for the same files.
 | kernel command line | RTMR2 | it carries the root PARTUUID, which differs per disk |
 | base initrd | RTMR2 | `mkinitramfs` writes a random seed, so the Vendor's base initrd is used as published (as on SEV-SNP) |
 | application archive | RTMR2 | Go version, `-trimpath`, the cpio writer: the same as on SEV-SNP (`docs/build/sev-snp.md`). The archive is written by `internal/setup/build/cpio`, byte-identical to the scripts' `mkcpio.py` |
-| archive placement | RTMR2 | the application archive goes **before** the base initrd (`cpio.AppFirst`). Appended after the compressed base initrd, the guest failed to decompress it (docs/plan/cvm-port.md, Phase 3.2). The likely reason is a missing 4-byte alignment, not a kernel limit on appending; see "Before or after the base initrd" below |
+| archive placement | RTMR2 | the application archive goes **before** the base initrd (`cpio.AppFirst`), the placement the TDX fixtures were recorded with. An unpadded append failed in 2026-10 (Phase 3.2 record, not repeated since); the cause is 4-byte alignment, measured on SEV-SNP on 2026-11-11. See "Before or after the base initrd" below |
 | `GRUB_FORCE_PARTUUID` | RTMR2 | GCP's Ubuntu 24.04 image boots its stock entry without an initrd when this is set (confirmed on the SEV-SNP image of the same family). An application in an initrd is then never loaded. See "`GRUB_FORCE_PARTUUID`" below |
 
 ## Byte order
@@ -212,26 +218,32 @@ commit `067c5c24cef2`, and `Documentation/driver-api/early-userspace/buffer-form
 - GRUB zero-pads each file to 4 bytes only when it loads several (`initrd a b`, `grub-core/loader/linux.c`). One
   combined file gets no padding.
 
-**Measured on SEV-SNP (2026-11-11): the alignment explanation holds.** On `attestamp-snp-vendor`, with the same
-Ubuntu kernel family:
+**Measured 2026-11-11.** The same base initrd file (50,100,283 bytes, size mod 4 = 3, sha256 `4703ec07…b0a2`) was
+used on both guests:
 
-| base initrd | how the archive was added | kernel | marker `/dev/attestamp-app-marker` |
-|---|---|---|---|
-| 50,100,283 bytes, **mod 4 = 3** | appended directly (unpadded) | `Initramfs unpacking failed: invalid magic at start of compressed archive` | absent: the application never ran |
-| the same, zero-padded to 50,100,284 bytes (mod 4 = 0) | appended after the padding | no error | present, with the application's text |
+| guest, placement | kernel | marker `/dev/attestamp-app-marker` |
+|---|---|---|
+| SEV-SNP, `AppLast`, unpadded | logged `Initramfs unpacking failed: invalid magic at start of compressed archive` (both boots) | absent: the application never ran |
+| SEV-SNP, `AppLast`, padded (base zero-padded to 50,100,284 bytes) | no error (both boots) | present, with the application's text |
+| Intel TDX, `AppFirst` | no error on any of four boots | present on all four |
 
-The guest booted in both cases, and INITRD changed with the application in both (`docs/build/sev-snp.md`,
-"Correction: SEV-SNP Option 1 as appended in 2026-11"). **A changed or matching INITRD does not by itself prove the
-application ran**: only the marker (or a boot log) does. `cpio.Join(AppLast)` now pads the base (commit `3c57d4c`);
-prepending (`AppFirst`) needs no padding because our archive is padded to 512 bytes, so the base that follows starts
-aligned.
+Placement, not platform, decides the outcome: `AppFirst` works because the application archive is padded to 512
+bytes, so the base initrd that follows starts on a 4-byte boundary.
 
-**Still open:**
+After the padding fix in `cpio.Join` (commit `3c57d4c`), placement is a convention rather than a correctness
+requirement: both orders work. The order still changes the measured bytes, so each platform keeps the placement its
+fixtures were recorded with: `AppFirst` on TDX, `AppLast` on SEV-SNP.
 
-- the base initrd the TDX append failed with in 2026-10 was not kept, so its length cannot be checked;
-- an alignment failure lets the guest boot without the application, so the 2026-10 note that the TDX guest "failed"
-  may mean the application was missing rather than that the boot stopped (its serial log was not kept);
-- the TDX base initrd's length on `attestamp-tdx-vendor` is measured in the TDX recording session (below, once done).
+In the unpadded case the guest booted and INITRD still changed with the application (`docs/build/sev-snp.md`,
+"Correction: SEV-SNP Option 1 as appended in 2026-11"). **A changed or matching measurement does not by itself prove
+the application ran**: only the marker, or the boot log, does. The boot logs are committed next to the fixtures
+(`*-boot.txt`).
+
+**TDX with `AppLast` was not tested on 2026-11-11.** The statement that an append failed to decompress on TDX comes
+from the Phase 3.2 record of 2026-10 (`docs/plan/cvm-port.md`), not from this session. That base initrd and its serial
+log were not kept. If its length was not a multiple of 4, the measurement above explains it; and an unpadded append
+lets the guest boot without the application, so "failed" there may mean the application was missing rather than that
+the boot stopped.
 
 ## The instance
 
@@ -274,5 +286,5 @@ describe` on 2026-11-11):
 | Option 2 on TDX (squashfs + dm-verity image inside the initrd) | Phase 3.4; not built or booted. Two builds giving the same root hash is the pass criterion |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
-| the PCR→RTMR mapping and the VM-shape dependence | not confirmed on GCP |
-| the append-alignment explanation on TDX itself | measured on SEV-SNP (same kernel family); the 2026-10 TDX file is gone (see "Before or after the base initrd") |
+| the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |
+| `AppLast` on TDX | not tested on 2026-11-11; the 2026-10 failure is the Phase 3.2 record |

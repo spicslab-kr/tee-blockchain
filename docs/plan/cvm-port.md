@@ -88,9 +88,9 @@ the recommended way to fetch a quote is `GetQuoteProvider()` over ConfigFS — `
 | # | Task | Pass criterion |
 |---|---|---|
 | 3.1 | Deterministic cpio of the application — fixed mtime, sorted order | two builds on two machines hash the same |
-| 3.2 | Prepend the application cpio to the base initrd (appending breaks decompression) | the instance boots |
-| 3.3 | Turn off `GRUB_FORCE_PARTUUID` so the initrd is actually read and measured | RTMR[2] changes when the initrd changes |
-| 3.4 | Option 2: squashfs + dm-verity (ext4 is not reproducible even with fixed UUID and hash_seed) | two builds give the same root hash |
+| 3.2 | Prepend the application cpio to the base initrd (appending broke decompression in 2026-10; on 2026-11-11 the cause was measured on SEV-SNP as missing 4-byte padding, and `cpio.Join` now pads; TDX + append was not re-tested) | the instance boots. **Done 2026-11-11**: four boots with `AppFirst`, the application unpacked every time (marker present) |
+| 3.3 | Turn off `GRUB_FORCE_PARTUUID` so the initrd is actually read and measured | RTMR[2] changes when the initrd changes. **Done 2026-11-11**: RTMR2 changed with the application; MRTD, RTMR0, RTMR1 did not |
+| 3.4 | Option 2: squashfs + dm-verity (ext4 is not reproducible even with fixed UUID and hash_seed) | two builds give the same root hash. **Done 2026-11-11 for the image**: the same image and root hash on the SEV-SNP and the TDX guest. Opening and mounting it inside a TDX boot is not built |
 | 3.5 | `setup/launch/<role>/tdx/` — write a GRUB entry, boot into it once, read the measurement back | the measured value equals the built value |
 | 3.6 | A `--verify` equivalent: build twice and refuse on a mismatch | a deliberate one-byte change fails the build |
 
