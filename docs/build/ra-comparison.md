@@ -45,6 +45,55 @@ on-chain value.
 | Code | `aws/measure.go`, `imagePCRs` | `tdx/measure.go`, `imageRTMRs` | `snp/measure.go`, `initrdNames`, `verityNames` |
 | Asserted on recorded evidence | yes (`aws/measure_test.go`, also against the `nitrite` library) | yes (`tdx/measure_test.go`) | yes, the five initrd values (`snp/measure_test.go`), each checked against a value read outside the parser. PCR12 has no recording yet |
 
+## Roots of trust
+
+Who vouches for each registered value. A value is only as trustworthy as the key that signed it.
+
+| format | registered values | root of trust |
+|---|---|---|
+| `aws-nitro` | PCR0, PCR1, PCR2 | AWS Nitro attestation PKI, one signature |
+| `intel-tdx` | MRTD + RTMR0–2 | Intel (PCK chain to the Intel SGX Root CA), one signature |
+| `amd-sev-snp-*` | MEASUREMENT | AMD (VCEK) |
+| | PCR4, KERNEL, CMDLINE, INITRD, and PCR12 for verity | Google's vTPM attestation key: a software root of trust, run by the hypervisor |
+
+**Intel TDX** has runtime-extendable measurement registers, RTMR0–RTMR3, inside the TD ("runtime extendable
+measurement register", [IETF draft-kdyxy-rats-tdx-eat-profile-02](https://www.ietf.org/archive/id/draft-kdyxy-rats-tdx-eat-profile-02.html),
+§3.3). The guest extends them after launch, and the TDX module covers them with the same Intel-rooted quote signature
+as MRTD. Google's documentation: "You can verify the Intel TDX module quote on its own to cover the entire boot chain"
+([attestation overview](https://docs.cloud.google.com/confidential-computing/confidential-vm/docs/attestation-overview)).
+
+**AMD SEV-SNP** has no equivalent.
+
+- MEASUREMENT is a SHA-384 chain built during `SNP_LAUNCH_UPDATE` (each update is `DIGEST_NEW := SHA-384(PAGE_INFO)`)
+  and finalized at `SNP_LAUNCH_FINISH`. It does not change afterwards: the report calls it "the measurement calculated
+  at launch" (AMD 56860 rev. 1.58).
+- Kernel, initrd and userspace measurements therefore come from the cloud's vTPM, which on Google Cloud is run by the
+  hypervisor. Google's attestation overview (link above) puts it this way:
+  - SEV-SNP's root of trust for measurement is "AMD Secure Processor + VM instance firmware".
+  - "Bootloader, kernel, and userspace measurements: Shielded VM vTPM".
+  - That vTPM is part of a "Software root of trust (hypervisor dependent)" and is "managed by the host hypervisor".
+
+**Measured on our own fixtures.** The two recordings in `internal/tee/parse/snp/testdata` come from the same instance,
+one booted with an initrd (`gcp-n2d-*`) and one without (`gcp-n2d-initrdless-*`).
+
+- They carry the identical MEASUREMENT, `f67900851e25a378f04b4d4b5f1ea4410c11deb74e97ddcc7e3363a33f6e1dbb7880d304005387bc98e9cbdceec4ea28`
+  (`xxd -s 0x90 -l 48` on both report files, 2026-11-11).
+- HOST_DATA (C0h), FAMILY_ID (10h), IMAGE_ID (20h) and ID_KEY_DIGEST (E0h) are all zero in both reports (`xxd` at
+  those offsets).
+- So on GCP the AMD signature identifies the firmware and says nothing about the workload: a different kernel
+  command line, a different initrd, or none at all, gives the same AMD-signed value.
+
+**Consequence for Attestamp.** An `intel-tdx` measurement set has one root of trust; an `amd-sev-snp-*` set has two.
+This is the same gap that `internal/tee/parse/snp/doc.go` records as the same-VM problem (test-matrix row T10).
+
+**What would close it.**
+
+- An SVSM at VMPL0 can host a vTPM inside the guest, bringing those PCRs under the launch measurement. See e-vTPM
+  (Narayanan et al., ACSAC 2023, arXiv:2303.16463) and SNPGuard (Wilke and Scopelliti, SysTEX'24, arXiv:2406.01186).
+- Google Cloud's documentation offers no SVSM: the attestation overview does not mention one, and neither do the
+  release notes. So this is not available to us. A Google community blog post (June 2026) mentions an SVSM vTPM
+  "preview"; it is not in Google's documentation and was not tried.
+
 ## Debug mode
 
 A debug TEE lets the host read and change the guest's memory, so its measurements prove nothing.

@@ -280,6 +280,10 @@ an application, or the verity setup, use `option1-initrd/gcp_boot_option1.sh` (O
 `option2-dm-verity/gcp_boot_option2.sh` (Option 2) from the 2026-11 scripts, after replacing their hard-coded disk
 UUID, PARTUUID, kernel version and UEFI boot entry number with the new instance's.
 
+The two roots of trust in one SEV-SNP measurement set (AMD for MEASUREMENT, Google's vTPM for the rest), and the
+check that MEASUREMENT is identical across our initrd and initrdless recordings, are written up in
+`docs/build/ra-comparison.md`, "Roots of trust".
+
 ## Byte order
 
 Sources: AMD SEV-SNP Firmware ABI, pub. 56860, **rev. 1.58** (May 2025; the revision we could retrieve, cited elsewhere
@@ -347,8 +351,10 @@ RTMR0–2 and leaves RTMR3, the runtime register, out.
 **Linux (confirmed).** The kernel's measurement-register interface (`drivers/virt/coco/tsm-mr.c`, 6.16) is used by
 `tdx-guest` only. `sev-guest` registers report generation and no measurement registers.
 
-**The vTPM on GCP (confirmed, Google's attestation overview).** The vTPM of a GCP SEV-SNP VM is "managed by the host
-hypervisor", and its measurements are "software-attested instead of hardware". Anything extended into PCR10–23 at run
+**The vTPM on GCP (confirmed, Google's attestation overview, re-read 2026-11-11).** The vTPM of a GCP SEV-SNP VM is
+"managed by the host hypervisor" and belongs to a "Software root of trust (hypervisor dependent)"; for SEV-SNP the page
+lists "Bootloader, kernel, and userspace measurements: Shielded VM vTPM". (An earlier version of this paragraph quoted
+"software-attested instead of hardware" from that page; the phrase is not on it.) Anything extended into PCR10–23 at run
 time (IMA, for example) is signed by Google's attestation key, not by AMD, and that vTPM sits outside the SNP trust
 boundary. That is also why our PCR4, KERNEL, CMDLINE, INITRD and PCR12 are Google-signed (see "Same VM").
 
