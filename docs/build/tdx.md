@@ -1,9 +1,10 @@
 # Intel TDX: what is measured, what changes it, and what is not done yet
 
 **Status.** The verifying side works on a recorded quote: `ra-parse`, `audit` and `verify` accept `intel-tdx`
-(`internal/tee/parse/tdx`). Requesting a quote from a running guest, building the image and launching it are not
-implemented. The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) passes against a local anvil chain
-(first run 2026-11-11, anvil 1.8.0).
+(`internal/tee/parse/tdx`). Requesting a quote from a running guest works (`att-ra-responder ra-serve --extractor
+tdx`; the whole chain passed on a live guest on 2026-11-12). Building the image and launching it are not implemented.
+The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) passes against a local anvil chain (first run
+2026-11-11, anvil 1.8.0). Tools and versions: [toolchain.md](toolchain.md).
 
 Statements are marked **confirmed** (read from our recorded quote, a spec, a library's source or an official page),
 **observed** (seen in our runs) or **not confirmed**.

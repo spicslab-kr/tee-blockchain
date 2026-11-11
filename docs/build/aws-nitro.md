@@ -3,7 +3,8 @@
 The Vendor and the Auditor each build the same source on their own instance. Whoever registers the
 value, it can only be trusted if both builds give the same measurements. On Nitro Enclaves the
 measurements are PCR0, PCR1 and PCR2. The short version is in the README under
-[Build](../../README.md#build).
+[Build](../../README.md#build). Tools, which step calls them, and the versions used: [toolchain.md](toolchain.md)
+(the Nitro instance's docker and nitro-cli versions have not been recorded yet).
 
 ## The three values
 

@@ -2,7 +2,9 @@
 
 **Status.** The verifying side works on recorded evidence: `ra-parse` checks a GCP SEV-SNP evidence pair and
 extracts its values (`internal/tee/parse/snp`, formats `amd-sev-snp-initrd` and `amd-sev-snp-verity`). Requesting
-evidence from a running guest, building the image and launching it are not implemented. A known weakness is
+evidence from a running guest works (`att-ra-responder ra-serve --extractor snp-initrd | snp-verity`; the whole chain
+passed on a live guest with `snp-initrd` on 2026-11-12). Building the image and launching it are not implemented.
+Tools and versions: [toolchain.md](toolchain.md). A known weakness is
 written down below under "Same VM": SEV-SNP support is weaker here than Nitro or TDX, and that does not go away
 with more code.
 
