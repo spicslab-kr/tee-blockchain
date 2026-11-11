@@ -43,14 +43,19 @@ guest by reading `/usr/share/initramfs-tools/init` before relying on it.
 
 **What is used instead: a marker carried in the archive.** `mkappinitrd` adds `conf/conf.d/zz-attestamp-app-marker`.
 The marker writes the names and sizes of the files in `/opt/app`, and the application's text, to
-`/run/attestamp-app-marker`. This is reliable because of two things in initramfs-tools' `/init`:
+`/dev/attestamp-app-marker`. This is reliable because of three things, checked on the SEV-SNP guest (Ubuntu 24.04,
+2026-11-11):
 
-- it sources every file in `conf/conf.d` by glob, with no ORDER file to edit;
-- it moves its `/run` tmpfs onto the real root.
+- initramfs-tools' `/init` sources every file in `conf/conf.d` by glob (line 94), with no ORDER file to edit;
+- `/dev` (devtmpfs) is mounted before that (line 40), and udev's init-bottom script moves it onto the real root
+  (`mount -n -o move /dev "${rootmnt}/dev"`);
+- a regular file can be created in devtmpfs.
 
-So the marker file exists after boot **if and only if** the kernel unpacked our archive. The procedure checks both
-properties in `/init` on the guest first. (The 2026-11 SEV-SNP scripts already read `/run/attestamp-status`, written
-in the initramfs, after boot.)
+So the marker file exists after boot **if and only if** the kernel unpacked our archive.
+
+`/run` would have been the obvious place, and it does not work: `/init` mounts its tmpfs on `/run` only at line 253,
+after sourcing `conf/conf.d`, so a file written there is hidden. (The SEV-SNP Option 2 check runs later, at
+local-bottom, so its `/run/attestamp-status` does survive.)
 
 `dmesg | grep -i initramfs` is recorded too, but only as a hint: the message text differs between kernel versions, and
 the ring buffer can wrap.
@@ -102,8 +107,9 @@ sha256sum mkappinitrd record-*             # must equal the local values
 uname -r
 cat /proc/sys/kernel/random/boot_id
 
-# Check the two properties the marker relies on, in initramfs-tools' /init:
-grep -n -E 'conf/conf.d|mount -t tmpfs.*/run|move /run|run-init' /usr/share/initramfs-tools/init
+# Check what the marker relies on (conf.d sourced after /dev is mounted; udev moves /dev to the real root):
+grep -n -E 'devtmpfs|conf/conf.d|tmpfs.*/run' /usr/share/initramfs-tools/init
+grep -n move /usr/share/initramfs-tools/scripts/init-bottom/udev
 
 # GRUB_FORCE_PARTUUID off (docs/build/sev-snp.md, "The boot setting changed"); skip if already commented out
 grep -n GRUB_FORCE_PARTUUID /etc/default/grub.d/40-force-partuuid.cfg
@@ -141,7 +147,7 @@ After every reboot, before recording:
 sudo shutdown -h +240
 cat /proc/sys/kernel/random/boot_id        # must differ from the previous boot
 cat /proc/cmdline
-cat /run/attestamp-app-marker              # Option 1 and TDX Option 2: present and naming the expected text
+cat /dev/attestamp-app-marker              # Option 1 and TDX Option 2: present and naming the expected text
 sudo dmesg | grep -i -E 'initramfs|unpack' # a hint only
 ```
 

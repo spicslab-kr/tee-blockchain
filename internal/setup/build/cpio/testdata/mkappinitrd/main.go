@@ -6,11 +6,13 @@
 // Either way it lands under /opt/app in the initramfs.
 //
 // The archive also carries a marker: conf/conf.d/zz-attestamp-app-marker. initramfs-tools' /init sources every file in
-// conf/conf.d (a plain glob, no ORDER file) after it has mounted the tmpfs on /run, and it later moves that /run onto
-// the real root. The marker writes the names and sizes of the files in /opt/app, and the content of /opt/app/app, to
-// /run/attestamp-app-marker. So after boot that file exists exactly when the kernel unpacked the archive, which a
-// dmesg line cannot show reliably. (Checked against /usr/share/initramfs-tools/init on the guest before use; see the
-// procedure.)
+// conf/conf.d (a plain glob, no ORDER file). At that point /dev (devtmpfs) is already mounted, and udev's init-bottom
+// script later moves that /dev onto the real root. The marker writes the names and sizes of the files in /opt/app, and
+// the content of /opt/app/app, to /dev/attestamp-app-marker. So after boot that file exists exactly when the kernel
+// unpacked the archive, which a dmesg line cannot show reliably.
+//
+// /run would not do: /init sources conf/conf.d (line 94 on Ubuntu 24.04) before it mounts the tmpfs on /run (line
+// 253), so a file written to /run there is hidden by that mount. Checked on the SEV-SNP guest, 2026-11-11.
 //
 //	mkappinitrd -base /boot/initrd.img-$(uname -r) -app-text "attestamp app v1" -placement first -out initrd-app.img
 //	mkappinitrd -base /boot/initrd.img-$(uname -r) -app-dir image-v1 -placement first -out initrd-app.img
@@ -43,7 +45,7 @@ if [ -d /opt/app ]; then
 		for f in /opt/app/*; do [ -f "$f" ] && echo "file ${f##*/} $(wc -c < "$f")"; done
 		[ -f /opt/app/app ] && cat /opt/app/app
 		[ -f /opt/app/roothash ] && cat /opt/app/roothash
-	} > /run/attestamp-app-marker 2>/dev/null || true
+	} > /dev/attestamp-app-marker 2>/dev/null || true
 fi
 `
 
