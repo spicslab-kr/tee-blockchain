@@ -24,10 +24,12 @@ case "$NET" in
            [ "${CONFIRM_MAINNET:-}" = 1 ] || { echo "NET=mainnet spends real ETH. If you are sure, also pass CONFIRM_MAINNET=1."; exit 1; };;
   *) echo "NET must be sepolia or mainnet"; exit 1;;
 esac
-AUDITOR_SIGNING_KEY=auditor.key   # 0xD2082a2513781b29beeF5DB847b2c85Cbc50ECeE - approver in flow 1
-DEPLOYER_KEY=deployer.key; VENDOR_SIGNING_KEY=$DEPLOYER_KEY   # 0xAf48305C64683eB72C28be61dD0E41478A2a0Df5 - pays gas, approver in flow 2
-AUDITOR_ADDR=0xD2082a2513781b29beeF5DB847b2c85Cbc50ECeE
-VENDOR_ADDR=0xAf48305C64683eB72C28be61dD0E41478A2a0Df5
+AUDITOR_SIGNING_KEY=auditor.key   # approver in flow 1
+DEPLOYER_KEY=deployer.key; VENDOR_SIGNING_KEY=$DEPLOYER_KEY   # pays gas, approver in flow 2
+# The addresses of the two key files above. The defaults are the original author's keys; with your own keys, set
+# AUDITOR_ADDR and VENDOR_ADDR in env.local.sh, or the registry is deployed with someone else's approver.
+AUDITOR_ADDR=${AUDITOR_ADDR:-0xD2082a2513781b29beeF5DB847b2c85Cbc50ECeE}
+VENDOR_ADDR=${VENDOR_ADDR:-0xAf48305C64683eB72C28be61dD0E41478A2a0Df5}
 
 SERVICE=nginx
 VERSION=1.31.6

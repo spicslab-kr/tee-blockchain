@@ -10,13 +10,16 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
 ## Prerequisites
 
 - Two Nitro-enabled EC2 instances (Linux), one for the Vendor and one for the Auditor. An optional
-  third, arm64 (Graviton), is used only by the architecture comparison.
+  third, arm64 (Graviton), is used only by the architecture comparison. `bash e2e/cloud/aws-nitro.sh create` makes
+  the two x86_64 instances; see [`cloud/README.md`](cloud/README.md) for the settings and cost.
 - `git`, an `ssh` client and the pinned Go version on your machine. `0-Setup-local-install.sh`
   installs what is missing.
 - The SSH key (`PEM` in `env.sh`, default `pem2.pem`) in the repository root, and two funded key
   files in the repository root: `auditor.key` (signing key, approver in flow 1) and `deployer.key` (deployer key, pays gas,
   signing key and approver in flow 2). Key files are gitignored. Never commit them.
-- Test ETH on the chosen network for both keys.
+- Test ETH on the chosen network for both keys. A key file holds one private key in hex. With your own keys, also set
+  `AUDITOR_ADDR` and `VENDOR_ADDR` (their addresses) in `e2e/env.local.sh`; otherwise `env.sh` uses the original
+  author's addresses and the registry is deployed with the wrong approver.
 
 ## env.sh and env.local.sh
 
@@ -54,7 +57,7 @@ bash e2e/0-Setup-local-install.sh   # git, ssh, and the pinned Go on your machin
 bash e2e/0-Setup-local-upload.sh    # build Linux binaries and upload them to both instances
 ```
 
-Stop everything when you are done (the instances themselves are stopped from the AWS console):
+Stop everything when you are done (the instances themselves with `bash e2e/cloud/aws-nitro.sh stop`):
 
 ```
 bash e2e/99-Setup-local-stop.sh     # terminate the enclaves and TCP bridges on both instances
