@@ -23,6 +23,25 @@ would otherwise end up in the PCRs. `build` refuses a responder built without ei
 Running `go build ./cmd/<role>/...` without `-o` drops a binary named after the package into the
 repo root; those names are in `.gitignore`, don't commit them.
 
+## Toolchain
+
+| tool | version | used for | how it was fixed |
+|---|---|---|---|
+| Go | `internal/setup/build/GO_TOOLCHAIN` (go1.26.1) | everything | `build` refuses any other version |
+| solc | 0.8.28 | compiling `contracts/evm/Registry.sol` | `--use 0.8.28` in `generate.go`; also in the bytecode's metadata (`64736f6c6343 00081c`) |
+| forge (Foundry) | 1.8.0 | running solc for `generate.go` | see below |
+| OpenZeppelin Contracts | v5.7.0, `cab19933c33c2ad1d4c7a84864a3601dddfd16f3` | imported by `Registry.sol` | the submodule |
+| Python | 3 (3.14.6 checked) | `generate.go`'s second step: splits forge's JSON into `.abi` and `.bin`, standard library only (`json`, `io`) | see below |
+| abigen | from go-ethereum in `go.mod` (v1.17.5) | the Go binding | `go run`, so the version is the module's |
+| anvil (Foundry) | 1.8.0 | the chain-backed tests | `README.md`, "Testing" |
+
+The forge that produced the committed `registry.go` was not recorded. Checked on 2026-11-12: forge 1.8.0
+(`foundry_v1.8.0_win32_amd64.zip`, sha256 matching the release's `.sha256` file), with OpenZeppelin at the commit above
+and Python 3.14.6, runs the three `go:generate` steps to a `registry.go` that is **byte-identical** to the committed
+one in both `chain/register/auditor/ether` and `chain/register/Vendor/ether`, metadata hash included. So forge 1.8.0
+is a version known to reproduce it. A different forge may pass different default settings to solc and change the
+metadata hash at the end of the bytecode, and with it the deployed code.
+
 ## Test
 
 ```
