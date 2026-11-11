@@ -7,39 +7,57 @@ and the results are recorded side by side.
 Nitro is the baseline. It must be run on real instances and its results recorded in the same shape
 as the other two, not quoted from the README.
 
-## The tests
+## State on 2026-11-11
 
-| id | test | expected verdict | Nitro script today | SEV-SNP | TDX |
+Each cell says how far the row is proven, and by what:
+
+| mark | meaning |
+|---|---|
+| **code** | a test in this repository passes on recorded evidence, with no instance running (`go test ./...`, anvil 1.8.0). It proves the software's verdict, not the platform's behaviour on a fresh run |
+| **2026-11 run** | observed in the 2026-11 SEV-SNP runs, made with scripts outside this repository and with the SHA-512 binding of that time. Not re-run since |
+| **script, never run** | a Nitro e2e script exists for the row but has never been run against real instances. No Nitro baseline exists |
+| **needs VM** | nothing has run; it needs instances (and, for TDX and SEV-SNP, the request/build/launch code of Phases 2–4) |
+| **missing** | no script and no test |
+
+| id | test | expected | Nitro | TDX | SEV-SNP (GCP) |
 |---|---|---|---|---|---|
-| T1 | same source built on two machines | identical measurement | `arch-measurement-compare.sh` (two x86_64 hosts) | — | — |
-| T2 | only the Go version differs | different measurement | `toolchain-pin-check.sh` ¹ | — | — |
-| T3 | only the build path differs, with `-trimpath` | identical measurement | inside `arch-measurement-compare.sh` | — | — |
-| T4 | normal flow: Auditor rebuilds, registers, User verifies | trusted, exit 0 | `flow1-auditor-registers/1,2,3` | — | — |
-| T5 | application swapped after registration | not trusted, exit 1 | `flow1-auditor-registers/4,5` | — | — |
-| T6 | Vendor self-registers a different image, Auditor disagrees | not trusted when both registries are required | `flow2-vendor-self-registers/1..5` | — | — |
-| T7 | build environment (OS / arch / Go) does not match | `receive` refuses | `build-env-check.sh` | — | — |
-| T8 | TEE in debug mode | measurements refused | **missing** ² | — | — |
-| T9 | replay of an earlier attestation | refused (nonce) | **no explicit script** ³ | — | — |
-| T10 | two attestations from different machines, combined | refused | **not applicable** ⁴ | **fails today** ⁵ | — |
+| T1 | same source built on two machines | identical measurement | **script, never run** (`arch-measurement-compare.sh`) | **needs VM** | **2026-11 run**: the application, its cpio archive and the dm-verity image hashed the same on two GCP machines ¹ |
+| T2 | only the Go version differs | different measurement (Nitro: `build` refuses) | **code**: `TestToolchain_E2E_WrongToolchainRefused` (refused). The differing measurement itself: **script, never run** (`toolchain-pin-check.sh`) ² | **needs VM** | **2026-11 run**: Go 1.22.2 and 1.23.4 gave different binaries ¹ |
+| T3 | only the build path differs, with `-trimpath` | identical measurement | **code** for the responder: `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`. The whole EIF: **script, never run** ³ | **needs VM** | **2026-11 run** (without `-trimpath`, two folders gave two binaries) ¹ |
+| T4 | normal flow: Auditor rebuilds, registers, User verifies | trusted, exit 0 | **code**: `TestRun_E2E_AuditorVendorUser` (recorded document, anvil). Real instances: **script, never run** (`flow1-auditor-registers/1,2,3`) | **code**: `TestRun_E2E_TDX_AuditorUser` (recorded quote, anvil; first passed 2026-11-11). Real instance: **needs VM** | **code** for verification only: `TestCmd_E2E_SNP_ParseInitrdBoot`. No audit/verify chain test yet. Real instance: **needs VM** |
+| T5 | application swapped after registration | not trusted, exit 1 | **code** in part: an unregistered measurement is not trusted (`TestRun_E2E_User_NothingRegistered`). The swap itself: **script, never run** (`flow1-auditor-registers/4,5`) | **code** in part: a differing MRTD is not registered and an unregistered quote exits 1 (`TestRun_E2E_TDX_AuditorUser`). The swap: **needs VM** | **needs VM** |
+| T6 | Vendor self-registers a different image, Auditor disagrees | not trusted when both registries are required | **script, never run** (`flow2-vendor-self-registers/1..5`) | **needs VM** | **needs VM** |
+| T7 | build environment (OS / arch / Go) does not match | `receive` refuses | **code**: `TestBuildEnv_ReceiveRejectsOtherArch`, `…OtherGoVersion`, `…ConfigWithoutBuildEnv`. On instances: **script, never run** (`build-env-check.sh`) | **code** in part: an `intel-tdx` build config without `build_env` is refused (`TestBuildConfig_BuildEnvRequiredOnTDX`) | the same rule is in the code (`needsBuildEnv` covers both SEV-SNP formats) but **has no test** |
+| T8 | TEE in debug mode | measurements refused | **missing** ⁴ | **code**: `TestParse_DebugTDIsRefused` (debug bit set in a copy of the recorded quote) | **code**: `TestParse_DebugGuestIsRefused` (debug bit set in a copy of the recorded report) |
+| T9 | replay of an earlier attestation | refused (nonce) | **code**: `TestCmd_E2E_ParseRejectsTamperedNonce` and the nonce unit tests. A replay against a live verifier: **missing** ⁵ | **code**: `tdx` nonce tests (a different REPORTDATA is refused) | **code**: `snp` nonce tests; **2026-11 run** replayed evidence and saw it refused |
+| T10 | two attestations from different machines, combined | refused | **not applicable** ⁶ | **not applicable** ⁶ | **fails today**: reproduced in the **2026-11 run** on GCP (and on AWS, before AWS was dropped for SEV-SNP) ⁷ |
 
-¹ Nitro behaves differently here by design. Attestamp pins the toolchain and `build` **refuses** to
-run under another patch version, rather than producing a different measurement. The underlying fact
-is the same (the script's own comment records that go1.26.2 and go1.26.8 give different binaries
+¹ From `docs/build/sev-snp.md`, "Variables". The 2026-11 numbering of "the seven SEV-SNP tests" is the scripts' own
+and is not the same as T1–T10 here; only rows whose meaning matches are filled.
+
+² Nitro behaves differently here by design. Attestamp pins the toolchain and `build` **refuses**
+to run under another patch version, rather than producing a different measurement. The underlying fact
+is the same (`toolchain-pin-check.sh` records that go1.26.2 and go1.26.8 give different binaries
 even with `-trimpath`), but the product behaviour differs, so record both: refused, and — in a
 separate run with the pin bypassed — the measurement that differs.
 
-² `tee/parse/aws/measure.go` detects a debug enclave by an all-zero PCR0 and `Info.Debug` carries
-it, but no e2e script launches a debug-mode enclave to prove the refusal happens. Add one.
+³ Since `e6ef9b4` every build also uses `-buildvcs=false`, and `build` refuses a responder without it: measured,
+identical source committed under two commits gave two different responder binaries without it
+(`docs/build/aws-nitro.md`). T1 and T3 for Nitro must be run after that commit and after `a379a2c`, which changed the
+entrypoint inside the EIF: **the Nitro baseline is taken after both**.
 
-³ The nonce check is inside `verify`, and `tee/parse/aws/nonce.go` has a unit test, but no e2e
-script replays a saved document against a live verifier. The SEV-SNP runs did test this. Add it to
-Nitro so the row can be filled for all three.
+⁴ `tee/parse/aws/measure.go` treats an all-zero PCR0 as debug (`Info.Debug`) and `Parse` fails when every PCR is
+zero, but no test or script launches a debug-mode enclave to prove it. A debug document is signed, so unlike TDX and
+SEV-SNP it cannot be made from the recorded one by flipping a bit; it has to be recorded from a debug enclave.
 
-⁴ Nitro returns one document from one enclave; there is nothing to combine.
+⁵ The nonce check is inside `verify` and has unit and command tests, but no e2e script replays a saved document
+against a live verifier.
 
-⁵ Reproduced on GCP and AWS: a vTPM attestation from an approved VM plus an SNP report from a
-different VM passes verification. This row is the honest reason SEV-SNP is weaker than the other
-two, and it has to appear in the table rather than in a footnote.
+⁶ Nitro and TDX return one document from one TEE; there is nothing to combine.
+
+⁷ A vTPM attestation from an approved VM plus an SNP report from a different VM passes verification. This row is the
+honest reason SEV-SNP is weaker than the other two, and it has to appear in the table rather than in a footnote. The
+switch to the SHA3-512 binding (2026-11-11) does not change it.
 
 ## Making the results machine-readable
 
@@ -60,21 +78,24 @@ With that in place the comparison table is generated, not typed, and a run that 
 passing shows up as a missing line rather than as nothing at all.
 
 **Do this for Nitro first.** Adding the JSONL line to the existing scripts is a small change, and
-it fixes the output contract before two more platforms are written against it.
+it fixes the output contract before two more platforms are written against it. Not done yet.
 
 ## What running the baseline needs
 
 From `e2e/README.md`:
 
-- two Nitro-enabled EC2 instances (Vendor, Auditor), plus an optional arm64 (Graviton) for T1/T3
+- two Nitro-enabled EC2 instances (Vendor, Auditor) in `eu-north-1`, plus an optional arm64 (Graviton) for T1/T3.
+  The vCPU quota there was requested; its current value has to be read with an authenticated `aws` (the session
+  expired on 2026-11-11)
 - `git`, `ssh`, and exactly the pinned Go version on the local machine
-- an SSH key in the repository root, and two funded key files: `auditor.key` (approver in flow 1)
-  and `deployer.key` (pays gas, approver in flow 2)
-- test ETH on Sepolia, which is the default. `NET=mainnet` spends real ETH and additionally
+- an SSH key in the repository root, and **two funded key files**: `auditor.key` (approver in flow 1)
+  and `deployer.key` (pays gas, approver in flow 2), with their addresses set as `AUDITOR_ADDR` and `VENDOR_ADDR` in
+  `e2e/env.local.sh`
+- **test ETH on Sepolia** for both keys, which is the default network. `NET=mainnet` spends real ETH and additionally
   requires `CONFIRM_MAINNET=1`
 - `e2e/env.local.sh`, copied from `env.local.example.sh`, holding the instance addresses. It is
   gitignored; never commit it
 
-Later, SEV-SNP needs GCP and AWS instances and TDX needs GCP instances. They do not all have to
-exist at the same time: each platform's rows can be filled in its own session, as long as every
-run writes to the same JSONL contract.
+SEV-SNP and TDX need GCP instances only (SEV-SNP on AWS was decided against on 2026-11-11). They do not all have to
+exist at the same time: each platform's rows can be filled in its own session, as long as every run writes to the
+same JSONL contract.
