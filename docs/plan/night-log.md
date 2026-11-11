@@ -424,3 +424,14 @@ SEV-SNP work from now on. Applied to:
 Also added to `docs/build/sev-snp.md`, "Not done yet", on the user's instruction: the 2026-10/11 shell scripts are
 scaffolding outside the repository; the final implementation is Go in `internal/setup/build/snp` and
 `internal/setup/launch/snp`; until then, any report of the seven tests writes its procedure into that document.
+
+## Decision 2026-11-11: code under MIT
+
+- `LICENSE` is now the MIT License, matching `contracts/evm/Registry.sol` (`SPDX-License-Identifier: MIT`), which
+  had disagreed with the Apache-2.0 `LICENSE`. The text was copied from a MIT-licensed dependency in the module cache
+  (`fxamacker/cbor` v2.9.3) and differs from it only in the copyright line.
+- **The copyright line is a placeholder**, `Copyright (c) [yyyy] [name of copyright owner]`, on the user's
+  instruction to leave it as it was: the Apache `LICENSE` named no owner either (only its appendix template did). It
+  still has to be filled in.
+- Documentation and images stay CC BY 4.0 (`LICENSE-CC-BY` kept), on the user's decision.
+- Also changed: the README license section and `CONTRIBUTING.md` ("code you contribute is licensed as MIT").

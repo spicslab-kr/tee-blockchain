@@ -221,8 +221,8 @@ needed for any test.
 
 ## License
 
-The code is licensed under the [Apache License, Version 2.0](LICENSE). The documentation and
-images (`*.md` files and `docs/`) are licensed under
+The code is licensed under the [MIT License](LICENSE), the same license `contracts/evm/Registry.sol` declares. The
+documentation and images (`*.md` files and `docs/`) are licensed under
 [Creative Commons Attribution 4.0 International](LICENSE-CC-BY) (CC BY 4.0).
 
 ## Contributors
