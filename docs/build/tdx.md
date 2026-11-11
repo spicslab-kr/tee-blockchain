@@ -29,8 +29,11 @@ fetched, so the check runs offline like the Nitro one. The cost: the platform's 
 from a machine with an out-of-date TDX module still verifies.
 
 The root certificate is the same one go-tdx-guest embeds and the one inside our real quote (sha256 fingerprint
-`44:A0:19:6B:…:74:D3`, valid 2018-05-21 → 2049-12-31, confirmed). It has not been compared with a copy downloaded from
-Intel.
+`44:A0:19:6B:…:74:D3`, valid 2018-05-21 → 2049-12-31, confirmed). **It is also the one Intel publishes** (checked
+2026-11-12): `https://certificates.trustedservices.intel.com/Intel_SGX_Provisioning_Certification_RootCA.cer` gives the
+same subject, serial `22650CD65A9D3489F383B49552BF501B392706AC`, validity and full sha256 fingerprint
+`44:A0:19:6B:2B:99:F8:89:B8:E1:49:E9:5B:80:7A:35:0E:74:24:96:43:99:E8:85:A7:CB:B8:CC:FA:B6:74:D3`
+(`openssl x509 -inform DER -noout -fingerprint -sha256` on the download, and on `root.pem` without `-inform DER`).
 
 ## The values
 
