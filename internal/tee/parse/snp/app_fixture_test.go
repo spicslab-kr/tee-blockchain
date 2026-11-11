@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,6 +54,30 @@ func TestAppFixtures_VerifyAndNonce(t *testing.T) {
 		nonce := sha256.Sum256([]byte("attestamp-snp-" + cell))
 		if err := (Parser{}).CheckNonce(appFormat(cell), raw, nonce[:]); err != nil {
 			t.Errorf("%s: nonce: %v", cell, err)
+		}
+	}
+}
+
+// Two genuine recordings from the same guest, minutes apart, mixed: the report of one with the vTPM attestation of the
+// other. Each half verifies on its own (the AMD signature, the AK chain and the quotes are all genuine), so only the
+// SHA3-512 binding can catch it: REPORT_DATA of A is the hash of A's attestation, not B's.
+func TestVerifySig_MixedRecordingsFailTheBinding(t *testing.T) {
+	read := func(cell, name string) []byte {
+		b, err := os.ReadFile(filepath.Join("testdata", "gcp-n2d-"+cell+"-"+name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	for _, pair := range [][2]string{{"opt1p-v1", "opt1p-v2"}, {"opt2-v1", "opt2-v2"}, {"opt1p-v1", "opt2-v1"}} {
+		a, b := pair[0], pair[1]
+		raw, err := Encode(read(a, "report.bin"), read(a, "auxblob.bin"), read(b, "att.pb"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = (Parser{}).VerifySig(context.Background(), FormatInitrd, raw, nil)
+		if !errors.Is(err, ErrSignature) || !strings.Contains(err.Error(), "REPORT_DATA is not SHA3-512") {
+			t.Errorf("report of %s with the vTPM attestation of %s must fail the binding, got %v", a, b, err)
 		}
 	}
 }
