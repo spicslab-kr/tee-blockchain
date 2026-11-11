@@ -450,3 +450,41 @@ The original repository was pinned; the problem existed only in this copy.
 Written into `contracts/README.md` ("OpenZeppelin version") and `STRUCTURE.md` (`.gitmodules` holds the path and
 URL; the gitlink is what pins the version). In the list of gaps for "everything needed to build is on GitHub", this
 item is **resolved**.
+
+## Non-ASCII swept out of everything inside the Nitro EIF
+
+Nitro PCR baseline must be taken AFTER this commit.
+Changing files inside the EIF changes PCR0 and PCR2
+(PCR1 is unaffected), and therefore the registered
+measurementHash. No baseline existed at the time of this change,
+so nothing had to be re-registered.
+
+What goes into the EIF from this repository, from `layerResponder` in `internal/setup/build/{Vendor,auditor}/aws/build.go`
+(lines 217-243): `/att-ra` (the `att-ra-responder` binary), `/att-entrypoint.sh` (`entrypoint.sh`, embedded) and
+`/att-app-cmd` (written from the application image's command), plus the ENTRYPOINT set in the image config. There is no
+`e2e/remote/` folder in this repository. The application's own files come from its Dockerfile, outside this repository.
+
+`go list -deps ./cmd/ra-responder` links four packages of ours: `cmd/ra-responder`, `internal/cli`,
+`internal/tee/request/Vendor`, `internal/tee/request/Vendor/aws` (plus `fxamacker/cbor` and `x448/float16`).
+
+Non-ASCII found in those files (ripgrep `[^\x00-\x7F]`; the Bash `grep -P` refused to run in this shell's locale):
+
+| file | what | done |
+|---|---|---|
+| `internal/setup/build/{Vendor,auditor}/aws/entrypoint.sh` lines 2-5 | Korean comments | translated; commands untouched; both copies byte-identical (`cmp`) and ASCII (`file`) |
+| `internal/tee/request/Vendor/wire.go` lines 9-10 | `·` as a separator in a comment | replaced by `|`; the `auditor` and `user` copies changed the same way (role duplication) |
+| `internal/cli/progress.go` lines 25-26, 79-80, 82-83, 87 | `✓`, `✗`, `·` | **left as they are.** They are program output (`Done` prints `✓`, `Fail` prints `✗`), not comments, and the comments next to them quote that output. The README documents `✓ matches`. Changing them is not a comment change |
+
+Outside the EIF and left alone: `build.go`, `lint.go`, `verify.go` in `internal/setup/build/{Vendor,auditor}/aws` print
+`→`, `…`, `·`, `✓`, `✗` from `att-vendor` and `att-auditor`; none of it is copied into the image.
+
+Checked: the responder built with `-buildvcs=false -ldflags=-buildid=` is byte-identical before and after the `wire.go`
+change (sha256 `187295fb…12a3` both), so that comment change does not change the code. The EIF change in this commit
+comes from `entrypoint.sh`.
+
+**Found while checking, not changed here:** a plain `go build -trimpath ./cmd/ra-responder` embeds the git commit
+(`vcs.revision`), its time (`vcs.time`), whether the tree was modified (`vcs.modified`) and a module version derived from
+them (`go version -m` shows `v0.0.0-20261111052755-e8ec754a88fd`, `+dirty` when modified). So two builds of identical
+code from different commits, or from a dirty tree, give different responder bytes and therefore different Nitro
+PCR2. Builds that use the one released `att-ra-responder` on both sides are not affected. Reported to the user; a fix
+(for example `-buildvcs=false`) changes how the binaries are built and was not made in this commit.

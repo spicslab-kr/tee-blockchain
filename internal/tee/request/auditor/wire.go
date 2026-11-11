@@ -6,8 +6,8 @@ import (
 	"io"
 )
 
-// request:  "TBRA" · version(1) · nonce(32)
-// response: "TBRA" · version(1) · status(1) · format len(1) · format name · doc len(4, big-endian) · doc
+// request:  "TBRA" | version(1) | nonce(32)
+// response: "TBRA" | version(1) | status(1) | format len(1) | format name | doc len(4, big-endian) | doc
 //        status 0 = ok, 1 = error (the doc field carries the message)
 
 const (
