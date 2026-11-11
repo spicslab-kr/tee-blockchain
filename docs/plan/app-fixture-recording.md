@@ -1,6 +1,7 @@
 # Recording fixtures that carry an application
 
-**Status: see "Results" at the end.** This procedure covers the four cells of the 2026-10-23 slides 7 and 16:
+**Status: run on 2026-11-11; see "Results" at the end.** This procedure covers the four cells of the 2026-10-23 slides
+7 and 16:
 
 | | Option 1: application cpio in the initrd | Option 2: squashfs + dm-verity image |
 |---|---|---|
@@ -122,21 +123,11 @@ sudo awk "/^menuentry 'Ubuntu'/{f=1} f{print} f&&/^}/{exit}" /boot/grub/grub.cfg
 cat stock-entry.txt                        # one menuentry with a linux and an initrd line
 ```
 
-An entry made from the template, changing only the title, the initrd file and, for SEV-SNP Option 2, the command line:
-
-```
-# make-entry <id> <initrd file name> [extra kernel arguments]  -> /etc/grub.d/41_<id>
-make_entry() {
-  printf '#!/bin/sh\nexec tail -n +3 $0\n' > "41_$1"
-  sed -e "s/^menuentry 'Ubuntu'.*{\$/menuentry '$1' --id $1 {/" \
-      -e "s#initrd\.img-[^ ]*#$2#" \
-      -e "/^[[:space:]]*linux[[:space:]]/ s#\$#${3:+ $3}#" stock-entry.txt >> "41_$1"
-  sudo install -m 755 "41_$1" "/etc/grub.d/41_$1"
-  echo "GRUB_DEFAULT=$1" | sudo tee /etc/default/grub.d/99-attestamp.cfg
-  sudo update-grub
-  sudo grep -n -A12 "menuentry '$1'" /boot/grub/grub.cfg
-}
-```
+An entry made from the template, changing only the title, the initrd file and, for SEV-SNP Option 2, the command line.
+`internal/setup/build/cpio/testdata/make-grub-entry.sh` does it (copy it to the instance with the other files); below,
+`make_entry <id> <initrd file> [extra arguments]` stands for `sudo sh make-grub-entry.sh <id> <initrd file> [extra
+arguments]`. It writes `/etc/grub.d/41_<id>` and `/etc/default/grub.d/99-attestamp.cfg`, runs `update-grub` and prints
+the new entry.
 
 The entry is made the default rather than booted once with `grub-reboot`. A one-shot entry is lost at the next
 maintenance restart, and a stale `initrdfail` can redirect it (`docs/build/tdx.md`, "`GRUB_FORCE_PARTUUID`").
@@ -174,6 +165,7 @@ sudo ./record-snp -out opt1-v2 -nonce-text attestamp-snp-opt1-v2
 ### Option 2 (`amd-sev-snp-verity`), in the same session
 
 ```
+sudo apt-get update                                                  # tpm2-tools is not found without it
 sudo apt-get install -y squashfs-tools cryptsetup-bin tpm2-tools     # before installing the hook below
 dpkg-query -W squashfs-tools cryptsetup-bin tpm2-tools
 sudo sh make-verity-image.sh "attestamp app v1" verity-v1
@@ -258,6 +250,45 @@ Fetch each recorded file with `gcloud compute scp`, one file per call, into `gcp
 4. Write the base size mod 4 and the marker and `dmesg` results into `docs/build/tdx.md`, "Before or after the base
    initrd", whatever they show.
 
-## Results
+## Results (2026-11-11)
 
-Not recorded yet.
+All recorded in one session per platform. The instances ran from start to stop (GCP's `lastStartTimestamp` and
+`lastStopTimestamp`): `attestamp-snp-vendor` 07:00:39–08:18:20 UTC, `attestamp-tdx-vendor` 08:31:47–08:52:50 UTC. Both guests booted
+the same base initrd (50,100,283 bytes, size mod 4 = 3, sha256 `4703ec07…b0a2`). Every recording verifies with its
+nonce, and its boot log is committed next to it (`*-boot.txt`).
+
+### The four cells of the 2026-10-23 slides (7 and 16), against what was measured
+
+| cell | slides claimed | measured | right or wrong |
+|---|---|---|---|
+| **TDX, Option 1** (cpio, `AppFirst`) | works | the archive was unpacked on both boots (marker present); only RTMR2 changed between v1 and v2 (MRTD, RTMR0, RTMR1 equal); T5 refused v2 | **right** |
+| **TDX, Option 2** (image inside the initrd, `AppFirst`) | works; RTMR2 covers the image, nothing extended at run time | image, hash tree and root hash unpacked on both boots (marker); only RTMR2 changed; T5 refused v2. Mounting the image inside the TDX boot was not built or tested | **right for what is measured**; the run-time use of the image is not built |
+| **SEV-SNP, Option 1** (cpio, `AppLast`) | works on AWS and GCP | **as appended in 2026-11 (no padding), the kernel discarded the archive**: `Initramfs unpacking failed: invalid magic`, no marker, yet INITRD changed with the application. With the base zero-padded to 4 bytes: unpacked (marker present), only INITRD changed, T5 refused v2. `cpio.Join(AppLast)` now pads | **wrong as presented** (the application never ran); right once padded |
+| **SEV-SNP, Option 2** (image on disk, PCR12) | works on AWS and GCP | `status ok` and the application mounted on both boots; PCR12 equal to the formula; CMDLINE and PCR12 changed, MEASUREMENT, PCR4, KERNEL, INITRD did not; first real `amd-sev-snp-verity` evidence; T5 refused v2 | **right** (on GCP; AWS is no longer used for SEV-SNP) |
+
+### Expected against measured
+
+| | expected | measured |
+|---|---|---|
+| TDX Option 1 | RTMR2 differs; MRTD, RTMR0, RTMR1 equal | as expected |
+| TDX Option 2 | RTMR2 differs; MRTD, RTMR0, RTMR1 equal | as expected |
+| SEV-SNP Option 1 | INITRD differs; MEASUREMENT, PCR4, KERNEL, CMDLINE equal | as expected, in both the unpadded and the padded pair. The unpadded pair's application never ran, which the evidence cannot show |
+| SEV-SNP Option 2 | CMDLINE and PCR12 differ; MEASUREMENT, PCR4, KERNEL, INITRD equal | as expected; PCR12 equal to SHA-256(0³² ‖ SHA-256("attestamp-verity-ok:" ‖ root hash)) for both root hashes |
+
+### Also measured in the session
+
+- **Placement, not platform, decides.** The same base initrd failed unpadded with `AppLast`, worked padded, and worked
+  with `AppFirst` on four TDX boots (`docs/build/tdx.md`, "Before or after the base initrd").
+- **The marker works, and `/run` would not have.** initramfs-tools' `/init` sources `conf/conf.d` before it mounts
+  `/run`, so the marker goes to `/dev` (checked on both guests).
+- **The Option 2 image is reproducible across machines.** `make-verity-image.sh`, with `umask 022`, gave the same
+  `app.img`, `app.hash` and root hash on both guests.
+- **TDX with `AppLast` was not tested.** The 2026-10 failure on TDX remains the Phase 3.2 record.
+
+### Not done
+
+- the image of TDX Option 2 is carried and measured, not opened or mounted at boot;
+- the SEV-SNP Option 2 tamper case (a changed image under an unchanged root hash, the 2026-11 `verity_tamper.sh`) was
+  not recorded;
+- one boot ID (SEV-SNP Option 2 v2) was not captured; that boot's command line, carrying the v2 root hash, shows it
+  happened.

@@ -25,7 +25,7 @@ Each cell says how far the row is proven, and by what:
 | T2 | only the Go version differs | different measurement (Nitro: `build` refuses) | **code**: `TestToolchain_E2E_WrongToolchainRefused` (refused). The differing measurement itself: **script, never run** (`toolchain-pin-check.sh`) ² | **needs VM** | **2026-11 run**: Go 1.22.2 and 1.23.4 gave different binaries ¹ |
 | T3 | only the build path differs, with `-trimpath` | identical measurement | **code** for the responder: `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`. The whole EIF: **script, never run** ³ | **needs VM** | **2026-11 run** (without `-trimpath`, two folders gave two binaries) ¹ |
 | T4 | normal flow: Auditor rebuilds, registers, User verifies | trusted, exit 0 | **code**: `TestRun_E2E_AuditorVendorUser` (recorded document, anvil). Real instances: **script, never run** (`flow1-auditor-registers/1,2,3`) | **code**: `TestRun_E2E_TDX_AuditorUser` (recorded quote, anvil; first passed 2026-11-11). Real instance: **needs VM** | **code** for verification only: `TestCmd_E2E_SNP_ParseInitrdBoot`. No audit/verify chain test yet. Real instance: **needs VM** |
-| T5 | application swapped after registration | not trusted, exit 1 | **code** in part: an unregistered measurement is not trusted (`TestRun_E2E_User_NothingRegistered`). The swap itself: **script, never run** (`flow1-auditor-registers/4,5`) | **code** in part: a differing MRTD is not registered and an unregistered quote exits 1 (`TestRun_E2E_TDX_AuditorUser`). The swap: **needs VM** ⁸ | **needs VM** ⁸ |
+| T5 | application swapped after registration | not trusted, exit 1 | **code** in part: an unregistered measurement is not trusted (`TestRun_E2E_User_NothingRegistered`). The swap itself: **script, never run** (`flow1-auditor-registers/4,5`) | **code**, both options: `TestRun_E2E_T5_ApplicationSwapIsRefused/tdx-option1`, `/tdx-option2` (recordings of 2026-11-11) ⁸ | **code**, both options: `…/snp-option1` (padded pair), `…/snp-option2` ⁸ |
 | T6 | Vendor self-registers a different image, Auditor disagrees | not trusted when both registries are required | **script, never run** (`flow2-vendor-self-registers/1..5`) | **needs VM** | **needs VM** |
 | T7 | build environment (OS / arch / Go) does not match | `receive` refuses | **code**: `TestBuildEnv_ReceiveRejectsOtherArch`, `…OtherGoVersion`, `…ConfigWithoutBuildEnv`. On instances: **script, never run** (`build-env-check.sh`) | **code** in part: an `intel-tdx` build config without `build_env` is refused (`TestBuildConfig_BuildEnvRequiredOnTDX`) | the same rule is in the code (`needsBuildEnv` covers both SEV-SNP formats) but **has no test** |
 | T8 | TEE in debug mode | measurements refused | **missing** ⁴ | **code**: `TestParse_DebugTDIsRefused` (debug bit set in a copy of the recorded quote) | **code**: `TestParse_DebugGuestIsRefused` (debug bit set in a copy of the recorded report) |
@@ -55,10 +55,13 @@ against a live verifier.
 
 ⁶ Nitro and TDX return one document from one TEE; there is nothing to combine.
 
-⁸ What moves T5 from "needs VM" to "code" on TDX and SEV-SNP is **one VM session per platform**: record the
-evidence twice on the same guest, with the application changed by one byte, then register one and present the other
-in a chain test. After that it is proved by `go test` with no VM. The procedure, ready to run, is
-`docs/plan/app-fixture-recording.md` (prepared 2026-11-11, not run yet).
+⁸ Moved from "needs VM" to "code" on 2026-11-11 with one VM session per platform: the evidence was recorded twice on
+the same guest, with the application changed by one byte, for each option (`docs/plan/app-fixture-recording.md`).
+The test registers v1 on a local anvil chain, checks the User trusts it, then serves v2 and requires exit 1 with
+"nobody has registered". From now on it is proved by `go test`, with no VM. What the test cannot show: whether the
+application in the recording actually ran. That is shown by the boot logs next to the fixtures (`*-boot.txt`); the
+SEV-SNP unpadded pair, whose application was discarded by the kernel, measures and verifies just the same and is
+therefore not used here.
 
 ⁹ The dm-verity application image built on `attestamp-snp-vendor` and on `attestamp-tdx-vendor` was byte-identical:
 two machines, two platforms, one image (`app.img` sha256 `28bdfcff…ec1c`, root hash `e29ec085…af0c9` for v1;

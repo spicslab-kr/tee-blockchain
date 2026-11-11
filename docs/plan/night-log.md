@@ -624,3 +624,48 @@ four items below are done.
    - Procedure (`8e42e38`): `docs/plan/app-fixture-recording.md`, two recordings per platform with the application
      changed by one byte, and why that makes T5 a permanent code test. `docs/plan/test-matrix.md` T5 points at it.
    - **No instance was started; no fixture was recorded.**
+
+## App-fixture recording, all four cells (2026-11-11, the user present)
+
+Instances, started on the user's instruction to record, stopped after reporting each one:
+
+- `attestamp-snp-vendor` ran 07:00:39–08:18:20 UTC;
+- `attestamp-tdx-vendor` ran 08:31:47–08:52:50 UTC.
+
+A safety stop (`shutdown -h +240`) was set after every boot. Both instances are TERMINATED. `GRUB_FORCE_PARTUUID` is
+now off on both; every other boot change was undone. On the SEV-SNP guest `tpm2-tools` was installed with apt.
+
+**Taken from the 2026-11 scripts outside the repository** (read as reference only; nothing copied; their hard-coded
+home paths, disk UUIDs, PARTUUIDs, kernel version and IP addresses were not brought in):
+
+| script | what was taken | where it is now |
+|---|---|---|
+| `option2-dm-verity/mkverity.sh` | the `mksquashfs` arguments (`-noappend -no-xattrs -all-root -mkfs-time 0 -all-time 0 -noI -noD -noF -noX -no-fragments -no-duplicates -processors 1 -b 4096`), the 4096-byte padding, `veritysetup format` with its fixed `--salt` and `--uuid` | `internal/setup/build/cpio/testdata/make-verity-image.sh` (adds `umask 022` and explicit modes) |
+| `option2-dm-verity/verity_hook.sh` | which binaries and modules the verifying initrd needs (`veritysetup`, `tpm2_pcrextend`, `sha256sum`, the TCTI library; `dm_verity loop squashfs tpm*`) | `internal/tee/parse/snp/testdata/record/initramfs-hook.sh` |
+| `option2-dm-verity/verity_boot.sh` | the local-bottom logic: root hash from the command line, `veritysetup verify` then `open`, mount on `${rootmnt}/opt/app-verity`, extend PCR12 (SHA-256) with SHA-256 of `attestamp-verity-<status>:<root hash>`, status in `/run` | `internal/tee/parse/snp/testdata/record/initramfs-local-bottom.sh` (same PCR12 value) |
+| `option2-dm-verity/gcp_setup_option2.sh` | the order: image to `/var/lib/attestamp`, hook and script into `/etc/initramfs-tools`, `mkinitramfs -o` a separate verifying initrd | `docs/plan/app-fixture-recording.md` |
+| `option2-dm-verity/gcp_boot_option2.sh` | a GRUB entry with `attestamp.roothash=` appended (its hard-coded entry was replaced by one made from the stock entry) | `internal/setup/build/cpio/testdata/make-grub-entry.sh` |
+| `auditor/auditor_exp_verity.py` | the expected-PCR12 formula, used to check both recordings | `app_fixture_test.go`, the `*-boot.txt` files |
+| `option2-dm-verity/verity_tamper.sh` | nothing; the tamper case was not recorded | — |
+
+**Findings:**
+
+- **SEV-SNP Option 1 as appended in 2026-11 loses the application.** Base initrd 50,100,283 bytes (mod 4 = 3); the
+  unpadded append gave `Initramfs unpacking failed: invalid magic at start of compressed archive` and no marker.
+  INITRD still changed. Padded to 4 bytes it worked. `cpio.Join(AppLast)` now pads (`3c57d4c`). The slide claim is
+  corrected (`c4b77cf`).
+- **The marker had to move from `/run` to `/dev`** (`56ec365`): `/init` sources `conf/conf.d` before mounting `/run`.
+- **TDX:** only RTMR2 moved in four recordings; the assumed mapping holds for RTMR2. `AppFirst` unpacked on all four
+  boots. TDX with `AppLast` was not tested.
+- **SEV-SNP Option 2:** first real `amd-sev-snp-verity` evidence; PCR12 matches the formula.
+- The dm-verity image was byte-identical on both guests (T1).
+- The two guests have the same distribution base initrd, byte for byte.
+
+**Committed:**
+
+- SEV-SNP: six recordings, with boot logs (`eb9a7a2`). Both Option 1 pairs are kept, on the user's decision.
+- TDX: four recordings (`e67f0a3`).
+- Tests: parser tests per pair; the mixed-recording binding test (`e3f1150`); the T5 chain test on anvil for all four
+  cells (`bfb0313`).
+- Docs: measured results replace the assumptions (`c625e26`).
+- Not done: TDX Option 2 image mounting at boot, the SEV-SNP tamper case, and Phase 2 (approved, paused).
