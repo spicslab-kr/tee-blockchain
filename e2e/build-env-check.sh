@@ -42,7 +42,7 @@ check_on() {
   if [ "$mine" = amd64 ]; then other=arm64; else other=amd64; fi
   nitroBanner "$label"
   $SCP "$WORK/arch/att-auditor-$arch" "$SSH_USER@$(host_of "$sshf"):~/att-auditor"
-  $sshf 'bash -s' <<REMOTE
+  $sshf 'bash -s' <<REMOTE | tee "$WORK/build-env-$arch.log"
 set -uo pipefail
 step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "\$1"; shift; "\$@"; }
 chmod +x att-auditor
@@ -79,8 +79,10 @@ rm -rf src1; ~/att-auditor receive --repo "\$PWD/remote.git" --into src1 > out1.
 cat out1.txt err1.txt
 if [ \$rc -ne 0 ] && grep -q "$other" err1.txt && grep -q "$mine" err1.txt; then
   echo "✅ refused (exit \$rc), both architectures named"
+  echo "@@RESULT other-arch-refused refused refused receive refused a config declaring $other on a $mine host (exit \$rc)"
 else
   echo "❌ expected refusal naming $other and $mine, got exit \$rc"; n=\$((n+1))
+  echo "@@RESULT other-arch-refused accepted refused receive did not refuse a config declaring $other on a $mine host (exit \$rc)"
 fi
 
 step "2. SAME, WITH --ignore-env: WARNING ONLY ($label)"
@@ -88,8 +90,10 @@ rm -rf src2; ~/att-auditor receive --repo "\$PWD/remote.git" --into src2 --ignor
 cat out2.txt err2.txt
 if [ \$rc -eq 0 ] && grep -q "warning:" err2.txt && grep -q "$other" err2.txt; then
   echo "✅ passed with a warning (exit 0)"
+  echo "@@RESULT ignore-env-warns accepted accepted with --ignore-env receive passed with a warning naming $other (exit 0)"
 else
   echo "❌ expected exit 0 plus a warning, got exit \$rc"; n=\$((n+1))
+  echo "@@RESULT ignore-env-warns refused accepted with --ignore-env receive did not pass with a warning (exit \$rc)"
 fi
 
 step "3. VENDOR DECLARES $mine, MUST PASS ($label)"
@@ -98,13 +102,19 @@ rm -rf src3; ~/att-auditor receive --repo "\$PWD/remote.git" --into src3 > out3.
 cat out3.txt err3.txt
 if [ \$rc -eq 0 ] && grep -q "build env matches" out3.txt; then
   echo "✅ matched (exit 0)"
+  echo "@@RESULT own-arch-accepted accepted accepted receive accepted a config declaring $mine on a $mine host (build env matches)"
 else
   echo "❌ expected a match, got exit \$rc"; n=\$((n+1))
+  echo "@@RESULT own-arch-accepted refused accepted receive did not accept a config declaring $mine on a $mine host (exit \$rc)"
 fi
 exit \$n
 REMOTE
-  rc=$?
+  rc=${PIPESTATUS[0]}
   localBanner
+  # One results line per verdict the remote script printed.
+  grep '^@@RESULT ' "$WORK/build-env-$arch.log" | while read -r _ check res exp reason; do
+    result T7 "$arch-$check" "$res" "$exp" "$reason"
+  done
   if [ $rc -eq 0 ]; then echo "✅ $label: all three verdicts as expected"; else echo "❌ $label: $rc verdict(s) wrong"; fi
   fail=$((fail+rc))
 }
@@ -114,6 +124,7 @@ if [ -n "$ARM64_HOST" ]; then
   check_on R "arm64 comparison host" arm64
 else
   echo "ARM64_HOST is empty - skipping the arm64 mirror check (set it in e2e/env.local.sh to run it)."
+  result T7 arm64-mirror error accepted "skipped: ARM64_HOST is empty"
 fi
 
 echo

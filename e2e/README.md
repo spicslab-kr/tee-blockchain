@@ -103,12 +103,14 @@ The Vendor's registry address is saved in `e2e-work/registry-flow2.txt`.
 | script | what it checks |
 |---|---|
 | `toolchain-pin-check.sh` | an att binary built with another Go patch version refuses to `build` |
-| `responder-check.sh` | `build --responder` refuses a responder built without `-trimpath`, or for the wrong architecture |
+| `responder-check.sh` | `build --responder` refuses a responder built without `-trimpath`, with version control stamping, or for the wrong architecture |
 | `build-env-check.sh` | `receive` rejects a `build-config.json` whose `build_env` does not match the instance, and `--ignore-env` only warns |
 | `arch-record-check.sh` | the architecture in records and registrations; sends no transaction |
-| `arch-measurement-compare.sh` | the same source measures the same on two x86_64 hosts and differently on arm64 (needs `ARM64_HOST`) |
+| `arch-measurement-compare.sh` | the same source measures the same on two x86_64 hosts checked out under two different paths (T1, T3), and differently on arm64 (only with `ARM64_HOST`) |
 
-Intermediate files go in `e2e-work/`.
+Intermediate files go in `e2e-work/`. Every verdict is also appended to `e2e-work/results/aws-nitro.jsonl`, one JSON line
+each (`result()` in `env.sh`; fields in `docs/plan/test-matrix.md`, "Making the results machine-readable").
+`arch-measurement-compare.sh` runs the x86_64 pair without `ARM64_HOST` and records the arm64 side as skipped.
 
 ## Settings and variables
 

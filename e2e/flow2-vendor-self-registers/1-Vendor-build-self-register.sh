@@ -100,8 +100,12 @@ echo "$REGISTRY" > "$WORK/registry-flow2.txt"  # the later steps read the regist
 #   my build. service, version and arch come from the build-config.json given with --config; a flag with another value
 #   overrides it and prints a warning.
 step "SELF-REGISTERING" "$VENDOR_BIN" self-register --config "$WORK/vendor-build-config.json" --tee-addr "$VENDOR_HOST:5000" --build-measurements "$WORK/vendor-build.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$VENDOR_SIGNING_KEY"
-echo "self-register exit=$?"
+rc=$?
+echo "self-register exit=$rc"
+result T6 vendor-self-registers "$(verdict_of $rc)" accepted "self-register exit $rc" "registry $REGISTRY"
 # att-user verify - runs the User's trust decision on what was just registered.
 step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"
-echo "verify exit=$?"
+rc=$?
+echo "verify exit=$rc"
+result T6 user-verify-after-self-register "$(verdict_of $rc)" accepted "verify exit $rc against the Vendor's own registry" "registry $REGISTRY"
 echo "next: 2-User-verify"

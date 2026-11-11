@@ -12,4 +12,5 @@ REGISTRY=$(cat e2e-work/registry-flow2.txt)
 step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = not trusted)"
+result T6 user-verify-vendor-registry "$(verdict_of $rc)" accepted "verify exit $rc against the Vendor's own registry (the Vendor is the approver)" "registry $REGISTRY"
 exit $rc

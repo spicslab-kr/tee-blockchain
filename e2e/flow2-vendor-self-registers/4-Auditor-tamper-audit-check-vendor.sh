@@ -28,7 +28,15 @@ echo "$REGISTRY" > "$WORK/registry.txt"  # the later steps read the registry add
 # att-auditor audit - registers my value; with --vendor-tee it also requests an attestation document from the Vendor's
 #   enclave and compares it with my value. That comparison reports the swap.
 step "AUDITING (checking Vendor's enclave)"
-"$AUDITOR_BIN" audit --tee-addr "$AUDITOR_HOST:5000" --build-measurements "$WORK/auditor-measured.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$AUDITOR_SIGNING_KEY" --service "$SERVICE" --version "$VERSION" --vendor-tee "$VENDOR_HOST:5000"
-rc=$?
+#   audit exits 0 either way (it registers the Auditor's own value); the swap shows only in its output, so that is kept.
+"$AUDITOR_BIN" audit --tee-addr "$AUDITOR_HOST:5000" --build-measurements "$WORK/auditor-measured.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$AUDITOR_SIGNING_KEY" --service "$SERVICE" --version "$VERSION" --vendor-tee "$VENDOR_HOST:5000" 2>&1 | tee "$WORK/audit-vendor-check.txt"
+rc=${PIPESTATUS[0]}
 echo "audit exit=$rc   registry=$REGISTRY   next: 5-User-tamper-verify-both-registries"
+if grep -q "runs something else" "$WORK/audit-vendor-check.txt"; then
+  result T6 auditor-sees-vendor-swap rejected rejected "audit --vendor-tee: the Vendor's enclave runs something else (audit exit $rc)" "registry $REGISTRY"
+elif grep -q "runs exactly what I built" "$WORK/audit-vendor-check.txt"; then
+  result T6 auditor-sees-vendor-swap accepted rejected "audit --vendor-tee: the Vendor's enclave runs what the Auditor built (audit exit $rc)" "registry $REGISTRY"
+else
+  result T6 auditor-sees-vendor-swap error rejected "audit --vendor-tee printed no verdict on the Vendor's enclave (audit exit $rc)" "registry $REGISTRY"
+fi
 exit $rc

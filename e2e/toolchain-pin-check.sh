@@ -25,8 +25,10 @@ step "1. LOCAL GO VERSION vs $PIN_FILE"
 HAVE="$(go version | awk '{print $3}')"
 if [ "$HAVE" = "$WANT" ]; then
   echo "✅ local go version = $HAVE = pin file ($PIN_FILE)"
+  result - local-go-equals-pin identical identical "local go version = $HAVE = pin file"
 else
   echo "❌ local go version is $HAVE - the pin file says $WANT. Fix it with bash e2e/0-Setup-local-install.sh."
+  result - local-go-equals-pin different identical "local go version is $HAVE - the pin file says $WANT"
   fail=1
 fi
 
@@ -37,9 +39,26 @@ if GOTOOLCHAIN=$WRONG go version 2>/dev/null | grep -q "$WRONG"; then
   HAVE_WRONG=1
 else
   echo "WARNING: cannot download GOTOOLCHAIN=$WRONG (offline?) - skipping the live refusal check. The unit tests (go test ./internal/setup/build ./cmd -run Toolchain) cover the same path."
+  result T2 wrong-toolchain-refused error refused "skipped: GOTOOLCHAIN=$WRONG could not be downloaded"
   HAVE_WRONG=0
 fi
 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-vendor" ./cmd/vendor
+
+# 2b. The fact the refusal protects against (test matrix T2, footnote 2): the same responder source built with another
+#     Go patch version gives other bytes, so the image measurement would differ. Checked on the binary, locally.
+if [ $HAVE_WRONG = 1 ]; then
+  GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-ra-responder-pinned" ./cmd/ra-responder
+  GOTOOLCHAIN=$WRONG GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-ra-responder-wrongtc" ./cmd/ra-responder
+  a=$(sha256 "$WORK/toolchain/att-ra-responder-pinned" | cut -c1-64); b=$(sha256 "$WORK/toolchain/att-ra-responder-wrongtc" | cut -c1-64)
+  if [ "$a" != "$b" ]; then
+    echo "✅ the responder built with $WRONG differs from the one built with $WANT ($a vs $b)"
+    result T2 responder-bytes-differ different different "att-ra-responder built with $WRONG differs from $WANT" "$WANT $a; $WRONG $b"
+  else
+    echo "❌ the responder is byte-identical under $WRONG and $WANT ($a)"
+    result T2 responder-bytes-differ identical different "att-ra-responder is byte-identical under $WRONG and $WANT" "$a"
+    fail=1
+  fi
+fi
 
 step "3. UPLOADING TO THE VENDOR HOST"
 nitroBanner "Vendor"
@@ -58,8 +77,10 @@ if [ $HAVE_WRONG = 1 ]; then
   ec="$(echo "$out" | sed -n 's/^__EXIT=//p' | tail -1)"
   if [ "${ec:-0}" != 0 ] && echo "$out" | grep -q "pins $WANT"; then
     echo "✅ refused (exit $ec) - 'built with $WRONG but the project pins $WANT'"
+    result T2 wrong-toolchain-refused refused refused "build refused (exit $ec): built with $WRONG but the project pins $WANT"
   else
     echo "❌ an att-vendor built with another toolchain was not refused (exit ${ec:-?}) - CheckToolchain is not running at the start of build"
+    result T2 wrong-toolchain-refused accepted refused "an att-vendor built with $WRONG was not refused (exit ${ec:-?})"
     fail=1
   fi
 fi
@@ -69,9 +90,11 @@ out="$(remote_build att-vendor)"
 echo "$out" | sed 's/^/    /'
 if echo "$out" | grep -q "pins $WANT"; then
   echo "❌ an att-vendor built with the pinned toolchain was refused by the toolchain check - GO_TOOLCHAIN and the real build toolchain disagree"
+  result T2 pinned-toolchain-accepted refused accepted "an att-vendor built with $WANT was refused by the toolchain check"
   fail=1
 else
   echo "✅ toolchain check passed (a later failure for another reason is not part of this test)"
+  result T2 pinned-toolchain-accepted accepted accepted "an att-vendor built with $WANT passed the toolchain check"
 fi
 localBanner
 

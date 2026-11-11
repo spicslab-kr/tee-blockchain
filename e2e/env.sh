@@ -59,6 +59,28 @@ nitroBanner() { echo; step "CONNECTING TO NITRO ($1)"; sleep 2; }
 localBanner() { echo; step "RETURNING TO LOCAL"; sleep 2; }
 mkdir -p "$WORK"
 
+# Results contract (docs/plan/test-matrix.md, "Making the results machine-readable"). Every verdict a script reaches is
+# also appended as one JSON line to $WORK/results/<platform>.jsonl, so the test matrix can be filled from the files
+# instead of by hand. e2e/cvm/in-guest-verify.sh writes the same fields for the confidential VMs.
+#
+#   result <test> <check> <result> <expected> <reason> [detail]
+#
+# test is the matrix row (T1..T10, or "-" for a check that is not a matrix row); check names the verdict within the
+# script; result and expected are one of accepted, rejected, identical, different, refused, error; reason is the line
+# the script printed; detail is optional free text (for example the measured values). RESULTS_PLATFORM is the format
+# string, aws-nitro unless set.
+RESULTS_PLATFORM=${RESULTS_PLATFORM:-aws-nitro}
+RESULTS_RUN=${RESULTS_RUN:-$(date -u +%Y%m%dT%H%M%SZ)}
+json_str() { printf '%s' "$1" | tr '\r\n\t' '   ' | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
+verdict_of() { case $1 in 0) echo accepted;; 1) echo rejected;; *) echo error;; esac; }   # att verify/compare exit code
+result() {
+  mkdir -p "$WORK/results"
+  printf '{"platform":"%s","test":"%s","check":"%s","script":"%s","result":"%s","expected":"%s","reason":"%s","detail":"%s","run":"%s","at":"%s"}\n' \
+    "$(json_str "$RESULTS_PLATFORM")" "$(json_str "$1")" "$(json_str "$2")" "$(json_str "${0#./}")" "$(json_str "$3")" \
+    "$(json_str "$4")" "$(json_str "$5")" "$(json_str "${6:-}")" "$(json_str "$RESULTS_RUN")" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    >> "$WORK/results/$RESULTS_PLATFORM.jsonl"
+}
+
 # Keep the window open after the script ends, with the exit status shown, until a key is pressed. A script started by
 # double-click in a file explorer would otherwise close the window before the result can be read.
 trap 'ec=$?; echo; if [ $ec -eq 0 ]; then echo "== done (exit 0) =="; else echo "== exited (exit $ec) =="; fi; read -n 1 -s -r -p "Press any key to close this window..."; echo' EXIT

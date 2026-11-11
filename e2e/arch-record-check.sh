@@ -31,8 +31,10 @@ check_host() {  # <ssh-func> <label> <expected GOARCH>
   got=$(goarch_of "$raw")
   if [ "$got" = "$want" ]; then
     echo "✅ $label: uname -m = $raw -> arch $got"
+    result - "uname-maps-to-$want" identical identical "$label: uname -m = $raw -> arch $got"
   else
     echo "❌ $label: uname -m = '$raw' -> arch '$got', expected $want"
+    result - "uname-maps-to-$want" different identical "$label: uname -m = '$raw' -> arch '$got', expected $want"
     fail=1
   fi
 }
@@ -74,8 +76,10 @@ out=$("$AUDITOR_BIN" send --repo "$WD/remote-a.git" --record "$WD/no-build-env.j
 echo "$out" | sed 's/^/  /'
 if [ $rc -ne 0 ] && echo "$out" | grep -q 'build_env.arch: want one of amd64|arm64' && echo "$out" | grep -q 'build_env.go'; then
   echo "✅ send: a record without build_env is refused - the message names build_env (exit $rc)"
+  result T7 send-without-build-env-refused refused refused "send refused a record without build_env (exit $rc)"
 else
   echo "❌ send: a record without build_env was not refused, or the message does not name build_env (exit $rc)"
+  result T7 send-without-build-env-refused accepted refused "send did not refuse a record without build_env, or did not name it (exit $rc)"
   fail=1
 fi
 
@@ -87,8 +91,10 @@ out=$("$AUDITOR_BIN" send --repo "$WD/remote-b.git" --record "$WD/with-build-env
 echo "$out" | sed 's/^/  /'
 if [ $rc -eq 0 ] && echo "$out" | grep -q "build env: linux/amd64 $GOVER trimpath=true" && git -C "$WD/remote-b.git" show HEAD:measurement-record.json 2>/dev/null | grep -q '"build_env"'; then
   echo "✅ send: printed build env: linux/amd64 $GOVER trimpath=true, and the pushed measurement-record.json carries build_env"
+  result - send-with-build-env-accepted accepted accepted "send printed build env linux/amd64 $GOVER trimpath=true and pushed it"
 else
   echo "❌ send: exit $rc - build env was not printed, or the pushed record has no build_env"
+  result - send-with-build-env-accepted refused accepted "send exit $rc: build env not printed, or the pushed record has no build_env"
   fail=1
 fi
 
@@ -118,8 +124,10 @@ if [ $rc -eq 0 ] && echo "$out" | grep -q "record $SERVICE $VERSION aws-nitro ·
    && echo "$pushed" | grep -q "\"service\": \"$SERVICE\"" && echo "$pushed" | grep -q '"arch": "arm64"' && echo "$pushed" | grep -q "\"go\": \"$GOVER\"" \
    && [ -f "$WD/measurement-record.json" ]; then
   echo "✅ send --config --measurements: built and sent the record; the pushed record's service and build_env are exactly those of build-config.json (measurement-record.json is also left next to measurements.json)"
+  result - send-from-config-accepted accepted accepted "send --config --measurements built and pushed a record carrying the config's service and build_env"
 else
   echo "❌ send --config --measurements: exit $rc - the record was not built, or the pushed record's service/build_env differ from the config"
+  result - send-from-config-accepted refused accepted "send --config --measurements exit $rc: record not built, or its service/build_env differ"
   fail=1
 fi
 
@@ -131,8 +139,10 @@ out=$("$AUDITOR_BIN" register --rpc http://127.0.0.1:1 --registry 0x000000000000
 echo "$out" | sed 's/^/  /'
 if [ $rc -ne 0 ] && echo "$out" | grep -q -- '--arch: want one of amd64|arm64'; then
   echo "✅ register: x86_64 is refused - it says to write amd64 (exit $rc)"
+  result - register-uname-spelling-refused refused refused "register --arch x86_64 refused before touching the chain (exit $rc)"
 else
   echo "❌ register: --arch x86_64 was not refused, or the message differs (exit $rc)"
+  result - register-uname-spelling-refused accepted refused "register --arch x86_64 was not refused, or the message differs (exit $rc)"
   fail=1
 fi
 

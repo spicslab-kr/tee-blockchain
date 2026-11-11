@@ -65,8 +65,12 @@ echo "$REGISTRY" > "$WORK/registry-flow2.txt"  # the later steps read the regist
 
 # att-vendor self-register - signs the attested (changed) value with my signing key and registers it. No third party compares it.
 step "SELF-REGISTERING" "$VENDOR_BIN" self-register --tee-addr "$VENDOR_HOST:5000" --build-measurements "$WORK/vendor-build.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$VENDOR_SIGNING_KEY" --service "$SERVICE" --version "$VERSION"
-echo "self-register exit=$?"
+rc=$?
+echo "self-register exit=$rc"
+result T6 vendor-self-registers-swapped "$(verdict_of $rc)" accepted "self-register of the swapped image, exit $rc" "registry $REGISTRY"
 # att-user verify - with only this registry listed, the User's check passes.
 step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"
-echo "verify exit=$?"
+rc=$?
+echo "verify exit=$rc"
+result T6 user-verify-vendor-registry-only "$(verdict_of $rc)" accepted "verify exit $rc with only the Vendor's registry: the swap passes there" "registry $REGISTRY"
 echo "next: 4-Auditor-tamper-audit-check-vendor"

@@ -284,7 +284,7 @@ not quoted from the README. Phase 0 gains one step:
 | # | Task | Pass criterion |
 |---|---|---|
 | 0.0 | Run the existing Nitro e2e suite end to end and record its results | every row of the matrix that applies to Nitro is filled from a real run |
-| 0.0b | Add the JSONL result line to each e2e script, and the two missing tests (T8 debug mode, T9 replay) | `e2e-work/results/aws-nitro.jsonl` has one line per test |
+| 0.0b | Add the JSONL result line to each e2e script, and the two missing tests (T8 debug mode, T9 replay) | `e2e-work/results/aws-nitro.jsonl` has one line per test. **JSONL done 2026-11-12** (`result()` in `e2e/env.sh`; the CVM script writes the same fields); T8 and T9: see the night log |
 
 0.0b comes before any TDX or SEV-SNP script is written, so all three are written against the same
 output contract.

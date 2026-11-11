@@ -16,4 +16,5 @@ echo "Auditor's registry $AREG"
 step "VERIFYING (both registries)" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$VREG,$AREG"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = not trusted)"
+result T6 user-verify-both-registries "$(verdict_of $rc)" rejected "verify exit $rc with the Vendor's and the Auditor's registries both required" "registries $VREG,$AREG"
 exit $rc

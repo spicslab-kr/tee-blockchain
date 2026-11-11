@@ -14,4 +14,5 @@ REGISTRY=${1:-$(cat "$WORK/registry.txt")}
 step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = not trusted)"
+result T4 user-verify "$(verdict_of $rc)" accepted "verify exit $rc against the Auditor's registry" "registry $REGISTRY"
 exit $rc

@@ -80,21 +80,29 @@ switch to the SHA3-512 binding (2026-11-11) does not change it.
 The scripts today print `✅` / `❌` and set an exit code. That is enough for a person watching and
 not enough to assemble a three-column table automatically.
 
-Each test should additionally append one line to `e2e-work/results/<platform>.jsonl`:
+Each verdict appends one line to `e2e-work/results/<platform>.jsonl` (done 2026-11-12: `result()` in `e2e/env.sh`,
+called by every Nitro e2e script, and the same fields from `e2e/cvm/in-guest-verify.sh` for the confidential VMs):
 
 ```json
-{"platform":"aws-nitro","test":"T5","result":"rejected","expected":"rejected","reason":"nobody has registered these measurements","at":"2026-11-10T12:00:00Z"}
+{"platform":"aws-nitro","test":"T5","check":"user-verify-after-swap","script":"e2e/flow1-auditor-registers/5-User-tamper-verify.sh","result":"rejected","expected":"rejected","reason":"verify exit 1 after the Vendor swapped the enclave","detail":"registry 0x…","run":"20261112T010000Z","at":"2026-11-12T01:02:03Z"}
 ```
 
-Fields: `platform` is the format string (`aws-nitro`, `intel-tdx`, `amd-sev-snp-initrd`,
-`amd-sev-snp-verity`), `result` and `expected` are one of `accepted` / `rejected` / `identical` /
-`different` / `refused`, and `reason` is the message the tool printed.
+| field | meaning |
+|---|---|
+| `platform` | the format string: `aws-nitro`, `intel-tdx`, `amd-sev-snp-initrd`, `amd-sev-snp-verity` |
+| `test` | the row above (`T1`…`T10`), or `-` for a check that is not a row (for example the local Go version) |
+| `check` | which verdict within the script; one script can write several lines for one row |
+| `script` | the script that wrote it |
+| `result`, `expected` | one of `accepted`, `rejected`, `identical`, `different`, `refused`, or `error` (skipped or broken: the reason says which) |
+| `reason` | what the script printed |
+| `detail` | optional: measured values, registry address |
+| `run`, `at` | the script run's start time and the line's time, UTC |
 
-With that in place the comparison table is generated, not typed, and a run that quietly stops
-passing shows up as a missing line rather than as nothing at all.
+A line passes when `result` equals `expected`. A run that quietly stops passing shows up as a missing or `error` line
+rather than as nothing at all.
 
-**Do this for Nitro first.** Adding the JSONL line to the existing scripts is a small change, and
-it fixes the output contract before two more platforms are written against it. Not done yet.
+Rows each script writes: `arch-measurement-compare.sh` T1, T3; `toolchain-pin-check.sh` T2; `responder-check.sh` T3;
+`build-env-check.sh` and `arch-record-check.sh` T7; flow 1 T4, T5; flow 2 T6; `in-guest-verify.sh` T4, T9.
 
 ## What running the baseline needs
 

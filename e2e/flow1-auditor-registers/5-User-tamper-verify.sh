@@ -14,4 +14,5 @@ REGISTRY=$(cat "$WORK/registry.txt")
 step "VERIFYING" "$USER_BIN" verify --tee-addr "$VENDOR_HOST:5000" --rpc "$RPC" --registry "$REGISTRY"
 rc=$?
 echo "verify exit=$rc  (0 = trusted, 1 = not trusted)"
+result T5 user-verify-after-swap "$(verdict_of $rc)" rejected "verify exit $rc after the Vendor swapped the enclave" "registry $REGISTRY"
 exit $rc
