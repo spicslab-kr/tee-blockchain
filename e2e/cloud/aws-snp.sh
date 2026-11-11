@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SEV-SNP is done on GCP; this script records the AWS path (SEV-SNP is an instance
+# option, the vTPM is an AMI attribute) and is kept for reference, not used.
+# (Decided 2026-11-11: AWS is used for Nitro Enclaves only. See docs/plan/cvm-port.md.)
+#
 # AWS SEV-SNP with a vTPM. This takes three steps, because SEV-SNP is an instance option but the
 # vTPM (NitroTPM) is an AMI attribute, so the stock AMI has to be re-registered with TPM support.
 #

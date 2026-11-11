@@ -406,3 +406,21 @@ Backups made (10 files): `vendor/vendor_evidence.sh.sha512.bak`, `relay-test/rel
 `user/verify_att/main.go.sha512.bak`, `README.md.sha512.bak`.
 
 None of the changed scripts has been run since the change.
+
+## Decision 2026-11-11: SEV-SNP on GCP only, AWS for Nitro only
+
+Decided by the user the same day. Each platform runs on one cloud: Nitro on AWS, TDX on GCP, SEV-SNP on GCP. No AWS
+SEV-SNP work from now on. Applied to:
+
+- `docs/plan/cvm-port.md`: cloud placement stated at the top; Phase 4b is GCP only and AWS SEV-SNP is marked "decided
+  against"; D1(c) asks only about GCP; D6 keeps the AWS reproduction as a record.
+- `docs/build/sev-snp.md`: new "Only GCP" section (the AWS NitroTPM path, snapshot → AMI re-registered with TPM
+  support, is "not our path"); VCEK in the body, VLEK moved to a footnote; one line that the SHA3-512 binding applies
+  to the GCP path and an AWS path would have to match; the "AWS evidence" row removed from "Not done yet".
+- `e2e/cloud/aws-snp.sh`: kept, with a header comment that it is reference only.
+- `e2e/cloud/README.md`: the AWS SEV-SNP step removed from the order; its section renamed "Not used".
+- The 2026-11 AWS SEV-SNP results are kept everywhere they appear, as the record that AWS gave the same results.
+
+Also added to `docs/build/sev-snp.md`, "Not done yet", on the user's instruction: the 2026-10/11 shell scripts are
+scaffolding outside the repository; the final implementation is Go in `internal/setup/build/snp` and
+`internal/setup/launch/snp`; until then, any report of the seven tests writes its procedure into that document.

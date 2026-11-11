@@ -5,6 +5,10 @@ parse, D3 decided in `docs/build/sev-snp.md`) are implemented and tested on thos
 TDX is written but has not run. D4 is decided in `docs/build/tdx.md`. Everything needing a running guest is not
 started. See `docs/plan/night-log.md`.
 
+Clouds (decided 2026-11-11): **Nitro on AWS, TDX on GCP, SEV-SNP on GCP.** Each platform runs on one cloud. AWS is
+used for Nitro Enclaves only; SEV-SNP on AWS is not pursued. The AWS SEV-SNP runs of 2026-11 stay in the record as
+evidence that AWS gave the same results (D6 below), and `e2e/cloud/aws-snp.sh` is kept for reference.
+
 Order: **Intel TDX first, AMD SEV-SNP second.** TDX attestation has the same shape as Nitro's —
 one request, one signed document, measurements inside it. SEV-SNP is the exception: two documents
 from two signers, joined by a hash. Building the TDX path first means SEV-SNP only has to add the
@@ -100,7 +104,9 @@ the recommended way to fetch a quote is `GetQuoteProvider()` over ConfigFS — `
 | 4.2 | `internal/tee/parse/snp/`: AMD signature on the report, cloud AK chain on the vTPM quote, `Report Data == SHA3-512(vTPM evidence)` (SHA-512 until 2026-11-11), event-log replay against the signed PCRs, `POLICY.DEBUG`, TCB version | `go test` against the fixtures |
 | 4.3 | Adapters, maps and CLI cases, as in 1.2-1.4 | `go build ./...`, `go test ./...` |
 
-4b (needs instances): request, build and launch, mirroring phases 2 and 3.
+4b (needs instances): request, build and launch, mirroring phases 2 and 3, **on GCP only**. SEV-SNP on AWS (VLEK
+signing, NitroTPM as the vTPM, an AMI re-registered with TPM support) was **decided against on 2026-11-11** and is not
+part of 4b.
 
 Existing reference material: the SEV-SNP test scripts from the October–November runs
 (`option1-initrd/`, `option2-dm-verity/`, `vendor/`, `auditor/`, `user/go-verifier/`,
@@ -122,8 +128,8 @@ Vendor's base initrd as a binary. Options:
   If chosen, say so plainly in `README.md` and `docs/build/`.
 - (b) build a reproducible base initrd ourselves. Keeps the original claim; much more work.
 - (c) put the kernel and initrd into the launch measurement directly. `sev-snp-measure` accepts
-  `--kernel`, `--initrd` and `--append`, so the path exists in principle; **whether GCP or AWS
-  lets a tenant use it is unverified.** If it works, the vTPM and the same-VM problem both
+  `--kernel`, `--initrd` and `--append`, so the path exists in principle; **whether GCP lets a
+  tenant use it is unverified.** (AWS no longer matters here: SEV-SNP is GCP only since 2026-11-11.) If it works, the vTPM and the same-VM problem both
   disappear. Verify this before committing to (a) or (b).
 
 **D2. Where the shared files live.** (a) and (b) both need the kernel, base initrd and disk image
@@ -143,7 +149,8 @@ MROWNER differs per machine and must be excluded either way, like Nitro's PCR3/4
 **D5. Freshness without a timestamp.** Nitro judges the certificate chain at the document's own
 timestamp. If an SNP report carries no equivalent field, decide what replaces it.
 
-**D6. SEV-SNP cannot prove both documents came from the same VM.** Reproduced on GCP and AWS: a
+**D6. SEV-SNP cannot prove both documents came from the same VM.** Reproduced on GCP, and on AWS before AWS was
+dropped for SEV-SNP (that AWS run stays as a record that the result is not GCP-specific): a
 vTPM attestation from an approved VM combined with an SNP report from a different VM passes
 verification. Nitro does not have this problem and TDX does not either. Until D1(c) or an in-VM
 vTPM is used, SEV-SNP support is honest only if the limitation is documented.

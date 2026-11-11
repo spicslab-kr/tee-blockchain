@@ -17,7 +17,8 @@ Nothing below can be automated — it needs your account and your identity.
 | account with billing | yes | yes |
 | CLI installed | `aws` | `gcloud` |
 | signed in | `aws configure` | `gcloud auth login` and `gcloud config set project <id>` |
-| quota | SEV-SNP shared tenancy exists only in `us-east-2` and `eu-west-1` | C3 (TDX) and N2D (SEV-SNP) quota in the zone you pick |
+| used for | Nitro Enclaves only | Intel TDX and AMD SEV-SNP |
+| quota | On-Demand Standard vCPUs in `eu-north-1` (the Nitro scripts' region) | C3 (TDX) and N2D (SEV-SNP) quota in the zone you pick |
 
 For the Nitro e2e suite you also need, in the repository root (all gitignored):
 
@@ -35,8 +36,10 @@ compared against.
 1. Nitro baseline        bash e2e/cloud/aws-nitro.sh create      # 2 instances, eu-north-1
 2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create    # 2 instances, us-central1-a
 3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create vendor auditor user y
-4. SEV-SNP on AWS        bash e2e/cloud/aws-snp.sh base → mkami → vm
 ```
+
+Each platform runs on one cloud: Nitro on AWS, TDX and SEV-SNP on GCP. SEV-SNP on AWS was decided against on
+2026-11-11; `aws-snp.sh` is kept only as a record of how that path works.
 
 They do not all have to exist at the same time. Each platform's rows in
 [`docs/plan/test-matrix.md`](../../docs/plan/test-matrix.md) can be filled in its own session.
@@ -53,10 +56,13 @@ Check the current price for your region before creating anything:
 - GCP: `gcloud compute machine-types describe c3-standard-4 --zone us-central1-a`, and the
   Compute Engine pricing page
 
+## Not used: AWS SEV-SNP
+
+Kept for reference only; SEV-SNP is done on GCP (decided 2026-11-11). The 2026-11-10 AWS SEV-SNP runs are still a
+valid record: they showed the same results as GCP, including the same-VM weakness (see `docs/build/sev-snp.md`).
+
 **`aws-snp.sh delete` deliberately does not remove AMIs and snapshots.** They keep costing storage,
 so `status` lists them and you remove them yourself once you are sure you are done with them.
-
-## The awkward one: AWS SEV-SNP
 
 SEV-SNP is an **instance** option and the vTPM is an **AMI** attribute, so they are set at
 different times and the stock AMI has no TPM. That is why `aws-snp.sh` has three steps:
@@ -77,7 +83,7 @@ GCP needs none of this: `--confidential-compute-type=SEV_SNP` and the vTPM is al
 
 | what | AWS | GCP |
 |---|---|---|
-| SEV-SNP on? | `aws ec2 describe-instances --query 'Reservations[].Instances[].CpuOptions'` | `gcloud compute instances describe <n> --format='value(confidentialInstanceConfig)'` |
+| SEV-SNP on? | not used (for reference: `aws ec2 describe-instances --query 'Reservations[].Instances[].CpuOptions'`) | `gcloud compute instances describe <n> --format='value(confidentialInstanceConfig)'` |
 | TDX on? | n/a (AWS has no TDX) | same field, value `TDX` |
 | vTPM present? | `ls -l /dev/tpm0` on the instance | same |
 | Nitro Enclaves on? | `nitro-cli describe-enclaves` after installing the CLI | n/a |

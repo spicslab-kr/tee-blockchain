@@ -30,6 +30,16 @@ SHA-512 versions are kept next to them as `<file>.sha512.bak` (outside this repo
 from 2026-11-10 and earlier were produced with SHA-512. Evidence bound with SHA-512 is now refused
 (`TestVerifySig_SHA512BindingIsRefused`).
 
+The SHA3-512 binding applies to the GCP path, the only one we use; if an AWS path is ever added, its binding must be
+changed to match.
+
+### Only GCP
+
+SEV-SNP is done on GCP only (decided 2026-11-11); AWS is used for Nitro Enclaves. **The AWS path is not ours:** on
+AWS, SEV-SNP is an instance option and the vTPM (NitroTPM) an AMI attribute, so a guest with both needs a snapshot of
+a running instance re-registered as an AMI with TPM support (`e2e/cloud/aws-snp.sh`, kept for reference). The 2026-11
+AWS runs remain a valid record: they gave the same results as GCP, including the same-VM weakness below.
+
 ### Decision: one CBOR container, two format strings
 
 **Container.** `RADoc.Raw` holds one CBOR map with three byte strings:
@@ -123,24 +133,24 @@ In our recorded GCP report all four are `0xe11f000000000004` (confirmed, `gcp-n2
 | VCEK in our GCP evidence | 2026-11-01 → 2033-11-01 | confirmed: `gcp-n2d-auxblob.bin` |
 | VCEK in go-sev-guest's testdata (Milan) | 2022-09-24 → 2029-09-24 | confirmed: `verify/testdata/vcek.testcer` |
 | the same chip's VCEK fetched from AMD's KDS on 2026-11-10 | 2026-11-09 → 2033-11-09, same public key | observed: KDS reissues it with the fetch date |
-| VLEK | not-before one day before issue, not-after seven years after | confirmed: VLEK spec (pub. 58369 rev. 0.10), Table 8 |
 | ARK-Milan, ASK (SEV-Milan) | 2020-10-22 → 2045-10-22 | confirmed: `kdsintf.amd.com/vcek/v1/Milan/cert_chain` |
-| ASVK (SEV-VLEK-Milan) | 2022-11-16 → 2047-11-16 | confirmed: `kdsintf.amd.com/vlek/v1/Milan/cert_chain` |
 | Google AK certificate in our evidence | 2026-11-10 → 2056-11-02 | confirmed: `gcp-n2d-initrdless-att.pb` |
 | Google EK/AK CA Root | 2022-07-08 → 2122-07-08 | confirmed: `root.pem` |
 
 What AMD's KDS specification (pub. 57230) says about VCEK lifetime is **not confirmed**: the document could not be
 retrieved.
 
-**Which key signs on each cloud.**
+**Which key signs: the VCEK.** Google's page says "Version Chip Endorsement Key (VCEK) certificates are cached on
+the VM instead of requested directly from AMD's key distribution system"
+(docs.cloud.google.com/confidential-computing/confidential-vm/docs/attestation), and both our recorded reports have
+SIGNING_KEY = 0 (VCEK) with a VCEK in the host's certificate table (confirmed). Whether GCP ever uses a VLEK is not
+confirmed.[^vlek]
 
-- GCP: VCEK. Google's page says "Version Chip Endorsement Key (VCEK) certificates are cached on the VM instead of
-  requested directly from AMD's key distribution system"
-  (docs.cloud.google.com/confidential-computing/confidential-vm/docs/attestation), and our recorded report has
-  SIGNING_KEY = 0 (VCEK) with a VCEK in the host's certificate table (confirmed). Whether GCP ever uses a VLEK is
-  not confirmed.
-- AWS: a VCEK on Dedicated Hosts and a VLEK on shared tenancy, per AWS's EC2 user guide (snp-attestation page). The
-  VLEK chain is `kdsintf.amd.com/vlek/v1/Milan/cert_chain`. Our parser has not been run on AWS evidence.
+[^vlek]: The other AMD key, the VLEK, is not on our path. AWS signs with a VLEK on shared tenancy (and a VCEK on
+    Dedicated Hosts), per AWS's EC2 user guide (snp-attestation page). Its chain is
+    `kdsintf.amd.com/vlek/v1/Milan/cert_chain`: ASVK (SEV-VLEK-Milan) 2022-11-16 → 2047-11-16 (confirmed from that
+    URL). A VLEK lives from one day before issue to seven years after (confirmed: VLEK spec, pub. 58369 rev. 0.10,
+    Table 8). The parser has never been run on VLEK-signed evidence.
 
 **Decision.**
 
@@ -261,7 +271,7 @@ The binding proves that the AMD-signed report covers this vTPM evidence. It does
 same VM: a vTPM attestation from an approved VM X, hashed into an SNP report requested on another VM Y, verifies.
 That was reproduced on GCP and AWS in the 2026-11 runs (`relay-test/relay_attack.sh`; test matrix row T10). Nitro and
 TDX return one document from one TEE and do not have this problem. It goes away only if the boot files are in the SNP
-launch measurement itself (direct kernel boot; whether GCP or AWS allow it is not confirmed) or if the vTPM runs inside
+launch measurement itself (direct kernel boot; whether GCP allows it is not confirmed) or if the vTPM runs inside
 the SNP guest's own trust boundary.
 
 ## Not done yet
@@ -273,8 +283,15 @@ the SNP guest's own trust boundary.
 | a recorded verity boot | `gcp-n2d-*` booted the distribution initrd, so INITRD is tested on real evidence but PCR12 is not: no recording has the verity hook. Nor does any recording carry an application archive in its initrd |
 | TCB minimums, CRLs | not applied; the platform's patch level is not judged |
 | AMD chain errors as `ErrChain` | go-sev-guest checks the chain and the signature in one call |
-| AWS evidence | AWS signs with a VLEK on shared tenancy and its vTPM is different; nothing here has been run on it |
 | the seven 2026-11 tests on a new instance | `snpguest` and `gotpm`, which those scripts call, could not be installed on the instance (see the night log of 2026-11-10) |
+
+AWS evidence is not on this list: SEV-SNP on AWS was decided against (see "Only GCP").
+
+**The 2026-10/11 shell scripts.** The scripts the SEV-SNP tests use (`vendor/`, `auditor/`, `user/`, `option1-initrd/`,
+`option2-dm-verity/`, `relay-test/`) are the scaffolding of the 2026-10 and 2026-11 experiments, and they live outside
+this repository. The final implementation goes into Go, in `internal/setup/build/snp` and `internal/setup/launch/snp`.
+Until then, whenever results of the seven tests are reported, the procedure that produced them is written into this
+document in enough detail to reproduce them.
 
 ## Checking
 
