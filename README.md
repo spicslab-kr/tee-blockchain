@@ -86,7 +86,8 @@ att-vendor build --app-dir <dir with Dockerfile> --out-dir out --verify
 ```
 
 All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md), [Intel TDX](docs/build/tdx.md),
-[AMD SEV-SNP](docs/build/sev-snp.md). The last two cover verification only so far.
+[AMD SEV-SNP](docs/build/sev-snp.md). The last two cover verification only so far. What each platform's evidence
+gives the verifier, side by side: [RA comparison](docs/build/ra-comparison.md).
 
 ## Quick start
 
