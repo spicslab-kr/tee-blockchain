@@ -48,6 +48,25 @@ Why all four, not RTMR2 alone: the firmware, boot loader and kernel extend RTMR2
 extend the expected RTMR2 while running something else, and only MRTD and RTMR0–1 would show it. Nitro registers PCR0,
 1 and 2 together for the same reason.
 
+### Option 1 and Option 2
+
+TDX, like SEV-SNP, has two ways to carry the application (`docs/plan/cvm-port.md`, Phase 3.4, and the 2026-10-23
+slides, slide 16):
+
+- **Option 1:** the application is a cpio archive in the initrd (`internal/setup/build/cpio`).
+- **Option 2:** the application is a read-only squashfs image with a dm-verity hash tree, and that image is placed
+  inside the initrd rather than on a separate disk. RTMR2 already covers the whole initrd, so the image is measured
+  with it and nothing is extended at run time.
+
+Consequence: TDX needs no second format. `intel-tdx` carries both options with the same measurement names (MRTD,
+RTMR0, RTMR1, RTMR2). SEV-SNP splits into `amd-sev-snp-initrd` and `amd-sev-snp-verity` because its image sits on
+disk, so a boot-time hook extends vTPM PCR12 and a sixth value appears (`docs/build/sev-snp.md`, "Decision: one CBOR
+container, two format strings"; `docs/build/ra-comparison.md`).
+
+ext4 is not reproducible even with a fixed UUID and `hash_seed`, so the image is squashfs with `-mkfs-time 0
+-all-time 0`, file times set to 0, and dm-verity with a fixed `--salt` and `--uuid` (`docs/build/sev-snp.md`,
+"Variables"). Option 2 on TDX has **not been built or booted yet** (Phase 3.4; see "Not done yet").
+
 Left out, because they describe the machine or whoever launched it, not the image:
 
 | field | why |
@@ -253,6 +272,7 @@ describe` on 2026-11-11):
 |---|---|
 | `tee/request/<role>/tdx`, a `--extractor` in `cmd/ra-responder` | Phase 2; needs a running guest |
 | `setup/build` and `setup/launch` for TDX | Phase 3: build the archive, put it first, boot a custom GRUB entry once, read the values back |
+| Option 2 on TDX (squashfs + dm-verity image inside the initrd) | Phase 3.4; not built or booted. Two builds giving the same root hash is the pass criterion |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the PCR→RTMR mapping and the VM-shape dependence | not confirmed on GCP |

@@ -62,6 +62,10 @@ that the AMD chain is checked offline, without asking AMD's key server.
 | `amd-sev-snp-initrd` | a cpio archive appended to the base initrd (Option 1) | MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD |
 | `amd-sev-snp-verity` | a squashfs image on disk, checked by dm-verity at boot against a root hash on the kernel command line; the result is extended into PCR12 (Option 2) | MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD, PCR12 |
 
+TDX does not need this split: there the Option 2 image goes inside the initrd, which RTMR2 already covers, so
+`intel-tdx` carries both options with the same four names (`docs/build/tdx.md`, "Option 1 and Option 2"). On SEV-SNP
+the image sits on disk, so a boot-time hook extends PCR12 and a sixth value appears.
+
 Why two: the on-chain `measurementHash` is computed over the sorted list of `name=value` lines. One format with five
 values in one case and six in another would give hashes that can never be compared, and a User could not tell
 which list a registration used. With two names each list is fixed, and the platform string in the record key keeps
