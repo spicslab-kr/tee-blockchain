@@ -1,0 +1,21 @@
+# Boot evidence for gcp-n2d-opt1-v1-*, copied from the session on attestamp-snp-vendor, 2026-11-11 (UTC).
+# Option 1, application archive appended to the base initrd WITHOUT padding.
+
+$ sudo ./mkappinitrd -base /boot/initrd.img-7.0.0-1017-gcp -app-text 'attestamp app v1' -placement last -out /boot/initrd-attestamp-app.img
+base      /boot/initrd.img-7.0.0-1017-gcp  50100283 bytes  sha256 4703ec07684196e8616d384ac585be54b6345ca8c6ea5544aab8445e0cd4b0a2  size mod 4 = 3
+app       "attestamp app v1"  1536 bytes  sha256 eeb1b5e9af3fb3ba3a08ff014e3a54f6366261428b2de97990db529c98f14c36
+placement last
+combined  /boot/initrd-attestamp-app.img  50101819 bytes  sha256 bc5662827304f527b6e6988e0e2fab248b4a5c28d27665f7666ba87717ef1153
+
+# after rebooting into the GRUB entry that loads /initrd-attestamp-app.img
+$ cat /proc/sys/kernel/random/boot_id
+032f3661-aaeb-42f4-9fb4-93dc5279ed4f
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+$ ls -l /dev/attestamp-app-marker
+ls: cannot access '/dev/attestamp-app-marker': No such file or directory
+$ sudo dmesg | grep -i -E 'initramfs|unpack'
+[    2.113602] Trying to unpack rootfs image as initramfs...
+[    2.394872] Initramfs unpacking failed: invalid magic at start of compressed archive
+
+# Result: the kernel discarded the application archive. No marker; the application never ran.

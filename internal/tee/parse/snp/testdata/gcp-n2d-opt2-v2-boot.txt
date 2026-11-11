@@ -1,0 +1,26 @@
+# Boot evidence for gcp-n2d-opt2-v2-*, copied from the session on attestamp-snp-vendor, 2026-11-11 (UTC).
+# Option 2: the same verifying initrd as v1; only the image on disk and the root hash on the command line changed.
+
+$ sudo sh make-verity-image.sh 'attestamp app v2' verity-v2
+umask 0022
+b8e2656fd5708d78ebcd6c4463555a61d59d877c5732afbe67daf55b40a2fb27  verity-v2/app.img
+9f3dc00c002b8f76b9613614d92e56edccf8a1c24b12d1f0adc86a16b97c6761  verity-v2/app.hash
+roothash a2f4df923b59d5ad7810b785af77146058253b06ba987b491047d6f610b951e1
+mksquashfs version 4.6.1 (2023/03/25)
+veritysetup 2.7.0 flags: UDEV BLKID KEYRING FIPS KERNEL_CAPI HW_OPAL
+# app.hash is identical to v1's: the image is one 4096-byte data block, so the hash file holds only the verity
+# superblock (fixed salt and UUID) and the root hash is the hash of that block (inferred, not checked further).
+
+# after rebooting into the GRUB entry rewritten with the v2 root hash (boot ID not captured for this boot; the command
+# line below, which carries the v2 root hash, shows the reboot happened)
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200 attestamp.roothash=a2f4df923b59d5ad7810b785af77146058253b06ba987b491047d6f610b951e1
+$ cat /run/attestamp-status
+ok
+$ cat /opt/app-verity/opt/app/app
+attestamp app v2
+$ sudo tpm2_pcrread sha256:12
+  sha256:
+    12: 0x0BCE3998DEAF2F3F0AE33C46EE371DC397FECEDC6339C7D734CA296DE5F383FD
+
+# Expected PCR12, computed with Python: 0bce3998deaf2f3f0ae33c46ee371dc397fecedc6339c7d734ca296de5f383fd  (equal)

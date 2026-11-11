@@ -1,0 +1,25 @@
+# Boot evidence for gcp-n2d-opt1p-v1-*, copied from the session on attestamp-snp-vendor, 2026-11-11 (UTC).
+# Option 1, application archive appended to the base initrd zero-padded to a multiple of 4 bytes
+# (the same bytes cpio.Join(AppLast) produces since commit 3c57d4c).
+
+$ sudo cp /boot/initrd.img-7.0.0-1017-gcp /root/base-padded.img && sudo truncate -s %4 /root/base-padded.img && sudo stat -c %s /root/base-padded.img
+50100284
+$ sudo ./mkappinitrd -base /root/base-padded.img -app-text 'attestamp app v1' -placement last -out /boot/initrd-attestamp-app.img
+base      /root/base-padded.img  50100284 bytes  sha256 33b2da140beb361081ee484c259d3fd3cc04f0bcb7a4c35367d43f53d025aac4  size mod 4 = 0
+app       "attestamp app v1"  1536 bytes  sha256 eeb1b5e9af3fb3ba3a08ff014e3a54f6366261428b2de97990db529c98f14c36
+placement last
+combined  /boot/initrd-attestamp-app.img  50101820 bytes  sha256 a4504052832e43d87ccd5d1c9ee8e6560be7a2cd528be4a842e8d2c246f358bf
+
+# after rebooting into the same GRUB entry
+$ cat /proc/sys/kernel/random/boot_id
+e09423f8-6369-40c8-a31d-e22444f72f52
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+$ ls -l /dev/attestamp-app-marker; cat /dev/attestamp-app-marker
+-rw-r--r-- 1 root root 29 Nov 11 07:15 /dev/attestamp-app-marker
+file app 17
+attestamp app v1
+$ sudo dmesg | grep -i -E 'initramfs|unpack'
+[    2.035096] Trying to unpack rootfs image as initramfs...
+
+# Result: the archive was unpacked; the marker names the application text.

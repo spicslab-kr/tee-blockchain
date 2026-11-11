@@ -1,0 +1,7 @@
+nonce_text attestamp-snp-opt1p-v1
+nonce 9098921938fe84657ce5928cbf37f025f82730dc9126007684b12dead572a3d2
+report_data 0258193bc114660276862dcb1b93d72d87c79ef1277f344f3a8a366aaf36ca3de4591de995305e624ad25671fd38103a34faf181a3c3d9e7261af921703f17d7
+provider sev_guest
+att_pb_bytes 62406
+report_bytes 1184
+auxblob_bytes 4763

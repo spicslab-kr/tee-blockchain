@@ -1,12 +1,41 @@
 # Recorded SEV-SNP evidence
 
-Two evidence pairs from one real AMD SEV-SNP guest on GCP, used by the tests in `internal/tee/parse/snp` and
-`cmd/snp_e2e_test.go`. They let the parser be written and tested with no instance running.
+Evidence from one real AMD SEV-SNP guest on GCP (`attestamp-snp-vendor`), used by the tests in
+`internal/tee/parse/snp` and `cmd/snp_e2e_test.go`. It lets the parser be written and tested with no instance running.
 
 | Recording | Boot | Binding | Used for |
 |---|---|---|---|
-| `gcp-n2d-*` | with an initrd | REPORT_DATA = **SHA3-512** of the vTPM attestation | the evidence the parser accepts: every value of `amd-sev-snp-initrd` is asserted |
+| `gcp-n2d-*` | with the distribution initrd | REPORT_DATA = **SHA3-512** of the vTPM attestation | the evidence the parser accepts: every value of `amd-sev-snp-initrd` is asserted |
 | `gcp-n2d-initrdless-*` | without an initrd (stock GCP Ubuntu) | REPORT_DATA = **SHA-512** of the vTPM attestation | evidence the parser must refuse, twice over: the binding (`VerifySig`) and the missing initrd (`Parse`) |
+| `gcp-n2d-opt1-v1-*`, `gcp-n2d-opt1-v2-*` | Option 1, application archive appended **without padding**: the kernel discarded it | SHA3-512 | T5 pair, and the record that an unpadded append loses the application |
+| `gcp-n2d-opt1p-v1-*`, `gcp-n2d-opt1p-v2-*` | Option 1, application archive appended after the base **zero-padded to 4 bytes**: unpacked | SHA3-512 | T5 pair (`amd-sev-snp-initrd`) |
+| `gcp-n2d-opt2-v1-*`, `gcp-n2d-opt2-v2-*` | Option 2, squashfs + dm-verity image on disk, verifying initrd, PCR12 extended | SHA3-512 | T5 pair (`amd-sev-snp-verity`); the first real evidence with a non-zero PCR12 |
+
+In each `v1`/`v2` pair the application differs by one byte (`attestamp app v1` → `attestamp app v2`) and nothing
+else. The procedure is `docs/plan/app-fixture-recording.md`.
+
+## The two Option 1 pairs, side by side
+
+Both were recorded on 2026-11-11 on the same instance, from the same base initrd (`/boot/initrd.img-7.0.0-1017-gcp`,
+50,100,283 bytes, **length mod 4 = 3**), with the same GRUB entry and command line.
+
+| | `gcp-n2d-opt1-*` (unpadded) | `gcp-n2d-opt1p-*` (padded) |
+|---|---|---|
+| how the initrd was made | base followed directly by the application archive | base zero-padded to 50,100,284 bytes (`truncate -s %4`), then the archive: the bytes `cpio.Join(AppLast)` writes since commit `3c57d4c` |
+| kernel log (`dmesg`) | `Initramfs unpacking failed: invalid magic at start of compressed archive` | no such line |
+| marker `/dev/attestamp-app-marker` | **absent** | present: `file app 17` / `attestamp app v1` (v2) |
+| did the application run | **no** | yes |
+| INITRD v1 → v2 | `bc566282…1153` → `1e3d844a…d511` | `a4504052…58bf` → `332163d0…6006` |
+| boot log | `gcp-n2d-opt1-v1-boot.txt`, `gcp-n2d-opt1-v2-boot.txt` | `gcp-n2d-opt1p-v1-boot.txt`, `gcp-n2d-opt1p-v2-boot.txt` |
+
+These two pairs cannot be told apart from the evidence alone. Both carry a well-formed quote and an INITRD that
+changes with the application. The difference - that in the unpadded pair the kernel discarded the archive and the
+application never ran - is visible only in the boot log and in the absence of the marker. That is the point of keeping
+the unpadded pair.
+
+Each `*-boot.txt` holds the commands and output from the session, copied verbatim: how the initrd was built, the boot
+ID, the command line, the marker and the kernel's initramfs lines (or, for Option 2, the verity status, the mounted
+application and PCR12 read with `tpm2_pcrread`).
 
 Each recording has four files:
 
@@ -50,6 +79,20 @@ Checked outside the parser for `gcp-n2d-*`, on the instance or with tools other 
 | KERNEL `3cf8c2c3…9adb` | `sha256sum /boot/vmlinuz-7.0.0-1017-gcp` on the instance |
 | CMDLINE `80dfd7d3…3de0` | `printf '%s' '<command line above>' \| sha256sum` |
 | REPORT_DATA `82ded258…142e` | `openssl dgst -sha3-512 gcp-n2d-att.pb`, on Windows and on the instance (OpenSSL 3.0.13) |
+
+Checked outside the parser for the application recordings (recorded 2026-11-11 between 07:10:59 and 08:03:23 UTC,
+the times of the first and last `record.txt`):
+
+| Value | Check |
+|---|---|
+| INITRD of each Option 1 recording | equals the "combined" sha256 `mkappinitrd` printed on the instance (in each `*-boot.txt`) |
+| INITRD of both Option 2 recordings `b0fd172d…f33a` | `sha256sum /boot/initrd-attestamp-verity.img` on the instance |
+| CMDLINE of `gcp-n2d-opt2-v1-*` `2c2f6529…8b52` | `printf '%s' '/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200 attestamp.roothash=e29ec085…af0c9' \| sha256sum` (single spaces, as GRUB logs it; the grub.cfg line has two before `console`) |
+| PCR12 of both Option 2 recordings | `tpm2_pcrread sha256:12` on the instance, and SHA-256(32 zero bytes ‖ SHA-256("attestamp-verity-ok:" ‖ root hash)) computed with Python |
+| the Option 2 image is reproducible | `make-verity-image.sh` run twice for v1 gave the same `app.img`, `app.hash` and root hash |
+
+The nonce of each application recording is SHA-256 of its nonce text, `attestamp-snp-<cell>`, e.g.
+`attestamp-snp-opt1p-v1` (in each `*-record.txt`).
 
 ## The nonce and the binding
 

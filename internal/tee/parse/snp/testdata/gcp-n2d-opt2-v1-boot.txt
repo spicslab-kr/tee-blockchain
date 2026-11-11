@@ -1,0 +1,38 @@
+# Boot evidence for gcp-n2d-opt2-v1-*, copied from the session on attestamp-snp-vendor, 2026-11-11 (UTC).
+# Option 2: squashfs + dm-verity image on disk, verifying initrd, root hash on the kernel command line.
+
+$ sudo sh make-verity-image.sh 'attestamp app v1' verity-v1
+umask 0022
+28bdfcff646c091bed6fb568066de3d727894a2f345a93600a71d92d7e05ec1c  verity-v1/app.img
+9f3dc00c002b8f76b9613614d92e56edccf8a1c24b12d1f0adc86a16b97c6761  verity-v1/app.hash
+roothash e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9
+mksquashfs version 4.6.1 (2023/03/25)
+veritysetup 2.7.0 flags: UDEV BLKID KEYRING FIPS KERNEL_CAPI HW_OPAL
+# built a second time into verity-v1-again: identical app.img, app.hash and root hash
+
+$ dpkg-query -W squashfs-tools cryptsetup-bin tpm2-tools
+cryptsetup-bin	2:2.7.0-1ubuntu4.2
+squashfs-tools	1:4.6.1-1build1
+tpm2-tools	5.6-1build4
+
+$ sudo mkinitramfs -o /boot/initrd-attestamp-verity.img 7.0.0-1017-gcp   # with initramfs-hook.sh and initramfs-local-bottom.sh installed
+$ sudo sha256sum /boot/initrd-attestamp-verity.img
+b0fd172dff60ce1ba307d0318ae92d49d2dad8296ae7de8c912e9ab79dabf33a  /boot/initrd-attestamp-verity.img
+
+# after rebooting into the GRUB entry with attestamp.roothash=
+$ cat /proc/sys/kernel/random/boot_id
+34eefca6-b27e-4824-aa2e-b64f06ea2c49
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200 attestamp.roothash=e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9
+$ cat /run/attestamp-status
+ok
+$ cat /run/attestamp-log
+(empty)
+$ cat /opt/app-verity/opt/app/app
+attestamp app v1
+$ sudo tpm2_pcrread sha256:12
+  sha256:
+    12: 0x470379C79F539F0EC838951311FC92D43782FF3EB138CD6575188CA4B18A4689
+
+# Expected PCR12 = SHA-256(32 zero bytes || SHA-256("attestamp-verity-ok:" || root hash)), computed with Python:
+# 470379c79f539f0ec838951311fc92d43782ff3eb138cd6575188ca4b18a4689  (equal)

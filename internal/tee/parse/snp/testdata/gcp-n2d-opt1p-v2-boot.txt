@@ -1,0 +1,21 @@
+# Boot evidence for gcp-n2d-opt1p-v2-*, copied from the session on attestamp-snp-vendor, 2026-11-11 (UTC).
+# Option 1, application archive appended to the base initrd zero-padded to a multiple of 4 bytes.
+
+$ sudo ./mkappinitrd -base /root/base-padded.img -app-text 'attestamp app v2' -placement last -out /boot/initrd-attestamp-app.img
+base      /root/base-padded.img  50100284 bytes  sha256 33b2da140beb361081ee484c259d3fd3cc04f0bcb7a4c35367d43f53d025aac4  size mod 4 = 0
+app       "attestamp app v2"  1536 bytes  sha256 6370946247f8834ea8917598480489230ab4fe1e8d3ce53979fec8b558d61496
+placement last
+combined  /boot/initrd-attestamp-app.img  50101820 bytes  sha256 332163d0c30f86c2e81ad48d7df15ab5af5a98eab286d3d8e06cce6b83cb6006
+
+# after rebooting into the same GRUB entry
+$ cat /proc/sys/kernel/random/boot_id
+d66de0f5-edd8-4d26-8f45-c70ee07e62d9
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+$ cat /dev/attestamp-app-marker
+file app 17
+attestamp app v2
+$ sudo dmesg | grep -i -E 'initramfs|unpack'
+[    1.976190] Trying to unpack rootfs image as initramfs...
+
+# Result: the archive was unpacked; the marker names the application text.
