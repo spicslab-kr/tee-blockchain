@@ -27,6 +27,16 @@ For the Nitro e2e suite you also need, in the repository root (all gitignored):
   the default; `NET=mainnet` spends real ETH and additionally requires `CONFIRM_MAINNET=1`
 - `e2e/env.local.sh`, copied from `env.local.example.sh` — `aws-nitro.sh status` prints the lines
 
+### GCP prerequisites (checked 2026-11-12 on the project the recordings were made in)
+
+| what | state found | check it with |
+|---|---|---|
+| Compute Engine API | enabled | `gcloud services list --enabled --filter=config.name=compute.googleapis.com` |
+| SSH to the guests | the default network's `default-allow-ssh` rule (tcp:22 from `0.0.0.0/0`), created with the project; `gcloud compute ssh` relies on it | `gcloud compute firewall-rules list` |
+| RA port for a verifier outside the guest | `attestamp-ra`, tcp:5000 from one `/32`, added by hand; not needed when the whole chain runs on the guest (`e2e/cvm/in-guest-verify.sh`) | same |
+| `xxd` on the guest (the manual quote recording in `internal/tee/parse/tdx/testdata/README.md`) | present in the stock image `ubuntu-2404-noble-amd64-v20261105` (package `xxd` 2:9.1.0016-1ubuntu7.20); not installed by hand (`/var/log/apt/history.log` shows only `tpm2-tools`) | `command -v xxd` on the guest |
+| `tpm2-tools` on the SEV-SNP guest | **not** in the stock image; installed by hand (`apt-get install -y tpm2-tools`, 5.6-1build4) for the Option 2 hook | `dpkg-query -W tpm2-tools` |
+
 ## Order
 
 Follow `docs/plan/cvm-port.md`. Nitro comes first because it is the baseline the other two are
