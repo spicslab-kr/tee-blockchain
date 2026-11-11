@@ -234,6 +234,22 @@ commit `067c5c24cef2`, and `Documentation/driver-api/early-userspace/buffer-form
   - then pad the base to a multiple of 4 (`truncate -s %4`) and append again.
 - Padding inside `cpio.Join` would change the combined file and so the measured value. It has not been made.
 
+**Measured so far: nothing (2026-11-11).** The hypothesis predicts that the base initrd used on TDX had a length that
+is **not** a multiple of 4, and the ones used in the 2026-11 SEV-SNP runs a length that **is**. No base initrd from
+either run is on the local machine: the scratchpad and the folder of 2026-11 scripts hold no `*initrd*`, `*.img`,
+`*.bin`, `*.cpio` or `*.zst` file. No instance was started to look. What to measure, and where:
+
+| what | where | command | the hypothesis expects |
+|---|---|---|---|
+| the base initrd the TDX append failed with (Phase 3.2, 2026-10) | that file is not known to be kept anywhere; if it is found, measure it | `expr $(stat -c %s <file>) % 4` | not 0 |
+| the base initrd the 2026-11 SEV-SNP runs appended to (the `i.bin` the scripts published) | the 2026-11 Vendor instances, if their disks still exist | same | 0 |
+| today's distribution initrd on each recorded guest | `attestamp-tdx-vendor` and `attestamp-snp-vendor`, `/boot/initrd.img-$(uname -r)` (both now `7.0.0-1017-gcp`) | same | nothing on its own: only says how likely an append is to fail with this file. Regenerated initrds can change length |
+| whether an append actually failed | the serial console of the boot that used the combined file | `gcloud compute instances get-serial-port-output <name> --zone us-central1-a`, then search for `Initramfs unpacking failed` | present when the remainder is not 0 |
+
+The app-fixture recording session (`docs/plan/app-fixture-recording.md`) measures the third and fourth rows on both
+guests at no extra cost. Whatever the numbers are, they go here as measured, including if they contradict the
+hypothesis.
+
 ## The instance
 
 `e2e/cloud/gcp-cvm.sh tdx create <roles…>` creates it.
