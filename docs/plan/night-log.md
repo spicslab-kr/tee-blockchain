@@ -669,3 +669,29 @@ home paths, disk UUIDs, PARTUUIDs, kernel version and IP addresses were not brou
   cells (`bfb0313`).
 - Docs: measured results replace the assumptions (`c625e26`).
 - Not done: TDX Option 2 image mounting at boot, the SEV-SNP tamper case, and Phase 2 (approved, paused).
+
+## Phase 2 implemented; runtime immutability designed (2026-11-11, evening)
+
+- The slides' "RTMR[2] alone" was settled with the user as a contrast (one value moves on TDX), not a registration
+  rule; `intel-tdx` keeps four names (`docs/build/tdx.md`, `c587015`).
+- **Phase 2 code** (`60de6b0`):
+  - `internal/tee/request/{tdx,snp}` plus thin adapters for Vendor and auditor;
+  - `att-ra-responder --extractor tdx | snp-initrd | snp-verity`;
+  - `--listen` still defaults to `127.0.0.1`.
+  - go-configfs-tsm v0.3.3 and go-tpm v0.9.8 moved from indirect to direct dependencies. They were already in the
+    module graph; nothing new was downloaded.
+- **Tests, with no hardware.** go-configfs-tsm's `faketsm` returns each recorded quote or report only for the
+  REPORTDATA it was made for, and the output verifies with the parsers. The SEV-SNP request code encodes the container
+  itself rather than importing `parse/snp`, and a test pins it byte-for-byte to `parse/snp.Encode`. This keeps verifier
+  code out of the TEE binary.
+- **Responder size.** The Linux `att-ra-responder` grew from 4.7 MB to 12.5 MB: go-tpm-tools' client links the
+  go-sev-guest and go-tdx-guest clients.
+- **Not done:** Phase 2.3, the live run on a guest.
+- **Nitro baseline.** The responder is in the Nitro EIF too, so its PCR2 changes again. Take the baseline after
+  `a379a2c`, `e6ef9b4` and `60de6b0`.
+- **Docs:**
+  - `docs/build/runtime-immutability.md` (new): layer 1 confirmed (kernel dm-verity documentation quoted, our
+    measurement), layer 2 not built, layer 3 reasoned and not tested; Nitro for comparison.
+  - `docs/plan/cvm-port.md`: why Phase 2 comes first (layer 2 removes `sshd`), the firewall narrowing, and Phase 5
+    (lock the guest, with the tamper case).
+  - README, STRUCTURE, tdx.md, sev-snp.md updated.

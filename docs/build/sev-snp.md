@@ -425,7 +425,7 @@ the SNP guest's own trust boundary.
 
 | what | why |
 |---|---|
-| `tee/request/<role>/snp`, a `--extractor` in `cmd/ra-responder` | needs a running guest; the recorder in `testdata/record` is the starting point |
+| the live run of `att-ra-responder --extractor snp-initrd` / `snp-verity` | Phase 2.3; the code (`internal/tee/request/snp`, the same sequence as `testdata/record`) is done and tested through a fake TSM and vTPM against the recorded evidence. Start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address. The guest also needs outbound access to Google's certificate host while attesting (the AK intermediates are fetched) |
 | `setup/build`, `setup/launch` for SEV-SNP | Phase 4b; the 2026-11 scripts do it by hand |
 | a recorded verity boot | `gcp-n2d-*` booted the distribution initrd, so INITRD is tested on real evidence but PCR12 is not: no recording has the verity hook. Nor does any recording carry an application archive in its initrd |
 | TCB minimums, CRLs | not applied; the platform's patch level is not judged |

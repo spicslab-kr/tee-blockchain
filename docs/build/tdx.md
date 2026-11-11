@@ -288,7 +288,7 @@ describe` on 2026-11-11):
 
 | what | why |
 |---|---|
-| `tee/request/<role>/tdx`, a `--extractor` in `cmd/ra-responder` | Phase 2; needs a running guest |
+| the live run of `att-ra-responder --extractor tdx` | Phase 2.3; the code (`internal/tee/request/tdx`) is done and tested through a fake TSM against the recorded quotes. Start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address |
 | `setup/build` and `setup/launch` for TDX | Phase 3: build the archive, put it first, boot a custom GRUB entry once, read the values back |
 | Option 2 on TDX (squashfs + dm-verity image inside the initrd) | Phase 3.4; not built or booted. Two builds giving the same root hash is the pass criterion |
 | TCB level, CRLs | collateral is not fetched (see above) |

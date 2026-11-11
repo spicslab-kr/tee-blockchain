@@ -189,11 +189,14 @@ hash, and register its own signed hash. The User can then require both registrie
 
 - **AWS Nitro Enclaves end to end.** Request, document verification against the AWS Nitro root,
   measurement extraction, image build and launch.
-- **Intel TDX and AMD SEV-SNP on GCP: verification only.** `ra-parse`, `audit` and `verify` check a
-  TDX quote (`intel-tdx`: MRTD, RTMR0–2) or SEV-SNP evidence (`amd-sev-snp-initrd`,
-  `amd-sev-snp-verity`), tested against evidence recorded on GCP. Requesting evidence from a running
-  guest, building and launching are not implemented yet. SEV-SNP evidence is two documents from two
-  signers, and nothing proves they come from the same VM; see [AMD SEV-SNP](docs/build/sev-snp.md#same-vm).
+- **Intel TDX and AMD SEV-SNP on GCP: verification, and requesting evidence in the guest.** `ra-parse`,
+  `audit` and `verify` check a TDX quote (`intel-tdx`: MRTD, RTMR0–2) or SEV-SNP evidence
+  (`amd-sev-snp-initrd`, `amd-sev-snp-verity`), tested against evidence recorded on GCP, including
+  recordings with an application in both options. `att-ra-responder --extractor tdx | snp-initrd |
+  snp-verity` produces the evidence inside the guest; it has been tested against the recordings, not yet
+  run on a live guest. Building and launching are not implemented yet. SEV-SNP evidence is two documents
+  from two signers, and nothing proves they come from the same VM; see [AMD SEV-SNP](docs/build/sev-snp.md#same-vm).
+  What a measurement says about a running guest: [runtime immutability](docs/build/runtime-immutability.md).
 - **GCP Confidential Space and Azure** have request-side scaffolding only.
 - **The measurement is the identity.** The image hash (PCR0·1·2 on Nitro, MRTD and RTMR0–2 on TDX)
   is what gets registered and looked up, so no name, version or key has to be known in advance.

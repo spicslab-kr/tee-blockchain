@@ -1,9 +1,16 @@
 # Porting Attestamp from Nitro to confidential VMs
 
-Status (2026-11-11): Phase 0.3 and 0.4 are done (fixtures recorded). Phase 1 (TDX parse) and phase 4a (SEV-SNP
-parse, D3 decided in `docs/build/sev-snp.md`) are implemented and tested on those fixtures; the anvil chain test for
-TDX is written but has not run. D4 is decided in `docs/build/tdx.md`. Everything needing a running guest is not
-started. See `docs/plan/night-log.md`.
+Status (2026-11-11, evening):
+
+- Done:
+  - Phase 0.3 and 0.4: the first fixtures.
+  - Phase 1 (TDX parse) and phase 4a (SEV-SNP parse), with D3, D4 and D5 decided.
+  - The anvil chain tests, which run.
+  - Application fixtures for all four platform/option cells, which make T5 a code test (`docs/plan/app-fixture-recording.md`).
+  - Phase 2 code (TDX and SEV-SNP request), tested on the recorded evidence; its run on a live guest (2.3) is pending.
+- Phase 3 is partly done: 3.2–3.4 were measured in the recording session.
+- Phase 5 (a locked guest) is designed below, not started.
+- See `docs/plan/night-log.md`.
 
 Clouds (decided 2026-11-11): **Nitro on AWS, TDX on GCP, SEV-SNP on GCP.** Each platform runs on one cloud. AWS is
 used for Nitro Enclaves only; SEV-SNP on AWS is not pursued. The AWS SEV-SNP runs of 2026-11 stay in the record as
@@ -75,13 +82,31 @@ the recommended way to fetch a quote is `GetQuoteProvider()` over ConfigFS — `
 `/dev/tdx_guest` is documented as deprecated. The README's `verify.TdxQuote` takes a `*pb.QuoteV4`;
 **confirm whether the current release also handles QuoteV5 before writing against it.**
 
-## Phase 2 — TDX request (needs a GCP TDX instance)
+## Phase 2 — TDX and SEV-SNP request (code done; the live run needs instances)
 
-| # | Task | Pass criterion |
-|---|---|---|
-| 2.1 | `internal/tee/request/{Vendor,auditor}/tdx/` — get a quote for a given nonce | the returned quote parses with the Phase 1 parser |
-| 2.2 | `--extractor tdx` in `cmd/ra-responder` | the responder answers a request from another machine |
-| 2.3 | End to end: `att-user verify` against a running TDX instance | exit 0 and a `✓ matches` line |
+**Why Phase 2 comes before locking the guest (Phase 5).** Runtime immutability's second layer
+(`docs/build/runtime-immutability.md`) removes `sshd`. Once that is done, the way fixtures are recorded today, logging in
+over SSH and running a recorder by hand, is impossible. The responder serving evidence over TCP is the only way to get
+a quote out of a locked VM. So Phase 2 is a precondition of layer 2.
+
+Built on 2026-11-11 to the approved design: the role-independent work once in `internal/tee/request/{tdx,snp}`, thin
+adapters in `internal/tee/request/{Vendor,auditor}/{tdx,snp}`, and `request/{Vendor,auditor}/aws` untouched.
+
+| # | Task | Pass criterion | State |
+|---|---|---|---|
+| 2.1 | `internal/tee/request/tdx` (ConfigFS TSM, REPORTDATA = nonce then zeros) and `internal/tee/request/snp` (GCE vTPM attestation, SHA3-512 into REPORT_DATA, SNP report and certificate table, the parse/snp container), with role adapters | the returned evidence parses with the Phase 1 and 4a parsers | **done, without hardware**: a fake TSM (go-configfs-tsm `faketsm`) answers only for the REPORTDATA each recording was made for, and the quote and evidence produced verify with the parsers |
+| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done; not run on a guest |
+| 2.3 | End to end: `att-user verify` against a running TDX and SEV-SNP instance | exit 0 and a `✓ matches` line | needs instances |
+
+**Listening.** `--listen` defaults to `tcp:127.0.0.1:5000`. A confidential VM is reached over its own network, so the
+responder has to be started with `--listen tcp:0.0.0.0:5000` explicitly, and the firewall must allow port 5000 only
+from the verifier's address (narrow the existing `attestamp-ra` rule's source range to that address rather than
+`0.0.0.0/0`). The responder hands out evidence to anyone who connects; the evidence is not secret, but there is no
+reason to offer it to the internet.
+
+**The responder is shared with Nitro.** `att-ra-responder` is also layered into the Nitro EIF, so adding these
+extractors changed its bytes, and Nitro PCR2 with them. The Nitro baseline has to be taken after commit `60de6b0` as
+well. The request packages do not import the parsers, so no verifier code is linked into the responder.
 
 ## Phase 3 — TDX build and launch (needs two GCP TDX instances)
 
@@ -107,6 +132,22 @@ the recommended way to fetch a quote is `GetQuoteProvider()` over ConfigFS — `
 4b (needs instances): request, build and launch, mirroring phases 2 and 3, **on GCP only**. SEV-SNP on AWS (VLEK
 signing, NitroTPM as the vTPM, an AMI re-registered with TPM support) was **decided against on 2026-11-11** and is not
 part of 4b.
+
+## Phase 5 — Lock the guest (runtime immutability, layers 2 and 3; after Phase 2)
+
+Designed, not started. The reasoning and what is confirmed versus reasoned are in
+`docs/build/runtime-immutability.md`. Order:
+
+| # | Task | Pass criterion |
+|---|---|---|
+| 5.1 | Build a locked root image: the root file system as a squashfs + dm-verity image with no `sshd` and no other login, writable paths on `tmpfs`, and outbound traffic blocked by a firewall configuration that lives inside the image; `att-ra-responder` started at boot with `--extractor tdx` or `snp-verity` and `--listen tcp:0.0.0.0:5000` | two builds give the same root hash (the Option 2 settings: squashfs times 0, fixed salt and UUID, `umask 022`) |
+| 5.2 | Boot it, with the root image's verity root hash on the kernel command line (`root=/dev/mapper/...` set up by the initrd against that hash) | the guest boots; SSH is refused; the responder answers from outside (Phase 2.3) |
+| 5.3 | Record evidence from the locked guest through the responder, not over SSH | a fixture recorded with `att-user ra-request` from the verifier's machine |
+| 5.4 | A test in which the verifier reads the root hash out of the measured command line (CMDLINE on SEV-SNP, the command-line event behind RTMR2 on TDX) and compares it with the hash of the image it was given | the hash in the evidence equals the published image's; a different image gives a different measurement |
+| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the 2026-11 script `option2-dm-verity/verity_tamper.sh` (flips one byte of the image at offset 5000 and reboots), outside the repository |
+
+5.4 and 5.5 turn layer 3 from reasoning into a measured result; until they pass, `runtime-immutability.md` keeps
+calling it reasoned.
 
 Existing reference material: the SEV-SNP test scripts from the October–November runs
 (`option1-initrd/`, `option2-dm-verity/`, `vendor/`, `auditor/`, `user/go-verifier/`,
