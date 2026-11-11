@@ -435,3 +435,18 @@ scaffolding outside the repository; the final implementation is Go in `internal/
   still has to be filled in.
 - Documentation and images stay CC BY 4.0 (`LICENSE-CC-BY` kept), on the user's decision.
 - Also changed: the README license section and `CONTRIBUTING.md` ("code you contribute is licensed as MIT").
+
+## OpenZeppelin: pinned upstream, missing in this copy
+
+The build-information audit found that this working copy has `.gitmodules` but no submodule gitlink in HEAD
+(`git ls-tree -r HEAD contracts` lists only `README.md` and `Registry.sol`) and an empty
+`contracts/evm/lib/openzeppelin-contracts`, so `Registry.sol` could not be recompiled here.
+
+Resolved with the user: the original repository's gitlink points at `cab19933c33c2ad1d4c7a84864a3601dddfd16f3`, whose
+commit message is "Release v5.7.0 (#6615)". This working copy is a zip extract, so the submodule contents and the
+gitlink are missing. A proper clone (`git clone --recursive`, or `git submodule update --init --recursive`) has them.
+The original repository was pinned; the problem existed only in this copy.
+
+Written into `contracts/README.md` ("OpenZeppelin version") and `STRUCTURE.md` (`.gitmodules` holds the path and
+URL; the gitlink is what pins the version). In the list of gaps for "everything needed to build is on GitHub", this
+item is **resolved**.

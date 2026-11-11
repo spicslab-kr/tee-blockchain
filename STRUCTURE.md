@@ -13,7 +13,7 @@ This page lists every folder in the repository, then explains the one idea that 
 ├── CONTRIBUTING.md         build, test, layout and commit conventions
 ├── STRUCTURE.md            this file
 ├── .gitattributes          line-ending and diff rules
-├── .gitmodules             pins OpenZeppelin under contracts/evm/lib
+├── .gitmodules             path and URL of the OpenZeppelin submodule (contracts/evm/lib); the gitlink pins v5.7.0
 ├── .gitignore              keys, e2e work files, stray build outputs
 │
 ├── cmd/                    one folder per binary, plus the end-to-end Go tests

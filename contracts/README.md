@@ -5,6 +5,16 @@ OpenZeppelin's `ECDSA` and `EIP712`. It records who vouches for which enclave im
 until when. Deploy it with `registry-deploy` (see the [Auditor guide](../cmd/auditor/README.md)
 or [Vendor guide](../cmd/vendor/README.md)).
 
+## OpenZeppelin version
+
+OpenZeppelin Contracts is pinned by the submodule gitlink at
+`cab19933c33c2ad1d4c7a84864a3601dddfd16f3`, which is the v5.7.0 release. Registry.sol uses `ECDSA` and `EIP712` from
+that version; OZ v4 implements EIP712 differently and would produce different bytecode.
+
+`.gitmodules` only names the path (`evm/lib/openzeppelin-contracts`) and the URL; the gitlink is what fixes the
+version. Clone with `git clone --recursive`, or run `git submodule update --init --recursive` after cloning, before
+running `go generate` in `internal/chain/register/*/ether`.
+
 ## What it stores
 
 For each registration, one `RegistrationInfo` under a record key:
