@@ -20,9 +20,15 @@ measured by the cloud's vTPM. So one piece of evidence is two documents from two
 | SNP attestation report (1,184 bytes) | the chip's VCEK, chaining to AMD's ARK | the firmware's launch digest, the guest policy, TCB versions, 64 bytes of REPORT_DATA |
 | vTPM attestation (go-tpm-tools `attest.Attestation`) | Google's attestation key (AK), chaining to Google's "EK/AK CA Root" | quotes over the PCRs with the verifier's nonce, the TCG event log |
 
-They are bound by **REPORT_DATA = SHA-512 of the vTPM attestation bytes**: the AMD signature covers REPORT_DATA, so
-it covers exactly the vTPM evidence carried next to it. This is the binding the 2026-11 test scripts used
-(`vendor/vendor_evidence.sh`).
+They are bound by **REPORT_DATA = SHA3-512 of the vTPM attestation bytes**: the AMD signature covers REPORT_DATA, so
+it covers exactly the vTPM evidence carried next to it. SHA3-512 gives 64 bytes, the size of REPORT_DATA, so the hash
+goes in unchanged.
+
+The binding was SHA-512 until **2026-11-11**, when it was changed to SHA3-512 by decision of the project lead. SHA-512
+is what the 2026-11 test scripts used (`vendor/vendor_evidence.sh`); they were changed the same day, and their
+SHA-512 versions are kept next to them as `<file>.sha512.bak` (outside this repository; see the night log). Results
+from 2026-11-10 and earlier were produced with SHA-512. Evidence bound with SHA-512 is now refused
+(`TestVerifySig_SHA512BindingIsRefused`).
 
 ### Decision: one CBOR container, two format strings
 
@@ -78,7 +84,7 @@ The checks `ra-parse` makes, in order (confirmed against the recorded evidence, 
    verifies. go-sev-guest does both in one call, so a certificate problem here is reported as a signature failure.
 2. The AK certificate chains to Google's EK/AK CA Root (embedded as `root.pem`).
 3. The quotes' signatures, and the event log replayed against the quoted PCRs (go-tpm-tools).
-4. REPORT_DATA = SHA-512(vTPM attestation).
+4. REPORT_DATA = SHA3-512(vTPM attestation).
 5. The quotes carry the nonce the verifier sent.
 6. POLICY.DEBUG (bit 19) is clear. A debug guest is refused.
 7. GRUB loaded an initrd. An initrdless boot is refused (see "Variables").
@@ -108,7 +114,7 @@ that time, because a Nitro leaf certificate lives about three hours. Is there an
 | COMMITTED_TCB (1E0h) | the TCB the firmware cannot be rolled back below |
 | LAUNCH_TCB (1F0h) | the TCB when the guest was launched. Table 27 says "the CommittedTcb at the time the guest was launched", the guest-context table says "the CurrentTcb" — the spec is inconsistent |
 
-In our recorded GCP report all four are `0xe11f000000000004` (confirmed, `gcp-n2d-report.bin`).
+In our recorded GCP report all four are `0xe11f000000000004` (confirmed, `gcp-n2d-initrdless-report.bin`).
 
 **The certificates live for years, so judging them "now" is enough.**
 
@@ -120,7 +126,7 @@ In our recorded GCP report all four are `0xe11f000000000004` (confirmed, `gcp-n2
 | VLEK | not-before one day before issue, not-after seven years after | confirmed: VLEK spec (pub. 58369 rev. 0.10), Table 8 |
 | ARK-Milan, ASK (SEV-Milan) | 2020-10-22 → 2045-10-22 | confirmed: `kdsintf.amd.com/vcek/v1/Milan/cert_chain` |
 | ASVK (SEV-VLEK-Milan) | 2022-11-16 → 2047-11-16 | confirmed: `kdsintf.amd.com/vlek/v1/Milan/cert_chain` |
-| Google AK certificate in our evidence | 2026-11-10 → 2056-11-02 | confirmed: `gcp-n2d-att.pb` |
+| Google AK certificate in our evidence | 2026-11-10 → 2056-11-02 | confirmed: `gcp-n2d-initrdless-att.pb` |
 | Google EK/AK CA Root | 2022-07-08 → 2122-07-08 | confirmed: `root.pem` |
 
 What AMD's KDS specification (pub. 57230) says about VCEK lifetime is **not confirmed**: the document could not be
@@ -142,7 +148,7 @@ retrieved.
    thirty-year AK certificate make "valid when the report was made" and "valid now" practically the same question,
    and the first cannot be asked anyway: nothing in the evidence says when it was made.
 2. Freshness comes only from the nonce. The verifier's nonce is in the quotes' `extraData`; the quotes are inside the
-   vTPM attestation; its SHA-512 is REPORT_DATA. So a report replayed from an earlier request carries an earlier
+   vTPM attestation; its SHA3-512 is REPORT_DATA. So a report replayed from an earlier request carries an earlier
    nonce and is refused. The verifier's own clock at the time it made the nonce bounds when the evidence was made.
 3. Staleness of the platform is a TCB question, not a time question. go-sev-guest's `validate` package can require
    minimum TCB versions (`MinimumTCB`, `MinimumLaunchTCB`) and check that the VCEK's TCB equals REPORTED_TCB.
@@ -179,13 +185,39 @@ What else changes the registered values (from the evidence's structure; **not me
 | MEASUREMENT | the virtual firmware GCP launches the guest with; GCP may update it |
 | PCR4 | shim and GRUB, i.e. the OS image and its updates |
 | KERNEL | the kernel package |
-| CMDLINE | the boot entry. It contains the root partition's PARTUUID, which differs per disk, so the Auditor must use the command line the Vendor publishes |
+| CMDLINE | the boot entry. It names the root by an identifier that differs per disk (the file system's UUID on the stock entry with an initrd, the partition's PARTUUID on the initrdless one), so the Auditor must use the command line the Vendor publishes |
 | INITRD | the base initrd and the application archive, and **where the archive goes**: on SEV-SNP it is appended after the base initrd (`cpio.AppLast`). The 2026-11 runs on GCP did that and the guests booted (observed). On TDX the same append failed to decompress and the archive goes first (`cpio.AppFirst`); why the two differ has not been established |
 
 **Initrdless boot.** GCP's Ubuntu 24.04 image sets `GRUB_FORCE_PARTUUID`, and GRUB then boots the stock entry
-**without any initrd** (confirmed: our recorded evidence logs `GRUB_FORCE_PARTUUID set, attempting initrdless boot.`
-and measures no initrd). An application in an initrd is then never loaded or measured. The 2026-11 scripts avoid it
-by booting their own GRUB entry (`grub-reboot`), and `ra-parse` refuses evidence without an initrd measurement.
+**without any initrd** (confirmed: our first recording, `gcp-n2d-initrdless-*`, logs `GRUB_FORCE_PARTUUID set,
+attempting initrdless boot.` and measures no initrd). An application in an initrd is then never loaded or measured.
+`ra-parse` refuses evidence without an initrd measurement. The 2026-11 scripts avoided it by booting their own GRUB
+entry (`grub-reboot`); turning the setting off, as below, makes the stock entry load the initrd.
+
+### The boot setting changed on `attestamp-snp-vendor` (2026-11-11)
+
+Done to record `gcp-n2d-*`, the evidence with an initrd. Every step was checked on the instance:
+
+1. The setting is not in `/etc/default/grub` but in `/etc/default/grub.d/40-force-partuuid.cfg`, line 3:
+   `GRUB_FORCE_PARTUUID=<the root partition's PARTUUID>`. The file's own comment says "Remove this line to enable boot
+   with an initramfs".
+2. Original kept: `sudo cp -p /etc/default/grub.d/40-force-partuuid.cfg /root/40-force-partuuid.cfg.orig`.
+3. Line commented out: `sudo sed -i 's/^GRUB_FORCE_PARTUUID=/#GRUB_FORCE_PARTUUID=/' /etc/default/grub.d/40-force-partuuid.cfg`.
+4. `sudo update-grub`. It printed `Found initrd image: /boot/initrd.img-7.0.0-1017-gcp`, and the default entry in
+   `/boot/grub/grub.cfg` became `linux /vmlinuz-7.0.0-1017-gcp root=UUID=<file system UUID> ro console=ttyS0,115200`
+   followed by `initrd /initrd.img-7.0.0-1017-gcp`. Before, the command line was `root=PARTUUID=<…> ro
+   console=ttyS0,115200 panic=-1` with no initrd.
+5. `sudo systemctl reboot`; `/proc/sys/kernel/random/boot_id` changed. The serial console showed `Trying to unpack
+   rootfs image as initramfs...` and `Freeing initrd memory: 48928K`, and no longer `attempting initrdless boot`.
+6. The TPM event log (`/sys/kernel/security/tpm0/binary_bios_measurements`) holds GRUB's command `initrd
+   /initrd.img-7.0.0-1017-gcp` and a measurement of that file. The parser reads that measurement as INITRD, and it equals
+   `sha256sum /boot/initrd.img-7.0.0-1017-gcp` on the instance (`4703ec07…b0a2`).
+
+To undo: `sudo cp -p /root/40-force-partuuid.cfg.orig /etc/default/grub.d/40-force-partuuid.cfg`, `sudo update-grub`,
+reboot.
+
+The setting stays changed on that instance; it boots with the initrd from now on. One side effect seen: the kernel
+command line lost `panic=-1`, which only the initrdless entry adds (observed in the two recordings).
 
 ## The instance
 
@@ -216,10 +248,12 @@ Our recorded guest: Ubuntu 24.04.5, kernel `7.0.0-1017-gcp`, `/dev/sev-guest` pr
 5. Pack and check them the way `cmd/snp_e2e_test.go` does: `snp.Encode(report, auxblob, att)`, then
    `att-user ra-parse --doc <file> --format amd-sev-snp-initrd --nonce <hex nonce>`.
 
-For a stock GCP boot step 5 verifies both signatures and the nonce and then refuses, because the boot was
-initrdless. To get registrable values, boot an entry with an initrd first: `option1-initrd/gcp_boot_option1.sh`
-(Option 1) or `option2-dm-verity/gcp_boot_option2.sh` (Option 2) from the 2026-11 scripts, after replacing their
-hard-coded disk UUID, PARTUUID, kernel version and UEFI boot entry number with the new instance's.
+On a stock GCP boot step 5 verifies both signatures and the nonce and then refuses, because the boot was initrdless.
+Turn `GRUB_FORCE_PARTUUID` off first, as in "The boot setting changed on `attestamp-snp-vendor`" above; the stock
+entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five values. To boot an initrd that carries
+an application, or the verity setup, use `option1-initrd/gcp_boot_option1.sh` (Option 1) or
+`option2-dm-verity/gcp_boot_option2.sh` (Option 2) from the 2026-11 scripts, after replacing their hard-coded disk
+UUID, PARTUUID, kernel version and UEFI boot entry number with the new instance's.
 
 ## Same VM
 
@@ -236,7 +270,7 @@ the SNP guest's own trust boundary.
 |---|---|
 | `tee/request/<role>/snp`, a `--extractor` in `cmd/ra-responder` | needs a running guest; the recorder in `testdata/record` is the starting point |
 | `setup/build`, `setup/launch` for SEV-SNP | Phase 4b; the 2026-11 scripts do it by hand |
-| a recorded initrd boot | the recorded guest booted initrdless, so the positive path of `Parse` (INITRD, PCR12) is tested only on the parts that exist: MEASUREMENT, PCR4, KERNEL and CMDLINE are asserted against recorded values |
+| a recorded verity boot | `gcp-n2d-*` booted the distribution initrd, so INITRD is tested on real evidence but PCR12 is not: no recording has the verity hook. Nor does any recording carry an application archive in its initrd |
 | TCB minimums, CRLs | not applied; the platform's patch level is not judged |
 | AMD chain errors as `ErrChain` | go-sev-guest checks the chain and the signature in one call |
 | AWS evidence | AWS signs with a VLEK on shared tenancy and its vTPM is different; nothing here has been run on it |

@@ -97,7 +97,7 @@ the recommended way to fetch a quote is `GetQuoteProvider()` over ConfigFS — `
 | # | Task | Pass criterion |
 |---|---|---|
 | 4.1 | Decide the container format that carries **two** documents in one `RADoc.Raw`, and the format string(s) | written down in `docs/build/sev-snp.md` |
-| 4.2 | `internal/tee/parse/snp/`: AMD signature on the report, cloud AK chain on the vTPM quote, `Report Data == SHA-512(vTPM evidence)`, event-log replay against the signed PCRs, `POLICY.DEBUG`, TCB version | `go test` against the fixtures |
+| 4.2 | `internal/tee/parse/snp/`: AMD signature on the report, cloud AK chain on the vTPM quote, `Report Data == SHA3-512(vTPM evidence)` (SHA-512 until 2026-11-11), event-log replay against the signed PCRs, `POLICY.DEBUG`, TCB version | `go test` against the fixtures |
 | 4.3 | Adapters, maps and CLI cases, as in 1.2-1.4 | `go build ./...`, `go test ./...` |
 
 4b (needs instances): request, build and launch, mirroring phases 2 and 3.
