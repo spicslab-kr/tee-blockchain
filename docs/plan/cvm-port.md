@@ -116,7 +116,8 @@ outside `attestamp`; expected values computed in Python; Korean comments.
 
 ## Open decisions
 
-These change the design and are not settled.
+These change the design. D3, D4 and D5 are decided (see "Changed from the 2026-10-23 slides" below and
+`docs/build/{tdx,sev-snp}.md`); D1, D2 and D6 are open.
 
 **D1. The hand-off.** On Nitro the Auditor clones the Vendor's repository and rebuilds from
 source, which is the project's central claim. On a CVM the distribution base initrd is not
@@ -140,20 +141,63 @@ git. Decide whether that is enough or a separate store is needed.
 initrd hash), Option 2 registers two (image hash + verifying-initrd hash). Because
 `measurementHash` is computed over the sorted name/value list, one platform string with a variable
 number of values produces hashes that cannot be compared. Two format strings
-(`amd-sev-snp-initrd`, `amd-sev-snp-verity`) avoid this.
+(`amd-sev-snp-initrd`, `amd-sev-snp-verity`) avoid this. **Decided (2026-11-11):** two format strings, but with more
+values than one and two; see below.
 
 **D4. What TDX registers.** The October slides are inconsistent: one says MRTD, RTMR[0], RTMR[1]
 and RTMR[2] are all in scope; another says the registered value is RTMR[2] alone. Pick one.
-MROWNER differs per machine and must be excluded either way, like Nitro's PCR3/4/8.
+MROWNER differs per machine and must be excluded either way, like Nitro's PCR3/4/8. **Decided (2026-11-11):** MRTD
+and RTMR0–2; see below.
 
 **D5. Freshness without a timestamp.** Nitro judges the certificate chain at the document's own
-timestamp. If an SNP report carries no equivalent field, decide what replaces it.
+timestamp. If an SNP report carries no equivalent field, decide what replaces it. **Decided (2026-11-11):** there is
+no time in either SNP document; chains are judged at verification time and freshness comes from the nonce only
+(`docs/build/sev-snp.md`, "Time and freshness").
 
 **D6. SEV-SNP cannot prove both documents came from the same VM.** Reproduced on GCP, and on AWS before AWS was
 dropped for SEV-SNP (that AWS run stays as a record that the result is not GCP-specific): a
 vTPM attestation from an approved VM combined with an SNP report from a different VM passes
 verification. Nitro does not have this problem and TDX does not either. Until D1(c) or an in-VM
 vTPM is used, SEV-SNP support is honest only if the limitation is documented.
+
+## Changed from the 2026-10-23 slides
+
+The registered values on both CVM platforms were decided differently from the 2026-10-23 presentation. The slides
+have to be corrected; the reasons are collected here so that can be done from one place. Both changes come from the
+same argument, which is also why Nitro registers PCR0, 1 and 2 together and not PCR2 alone: **a value that the boot
+chain itself extends can be forged by a changed boot chain, unless the boot chain is registered too.**
+
+### TDX: RTMR[2] alone → MRTD, RTMR0, RTMR1, RTMR2
+
+| | |
+|---|---|
+| Original plan (slides) | RTMR[2] alone is the registered value (one slide; another listed MRTD and RTMR0–2 as in scope) |
+| Changed to | four values, names `MRTD`, `RTMR0`, `RTMR1`, `RTMR2`, format `intel-tdx` |
+| Reason | RTMR2 holds the kernel command line and the initrd, but RTMR2 is extended by the firmware, the boot loader and the kernel themselves. A changed kernel could extend exactly the expected RTMR2 while running something else; only MRTD (the firmware), RTMR0 (its configuration) and RTMR1 (boot loader and kernel) would show it. RTMR2 alone would prove nothing about who computed it |
+| Left out, as before | MROWNER, MROWNERCONFIG, MRCONFIGID (set by the launcher; MROWNER is non-zero in our GCP quote), RTMR3 (run time), MRSEAM (the platform) |
+| Cost | a GCP firmware update (MRTD) or a kernel update (RTMR1) changes the registered value; RTMR0 probably depends on the VM shape (not confirmed) |
+| Where | `internal/tee/parse/tdx/measure.go` (`imageRTMRs`); `docs/build/tdx.md`, "The values"; tested on the recorded quote |
+
+### SEV-SNP: the initrd hash → MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD
+
+| | |
+|---|---|
+| Original plan (slides) | Option 1: one value, the initrd hash. Option 2: two values, the disk image hash and the verifying initrd's hash |
+| Changed to | `amd-sev-snp-initrd`: `MEASUREMENT`, `PCR4`, `KERNEL`, `CMDLINE`, `INITRD` (5). `amd-sev-snp-verity`: the same and `PCR12` (6). In Option 2 the disk image is covered through its dm-verity root hash on the kernel command line (CMDLINE) and the result the verifying initrd extends into PCR12 |
+| Reason | GRUB measures the initrd, and GRUB and the kernel are what load it. With INITRD alone, a changed boot loader or kernel could report the expected initrd hash while booting another. PCR4 covers shim and GRUB, KERNEL the kernel file, CMDLINE the command line (and in Option 2 the root hash). MEASUREMENT is the only value AMD signs (the virtual firmware); the other values are from Google's vTPM |
+| Also decided | two format strings (D3), because the two lists have different lengths and `measurementHash` covers the name list |
+| Cost | a kernel or GRUB update changes the registered value; the command line names the root disk, so the Auditor uses the command line the Vendor publishes |
+| Where | `internal/tee/parse/snp/measure.go` (`initrdNames`, `verityNames`); `docs/build/sev-snp.md`, "The values"; all five initrd values tested on the recorded evidence (PCR12 has no recording yet) |
+
+### Other decisions made after the slides
+
+Whether the slides mention these was not checked; look for them when correcting the deck.
+
+| | before | now | decided |
+|---|---|---|---|
+| SEV-SNP binding | REPORT_DATA = SHA-512 of the vTPM attestation (the 2026-11 scripts) | SHA3-512 | 2026-11-11 |
+| SEV-SNP cloud | runs on GCP and AWS | GCP only; AWS for Nitro only | 2026-11-11 |
+| Measurement names | — | `<NAME><n>` like Nitro's `PCR<n>` (`RTMR0`), and plain names for SNP (`KERNEL`) | 2026-11-10 |
 
 ## Prior work to read before deciding D1 and D6
 
