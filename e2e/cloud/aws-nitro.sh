@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
-# Create, inspect and remove the two AWS Nitro Enclaves instances the e2e suite needs.
+# Create, inspect and remove the AWS Nitro Enclaves instances the e2e suite needs.
 #
-#   bash e2e/cloud/aws-nitro.sh create   # key pair, security group, two instances
-#   bash e2e/cloud/aws-nitro.sh status   # addresses, to paste into e2e/env.local.sh
-#   bash e2e/cloud/aws-nitro.sh stop     # stop both (keeps the disks, stops the hourly charge)
-#   bash e2e/cloud/aws-nitro.sh start    # start them again
-#   bash e2e/cloud/aws-nitro.sh delete   # terminate both and delete the security group
+#   bash e2e/cloud/aws-nitro.sh create         # key pair, security group, two x86_64 instances (vendor, auditor)
+#   bash e2e/cloud/aws-nitro.sh create-arm64   # one more, arm64 (Graviton), for the architecture checks (ARM64_HOST)
+#   bash e2e/cloud/aws-nitro.sh status         # addresses, to paste into e2e/env.local.sh
+#   bash e2e/cloud/aws-nitro.sh stop           # stop all of them (keeps the disks, stops the hourly charge)
+#   bash e2e/cloud/aws-nitro.sh start          # start them again
+#   bash e2e/cloud/aws-nitro.sh delete         # terminate all of them and delete the security group
 #
 # Verified against the AWS docs (2026-11):
 #   - Nitro Enclaves is turned on at launch with --enclave-options 'Enabled=true'
 #   - the smallest size of most families is NOT supported (no m5.large, no m6i.large);
 #     m6i.xlarge is what this project's e2e runs used
+#   - Graviton (arm64) instances support Nitro Enclaves too; c7g.xlarge (4 vCPU) is the arm64 counterpart
+#     (2026-11-12, aws ec2 describe-instance-types in eu-north-1: NitroEnclavesSupport "supported" for both types)
 #   - the parent instance must run Linux or Windows 2016+
 set -uo pipefail
 
 REGION=${REGION:-eu-north-1}
-TYPE=${TYPE:-m6i.xlarge}          # 4 vCPU. .large sizes are not supported by Nitro Enclaves
+TYPE=${TYPE:-m6i.xlarge}              # 4 vCPU, x86_64. .large sizes are not supported by Nitro Enclaves
+TYPE_ARM64=${TYPE_ARM64:-c7g.xlarge}  # 4 vCPU, arm64 (Graviton)
 KEY_NAME=${KEY_NAME:-attestamp-e2e}
 SG_NAME=${SG_NAME:-attestamp-e2e}
 TAG=${TAG:-attestamp-e2e}
@@ -30,9 +34,10 @@ command -v /usr/bin/env >/dev/null
 command -v aws >/dev/null 2>&1 || die "aws CLI not found. Install it and run 'aws configure' first."
 aws sts get-caller-identity >/dev/null 2>&1 || die "aws CLI is not authenticated. Run 'aws configure'."
 
+# latest_al2023 <x86_64|arm64> - the newest Amazon Linux 2023 AMI for that architecture.
 latest_al2023() {
   aws ec2 describe-images --owners amazon \
-    --filters "Name=name,Values=al2023-ami-2023.*-kernel-*-x86_64" "Name=state,Values=available" \
+    --filters "Name=name,Values=al2023-ami-2023.*-kernel-*-$1" "Name=state,Values=available" \
     --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text
 }
 
@@ -43,16 +48,19 @@ ids_by_role() {
     --query 'Reservations[].Instances[].InstanceId' --output text
 }
 
-case "${1:-}" in
-create)
-  echo "region $REGION   type $TYPE"
-  echo "This creates two billable EC2 instances. Ctrl-C now to stop."; sleep 4
+address_of() {
+  aws ec2 describe-instances --filters "Name=tag:Project,Values=$TAG" "Name=tag:Role,Values=$1" \
+    "Name=instance-state-name,Values=running" --query 'Reservations[].Instances[].PublicIpAddress' --output text
+}
 
+# ensure_key_and_group - the key pair (written to $PEM_OUT) and the security group, created once and then reused.
+# Sets SG.
+ensure_key_and_group() {
   if [ ! -f "$PEM_OUT" ]; then
     aws ec2 create-key-pair --key-name "$KEY_NAME" --query KeyMaterial --output text > "$PEM_OUT" \
       || die "could not create key pair $KEY_NAME (does it already exist? delete it or set KEY_NAME)"
     chmod 400 "$PEM_OUT"
-    echo "wrote $PEM_OUT  (gitignored — never commit it)"
+    echo "wrote $PEM_OUT  (gitignored - never commit it)"
   else
     echo "$PEM_OUT already exists, reusing it"
   fi
@@ -70,23 +78,43 @@ create)
   else
     echo "security group $SG already exists, reusing it"
   fi
+}
 
-  AMI=$(latest_al2023); [ "$AMI" != "None" ] || die "no Amazon Linux 2023 AMI found in $REGION"
-  echo "AMI $AMI (latest Amazon Linux 2023)"
+# launch_role <role> <instance type> <ami> - one instance with Nitro Enclaves on, unless one with that role exists.
+launch_role() {
+  if [ -n "$(ids_by_role "$1")" ]; then echo "$1 instance already exists, skipping"; return 0; fi
+  id=$(aws ec2 run-instances \
+    --image-id "$3" --count 1 --instance-type "$2" \
+    --key-name "$KEY_NAME" --security-group-ids "$SG" \
+    --enclave-options 'Enabled=true' \
+    --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=64,VolumeType=gp3}' \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=$TAG},{Key=Role,Value=$1}]" \
+    --query 'Instances[0].InstanceId' --output text) || die "run-instances ($1)"
+  echo "$1: $id ($2)"
+}
 
-  for role in vendor auditor; do
-    if [ -n "$(ids_by_role "$role")" ]; then echo "$role instance already exists, skipping"; continue; fi
-    id=$(aws ec2 run-instances \
-      --image-id "$AMI" --count 1 --instance-type "$TYPE" \
-      --key-name "$KEY_NAME" --security-group-ids "$SG" \
-      --enclave-options 'Enabled=true' \
-      --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=64,VolumeType=gp3}' \
-      --tag-specifications "ResourceType=instance,Tags=[{Key=Project,Value=$TAG},{Key=Role,Value=$role}]" \
-      --query 'Instances[0].InstanceId' --output text) || die "run-instances ($role)"
-    echo "$role: $id"
-  done
-  echo; echo "waiting for both to be running…"
+case "${1:-}" in
+create)
+  echo "region $REGION   type $TYPE"
+  echo "This creates two billable EC2 instances. Ctrl-C now to stop."; sleep 4
+  ensure_key_and_group
+  AMI=$(latest_al2023 x86_64); [ "$AMI" != "None" ] || die "no Amazon Linux 2023 x86_64 AMI found in $REGION"
+  echo "AMI $AMI (latest Amazon Linux 2023, x86_64)"
+  for role in vendor auditor; do launch_role "$role" "$TYPE" "$AMI"; done
+  echo; echo "waiting for them to be running..."
   aws ec2 wait instance-running --filters "Name=tag:Project,Values=$TAG" 2>/dev/null
+  exec "$0" status
+  ;;
+
+create-arm64)
+  echo "region $REGION   type $TYPE_ARM64 (arm64)"
+  echo "This creates one billable EC2 instance. Ctrl-C now to stop."; sleep 4
+  ensure_key_and_group
+  AMI=$(latest_al2023 arm64); [ "$AMI" != "None" ] || die "no Amazon Linux 2023 arm64 AMI found in $REGION"
+  echo "AMI $AMI (latest Amazon Linux 2023, arm64)"
+  launch_role arm64 "$TYPE_ARM64" "$AMI"
+  echo; echo "waiting for it to be running..."
+  aws ec2 wait instance-running --filters "Name=tag:Project,Values=$TAG" "Name=tag:Role,Values=arm64" 2>/dev/null
   exec "$0" status
   ;;
 
@@ -97,20 +125,18 @@ status)
     --query 'Reservations[].Instances[].[Tags[?Key==`Role`]|[0].Value,InstanceId,State.Name,PublicIpAddress]' \
     --output text | sort
   echo
-  V=$(aws ec2 describe-instances --filters "Name=tag:Project,Values=$TAG" "Name=tag:Role,Values=vendor" \
-        "Name=instance-state-name,Values=running" --query 'Reservations[].Instances[].PublicIpAddress' --output text)
-  A=$(aws ec2 describe-instances --filters "Name=tag:Project,Values=$TAG" "Name=tag:Role,Values=auditor" \
-        "Name=instance-state-name,Values=running" --query 'Reservations[].Instances[].PublicIpAddress' --output text)
-  if [ -n "$V" ] && [ -n "$A" ]; then
+  V=$(address_of vendor); A=$(address_of auditor); R=$(address_of arm64)
+  if [ -n "$V" ] || [ -n "$A" ] || [ -n "$R" ]; then
     echo "Paste into e2e/env.local.sh (gitignored):"
     echo "  VENDOR_HOST=$V"
     echo "  AUDITOR_HOST=$A"
-    echo "  ARM64_HOST="
+    echo "  ARM64_HOST=$R"
   fi
   ;;
 
 stop|start)
   ids=$(aws ec2 describe-instances --filters "Name=tag:Project,Values=$TAG" \
+        "Name=instance-state-name,Values=pending,running,stopping,stopped" \
         --query 'Reservations[].Instances[].InstanceId' --output text)
   [ -n "$ids" ] || die "no instances tagged Project=$TAG"
   aws ec2 "$1-instances" --instance-ids $ids --query "${1^}pingInstances" --output text 2>/dev/null \
@@ -130,5 +156,5 @@ delete)
   echo "key pair $KEY_NAME and $PEM_OUT were left alone; delete them by hand if you are done."
   ;;
 
-*) sed -n '2,12p' "$0"; exit 2 ;;
+*) sed -n '2,16p' "$0"; exit 2 ;;
 esac

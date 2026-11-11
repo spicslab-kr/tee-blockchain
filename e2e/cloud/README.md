@@ -18,7 +18,7 @@ Nothing below can be automated — it needs your account and your identity.
 | CLI installed | `aws` | `gcloud` |
 | signed in | `aws configure` | `gcloud auth login` and `gcloud config set project <id>` |
 | used for | Nitro Enclaves only | Intel TDX and AMD SEV-SNP |
-| quota | On-Demand Standard vCPUs in `eu-north-1` (the Nitro scripts' region) | C3 (TDX) and N2D (SEV-SNP) quota in the zone you pick |
+| quota | On-Demand Standard vCPUs in `eu-north-1` (the Nitro scripts' region; c7g counts in the same Standard family) | C3 (TDX) and N2D (SEV-SNP) quota in the zone you pick |
 
 For the Nitro e2e suite you also need, in the repository root (all gitignored):
 
@@ -34,6 +34,7 @@ compared against.
 
 ```
 1. Nitro baseline        bash e2e/cloud/aws-nitro.sh create      # 2 instances, eu-north-1
+   (architecture rows)   bash e2e/cloud/aws-nitro.sh create-arm64  # 1 more, c7g.xlarge (Graviton), for ARM64_HOST
 2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create    # 2 instances, us-central1-a
 3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create vendor auditor user y
 ```
