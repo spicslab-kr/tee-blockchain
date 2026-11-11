@@ -425,9 +425,9 @@ the SNP guest's own trust boundary.
 
 | what | why |
 |---|---|
-| the live run of `att-ra-responder --extractor snp-initrd` / `snp-verity` | Phase 2.3; the code (`internal/tee/request/snp`, the same sequence as `testdata/record`) is done and tested through a fake TSM and vTPM against the recorded evidence. Start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address. The guest also needs outbound access to Google's certificate host while attesting (the AK intermediates are fetched) |
+| `att-ra-responder ra-serve --extractor snp-initrd` / `snp-verity` answering a verifier on another machine | Phase 2.2. On the guest itself (127.0.0.1) `snp-initrd` passed the whole chain on 2026-11-12 (`e2e/cvm/in-guest-verify.sh`); `snp-verity` was refused on that boot because it had no verity image, and has not run on a verity boot. From outside: start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address. The guest also needs outbound access to Google's certificate host while attesting (the AK intermediates are fetched) |
 | `setup/build`, `setup/launch` for SEV-SNP | Phase 4b; the 2026-11 scripts do it by hand |
-| a recorded verity boot | `gcp-n2d-*` booted the distribution initrd, so INITRD is tested on real evidence but PCR12 is not: no recording has the verity hook. Nor does any recording carry an application archive in its initrd |
+| a verity boot through the responder | the recordings `gcp-n2d-opt2-*` (2026-11-11) have the verity hook and a PCR12 that matches the formula, but were made with `record-snp`, not with `att-ra-responder`; the tamper case (an image that does not match its root hash) was not recorded |
 | TCB minimums, CRLs | not applied; the platform's patch level is not judged |
 | AMD chain errors as `ErrChain` | go-sev-guest checks the chain and the signature in one call |
 | the seven 2026-11 tests on a new instance | `snpguest` and `gotpm`, which those scripts call, could not be installed on the instance (see the night log of 2026-11-10) |

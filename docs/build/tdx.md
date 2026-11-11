@@ -302,7 +302,7 @@ describe` on 2026-11-11):
 
 | what | why |
 |---|---|
-| `att-ra-responder --extractor tdx` answering a verifier on another machine | Phase 2.2. On the guest itself (127.0.0.1) the whole chain passed on 2026-11-12 (`e2e/cvm/in-guest-verify.sh`). From outside: start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address |
+| `att-ra-responder ra-serve --extractor tdx` answering a verifier on another machine | Phase 2.2. On the guest itself (127.0.0.1) the whole chain passed on 2026-11-12 (`e2e/cvm/in-guest-verify.sh`). From outside: start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address |
 | `setup/build` and `setup/launch` for TDX | Phase 3: build the archive, put it first, boot a custom GRUB entry once, read the values back |
 | Option 2 on TDX as product code | booted and mounted with test scripts on 2026-11-12 (above); not in `setup/build`, and a failed check does not stop the boot |
 | TCB level, CRLs | collateral is not fetched (see above) |

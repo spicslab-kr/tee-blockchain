@@ -192,9 +192,10 @@ hash, and register its own signed hash. The User can then require both registrie
 - **Intel TDX and AMD SEV-SNP on GCP: verification, and requesting evidence in the guest.** `ra-parse`,
   `audit` and `verify` check a TDX quote (`intel-tdx`: MRTD, RTMR0–2) or SEV-SNP evidence
   (`amd-sev-snp-initrd`, `amd-sev-snp-verity`), tested against evidence recorded on GCP, including
-  recordings with an application in both options. `att-ra-responder --extractor tdx | snp-initrd |
-  snp-verity` produces the evidence inside the guest; it has been tested against the recordings, not yet
-  run on a live guest. Building and launching are not implemented yet. SEV-SNP evidence is two documents
+  recordings with an application in both options. `att-ra-responder ra-serve --extractor tdx | snp-initrd |
+  snp-verity` produces the evidence inside the guest; tested against the recordings, and on 2026-11-12 run on
+  live TDX and SEV-SNP guests with the whole chain on the guest (`e2e/cvm/in-guest-verify.sh`). Building and
+  launching are not implemented yet. SEV-SNP evidence is two documents
   from two signers, and nothing proves they come from the same VM; see [AMD SEV-SNP](docs/build/sev-snp.md#same-vm).
   What a measurement says about a running guest: [runtime immutability](docs/build/runtime-immutability.md).
 - **GCP Confidential Space and Azure** have request-side scaffolding only.

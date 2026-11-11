@@ -122,8 +122,8 @@ What is implemented, checked against the code:
 | aws (Nitro Enclaves) | Yes. | Request (NSM, vsock, proxy), document verification against the AWS Nitro root, measurement extraction, image build, enclave launch. |
 | gcp (Confidential Space) | No. | `tee/request/<role>/gcp` can fetch a token from the launcher socket and has a test. `tee/parse/<role>/gcp.go` returns "not implemented" for every method. Nothing in `cmd/*` constructs either. There is no gcp folder under `setup/`. |
 | azure (Confidential VM) | No. | `tee/request/<role>/azure` returns "not implemented" (it needs a vTPM library and MAA). `tee/parse/<role>/azure.go` returns "not implemented". Nothing in `cmd/*` constructs either. No azure folder under `setup/`. |
-| tdx (Intel TDX on GCP) | Verification, and requesting a quote inside the guest. | `tee/parse/tdx` (shared) and `tee/parse/<role>/tdx.go`; `tee/request/tdx` (shared) and `tee/request/{Vendor,auditor}/tdx`; `att-ra-responder --extractor tdx`; `cmd/*` parse, audit and verify `intel-tdx`. Tested on recorded quotes; the request side through a fake TSM. Nothing under `setup/` yet. |
-| snp (AMD SEV-SNP on GCP) | Verification, and requesting evidence inside the guest. | `tee/parse/snp` (shared) and `tee/parse/<role>/snp.go`; `tee/request/snp` (shared) and `tee/request/{Vendor,auditor}/snp`; `att-ra-responder --extractor snp-initrd` or `snp-verity`; `cmd/*` parse `amd-sev-snp-initrd` and `amd-sev-snp-verity`. Tested on recorded evidence; the request side through a fake TSM and vTPM. Nothing under `setup/` yet. |
+| tdx (Intel TDX on GCP) | Verification, and requesting a quote inside the guest. | `tee/parse/tdx` (shared) and `tee/parse/<role>/tdx.go`; `tee/request/tdx` (shared) and `tee/request/{Vendor,auditor}/tdx`; `att-ra-responder ra-serve --extractor tdx`; `cmd/*` parse, audit and verify `intel-tdx`. Tested on recorded quotes; the request side through a fake TSM. Nothing under `setup/` yet. |
+| snp (AMD SEV-SNP on GCP) | Verification, and requesting evidence inside the guest. | `tee/parse/snp` (shared) and `tee/parse/<role>/snp.go`; `tee/request/snp` (shared) and `tee/request/{Vendor,auditor}/snp`; `att-ra-responder ra-serve --extractor snp-initrd` or `snp-verity`; `cmd/*` parse `amd-sev-snp-initrd` and `amd-sev-snp-verity`. Tested on recorded evidence; the request side through a fake TSM and vTPM. Nothing under `setup/` yet. |
 
 Only **aws** is a working platform end to end. tdx and snp verify recorded evidence; gcp and azure
 exist so the format names, the Parser interface and the folder layout are already in place.
@@ -162,8 +162,8 @@ the role-neutral logic is pulled out into the shared pieces above wherever Go al
 | --- | --- |
 | `chain/register` (all of it, including the generated `registry.go`) | Vendor, auditor |
 | `setup/build/<role>/aws` and `setup/launch/<role>/aws` | Vendor, auditor |
-| `tee/request` (`request.go`, `nonce.go`, `tcp.go`, `wire.go`, `aws/*`, `gcp/*`, `azure/*`) | Vendor, auditor; the user copy of `request.go`, `nonce.go`, `tcp.go`, `wire.go` is the same too |
-| `tee/parse` (`parse.go`, `aws.go`, `gcp.go`, `azure.go`) | Vendor, auditor, user |
+| `tee/request` (`request.go`, `nonce.go`, `tcp.go`, `wire.go`, `aws/*`, `gcp/*`, `azure/*`, `tdx/*`, `snp/*`) | Vendor, auditor; the user copy of `request.go`, `nonce.go`, `tcp.go`, `wire.go` is the same too |
+| `tee/parse` (`parse.go`, `aws.go`, `gcp.go`, `azure.go`, `tdx.go`, `snp.go`) | Vendor, auditor, user |
 | `chain/lookup` (`lookup.go`, `ether/reader.go`) | Vendor, auditor |
 | `core/compare/<role>` | Vendor, auditor |
 | `core/transfer`: `build_config.go`, `codec.go`, `digest.go`, `measurement_record.go`, `registration.go`, `git_common.go` | Vendor, auditor |
