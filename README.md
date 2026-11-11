@@ -217,8 +217,9 @@ go test ./...
 ```
 
 Unit tests run anywhere. `cmd/*_e2e_test.go` build the real binaries and drive them against a local
-[anvil](https://getfoundry.sh) chain and a recorded Nitro attestation document. No Nitro hardware is
-needed for any test.
+[anvil](https://getfoundry.sh) chain and recorded attestation evidence (Nitro, TDX and SEV-SNP). No TEE
+hardware is needed for any test. The tests look for anvil on `PATH` or in `~/.foundry/bin` and skip the
+chain tests without it; they were last run with anvil 1.8.0 (Foundry v1.8.0, commit `61ae26af`).
 
 ## License
 

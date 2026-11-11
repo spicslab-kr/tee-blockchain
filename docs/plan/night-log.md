@@ -562,3 +562,15 @@ against the code, the fixtures or the source before being written down.
   hardware-rooted runtime register needs an SVSM vTPM, which on GCP appears only as a "preview" in a community blog.
 - **Exact GCP images** recorded in both docs: `ubuntu-2404-noble-amd64-v20261105` for both instances; disks 64 GB
   (`pd-balanced` TDX, `pd-standard` SEV-SNP); Secure Boot off, vTPM on.
+
+## anvil installed; every chain test ran for the first time
+
+- On the user's instruction, `anvil.exe` alone was extracted from the Foundry v1.8.0 zip downloaded on 2026-11-10.
+  Its sha256 still matched the release's (`e31241db…982e`). Installed to `C:\Users\bags3\.foundry\bin\anvil.exe`,
+  where `cmd/register_e2e_test.go` looks. `anvil --version`: 1.8.0, commit `61ae26af36320d4fa1020f7db53785885e29eeb5`,
+  built 2026-08-26.
+- `go test -run TDX ./cmd/`: `TestCmd_E2E_TDX_ServeRequestParse` and **`TestRun_E2E_TDX_AuditorUser` pass**.
+- `go test -v ./cmd/`: all 26 tests pass, none skipped. The Nitro chain tests that had been skipping for lack of anvil
+  ran too (`TestRun_E2E_AuditorVendorUser`, `TestRegister_E2E_DeployAndRegister`, `TestLookup_E2E_FindAddressAndRead`,
+  `TestCompare_E2E_PlainAndChainModes` and the rest).
+- `README.md` ("Testing") records the anvil version; `docs/build/tdx.md` no longer says the chain test has not run.

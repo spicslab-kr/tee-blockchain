@@ -2,8 +2,8 @@
 
 **Status.** The verifying side works on a recorded quote: `ra-parse`, `audit` and `verify` accept `intel-tdx`
 (`internal/tee/parse/tdx`). Requesting a quote from a running guest, building the image and launching it are not
-implemented. The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) is written but has not run yet, because
-`anvil` was not installed on the machine it was written on.
+implemented. The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) passes against a local anvil chain
+(first run 2026-11-11, anvil 1.8.0).
 
 Statements are marked **confirmed** (read from our recorded quote, a spec, a library's source or an official page),
 **observed** (seen in our runs) or **not confirmed**.
@@ -253,7 +253,6 @@ describe` on 2026-11-11):
 |---|---|
 | `tee/request/<role>/tdx`, a `--extractor` in `cmd/ra-responder` | Phase 2; needs a running guest |
 | `setup/build` and `setup/launch` for TDX | Phase 3: build the archive, put it first, boot a custom GRUB entry once, read the values back |
-| the audit-and-verify chain test against anvil | written (`cmd/tdx_e2e_test.go`), skipped where anvil is not installed |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the PCR→RTMR mapping and the VM-shape dependence | not confirmed on GCP |
