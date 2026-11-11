@@ -259,8 +259,32 @@ func TestJoin(t *testing.T) {
 	if got := string(Join(base, app, AppFirst)); got != "APPBASE" {
 		t.Errorf("AppFirst = %q", got)
 	}
+	// a base whose length is a multiple of 4 gets no padding
 	if got := string(Join(base, app, AppLast)); got != "BASEAPP" {
 		t.Errorf("AppLast = %q", got)
+	}
+}
+
+// The kernel accepts an uncompressed archive after a compressed segment only at a 4-byte-aligned offset. With AppLast
+// the archive must start on one whatever the base's length, with zero bytes in between (which the kernel skips).
+// Measured on GCP SEV-SNP: an Ubuntu base of 50100283 bytes (mod 4 = 3) appended without padding lost the archive.
+func TestJoin_AppLastAlignsTheArchive(t *testing.T) {
+	app := []byte("070701")
+	for n := 0; n < 8; n++ {
+		base := bytes.Repeat([]byte{0xFF}, n)
+		got := Join(base, app, AppLast)
+		at := len(got) - len(app)
+		if at%4 != 0 || !bytes.Equal(got[at:], app) {
+			t.Fatalf("base %d bytes: archive at offset %d", n, at)
+		}
+		if !bytes.Equal(got[:n], base) || !bytes.Equal(got[n:at], make([]byte, at-n)) || at-n > 3 {
+			t.Fatalf("base %d bytes: want the base, then %d zero bytes, got %x", n, at-n, got[:at])
+		}
+	}
+	// the base length of the measured Ubuntu initrd: 3 zero bytes
+	base := make([]byte, 50100283)
+	if got := Join(base, app, AppLast); len(got) != 50100284+len(app) {
+		t.Fatalf("len = %d, want %d", len(got), 50100284+len(app))
 	}
 }
 

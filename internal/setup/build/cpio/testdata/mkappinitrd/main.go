@@ -19,7 +19,8 @@
 //
 // It prints the sizes and sha256 of the base, the archive and the result, and the base size modulo 4: the kernel only
 // unpacks an archive appended after a compressed segment at a 4-byte-aligned offset (docs/build/tdx.md, "Before or
-// after the base initrd").
+// after the base initrd"). Since 2026-11-11 cpio.Join pads the base for AppLast itself; the SEV-SNP recordings made
+// before that were built from a base padded by hand (truncate -s %4), which gives the same bytes.
 //
 // It is under testdata so that `go build ./...` skips it; build it explicitly:
 //

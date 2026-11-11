@@ -148,22 +148,31 @@ func FromDir(root string) ([]Entry, error) {
 type Placement int
 
 const (
-	// AppFirst puts the application archive before the base initrd. Intel TDX on GCP needs this: with the
-	// application appended after the distribution's compressed initrd, the guest failed to decompress it and did not
-	// boot (docs/plan/cvm-port.md, Phase 3.2).
+	// AppFirst puts the application archive before the base initrd. This is what the Intel TDX runs on GCP use: an
+	// unpadded append failed there (docs/plan/cvm-port.md, Phase 3.2), for the alignment reason given under AppLast.
 	AppFirst Placement = iota
-	// AppLast appends the application archive after the base initrd. This is what the AMD SEV-SNP runs on GCP did
-	// (option1-initrd/gcp_boot_option1.sh: cat i.bin app.cpio), and those guests booted. Why the same append fails on
-	// TDX has not been established.
+	// AppLast appends the application archive after the base initrd, zero-padding the base to a multiple of 4 bytes
+	// first. The kernel only recognises an uncompressed archive after a compressed segment at a 4-byte-aligned offset
+	// (init/initramfs.c). Measured on GCP SEV-SNP, 2026-11-11: with the Ubuntu base initrd (length mod 4 = 3) and no
+	// padding, the kernel logged "Initramfs unpacking failed: invalid magic at start of compressed archive", dropped the
+	// archive and still booted; with the padding the archive was unpacked. The 2026-11 scripts appended without padding
+	// (option1-initrd/gcp_boot_option1.sh: cat i.bin app.cpio).
 	AppLast
 )
 
+// alignment is the boundary the kernel requires an uncompressed initramfs archive to start on.
+const alignment = 4
+
 // Join concatenates the base initrd and the application archive in the given order. The result is what gets measured
-// (RTMR2 on TDX, a vTPM PCR on SEV-SNP), so the order is part of the measurement.
+// (RTMR2 on TDX, a vTPM PCR on SEV-SNP), so the order and the padding are part of the measurement. With AppLast the base
+// is followed by zero bytes up to a multiple of 4 (the kernel skips NUL bytes between segments). With AppFirst no
+// padding is needed: Write pads the archive to 512 bytes, so the base starts aligned.
 func Join(base, app []byte, where Placement) []byte {
-	out := make([]byte, 0, len(base)+len(app))
+	out := make([]byte, 0, len(base)+alignment+len(app))
 	if where == AppFirst {
 		return append(append(out, app...), base...)
 	}
-	return append(append(out, base...), app...)
+	out = append(out, base...)
+	out = append(out, make([]byte, pad(len(base), alignment))...)
+	return append(out, app...)
 }
