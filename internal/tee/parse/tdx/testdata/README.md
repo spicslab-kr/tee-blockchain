@@ -48,5 +48,17 @@ sudo cat /sys/kernel/config/tsm/report/q/outblob > quote.bin
 sudo rmdir /sys/kernel/config/tsm/report/q
 ```
 
+Or with the recorder in `record/main.go`, which does the same with only the standard library, checks that the quote
+carries the REPORTDATA written, and also saves the kernel command line and boot ID. It is skipped by `go build ./...`;
+build it by name from the repository root and run it as root on the guest:
+
+```
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o record-tdx ./internal/tee/parse/tdx/testdata/record
+sudo ./record-tdx -out fx -nonce-text attestamp-tdx-fixture-0001
+```
+
+`record-tdx` has not been run on a guest yet (2026-11-11). To record quotes with an application in the initrd, see
+`docs/plan/app-fixture-recording.md`.
+
 The quote carries no secret, but it does carry the PCK certificate of the physical machine it was made on. MROWNER is
 set by GCP and differs per instance; the parser ignores it.

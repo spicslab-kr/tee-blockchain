@@ -80,16 +80,16 @@ None of them contains a private key, a credential or an IP address.
 
 ## Recording another one
 
-`record/main.go` is outside the module build (Go ignores `testdata`). To build it:
+`record/main.go` is skipped by `go build ./...` (Go ignores `testdata` in patterns) but builds when named, with the
+module's own pinned dependencies (go-tpm-tools v0.4.11). From the repository root:
 
 ```
-mkdir /tmp/record && cp record/main.go /tmp/record && cd /tmp/record
-go mod init record
-go get github.com/google/go-tpm-tools@v0.4.11 github.com/google/go-tpm@v0.9.8
-go mod tidy
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o record .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o record-snp ./internal/tee/parse/snp/testdata/record
 ```
 
-`crypto/sha3` needs Go 1.24 or later; the pinned go1.26.1 has it.
+(The 2026-11-10 recording used a separate scratch module with the same dependency versions, because the module did
+not depend on go-tpm-tools yet.) `crypto/sha3` needs Go 1.24 or later; the pinned go1.26.1 has it.
 
-Then on an SEV-SNP guest booted with an initrd: `sudo ./record -out fx -nonce-text attestamp-snp-fixture-0001`.
+To record evidence with an application in the initrd, see `docs/plan/app-fixture-recording.md`.
+
+Then on an SEV-SNP guest booted with an initrd: `sudo ./record-snp -out fx -nonce-text attestamp-snp-fixture-0001`.
