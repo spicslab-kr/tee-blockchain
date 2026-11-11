@@ -1,35 +1,77 @@
 # Recording fixtures that carry an application
 
-**Status: prepared, not run.** Nothing in this document has been executed on an instance yet (2026-11-11). The tools
-it uses compile; the commands have not been typed on a guest.
+**Status: see "Results" at the end.** This procedure covers the four cells of the 2026-10-23 slides 7 and 16:
 
-## Why: two recordings per platform, one byte apart
+| | Option 1: application cpio in the initrd | Option 2: squashfs + dm-verity image |
+|---|---|---|
+| Intel TDX (`intel-tdx`) | archive placed before the base initrd (`cpio.AppFirst`) | the image and its hash tree inside the initrd, also `AppFirst`; RTMR2 covers it, nothing is extended at run time |
+| AMD SEV-SNP (`amd-sev-snp-initrd` / `amd-sev-snp-verity`) | archive appended after the base initrd (`cpio.AppLast`) | the image on disk; a verifying initrd checks it against `attestamp.roothash=` on the kernel command line and extends vTPM PCR12 |
 
-Test-matrix row T5 ("application swapped after registration → not trusted") is the project's central claim, and on
-TDX and SEV-SNP it is empty. None of the recorded evidence carries an application: `gcp-c3-quote.bin` and
-`gcp-n2d-*` booted the distribution initrd.
+## Why: two recordings per cell, one byte apart
 
-So record **twice per platform, on the same VM, with only the application changed by one byte** (`attestamp app v1`
-→ `attestamp app v2`). Then:
+Test-matrix row T5 ("application swapped after registration → not trusted") is the project's central claim. On TDX
+and SEV-SNP it was empty, because no recorded evidence carried an application.
 
-- on TDX, RTMR2 must differ between the two quotes while MRTD, RTMR0 and RTMR1 stay equal;
-- on SEV-SNP, INITRD must differ while MEASUREMENT, PCR4, KERNEL and CMDLINE stay equal.
+So every cell is recorded **twice on the same VM, with only the application changed by one byte** (`attestamp app v1`
+→ `attestamp app v2`). Expected:
 
-With the two recordings committed, T5 becomes a permanent code test: register v1 on a local chain, present v2, and
-`verify` must refuse. From then on it is proved by `go test` with no VM. One VM session per platform is all it takes.
+| | Option 1 | Option 2 |
+|---|---|---|
+| TDX | RTMR2 differs; MRTD, RTMR0, RTMR1 equal | RTMR2 differs; MRTD, RTMR0, RTMR1 equal |
+| SEV-SNP | INITRD differs; MEASUREMENT, PCR4, KERNEL, CMDLINE equal | CMDLINE (new root hash) and PCR12 differ; MEASUREMENT, PCR4, KERNEL, INITRD equal |
 
-What the application is does not matter. What the recordings prove is that a changed application changes the
-measured value, so the application is one file, `/opt/app/app`, with one line of text.
+On TDX one value carries the application (RTMR2) in both options, under the same format and the same four names. On
+SEV-SNP Option 2 two values carry it (CMDLINE and PCR12), and `amd-sev-snp-verity` is the first time PCR12 is non-zero
+in real evidence.
 
-If RTMR2 does **not** differ on TDX, write that down: it would contradict the assumed mapping of GRUB's
-measurements into RTMR2 (`docs/build/tdx.md`, "The values"), which has not been confirmed on GCP.
+With the pairs committed, T5 becomes a permanent code test: register v1 on a local chain, present v2, and `verify`
+must refuse. From then on it is proved by `go test`, with no VM.
 
-The same session also measures what `docs/build/tdx.md`, "Before or after the base initrd", left open: the base
-initrd's size modulo 4, and whether the kernel logged `Initramfs unpacking failed` for each placement.
+If a value does not change as expected, it is written down as it came out. In particular, if RTMR2 does not differ on
+TDX, the assumption in `docs/build/tdx.md`, "The values" (GRUB's measurements land in RTMR2) is wrong.
+
+## Did the application really get unpacked?
+
+Option 1 and TDX Option 2 put the application into the initrd. GRUB measures the whole file whether or not the kernel
+manages to unpack the appended archive (`docs/build/tdx.md`, "Before or after the base initrd"). So a changed
+measurement alone does not prove the application was there.
+
+**Why `ls /opt/app` after boot proves nothing.** initramfs-tools unpacks the initrd into the initial rootfs, runs
+`/init`, mounts the real root on `${rootmnt}` and switches to it (`run-init`, which also deletes the initramfs
+contents). After boot `/opt/app` is absent whether or not the archive was unpacked. The procedure checks this on the
+guest by reading `/usr/share/initramfs-tools/init` before relying on it.
+
+**What is used instead: a marker carried in the archive.** `mkappinitrd` adds `conf/conf.d/zz-attestamp-app-marker`.
+The marker writes the names and sizes of the files in `/opt/app`, and the application's text, to
+`/run/attestamp-app-marker`. This is reliable because of two things in initramfs-tools' `/init`:
+
+- it sources every file in `conf/conf.d` by glob, with no ORDER file to edit;
+- it moves its `/run` tmpfs onto the real root.
+
+So the marker file exists after boot **if and only if** the kernel unpacked our archive. The procedure checks both
+properties in `/init` on the guest first. (The 2026-11 SEV-SNP scripts already read `/run/attestamp-status`, written
+in the initramfs, after boot.)
+
+`dmesg | grep -i initramfs` is recorded too, but only as a hint: the message text differs between kernel versions, and
+the ring buffer can wrap.
+
+**SEV-SNP Option 2 does not have this problem.** The image is on disk, not in the initrd. If verification fails,
+`/run/attestamp-status` says `fail` and PCR12 records `fail`. If the verifying script never runs, PCR12 stays zero,
+and `ra-parse` refuses that.
+
+## Reproducibility of the Option 2 image
+
+From `docs/build/sev-snp.md`, "Variables", built into `internal/setup/build/cpio/testdata/make-verity-image.sh`:
+
+- squashfs, not ext4: ext4 gave different hashes for two builds even with a fixed UUID and `hash_seed`;
+- `mksquashfs -mkfs-time 0 -all-time 0`, every file and directory time set to 0, owners root;
+- `veritysetup format --salt=0011…eeff --uuid=11111111-2222-3333-4444-555555555555`: fixed, not random;
+- **`umask 022`**, set by the script, with modes set explicitly (755). Folder modes 755 vs 775 gave different root
+  hashes in 2026-11, and that remains an open issue for builds that do not set them.
 
 ## Tools, built on your machine
 
-From the repository root (Git Bash, macOS or Linux), one command per line:
+From the repository root, one command per line:
 
 ```
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o mkappinitrd ./internal/setup/build/cpio/testdata/mkappinitrd
@@ -38,163 +80,178 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o reco
 sha256sum mkappinitrd record-tdx record-snp
 ```
 
-| tool | what it does |
+| file | what it does |
 |---|---|
-| `mkappinitrd` | writes the one-file application archive with `internal/setup/build/cpio` and joins it to the base initrd with `cpio.Join` (`-placement first` = `AppFirst`, `last` = `AppLast`). Prints sizes, sha256 and the base size mod 4 |
-| `record-tdx` | asks ConfigFS TSM (`tdx_guest`) for a quote with REPORTDATA = SHA-512 of `-nonce-text`; writes `quote.bin`, `record.txt` |
-| `record-snp` | the existing SEV-SNP recorder: vTPM attestation (GCE AK) over SHA-256 of `-nonce-text`, then an SNP report with REPORT_DATA = SHA3-512 of it; writes `att.pb`, `report.bin`, `auxblob.bin`, `record.txt` |
+| `mkappinitrd` | the application archive (`internal/setup/build/cpio`) with the marker, joined to the base initrd by `cpio.Join`: `-app-text` (Option 1) or `-app-dir` (TDX Option 2); `-placement first` (`AppFirst`) or `last` (`AppLast`). Prints sizes, sha256 and the base size mod 4 |
+| `internal/setup/build/cpio/testdata/make-verity-image.sh` | the reproducible squashfs image, hash tree and root hash |
+| `internal/tee/parse/snp/testdata/record/initramfs-hook.sh`, `initramfs-local-bottom.sh` | SEV-SNP Option 2: the verifying initrd's hook and its check-mount-extend-PCR12 script |
+| `record-tdx` | ConfigFS TSM quote with REPORTDATA = SHA-512 of `-nonce-text` |
+| `record-snp` | vTPM attestation (GCE AK) over SHA-256 of `-nonce-text` and an SNP report bound to it by SHA3-512 |
 
-All three are under `testdata`, so `go build ./...` and `go test ./...` skip them.
+Copy each file to the instance with `gcloud compute scp <file> <instance>:<file> --zone us-central1-a`, one file per
+call.
 
-## Intel TDX (`attestamp-tdx-vendor`, `cpio.AppFirst`)
+## Common steps on the instance
 
-Ask before starting the instance (it is billed while running). From your machine:
-
-```
-gcloud compute instances start attestamp-tdx-vendor --zone us-central1-a
-gcloud compute scp mkappinitrd attestamp-tdx-vendor:mkappinitrd --zone us-central1-a
-gcloud compute scp record-tdx attestamp-tdx-vendor:record-tdx --zone us-central1-a
-gcloud compute ssh attestamp-tdx-vendor --zone us-central1-a
-```
-
-On the instance:
+Run once at the start, as the login user:
 
 ```
-sudo shutdown -h +240                      # safety stop; a reboot cancels it, so repeat after every reboot
-chmod +x mkappinitrd record-tdx
-sha256sum mkappinitrd record-tdx           # must equal the local values
-uname -r                                   # write down; 7.0.0-1017-gcp when the first fixture was recorded
-cat /proc/sys/kernel/random/boot_id        # write down
+sudo shutdown -h +240                      # safety stop; every reboot cancels it, so repeat after each one
+chmod +x mkappinitrd record-*
+sha256sum mkappinitrd record-*             # must equal the local values
+uname -r
+cat /proc/sys/kernel/random/boot_id
 
-# 1. Turn GRUB_FORCE_PARTUUID off (same as docs/build/sev-snp.md, "The boot setting changed")
+# Check the two properties the marker relies on, in initramfs-tools' /init:
+grep -n -E 'conf/conf.d|mount -t tmpfs.*/run|move /run|run-init' /usr/share/initramfs-tools/init
+
+# GRUB_FORCE_PARTUUID off (docs/build/sev-snp.md, "The boot setting changed"); skip if already commented out
 grep -n GRUB_FORCE_PARTUUID /etc/default/grub.d/40-force-partuuid.cfg
 sudo cp -p /etc/default/grub.d/40-force-partuuid.cfg /root/40-force-partuuid.cfg.orig
 sudo sed -i 's/^GRUB_FORCE_PARTUUID=/#GRUB_FORCE_PARTUUID=/' /etc/default/grub.d/40-force-partuuid.cfg
-sudo update-grub                           # must print "Found initrd image: /boot/initrd.img-..."
-
-# 2. The application initrd, v1. Writes the combined file next to the stock initrd.
-sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-text "attestamp app v1" -placement first -out /boot/initrd-attestamp-app.img
-#    write down all four printed lines, in particular "size mod 4"
-
-# 3. A GRUB entry that boots it, made from the stock entry with only the initrd path changed
-sudo awk "/^menuentry 'Ubuntu'/{f=1} f{print} f&&/^}/{exit}" /boot/grub/grub.cfg > stock-entry.txt
-cat stock-entry.txt                        # check: one menuentry with a linux and an initrd line
-printf '#!/bin/sh\nexec tail -n +3 $0\n' > 41_attestamp_app
-sed -e "s/^menuentry 'Ubuntu'.*{\$/menuentry 'attestamp-app' --id attestamp-app {/" -e 's#initrd\.img-[^ ]*#initrd-attestamp-app.img#' stock-entry.txt >> 41_attestamp_app
-cat 41_attestamp_app                       # check: the title and the initrd line changed, nothing else
-sudo install -m 755 41_attestamp_app /etc/grub.d/41_attestamp_app
-echo 'GRUB_DEFAULT=attestamp-app' | sudo tee /etc/default/grub.d/99-attestamp-app.cfg
 sudo update-grub
-sudo grep -n -A12 "menuentry 'attestamp-app'" /boot/grub/grub.cfg
 
-# 4. Boot it
-sudo systemctl reboot
+# The stock entry, as the template for ours
+sudo awk "/^menuentry 'Ubuntu'/{f=1} f{print} f&&/^}/{exit}" /boot/grub/grub.cfg > stock-entry.txt
+cat stock-entry.txt                        # one menuentry with a linux and an initrd line
 ```
 
-The entry is made the default rather than booted once with `grub-reboot`: a one-shot entry is lost at the next
+An entry made from the template, changing only the title, the initrd file and, for SEV-SNP Option 2, the command line:
+
+```
+# make-entry <id> <initrd file name> [extra kernel arguments]  -> /etc/grub.d/41_<id>
+make_entry() {
+  printf '#!/bin/sh\nexec tail -n +3 $0\n' > "41_$1"
+  sed -e "s/^menuentry 'Ubuntu'.*{\$/menuentry '$1' --id $1 {/" \
+      -e "s#initrd\.img-[^ ]*#$2#" \
+      -e "/^[[:space:]]*linux[[:space:]]/ s#\$#${3:+ $3}#" stock-entry.txt >> "41_$1"
+  sudo install -m 755 "41_$1" "/etc/grub.d/41_$1"
+  echo "GRUB_DEFAULT=$1" | sudo tee /etc/default/grub.d/99-attestamp.cfg
+  sudo update-grub
+  sudo grep -n -A12 "menuentry '$1'" /boot/grub/grub.cfg
+}
+```
+
+The entry is made the default rather than booted once with `grub-reboot`. A one-shot entry is lost at the next
 maintenance restart, and a stale `initrdfail` can redirect it (`docs/build/tdx.md`, "`GRUB_FORCE_PARTUUID`").
 
-After the reboot, `gcloud compute ssh attestamp-tdx-vendor --zone us-central1-a` again:
+After every reboot, before recording:
 
 ```
 sudo shutdown -h +240
-cat /proc/sys/kernel/random/boot_id        # must differ from before
-cat /proc/cmdline                          # the stock command line (root=UUID=...)
-sudo dmesg | grep -i -E "initramfs|unpack" # write down; "Initramfs unpacking failed" means the archive was dropped
-sudo ./record-tdx -out app-v1 -nonce-text attestamp-tdx-app-v1
-
-# 5. v2: one byte different, same file name, same entry
-sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-text "attestamp app v2" -placement first -out /boot/initrd-attestamp-app.img
-sudo systemctl reboot
-```
-
-After the second reboot:
-
-```
-sudo shutdown -h +240
-cat /proc/sys/kernel/random/boot_id
-cat /proc/cmdline                          # must equal the v1 command line
-sudo dmesg | grep -i -E "initramfs|unpack"
-sudo ./record-tdx -out app-v2 -nonce-text attestamp-tdx-app-v2
-sha256sum app-v1/* app-v2/*
-
-# 6. Undo the boot entry (GRUB_FORCE_PARTUUID stays off, as on the SEV-SNP instance)
-sudo rm /etc/grub.d/41_attestamp_app /etc/default/grub.d/99-attestamp-app.cfg /boot/initrd-attestamp-app.img
-sudo update-grub
-exit
-```
-
-From your machine, one file per call, then stop:
-
-```
-gcloud compute scp attestamp-tdx-vendor:app-v1/quote.bin gcp-c3-app-v1-quote.bin --zone us-central1-a
-gcloud compute scp attestamp-tdx-vendor:app-v1/record.txt gcp-c3-app-v1-record.txt --zone us-central1-a
-gcloud compute scp attestamp-tdx-vendor:app-v2/quote.bin gcp-c3-app-v2-quote.bin --zone us-central1-a
-gcloud compute scp attestamp-tdx-vendor:app-v2/record.txt gcp-c3-app-v2-record.txt --zone us-central1-a
-sha256sum gcp-c3-app-v*                    # must equal the instance's values
-gcloud compute instances stop attestamp-tdx-vendor --zone us-central1-a
-```
-
-## AMD SEV-SNP (`attestamp-snp-vendor`, `cpio.AppLast`)
-
-Ask before starting the instance. `GRUB_FORCE_PARTUUID` is already off on this instance (since 2026-11-11), so step 1
-is a check only. From your machine:
-
-```
-gcloud compute instances start attestamp-snp-vendor --zone us-central1-a
-gcloud compute scp mkappinitrd attestamp-snp-vendor:mkappinitrd --zone us-central1-a
-gcloud compute scp record-snp attestamp-snp-vendor:record-snp --zone us-central1-a
-gcloud compute ssh attestamp-snp-vendor --zone us-central1-a
-```
-
-On the instance, the same steps as TDX with these differences:
-
-```
-sudo shutdown -h +240
-chmod +x mkappinitrd record-snp
-sha256sum mkappinitrd record-snp
-grep -n GRUB_FORCE_PARTUUID /etc/default/grub.d/40-force-partuuid.cfg   # must show the line commented out
-
-sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-text "attestamp app v1" -placement last -out /boot/initrd-attestamp-app.img
-# step 3 (GRUB entry) exactly as for TDX, then reboot
-
-# after the reboot
-sudo shutdown -h +240
-cat /proc/sys/kernel/random/boot_id
+cat /proc/sys/kernel/random/boot_id        # must differ from the previous boot
 cat /proc/cmdline
-sudo dmesg | grep -i -E "initramfs|unpack" # with -placement last this is the line that tests the alignment hypothesis
-sudo ./record-snp -out app-v1 -nonce-text attestamp-snp-app-v1
+cat /run/attestamp-app-marker              # Option 1 and TDX Option 2: present and naming the expected text
+sudo dmesg | grep -i -E 'initramfs|unpack' # a hint only
+```
+
+## AMD SEV-SNP (`attestamp-snp-vendor`): first
+
+Files to copy: `mkappinitrd`, `record-snp`, `make-verity-image.sh`, `initramfs-hook.sh`, `initramfs-local-bottom.sh`.
+`GRUB_FORCE_PARTUUID` is already off on this instance (since 2026-11-11).
+
+### Option 1 (`amd-sev-snp-initrd`, `AppLast`)
+
+```
+sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-text "attestamp app v1" -placement last -out /boot/initrd-attestamp-app.img
+make_entry attestamp-app initrd-attestamp-app.img
+sudo systemctl reboot
+# after the reboot: the checks above, then
+sudo ./record-snp -out opt1-v1 -nonce-text attestamp-snp-opt1-v1
 
 sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-text "attestamp app v2" -placement last -out /boot/initrd-attestamp-app.img
 sudo systemctl reboot
-
-# after the second reboot
-sudo shutdown -h +240
-cat /proc/sys/kernel/random/boot_id
-cat /proc/cmdline
-sudo dmesg | grep -i -E "initramfs|unpack"
-sudo ./record-snp -out app-v2 -nonce-text attestamp-snp-app-v2
-sha256sum app-v1/* app-v2/*
-
-sudo rm /etc/grub.d/41_attestamp_app /etc/default/grub.d/99-attestamp-app.cfg /boot/initrd-attestamp-app.img
-sudo update-grub
-exit
+# after the reboot: the checks, then
+sudo ./record-snp -out opt1-v2 -nonce-text attestamp-snp-opt1-v2
 ```
 
-From your machine, one file per call (`att.pb`, `report.bin`, `auxblob.bin`, `record.txt` for `app-v1` and `app-v2`,
-saved as `gcp-n2d-app-v1-<file>` and `gcp-n2d-app-v2-<file>`), compare sha256 with the instance, then
-`gcloud compute instances stop attestamp-snp-vendor --zone us-central1-a`.
+### Option 2 (`amd-sev-snp-verity`), in the same session
+
+```
+sudo apt-get install -y squashfs-tools cryptsetup-bin tpm2-tools     # before installing the hook below
+dpkg-query -W squashfs-tools cryptsetup-bin tpm2-tools
+sudo sh make-verity-image.sh "attestamp app v1" verity-v1
+sudo mkdir -p /var/lib/attestamp /opt/app-verity                    # the root is read-only when the check runs
+sudo cp verity-v1/app.img verity-v1/app.hash /var/lib/attestamp/
+sudo install -m 755 initramfs-hook.sh /etc/initramfs-tools/hooks/attestamp-verity
+sudo install -m 755 initramfs-local-bottom.sh /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
+sudo mkinitramfs -o /boot/initrd-attestamp-verity.img $(uname -r)    # the verifying initrd, used for v1 and v2
+make_entry attestamp-verity initrd-attestamp-verity.img "attestamp.roothash=$(cat verity-v1/roothash)"
+sudo systemctl reboot
+# after the reboot
+cat /run/attestamp-status                  # must be ok
+cat /run/attestamp-log
+cat /opt/app-verity/opt/app/app            # attestamp app v1
+sudo ./record-snp -out opt2-v1 -nonce-text attestamp-snp-opt2-v1
+
+sudo sh make-verity-image.sh "attestamp app v2" verity-v2
+sudo cp verity-v2/app.img verity-v2/app.hash /var/lib/attestamp/
+make_entry attestamp-verity initrd-attestamp-verity.img "attestamp.roothash=$(cat verity-v2/roothash)"
+sudo systemctl reboot
+# after the reboot: the same three checks, then
+sudo ./record-snp -out opt2-v2 -nonce-text attestamp-snp-opt2-v2
+```
+
+## Intel TDX (`attestamp-tdx-vendor`): second
+
+Files to copy: `mkappinitrd`, `record-tdx`, `make-verity-image.sh`. Turn `GRUB_FORCE_PARTUUID` off (common steps).
+
+### Option 1 (`AppFirst`)
+
+```
+sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-text "attestamp app v1" -placement first -out /boot/initrd-attestamp-app.img
+make_entry attestamp-app initrd-attestamp-app.img
+sudo systemctl reboot
+sudo ./record-tdx -out opt1-v1 -nonce-text attestamp-tdx-opt1-v1     # after the checks
+sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-text "attestamp app v2" -placement first -out /boot/initrd-attestamp-app.img
+sudo systemctl reboot
+sudo ./record-tdx -out opt1-v2 -nonce-text attestamp-tdx-opt1-v2
+```
+
+### Option 2 (image inside the initrd, `AppFirst`), in the same session
+
+```
+sudo apt-get install -y squashfs-tools cryptsetup-bin
+dpkg-query -W squashfs-tools cryptsetup-bin
+sudo sh make-verity-image.sh "attestamp app v1" verity-v1
+sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-dir verity-v1 -placement first -out /boot/initrd-attestamp-app.img
+sudo systemctl reboot                      # same entry as Option 1
+sudo ./record-tdx -out opt2-v1 -nonce-text attestamp-tdx-opt2-v1     # after the checks; the marker names app.img, app.hash, roothash
+sudo sh make-verity-image.sh "attestamp app v2" verity-v2
+sudo ./mkappinitrd -base /boot/initrd.img-$(uname -r) -app-dir verity-v2 -placement first -out /boot/initrd-attestamp-app.img
+sudo systemctl reboot
+sudo ./record-tdx -out opt2-v2 -nonce-text attestamp-tdx-opt2-v2
+```
+
+This records what TDX Option 2 measures: the image and hash tree carried inside the initrd. Opening and mounting the
+image before the switch to the real root is Phase 3.4 and is not part of this recording.
+
+## Undo, fetch, stop (each instance)
+
+```
+sudo rm -f /etc/grub.d/41_attestamp-app /etc/grub.d/41_attestamp-verity /etc/default/grub.d/99-attestamp.cfg
+sudo rm -f /etc/initramfs-tools/hooks/attestamp-verity /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
+sudo rm -f /boot/initrd-attestamp-app.img /boot/initrd-attestamp-verity.img
+sudo update-grub
+sha256sum opt*/*
+```
+
+Fetch each recorded file with `gcloud compute scp`, one file per call, into `gcp-n2d-<opt1|opt2>-<v1|v2>-<file>`
+(SEV-SNP) or `gcp-c3-<opt1|opt2>-<v1|v2>-<file>` (TDX), compare sha256 with the instance, then
+`gcloud compute instances stop <instance> --zone us-central1-a`. `GRUB_FORCE_PARTUUID` stays off.
 
 ## Afterwards, with no VM
 
-1. Commit the files under `internal/tee/parse/tdx/testdata/` and `internal/tee/parse/snp/testdata/`, with their
-   identifying information listed in each `README.md`, as for the existing fixtures.
-2. Parser tests:
-   - TDX: RTMR2 differs between v1 and v2; MRTD, RTMR0 and RTMR1 are equal.
-   - SEV-SNP: INITRD differs and equals the "combined" sha256 that `mkappinitrd` printed (a check from outside the
-     parser); MEASUREMENT, PCR4, KERNEL and CMDLINE are equal.
-3. A `cmd` chain test per platform, like `TestRun_E2E_TDX_AuditorUser`: register the v1 measurements on anvil, serve
-   v2 with `ra-serve --extractor fixture=...`, and `verify` must exit 1. That is T5 as code.
-4. Write the measured base size mod 4 and the `dmesg` lines into `docs/build/tdx.md`, "Before or after the base
+1. Commit the eight recordings under `internal/tee/parse/{tdx,snp}/testdata/`, with their identifying information
+   listed in each `README.md`.
+2. Parser tests for each pair: the expected values differ and the rest are equal (table at the top). On SEV-SNP,
+   INITRD of Option 1 must equal the "combined" sha256 `mkappinitrd` printed, and PCR12 of Option 2 must equal the
+   formula in `initramfs-local-bottom.sh`, each computed outside the parser.
+3. A `cmd` chain test per cell: register v1 on anvil, serve v2 with `ra-serve --extractor fixture=...`, and `verify`
+   must exit 1. That is T5 as code.
+4. Write the base size mod 4 and the marker and `dmesg` results into `docs/build/tdx.md`, "Before or after the base
    initrd", whatever they show.
-5. Move T5 in `docs/plan/test-matrix.md` from "needs VM" to "code" for each platform that was recorded.
+
+## Results
+
+Not recorded yet.
