@@ -81,7 +81,18 @@ container, two format strings"; `docs/build/ra-comparison.md`).
 
 ext4 is not reproducible even with a fixed UUID and `hash_seed`, so the image is squashfs with `-mkfs-time 0
 -all-time 0`, file times set to 0, and dm-verity with a fixed `--salt` and `--uuid` (`docs/build/sev-snp.md`,
-"Variables"). Option 2 on TDX has **not been built or booted yet** (Phase 3.4; see "Not done yet").
+"Variables").
+
+Option 2 on TDX was booted on 2026-11-12 (Phase 3.4). A script in the initrd
+(`internal/tee/parse/tdx/testdata/record/initramfs-local-bottom.sh`) verifies the image against the root hash that
+travels in the initrd. It then opens the image with dm-verity and mounts it read-only on `/opt/app-verity`.
+- Results for v1 and v2: `dmsetup status` `V`, and the application could be read.
+- Only RTMR2 differed between the two boots.
+- An image that did not match its root hash was not opened. The boot still continued, because the script only records
+  `fail`.
+
+The fixtures are `gcp-c3-opt2m-*`, and the procedure is `docs/plan/night-log.md`, "Overnight 2026-11-12". It is still
+a test setup: the scripts are not part of `setup/build`.
 
 Left out, because they describe the machine or whoever launched it, not the image:
 
@@ -291,9 +302,9 @@ describe` on 2026-11-11):
 
 | what | why |
 |---|---|
-| the live run of `att-ra-responder --extractor tdx` | Phase 2.3; the code (`internal/tee/request/tdx`) is done and tested through a fake TSM against the recorded quotes. Start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address |
+| `att-ra-responder --extractor tdx` answering a verifier on another machine | Phase 2.2. On the guest itself (127.0.0.1) the whole chain passed on 2026-11-12 (`e2e/cvm/in-guest-verify.sh`). From outside: start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address |
 | `setup/build` and `setup/launch` for TDX | Phase 3: build the archive, put it first, boot a custom GRUB entry once, read the values back |
-| Option 2 on TDX (squashfs + dm-verity image inside the initrd) | Phase 3.4; not built or booted. Two builds giving the same root hash is the pass criterion |
+| Option 2 on TDX as product code | booted and mounted with test scripts on 2026-11-12 (above); not in `setup/build`, and a failed check does not stop the boot |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |

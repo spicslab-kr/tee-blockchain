@@ -222,7 +222,8 @@ sudo ./record-tdx -out opt2-v2 -nonce-text attestamp-tdx-opt2-v2
 ```
 
 This records what TDX Option 2 measures: the image and hash tree carried inside the initrd. Opening and mounting the
-image before the switch to the real root is Phase 3.4 and is not part of this recording.
+image before the switch to the real root is Phase 3.4 and is not part of this recording; it was recorded separately on
+2026-11-12 (`gcp-c3-opt2m-*`, procedure in `docs/plan/night-log.md`, "Overnight 2026-11-12").
 
 ## Undo, fetch, stop (each instance)
 

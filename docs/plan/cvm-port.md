@@ -7,9 +7,10 @@ Status (2026-11-11, evening):
   - Phase 1 (TDX parse) and phase 4a (SEV-SNP parse), with D3, D4 and D5 decided.
   - The anvil chain tests, which run.
   - Application fixtures for all four platform/option cells, which make T5 a code test (`docs/plan/app-fixture-recording.md`).
-  - Phase 2 code (TDX and SEV-SNP request), tested on the recorded evidence. Its live run (2.3) passed on the SEV-SNP
-    guest on 2026-11-12, with everything on one guest; TDX is in the night log.
-- Phase 3 is partly done: 3.2–3.4 were measured in the recording session.
+  - Phase 2 code (TDX and SEV-SNP request), tested on the recorded evidence. Its live run (2.3) passed on both guests on
+    2026-11-12, with everything on one guest.
+- Phase 3 is partly done: 3.2–3.4 were measured in the recording sessions; on 2026-11-12 the TDX boot also opened and
+  mounted the dm-verity image (3.4).
 - Phase 5 (a locked guest) is designed below, not started.
 - See `docs/plan/night-log.md`.
 
@@ -96,8 +97,8 @@ adapters in `internal/tee/request/{Vendor,auditor}/{tdx,snp}`, and `request/{Ven
 | # | Task | Pass criterion | State |
 |---|---|---|---|
 | 2.1 | `internal/tee/request/tdx` (ConfigFS TSM, REPORTDATA = nonce then zeros) and `internal/tee/request/snp` (GCE vTPM attestation, SHA3-512 into REPORT_DATA, SNP report and certificate table, the parse/snp container), with role adapters | the returned evidence parses with the Phase 1 and 4a parsers | **done, without hardware**: a fake TSM (go-configfs-tsm `faketsm`) answers only for the REPORTDATA each recording was made for, and the quote and evidence produced verify with the parsers |
-| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **SEV-SNP: answered on the guest over 127.0.0.1, 2026-11-12** (`snp-initrd`); not yet from another machine |
-| 2.3 | End to end: `att-user verify` against a running TDX and SEV-SNP instance | exit 0 and a `✓ matches` line | **SEV-SNP `amd-sev-snp-initrd`: passed 2026-11-12, all on one guest** (`e2e/cvm/in-guest-verify.sh`, 11 of 11 checks). TDX: see the night log |
+| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **Answered on the guest over 127.0.0.1, 2026-11-12** (`tdx`, `snp-initrd`); not yet from another machine |
+| 2.3 | End to end: `att-user verify` against a running TDX and SEV-SNP instance | exit 0 and a `✓ matches` line | **Passed 2026-11-12, all on one guest** (`e2e/cvm/in-guest-verify.sh`, 11 of 11 checks each): `amd-sev-snp-initrd` on a stock boot; `intel-tdx` on a stock boot and again on a boot with the dm-verity application mounted (3.4) |
 
 **How 2.3 was run.** Without a firewall rule, everything runs on the guest and talks over `127.0.0.1`: the responder
 (as root), anvil 1.8.0, `att-auditor registry-deploy` and `audit`, `att-user verify`. Two consequences to keep in mind:
@@ -128,7 +129,7 @@ well. The request packages do not import the parsers, so no verifier code is lin
 | 3.1 | Deterministic cpio of the application — fixed mtime, sorted order | two builds on two machines hash the same |
 | 3.2 | Prepend the application cpio to the base initrd (appending broke decompression in 2026-10; on 2026-11-11 the cause was measured on SEV-SNP as missing 4-byte padding, and `cpio.Join` now pads; TDX + append was not re-tested) | the instance boots. **Done 2026-11-11**: four boots with `AppFirst`, the application unpacked every time (marker present) |
 | 3.3 | Turn off `GRUB_FORCE_PARTUUID` so the initrd is actually read and measured | RTMR[2] changes when the initrd changes. **Done 2026-11-11**: RTMR2 changed with the application; MRTD, RTMR0, RTMR1 did not |
-| 3.4 | Option 2: squashfs + dm-verity (ext4 is not reproducible even with fixed UUID and hash_seed) | two builds give the same root hash. **Done 2026-11-11 for the image**: the same image and root hash on the SEV-SNP and the TDX guest. Opening and mounting it inside a TDX boot is not built |
+| 3.4 | Option 2: squashfs + dm-verity (ext4 is not reproducible even with fixed UUID and hash_seed) | two builds give the same root hash. **Done 2026-11-11 for the image**: the same image and root hash on the SEV-SNP and the TDX guest. **Done 2026-11-12 on TDX at boot**: the initrd verifies the image against its root hash, opens it with dm-verity and mounts it read-only on `/opt/app-verity` (status `V`), for v1 and v2; an image that does not match its root hash is not opened (`fail`, nothing mounted), but the boot continues. Fixtures `gcp-c3-opt2m-*`. Still a test setup: scripts in `tdx/testdata/record/`, not `setup/build` |
 | 3.5 | `setup/launch/<role>/tdx/` — write a GRUB entry, boot into it once, read the measurement back | the measured value equals the built value |
 | 3.6 | A `--verify` equivalent: build twice and refuse on a mismatch | a deliberate one-byte change fails the build |
 

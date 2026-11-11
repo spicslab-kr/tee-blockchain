@@ -740,3 +740,77 @@ TERMINATED.
 `gcloud compute instances start attestamp-tdx-vendor` failed with `ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS`: no
 c3-standard-4 in us-central1-a; GCP suggested us-central1-f. Moving zones means a new instance, which the brief does
 not allow. Attempt 1 of 2; tasks 2 (TDX) and 3 wait for the second attempt.
+
+Attempt 2, after the repository-only gaps below: the start succeeded.
+
+### 2. Phase 2.3 on TDX: passed
+
+`attestamp-tdx-vendor`, stock boot, kernel `7.0.0-1017-gcp`. Same binaries (sha256 checked on the guest), anvil 1.8.0
+downloaded on the guest and checked against the release checksum. Host key the same as in earlier sessions; only the
+external IP had changed.
+
+`sh in-guest-verify.sh tdx intel-tdx`: **11 passed, 0 failed.** 8,000-byte quotes; the two differ; a replay against the
+next nonce is refused with exit 6; audit registered; verify exit 0 with `✓ matches`. Stock-boot RTMR2 `9960b923…`.
+
+### 3. Phase 3.4 on TDX: the image is opened and mounted at boot
+
+Scripts `internal/tee/parse/tdx/testdata/record/initramfs-{hook,local-bottom}.sh` (SEV-SNP's, without PCR12).
+
+1. Hook and local-bottom installed into `/etc/initramfs-tools`, `mkinitramfs -o initrd-verity-base.img`, both removed
+   again at once. The base carries `veritysetup`, `dm-verity.ko` and the script; squashfs, loop and dm-mod are built
+   into this kernel.
+2. The existing `verity-v1` and `verity-v2` (the same images as the 2026-11-11 recordings; sha256 checked) put before
+   the base with `mkappinitrd -placement first`; `make-grub-entry.sh attestamp-verity initrd-attestamp-verity.img`.
+3. Results, one boot each:
+
+| boot | `/run/attestamp-status` | mounted | content | RTMR2 |
+|---|---|---|---|---|
+| stock | — | — | — | `9960b923…` |
+| v1 | `ok e29ec085…` | `/opt/app-verity`, squashfs ro on `/dev/mapper/attestamp-app`, `dmsetup status` `V` | `attestamp app v1` | `fc0d75eb…` |
+| v2 | `ok a2f4df92…` | same | `attestamp app v2` | `71cd0493…` |
+| tamper: v2's image with v1's root hash | `fail e29ec085…`, log "Verification of root hash failed." | nothing; no dm device | — | `01964c57…` |
+
+MRTD, RTMR0 and RTMR1 were the same on every boot. On the v2 boot `in-guest-verify.sh tdx intel-tdx` passed again (11 of
+11) and the live quote's RTMR2 equalled the recording's.
+
+**The tampered boot carried on to a normal login**: the script records `fail` and exits 0. That is enough for a
+verifier (RTMR2 differs from every registered value), but a locked guest (Phase 5) must stop the boot instead.
+
+Committed as fixtures `gcp-c3-opt2m-v1-*` and `gcp-c3-opt2m-v2-*` with boot logs; `TestMountedFixtures_OnlyRTMR2Changes`.
+The tamper quote was not committed (its RTMR2 is above).
+
+**Undone before stopping:** `/etc/grub.d/41_attestamp-verity`, `/etc/default/grub.d/99-attestamp.cfg` and
+`/boot/initrd-attestamp-verity.img` removed, `update-grub` run, `grub.cfg` has no `attestamp` entry and `default="0"`.
+`/etc/initramfs-tools/{hooks,scripts/local-bottom}` are empty. Left on the guest: the empty folder `/opt/app-verity`
+and the working files in the home folder.
+
+**Stopped** `attestamp-tdx-vendor` at about 16:05 UTC by the guest's clock. Both instances TERMINATED
+(`gcloud compute instances list`).
+
+### 4. Build-info gaps that need only the repository
+
+| # | result | commit |
+|---|---|---|
+| 3 forge | forge 1.8.0 + solc 0.8.28 + OpenZeppelin `cab19933` + Python 3.14.6 + abigen (go-ethereum v1.17.5) regenerate both `registry.go` byte for byte. The forge originally used is still unknown | `8ec564f` |
+| 4 Python | Python 3, standard library only | `8ec564f` |
+| 13 vsock/CID/memory/CPUs | table in `docs/build/aws-nitro.md`; `launch` opens the port to `0.0.0.0/0` when the role allows | `aec6a04` |
+| 14 Intel root | identical to Intel's published certificate | `4e923c3` |
+| 11 git on Nitro | `0-Setup-local-upload.sh` installs it when missing; not run | `faf6a72` |
+| 9 SEV-SNP packing | `internal/tee/parse/snp/testdata/pack` | below |
+| 7 test application | the fork's pinned commit is upstream's; scripts now clone `nginx/docker-nginx` | below |
+
+Test matrix, cells that needed no VM: SEV-SNP T7 now has `TestBuildConfig_BuildEnvRequiredOnSNP`. The other gaps need
+a VM (T2, T3, T6 on TDX and SEV-SNP) or Nitro (T8 debug enclave, T9 live replay, every "script, never run"), and were
+left alone.
+
+Left alone on purpose, and what each needs:
+
+| # | needs |
+|---|---|
+| 1 Nitro build environment | a Nitro instance at the baseline: `rpm -q docker aws-nitro-enclaves-cli`, `uname -r`, `/etc/os-release`, the AMI ID |
+| 2 reference results | the Nitro baseline run itself (after `a379a2c`, `e6ef9b4`, `60de6b0`), with funded Sepolia keys |
+| 5 SEV-SNP 2026-11 scripts | nothing: decided to stay outside the repository |
+| 6 SEV-SNP guest tool versions of 2026-11 | the person who ran them (`snpguest`, gotpm, tpm2-tools versions) |
+| 8 Nitro fixture READMEs | the person who recorded them (date, AMI, `nitro-cli` version, nonce source) |
+| 10 GCP prerequisites | a decision on how much of GCP setup the repository describes; the facts are known |
+| 12 arm64 Nitro host | an AWS session to write and test a create script for Graviton |
