@@ -196,7 +196,7 @@ What else changes the registered values (from the evidence's structure; **not me
 | PCR4 | shim and GRUB, i.e. the OS image and its updates |
 | KERNEL | the kernel package |
 | CMDLINE | the boot entry. It names the root by an identifier that differs per disk (the file system's UUID on the stock entry with an initrd, the partition's PARTUUID on the initrdless one), so the Auditor must use the command line the Vendor publishes |
-| INITRD | the base initrd and the application archive, and **where the archive goes**: on SEV-SNP it is appended after the base initrd (`cpio.AppLast`). The 2026-11 runs on GCP did that and the guests booted (observed). On TDX the same append failed to decompress and the archive goes first (`cpio.AppFirst`); why the two differ has not been established |
+| INITRD | the base initrd and the application archive, and **where the archive goes**: on SEV-SNP it is appended after the base initrd (`cpio.AppLast`). The 2026-11 runs on GCP did that and the guests booted (observed). On TDX the same append failed and the archive goes first (`cpio.AppFirst`). The kernel accepts an appended uncompressed archive only at an offset that is a multiple of 4, and drops it with one log line otherwise while the base still boots; so "the guests booted" does not prove the application was unpacked, and a matching INITRD does not either. See `docs/build/tdx.md`, "Before or after the base initrd" (inferred from the kernel source, not yet tested) |
 
 **Initrdless boot.** GCP's Ubuntu 24.04 image sets `GRUB_FORCE_PARTUUID`, and GRUB then boots the stock entry
 **without any initrd** (confirmed: our first recording, `gcp-n2d-initrdless-*`, logs `GRUB_FORCE_PARTUUID set,
@@ -243,8 +243,19 @@ command line lost `panic=-1`, which only the initrdless entry adds (observed in 
 | zone | `us-central1-a` (default) | one of the zones that offer SEV-SNP |
 | vTPM | nothing to set | `/dev/tpm0` and `/dev/tpmrm0` were present without a flag (observed 2026-11-10) |
 
-Our recorded guest: Ubuntu 24.04.5, kernel `7.0.0-1017-gcp`, `/dev/sev-guest` present, ConfigFS TSM provider
-`sev_guest`, SEV-SNP active in `dmesg`.
+Our recorded guest, `attestamp-snp-vendor` (read with `gcloud compute instances describe` and `gcloud compute disks
+describe` on 2026-11-11):
+
+| | |
+|---|---|
+| image | `ubuntu-os-cloud/global/images/ubuntu-2404-noble-amd64-v20261105` (the family moves; this is the exact image) |
+| boot disk | 64 GB, `pd-standard` |
+| CPU platform | AMD Milan (minimum) |
+| Shielded VM | Secure Boot **off**, vTPM on, integrity monitoring on |
+| maintenance | `TERMINATE` |
+| OS, kernel | Ubuntu 24.04.5, `7.0.0-1017-gcp`, with `GRUB_FORCE_PARTUUID` turned off since 2026-11-11 |
+| devices | `/dev/sev-guest`, `/dev/tpm0`, `/dev/tpmrm0`; ConfigFS TSM provider `sev_guest`; SEV-SNP active in `dmesg` |
+| tools on the guest | OpenSSL 3.0.13 (image default). No Go, tpm2-tools, `snpguest` or `gotpm` |
 
 ## From scratch: record and check one evidence pair
 
@@ -264,6 +275,104 @@ entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five va
 an application, or the verity setup, use `option1-initrd/gcp_boot_option1.sh` (Option 1) or
 `option2-dm-verity/gcp_boot_option2.sh` (Option 2) from the 2026-11 scripts, after replacing their hard-coded disk
 UUID, PARTUUID, kernel version and UEFI boot entry number with the new instance's.
+
+## Byte order
+
+Sources: AMD SEV-SNP Firmware ABI, pub. 56860, **rev. 1.58** (May 2025; the revision we could retrieve, cited elsewhere
+in this file at 1.59); GHCB, pub. 56421 rev. 2.04; TCG TPM 2.0 Library Part 1 r1.59; TCG PC Client Platform Firmware
+Profile v1.05 r23. "Pinned" means a test fails if the order were the other one.
+
+**SNP report** (offsets into the 0x4A0-byte report). Rev. 1.58 states little endian only for the signature and
+public-key formats (Tables 141, 142); for the other fields it gives no general convention. Little endian there is
+go-sev-guest's reading, backed by the recorded report, where reserved bits make the wrong order visible.
+
+| field | offset, size | order | spec | pinned by |
+|---|---|---|---|---|
+| VERSION | 0x00, u32 | LE | Table 23 ("Set to 5h"); order not stated | the signature test (read BE the version is outside 2–5 and go-sev-guest refuses it) |
+| POLICY | 0x08, u64 | LE | Table 23; Table 9: bit 17 "must be one", bit 19 DEBUG, bits 63:26 MBZ | `TestEndian_PolicyIsLittleEndian` (LE gives 0x30000; BE would clear bit 17), `TestEndian_PolicyHighReservedBitIsRefused`, `TestParse_DebugGuestIsRefused` |
+| SIGNER_INFO (SIGNING_KEY bits 4:2) | 0x48, u32 | LE | Table 23: bits 31:5 MBZ | `TestEndian_SignerInfoReservedBitsAreRefused` (the fixture's value is 0, so it alone could not tell) |
+| SIGNATURE_ALGO | 0x34, u32 | LE | Table 23; Table 139: 1 = ECDSA P-384 with SHA-384 | signature test |
+| signature R, S | 0x2A0, 0x2E8, 72 bytes each | LE, zero-extended | Table 141: "zero-extended little-endian encoded" | `TestEndian_SignatureRIsLittleEndianZeroExtended`; signature test |
+| GUEST_SVN, VMPL, CURRENT/REPORTED/COMMITTED/LAUNCH_TCB, PLATFORM_INFO, mitigation vectors | various u32/u64 | LE | Table 23; order not stated | **not pinned**: nothing judges these values today. It will matter once TCB or VMPL checks are added |
+
+**Certificate table** (the host's `auxblob`, GHCB §4.1.8.1). GUIDs are "formatted and encoded as defined in RFC 4122"
+(big-endian fields), pinned by `TestEndian_CertTableGUIDIsRFC4122`: rewritten in the EFI mixed-endian order the VCEK is
+no longer found. The entry's offset and length are u32 with no stated order; read LE they point at the certificates
+(every decode depends on it).
+
+**vTPM attestation.**
+
+| structure | order | spec | pinned by |
+|---|---|---|---|
+| TPMS_ATTEST in each quote (magic, type, size prefixes, clockInfo, PCR selection) | BE | TPM 2.0 Part 1 §7.1: "The octet at offset zero within the array is the most significant octet" | `TestCheckNonce`, `TestInfo` (the nonce comes out of `extraData`), signature test |
+| TPMT_SIGNATURE, TPMT_PUBLIC | BE | same | signature test |
+| TCG event log (event headers, Spec ID event, digests' algorithm IDs and sizes) | LE | PC Client PFP §2.7: "All constants and data SHALL be represented as Little Endian format unless otherwise explicitly stated"; §10.1 | the replay against the quoted PCRs, and KERNEL, CMDLINE, INITRD in `TestParse_RealEvidence` |
+
+So one piece of SEV-SNP evidence mixes three conventions: AMD's little-endian report, the TPM's big-endian quotes and
+the firmware profile's little-endian event log, plus RFC 4122 GUIDs in the certificate table and EFI-ordered GUIDs in
+the event log. Each library handles its own part.
+
+As with TDX, go-sev-guest verifies the report signature over bytes rebuilt from the parsed fields
+(`ReportToAbiBytes`), so a passing signature alone does not pin byte order; the reserved-bit checks above do.
+
+Seen while reading, not verified further: in the path we use (no certificate fetching), go-sev-guest does not appear to
+compare REPORTED_TCB with the VCEK certificate's TCB extension, so the TCB is not judged (as "Not done yet" says).
+
+## Runtime measurement: what SEV-SNP can and cannot do
+
+Researched 2026-11-11, in answer to the remark that "TDX has runtime checks and SEV-SNP is written as if it can, but in
+practice it cannot". The remark is right for SEV-SNP hardware, and for SEV-SNP on GCP today.
+
+**TDX (confirmed).** RTMR0–3 can be extended by the guest at run time. Since Linux 6.16 the kernel exposes them as
+`/sys/devices/virtual/misc/tdx_guest/measurements/rtmr[0-3]:sha384`: writing 48 bytes extends the register
+(`TDG.MR.RTMR.EXTEND`). The values appear in the next quote, which Intel's Quoting Enclave signs. Attestamp registers
+RTMR0–2 and leaves RTMR3, the runtime register, out.
+
+**SEV-SNP (confirmed, ABI 56860 rev. 1.58).**
+
+- The attestation report has **no register the guest can extend**.
+- MEASUREMENT ("calculated at launch"), HOST_DATA, ID_KEY_DIGEST, AUTHOR_KEY_DIGEST, FAMILY_ID and IMAGE_ID are all
+  fixed at launch.
+- At request time the guest supplies only REPORT_DATA (64 bytes, "the firmware does not interpret this data") and a
+  VMPL (Table 22, MSG_REPORT_REQ).
+- None of the guest message types (CPUID, KEY, REPORT, EXPORT, IMPORT, ABSORB, VMRK, ABSORB_NOMA, TSC_INFO) extends a
+  measurement.
+- REPORT_DATA does not accumulate. A "runtime" value can only be hashed into it per request, with no
+  hardware-kept history.
+
+**Linux (confirmed).** The kernel's measurement-register interface (`drivers/virt/coco/tsm-mr.c`, 6.16) is used by
+`tdx-guest` only. `sev-guest` registers report generation and no measurement registers.
+
+**The vTPM on GCP (confirmed, Google's attestation overview).** The vTPM of a GCP SEV-SNP VM is "managed by the host
+hypervisor", and its measurements are "software-attested instead of hardware". Anything extended into PCR10–23 at run
+time (IMA, for example) is signed by Google's attestation key, not by AMD, and that vTPM sits outside the SNP trust
+boundary. That is also why our PCR4, KERNEL, CMDLINE, INITRD and PCR12 are Google-signed (see "Same VM").
+
+**What would give SEV-SNP a runtime register.**
+
+- A vTPM inside the guest's trust boundary: an SVSM running at VMPL0, as AMD's SVSM specification (pub. 58019)
+  describes.
+- Linux has had the guest driver since 6.16 (`drivers/char/tpm/tpm_svsm.c`, `CONFIG_TCG_SVSM`); Canonical backported it
+  to `linux-gcp` (June 2025, per the research; not checked on our kernel).
+- COCONUT-SVSM's vTPM is ephemeral: its EK is regenerated every boot.
+- Azure's Confidential VMs run their vTPM "inside the VM in a hardware-based protected memory region… isolated and
+  encrypted by AMD SEV-SNP" (Microsoft's docs).
+- For GCP, the only mention found is a Google community blog (June 2026) calling SVSM vTPM key isolation "available in
+  preview". Google's documentation and release notes have no entry for it (not confirmed).
+- How an SVSM vTPM's key is bound into an SNP report could not be confirmed: spec 58019 could not be retrieved.
+
+| capability | TDX | SEV-SNP on GCP |
+|---|---|---|
+| launch measurement signed by the hardware vendor | MRTD | MEASUREMENT |
+| register the guest can extend, signed by the hardware vendor | RTMR0–3 | **none** |
+| Linux interface to extend it | sysfs `measurements/rtmr*`, 6.16 | none |
+| per-request guest data | REPORTDATA, 64 bytes | REPORT_DATA, 64 bytes |
+| runtime PCRs | GCP vTPM (Google-signed) | GCP vTPM (Google-signed, hypervisor-managed) |
+| hardware-rooted vTPM | not needed (RTMRs) | SVSM vTPM: kernel driver since 6.16; on GCP only a "preview" claim in a blog |
+
+Attestamp does not use any runtime measurement on either platform today, and this document makes no runtime claim for
+SEV-SNP. A future runtime check on SEV-SNP would rest on Google's vTPM, which the "Same VM" weakness below already
+limits.
 
 ## Same VM
 

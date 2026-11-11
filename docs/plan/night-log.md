@@ -525,3 +525,40 @@ On the user's decision. Enforced in code, not only written down:
 **Nitro PCR baseline: baseline after both.** The entrypoint translation (`a379a2c`) and this change both change what
 goes into the EIF (the entrypoint bytes, and the responder bytes, which no longer carry the commit), so PCR0 and PCR2
 change twice. Take the Nitro baseline only after both commits.
+
+## Byte order, GRUB_FORCE_PARTUUID, cpio placement, SEV-SNP runtime measurement
+
+Three research tasks were delegated to background agents (read-only, no cloud commands); their findings were checked
+against the code, the fixtures or the source before being written down.
+
+- **Byte order** (`docs/build/tdx.md` and `docs/build/sev-snp.md`, "Byte order").
+  - No library reads a field in the wrong order.
+  - Eight new tests pin the order against the recorded evidence: `internal/tee/parse/{tdx,snp}/endian_test.go`. Each
+    refusal test was checked to fail for the intended reason:
+    - POLICY bit 59 → "mbz range policy[0x1a:0x3f]"
+    - SIGNER_INFO bit 26 → "mbz range data[0x48:0x4C]"
+    - R → "ECDSA verification failure"
+    - GUID in EFI order → "missing VCEK certificate"
+  - Gaps in the specs:
+    - AMD 56860 rev. 1.58 states little endian only for signatures and keys.
+    - Intel's DCAP document types TDATTRIBUTES as a byte array without saying which byte holds bit 0. The fixture pins
+      it: read LE only bit 28 is set; read BE a reserved bit would be.
+    - Both libraries verify signatures over re-serialised fields, so a passing signature does not pin byte order.
+- **`GRUB_FORCE_PARTUUID`** (`docs/build/tdx.md`). Set by Ubuntu's `livecd-rootfs` for non-generic kernels, to skip
+  the initramfs for boot speed, with a fallback after a panic.
+  - Migration concern: partly valid. The fixed PARTUUID goes stale if the root partition's GUID changes; live
+    migration does not apply to these VMs.
+  - Docker concern: not supported by what was found.
+- **cpio placement** (`docs/build/tdx.md`, "Before or after the base initrd").
+  - The kernel accepts an uncompressed cpio after a compressed segment only at a 4-byte-aligned offset (checked by me
+    in `init/initramfs.c` on GitHub master: `if (*buf == '0' && !(this_header & 3))`).
+  - Ubuntu's initrd is not padded to 4 bytes, and neither is `cpio.Join` (inferred).
+  - **Important, inferred:** an appended archive at an unaligned offset is dropped with one log line while the base
+    still boots, and GRUB still measures the combined file. So the 2026-11 SEV-SNP "booted" results, and a matching
+    INITRD, do not prove the application was unpacked. Not yet tested; the checks to run are in the doc.
+  - `cpio.Join` was not changed (padding would change the measured value).
+- **SEV-SNP runtime measurement** (`docs/build/sev-snp.md`). SNP has no guest-extendable register (ABI rev. 1.58); the
+  kernel's measurement-register interface is TDX-only (6.16); GCP's vTPM is hypervisor-managed and Google-signed. A
+  hardware-rooted runtime register needs an SVSM vTPM, which on GCP appears only as a "preview" in a community blog.
+- **Exact GCP images** recorded in both docs: `ubuntu-2404-noble-amd64-v20261105` for both instances; disks 64 GB
+  (`pd-balanced` TDX, `pd-standard` SEV-SNP); Secure Boot off, vTPM on.
