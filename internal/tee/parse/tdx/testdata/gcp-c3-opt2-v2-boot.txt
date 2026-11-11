@@ -1,0 +1,29 @@
+# Boot evidence for gcp-c3-opt2-v2-*, copied from the session on attestamp-tdx-vendor, 2026-11-11 (UTC).
+# Option 2: squashfs + dm-verity image and its hash tree placed inside the initrd, BEFORE the base (cpio.AppFirst).
+
+$ sudo sh make-verity-image.sh 'attestamp app v2' verity-v2
+umask 0022
+b8e2656fd5708d78ebcd6c4463555a61d59d877c5732afbe67daf55b40a2fb27  verity-v2/app.img
+9f3dc00c002b8f76b9613614d92e56edccf8a1c24b12d1f0adc86a16b97c6761  verity-v2/app.hash
+roothash a2f4df923b59d5ad7810b785af77146058253b06ba987b491047d6f610b951e1
+mksquashfs version 4.6.1 (2023/03/25)
+veritysetup 2.7.0 flags: UDEV BLKID KEYRING FIPS KERNEL_CAPI HW_OPAL
+$ sudo ./mkappinitrd -base /boot/initrd.img-7.0.0-1017-gcp -app-dir verity-v2 -placement first -out /boot/initrd-attestamp-app.img
+base      /boot/initrd.img-7.0.0-1017-gcp  50100283 bytes  sha256 4703ec07684196e8616d384ac585be54b6345ca8c6ea5544aab8445e0cd4b0a2  size mod 4 = 3
+app       verity-v2/  10240 bytes  sha256 61bc2cb4e09eaa72be07fbc8743c13715c8d3dfbdb15ca0e21e482d876cdf83d
+placement first
+combined  /boot/initrd-attestamp-app.img  50110523 bytes  sha256 1a38ac9f6598c0e1c8e512e5236aa33bf179fcf9734b889a83ac3cabdd40e6b3
+
+# after rebooting into the same GRUB entry
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+$ cat /dev/attestamp-app-marker
+file app.hash 4096
+file app.img 4096
+file roothash 65
+a2f4df923b59d5ad7810b785af77146058253b06ba987b491047d6f610b951e1
+$ sudo dmesg | grep -i -E 'initramfs|unpack'
+[    1.722188] Trying to unpack rootfs image as initramfs...
+# (boot ID 89736763-e210-4eb2-a5c5-aa85344289a5, in gcp-c3-opt2-v2-record.txt)
+
+# Result: no unpacking error; the image, hash tree and root hash were in the initramfs.

@@ -1,0 +1,27 @@
+# Boot evidence for gcp-c3-opt1-v1-*, copied from the session on attestamp-tdx-vendor, 2026-11-11 (UTC).
+# Option 1, application archive placed BEFORE the base initrd (cpio.AppFirst).
+
+$ sudo stat -c %s /boot/initrd.img-$(uname -r)
+50100283
+$ sudo sha256sum /boot/initrd.img-7.0.0-1017-gcp
+4703ec07684196e8616d384ac585be54b6345ca8c6ea5544aab8445e0cd4b0a2  /boot/initrd.img-7.0.0-1017-gcp
+# (the same file, byte for byte, as on attestamp-snp-vendor)
+
+$ sudo ./mkappinitrd -base /boot/initrd.img-7.0.0-1017-gcp -app-text 'attestamp app v1' -placement first -out /boot/initrd-attestamp-app.img
+base      /boot/initrd.img-7.0.0-1017-gcp  50100283 bytes  sha256 4703ec07684196e8616d384ac585be54b6345ca8c6ea5544aab8445e0cd4b0a2  size mod 4 = 3
+app       "attestamp app v1"  1536 bytes  sha256 eeb1b5e9af3fb3ba3a08ff014e3a54f6366261428b2de97990db529c98f14c36
+placement first
+combined  /boot/initrd-attestamp-app.img  50101819 bytes  sha256 46a45b6dbdad3db284bbe2a75146ea283bc6bb4a5c12d69d0a3f8fb88299155b
+
+# after rebooting into the GRUB entry that loads /initrd-attestamp-app.img
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+$ ls -l /dev/attestamp-app-marker; cat /dev/attestamp-app-marker
+-rw-r--r-- 1 root root 29 Nov 11 08:35 /dev/attestamp-app-marker
+file app 17
+attestamp app v1
+$ sudo dmesg | grep -i -E 'initramfs|unpack'
+[    1.774393] Trying to unpack rootfs image as initramfs...
+# (boot ID 9829230c-38b5-4daa-824c-41203abdf8d8, in gcp-c3-opt1-v1-record.txt)
+
+# Result: no unpacking error; the marker names the application text.

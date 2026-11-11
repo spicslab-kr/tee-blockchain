@@ -1,0 +1,6 @@
+nonce_text attestamp-tdx-opt1-v1
+report_data 3b3c451e9b231591076f4be902d596dee5462423cae535dec10ac657f51e4f1b9e993c87b0decc6858700e536e7d0dd0a73eb8543ccff2b61ce4cb0b8cb9df41
+provider tdx_guest
+quote_bytes 8000
+cmdline BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+boot_id 9829230c-38b5-4daa-824c-41203abdf8d8

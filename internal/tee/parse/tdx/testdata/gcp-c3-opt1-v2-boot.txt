@@ -1,0 +1,20 @@
+# Boot evidence for gcp-c3-opt1-v2-*, copied from the session on attestamp-tdx-vendor, 2026-11-11 (UTC).
+# Option 1, application archive placed BEFORE the base initrd (cpio.AppFirst).
+
+$ sudo ./mkappinitrd -base /boot/initrd.img-7.0.0-1017-gcp -app-text 'attestamp app v2' -placement first -out /boot/initrd-attestamp-app.img
+base      /boot/initrd.img-7.0.0-1017-gcp  50100283 bytes  sha256 4703ec07684196e8616d384ac585be54b6345ca8c6ea5544aab8445e0cd4b0a2  size mod 4 = 3
+app       "attestamp app v2"  1536 bytes  sha256 6370946247f8834ea8917598480489230ab4fe1e8d3ce53979fec8b558d61496
+placement first
+combined  /boot/initrd-attestamp-app.img  50101819 bytes  sha256 6a97953c3c7ac03218db23b780fbeacc61cd0dc0855839289085fa2f462e8085
+
+# after rebooting into the same GRUB entry
+$ cat /proc/cmdline
+BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+$ cat /dev/attestamp-app-marker
+file app 17
+attestamp app v2
+$ sudo dmesg | grep -i -E 'initramfs|unpack'
+[    1.936468] Trying to unpack rootfs image as initramfs...
+# (boot ID b788440d-17b9-4f08-8845-fc1d8cb2374e, in gcp-c3-opt1-v2-record.txt)
+
+# Result: no unpacking error; the marker names the application text.

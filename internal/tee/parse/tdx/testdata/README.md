@@ -1,14 +1,33 @@
-# Recorded TDX quote
+# Recorded TDX quotes
 
-One quote from a real Intel TDX guest, used by every test in `internal/tee/parse/tdx`. It lets the parser, the
-role adapters and the CLI be tested with no TDX instance running.
+Quotes from a real Intel TDX guest on GCP (`attestamp-tdx-vendor`), used by the tests in `internal/tee/parse/tdx` and
+`cmd`. They let the parser, the role adapters and the CLI be tested with no TDX instance running.
 
 | File | Content |
 |---|---|
-| `gcp-c3-quote.bin` | The raw quote, 8000 bytes, as read from ConfigFS TSM `outblob` |
+| `gcp-c3-quote.bin` | The first quote, 8000 bytes, as read from ConfigFS TSM `outblob`, from the stock (initrdless) boot |
 | `gcp-c3-quote.nonce` | The 64 bytes written to `inblob` (the TD's REPORTDATA), as 128 hex characters and a newline |
+| `gcp-c3-opt1-v1-*`, `gcp-c3-opt1-v2-*` | Option 1: a one-file application archive placed before the base initrd (`cpio.AppFirst`), recorded twice with the application changed by one byte |
+| `gcp-c3-opt2-v1-*`, `gcp-c3-opt2-v2-*` | Option 2: a squashfs + dm-verity image and its hash tree placed inside the initrd, also `AppFirst`, recorded twice with the image's content changed by one byte |
 
 sha256 of `gcp-c3-quote.bin`: `228da7b4e87f2fd21c7732d91bfe709f5fa81850f8216768b5b1d48fb46b8a4d`
+
+## The application recordings (2026-11-11)
+
+Each has `-quote.bin` (the quote), `-record.txt` (what `record/main.go` printed: nonce text, REPORTDATA, provider,
+size, the kernel command line, the boot ID) and `-boot.txt` (the commands and output of the session, copied verbatim:
+how the initrd was built, the marker, the kernel's initramfs lines).
+
+- REPORTDATA = SHA-512 of the nonce text `attestamp-tdx-<cell>`, e.g. `attestamp-tdx-opt1-v1`.
+- The base initrd was `/boot/initrd.img-7.0.0-1017-gcp`, 50,100,283 bytes (**size mod 4 = 3**), sha256 `4703ec07…b0a2`:
+  byte-identical to the one on the SEV-SNP guest.
+- On all four boots the kernel logged no unpacking error, and the marker `/dev/attestamp-app-marker` was present,
+  naming the application text (Option 1) or `app.img`, `app.hash` and the root hash (Option 2).
+- Result, checked by `app_fixture_test.go`: in each pair only RTMR2 differs; MRTD, RTMR0 and RTMR1 are the same in all
+  four quotes.
+
+The same identifying information as the first quote: the PCK certificate of the physical machine. `-record.txt` also
+holds the root file system's UUID (in the command line) and the boot ID.
 
 ## Where it came from
 
