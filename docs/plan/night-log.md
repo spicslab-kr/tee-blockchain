@@ -276,3 +276,133 @@ JSONL line per test to `e2e-work/results/amd-sev-snp.jsonl` (format in `docs/pla
 - AWS: read only. The vCPU request in eu-north-1 is `CASE_CLOSED`, not `PENDING`.
 - Local: nothing installed. Go 1.26.1 was fetched into the module cache by `GOTOOLCHAIN`.
 - Gate at the end: `gofmt -l .` clean, `go vet ./...` clean, `go test ./...` all `ok`.
+
+# 2026-11-11, daytime (the user present)
+
+Times are UTC.
+
+## SEV-SNP evidence with an initrd
+
+- 03:51 started `attestamp-snp-vendor`; `sudo shutdown -h +240`. The external IP changes on every start; it was read
+  from the start output and not written down.
+- `GRUB_FORCE_PARTUUID` is set in `/etc/default/grub.d/40-force-partuuid.cfg`, not in `/etc/default/grub`. Kept the
+  original as `/root/40-force-partuuid.cfg.orig`, commented the line out, ran `update-grub`, rebooted. The first
+  `systemctl reboot` never ran (the SSH connection dropped before it; `boot_id` was unchanged), the second did.
+  New `boot_id`; serial console shows the initramfs unpacked; the event log has GRUB's `initrd` command. Steps and
+  how to undo them: `docs/build/sev-snp.md`, "The boot setting changed on `attestamp-snp-vendor`".
+- Recorded once more with the fixed nonce (still SHA-512). The parser accepted it, and its INITRD equalled
+  `sha256sum /boot/initrd.img-7.0.0-1017-gcp` on the instance. Stopped the VM (about 20 minutes running).
+- This recording was then **discarded** because of the SHA3-512 change below, and the evidence was recorded again.
+
+## Decision 2026-11-11: the SEV-SNP binding is SHA3-512
+
+Decided by the project lead the same day: REPORT_DATA = **SHA3-512** of the vTPM attestation instead of SHA-512. Both
+are 64 bytes, the size of REPORT_DATA.
+
+- Repository: `internal/tee/parse/snp` (`bindingSum`, Go's standard `crypto/sha3`; no new dependency) and
+  `testdata/record/main.go`.
+- 04:28:50 started `attestamp-snp-vendor` again, `shutdown -h +240` (fires 08:30), checked that it still booted with
+  the initrd (`/proc/cmdline` has `root=UUID=…`), copied the rebuilt recorder (sha256 `2c6ea569…bf41` on both sides),
+  recorded with nonce text `attestamp-snp-fixture-0001`, fetched the four files (sha256 equal on both sides), stopped
+  the VM at 04:34:45 (GCP's `lastStopTimestamp`). REPORT_DATA `82ded258…142e` equals `openssl dgst -sha3-512` of `att.pb` on Windows and on the
+  instance (OpenSSL 3.0.13), and Python's `hashlib.sha3_512`.
+- **Fixtures, on the user's decision to keep both:** the new recording is `gcp-n2d-*`; the 2026-11-10 one was renamed
+  `gcp-n2d-initrdless-*`. It is the only evidence of an initrdless boot and of the old binding, and a signed event log
+  cannot be made up in a test. Tests: every `amd-sev-snp-initrd` value asserted against a value read outside the
+  parser; verity refused without a root hash; initrdless refused; SHA-512 binding refused (`VerifySig`) and its
+  REPORT_DATA shown to be SHA-512; the cmd test now expects five values from `ra-parse`.
+- **Still untested on real evidence: PCR12** (no recording has the verity hook) and an initrd carrying an application.
+
+### Changes outside the repository: `C:\Users\bags3\Desktop\SEV-SNP-vTPM-코드-11-10\SEV-SNP-vTPM-코드\`
+
+Scope, on the user's decision: every file of the **GCP** SNP+vTPM pair that makes or checks the binding. The AWS
+NitroTPM experiment (`awscollect.sh`, `awscollect2.sh`, `go-verifier/aws`, `awsverify.py`) was **not** changed. Before
+each change the original was copied next to it as `<file>.sha512.bak` (`cp -p`), so results from 2026-11-10 and earlier
+can be tied to the SHA-512 versions. Korean comments were left as they are, including ones that still say SHA-512
+(`relay-test/relay_attack.sh` line 16). The shell scripts now need `openssl` with SHA3 (OpenSSL 1.1.1 or later; the
+GCP Ubuntu 24.04 image has 3.0.13). Both Go programs pass `go vet` for linux/amd64 after the change.
+
+Lines quoted exactly, before → after:
+
+`vendor/vendor_evidence.sh`, line 7
+```
+before: sha512sum att.pb | cut -d' ' -f1 | xxd -r -p > rd.bin
+after:  openssl dgst -sha3-512 -binary att.pb > rd.bin
+```
+
+`user/in-vm-check/collect_grub.sh`, line 10
+```
+before: sha512sum ev_$V/att.pb | cut -d' ' -f1 | xxd -r -p > ev_$V/rd.bin
+after:  openssl dgst -sha3-512 -binary ev_$V/att.pb > ev_$V/rd.bin
+```
+
+`user/in-vm-check/collect_verity_grub.sh`, line 10
+```
+before: sha512sum ev_$V/att.pb | cut -d' ' -f1 | xxd -r -p > ev_$V/rd.bin
+after:  openssl dgst -sha3-512 -binary ev_$V/att.pb > ev_$V/rd.bin
+```
+
+`relay-test/relay_attack.sh`, line 18 (only this part of the line changed; the rest is unchanged)
+```
+before: sha512sum ../att_from_x.pb | cut -d' ' -f1 | xxd -r -p > rd.bin
+after:  openssl dgst -sha3-512 -binary ../att_from_x.pb > rd.bin
+```
+
+`user/user_verify.py`, line 24
+```
+before: check('SNP 보고서 사용자 데이터 = SHA-512(vTPM 증명)', hashlib.sha512(att).digest() == rep[0x50:0x90])
+after:  check('SNP 보고서 사용자 데이터 = SHA3-512(vTPM 증명)', hashlib.sha3_512(att).digest() == rep[0x50:0x90])
+```
+
+`user/in-vm-check/userverify_grub.py`, line 17, and `user/in-vm-check/userverify_grub2.py`, line 17 (identical)
+```
+before: check('SNP 보고서 사용자 데이터 = SHA-512(vTPM 증명)', hashlib.sha512(att).digest() == rep[0x50:0x90])
+after:  check('SNP 보고서 사용자 데이터 = SHA3-512(vTPM 증명)', hashlib.sha3_512(att).digest() == rep[0x50:0x90])
+```
+
+`user/verify_att/main.go`, lines 5, 36, 37
+```
+before: 	"crypto/sha512"
+after:  	"crypto/sha3"
+
+before: 	sum := sha512.Sum512(raw)
+after:  	sum := sha3.Sum512(raw)
+
+before: 	fmt.Println("SHA-512(att.pb) =", hex.EncodeToString(sum[:]))
+after:  	fmt.Println("SHA3-512(att.pb) =", hex.EncodeToString(sum[:]))
+```
+
+`user/go-verifier/gcp/main.go`, lines 17, 212, 295, 373, 374, 381
+```
+before: 	"crypto/sha512"
+after:  	"crypto/sha3"
+
+before: 	check(bytes.Equal(r.GetReportData(), wantReportData), "Report Data = SHA-512(vTPM 증명)", short(r.GetReportData()))
+after:  	check(bytes.Equal(r.GetReportData(), wantReportData), "Report Data = SHA3-512(vTPM 증명)", short(r.GetReportData()))
+
+before: 	sum := sha512.Sum512(raw)        (line 295, before verifySNP(snp, sum[:]))
+after:  	sum := sha3.Sum512(raw)
+
+before: 	step("[3] 증명의 SHA-512를 Report Data에 넣어 SNP 보고서 받기")
+after:  	step("[3] 증명의 SHA3-512를 Report Data에 넣어 SNP 보고서 받기")
+
+before: 	sum := sha512.Sum512(raw)        (line 374, before snpReport(sum))
+after:  	sum := sha3.Sum512(raw)
+
+before: 	line("SHA-512(증명) = %s…", hex.EncodeToString(sum[:])[:32])
+after:  	line("SHA3-512(증명) = %s…", hex.EncodeToString(sum[:])[:32])
+```
+
+`README.md`, line 71
+```
+before: | `vendor_evidence.sh` | User 난수로 vTPM 증명을 받고, 그 SHA-512를 Report Data로 SNP 보고서를 받아 묶음 (GCP) |
+after:  | `vendor_evidence.sh` | User 난수로 vTPM 증명을 받고, 그 SHA3-512를 Report Data로 SNP 보고서를 받아 묶음 (GCP) |
+```
+
+Backups made (10 files): `vendor/vendor_evidence.sh.sha512.bak`, `relay-test/relay_attack.sh.sha512.bak`,
+`user/in-vm-check/collect_grub.sh.sha512.bak`, `user/in-vm-check/collect_verity_grub.sh.sha512.bak`,
+`user/go-verifier/gcp/main.go.sha512.bak`, `user/user_verify.py.sha512.bak`,
+`user/in-vm-check/userverify_grub.py.sha512.bak`, `user/in-vm-check/userverify_grub2.py.sha512.bak`,
+`user/verify_att/main.go.sha512.bak`, `README.md.sha512.bak`.
+
+None of the changed scripts has been run since the change.
