@@ -574,3 +574,53 @@ against the code, the fixtures or the source before being written down.
   ran too (`TestRun_E2E_AuditorVendorUser`, `TestRegister_E2E_DeployAndRegister`, `TestLookup_E2E_FindAddressAndRead`,
   `TestCompare_E2E_PlainAndChainModes` and the rest).
 - `README.md` ("Testing") records the anvil version; `docs/build/tdx.md` no longer says the chain test has not run.
+
+## Other work since the last log entry
+
+The plan, test matrix and slide changes were committed separately and are not repeated here:
+
+- `docs/plan/test-matrix.md` filled with what code proves and what needs an instance (`bb3fe50`)
+- the 2026-10-23 slide changes collected in `docs/plan/cvm-port.md` (`49858b3`)
+- the AWS quota could not be read: the `aws` session had expired, and `aws login` needs a person
+
+The Phase 2 design (`tee/request` for TDX and SEV-SNP) was approved by the user; implementation is paused until the
+four items below are done.
+
+## Four items, 2026-11-11 (no instance started for any of them)
+
+1. **Option 2 on TDX** (`c221d4d`).
+   - `docs/build/tdx.md` now describes it: the squashfs + dm-verity image goes inside the initrd, so RTMR2 covers it
+     and `intel-tdx` needs no second format.
+   - `docs/build/sev-snp.md` and `docs/build/ra-comparison.md` cross-reference it.
+   - Phase 3.4 is still in "Not done yet".
+   - The instruction pointed at a "Reproducibility" section of `sev-snp.md`; there is none, so the reference is to
+     "Variables", which holds the squashfs and dm-verity settings.
+2. **Roots of trust** (`d61c217`). `docs/build/ra-comparison.md` gained a "Roots of trust" section.
+   - Re-checked myself:
+     - MEASUREMENT is identical in both SEV-SNP recordings (`xxd -s 0x90 -l 48` on each report).
+     - HOST_DATA (C0h), FAMILY_ID (10h), IMAGE_ID (20h) and ID_KEY_DIGEST (E0h) are zero in both.
+     - The SHA-384 launch digest is updated during `SNP_LAUNCH_UPDATE` and finalized by `SNP_LAUNCH_FINISH`
+       (56860 rev. 1.58 text).
+   - **Correction:** Google's attestation overview does **not** contain "Hybrid hardware and software attested" or
+     "Hardware attested" (checked twice). The section quotes what the page does say ("Root of trust for
+     measurement: AMD Secure Processor + VM instance firmware", "Bootloader, kernel, and userspace measurements:
+     Shielded VM vTPM", "Software root of trust (hypervisor dependent)", and for TDX "You can verify the Intel TDX
+     module quote on its own to cover the entire boot chain").
+   - An earlier paragraph in `sev-snp.md` attributed "software-attested instead of hardware" to that page. The phrase
+     is not on it, and the paragraph was corrected.
+   - The IETF draft supports only "runtime extendable measurement register" for RTMR0-3 (§3.3).
+   - "Google Cloud does not offer an SVSM" is written as "Google's documentation offers none", with the June 2026
+     community-blog "preview" mention kept.
+   - RTMR index conventions were not written, as instructed.
+3. **cpio alignment** (`a3bdff1`). **Not measured.** No base initrd from the TDX run or the 2026-11 SEV-SNP runs is
+   on the local machine (searched the scratchpad and the folder of 2026-11 scripts). `docs/build/tdx.md` now lists what
+   to measure, where and with which command, and what the hypothesis expects.
+4. **App fixtures: prepared only, NOT RUN.**
+   - Tools (`5282c9e`): `internal/tee/parse/tdx/testdata/record` (TDX quote recorder, standard library only) and
+     `internal/setup/build/cpio/testdata/mkappinitrd` (dummy one-file application archive and `cpio.Join`). Both
+     compile and vet for linux/amd64. `mkappinitrd` was run locally on a 10-byte fake base to check the order of
+     `first` and `last`. Neither has run on a guest.
+   - The SEV-SNP recorder now also builds inside the module.
+   - Procedure (`8e42e38`): `docs/plan/app-fixture-recording.md`, two recordings per platform with the application
+     changed by one byte, and why that makes T5 a permanent code test. `docs/plan/test-matrix.md` T5 points at it.
+   - **No instance was started; no fixture was recorded.**
