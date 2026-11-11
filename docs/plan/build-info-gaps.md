@@ -37,6 +37,6 @@ Most important first.
 | 10 | **GCP prerequisites**: the default network's `default-allow-ssh` rule, the Compute Engine API enabled, `xxd` on the guest for the TDX recording | repo | `e2e/cloud/README.md` |
 | 11 | **git on the Nitro instances**: no script installs it | repo | the remote setup script |
 | 12 | **arm64 Nitro host**: no create script; `aws-nitro.sh` filters x86_64 images | repo | `e2e/cloud/aws-nitro.sh` |
-| 13 | **vsock port, CID, enclave memory and CPUs**: in code only (`entrypoint.sh`, `cmd/auditor/main.go`) | repo | `docs/build/aws-nitro.md` |
+| 13 | **vsock port, CID, enclave memory and CPUs.** Done 2026-11-12: defaults, flags and where each goes, including that `launch` opens the port from `0.0.0.0/0` when the role allows it | — | `docs/build/aws-nitro.md`, "Ports, vsock address and enclave resources" |
 | 14 | **Intel SGX Root CA** not compared with Intel's published copy | repo (public download) | `docs/build/tdx.md` |
 | 15 | **Identifiers in committed files.** Done 2026-11-12: the project ID and every local path were removed from `docs/plan/night-log.md`. The project ID stays inside the eight SEV-SNP `*-att.pb` fixtures, where Google signed it; `internal/tee/parse/snp/testdata/README.md` now says so at the top of its identifiers section. Still for a person to decide: publishing those fixtures; the EC2 instance ID inside the Nitro fixture (also signed, and asserted by `internal/tee/parse/aws/measure_test.go`); and the original author's two Sepolia addresses that `e2e/env.sh` uses as defaults | person (publication decision) | — |

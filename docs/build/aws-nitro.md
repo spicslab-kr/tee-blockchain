@@ -143,3 +143,20 @@ checking a Vendor's self-registration later in flow 2.
 | `--build-measurements` (`launch`) | starts a received image only if it measures the same | yes, but then a swapped image starts unchecked |
 | `--memory`, `--cpus` (`launch`) | the enclave's memory and CPU count | they are set when the enclave starts, not part of the build; the image must fit in the memory |
 | `--arch` (`register`, `self-register`, `audit`) | names the architecture of the registration; not a build setting | it defaults to `build-config.json` or this machine |
+
+## Ports, vsock address and enclave resources
+
+These values were only in the code (`internal/setup/{build,launch}/*/aws`, `cmd/{vendor,auditor}/main.go`). Defaults,
+and where each one goes:
+
+| value | default | set by | where it ends up |
+|---|---|---|---|
+| RA port inside the enclave | 5000 | `build`/`pack --port` | `ENV ATT_RA_PORT=<port>` in the image `build` layers on the software; `entrypoint.sh` starts `ra-serve --listen vsock:${ATT_RA_PORT:-5000} --extractor nsm`. It is in the image, so the Vendor and the Auditor must use the same `--port` (whether a different port changes PCR0/PCR2 was not measured) |
+| RA port on the parent instance | the same port | `launch --port` ("must match the value given to build or pack") | `ra-proxy --listen <listen>:<port> --vsock <cid>:<port>`, started detached by `launch`; its log is `out/proxy.log` |
+| listen address of the bridge | `0.0.0.0` | `launch --listen` | the TCP side of `ra-proxy`. After starting it, `launch` opens the port in the instance's first security group itself, **from `0.0.0.0/0`**, if the instance role allows `ec2:AuthorizeSecurityGroupIngress`; otherwise it prints the `aws ec2 authorize-security-group-ingress` command to run by hand (`OpenPort`, `port.go`) |
+| enclave vsock CID | 16 | `launch --cid` | `nitro-cli run-enclave --enclave-cid`, and the target of `ra-proxy --vsock` (default `16:5000`) |
+| enclave CPUs | 2 | `launch --cpus` | `nitro-cli run-enclave --cpu-count`; `launch` raises `cpu_count` in `/etc/nitro_enclaves/allocator.yaml` if it is lower |
+| enclave memory | four times the EIF size, rounded up to 512 MiB, at least 512 MiB (`MemoryFor`) | `launch --memory <MiB>` | `nitro-cli run-enclave --memory`; `launch` raises `memory_mib` in the allocator file if it is lower. Raising the allocator stops any running enclave |
+| responder default when run by hand | `tcp:127.0.0.1:5000` | `att-ra-responder ra-serve --listen` | only for a manual run; inside the EIF the entrypoint always passes `vsock:` |
+
+CID, CPUs and memory are given when the enclave starts and are not part of the measured image.
