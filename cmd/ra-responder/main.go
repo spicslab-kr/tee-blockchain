@@ -4,9 +4,10 @@
 // so a shared responder keeps the image PCR0/PCR2 identical between their independent
 // builds of the same Dockerfile.
 //
-// Inside the enclave only two commands run (see internal/setup/build's entrypoint.sh):
-// "lo-up" and "ra-serve --extractor nsm". Neither depends on the role that built the image,
-// so this binary carries just those two, built once from one source.
+// Inside a Nitro enclave only two commands run (see internal/setup/build's entrypoint.sh):
+// "lo-up" and "ra-serve --extractor nsm". Inside an Intel TDX or AMD SEV-SNP guest it is
+// "ra-serve --extractor tdx | snp-initrd | snp-verity --listen tcp:0.0.0.0:<port>". None depends
+// on the role that built the image, so this binary carries just these, built once from one source.
 //
 // It imports attestamp/internal/tee/request/Vendor and its aws package because each role has
 // its own copy of Nonce/RADoc/Extractor and no shared one exists. The Vendor copy was picked
@@ -29,6 +30,8 @@ import (
 	"attestamp/internal/cli"
 	ra "attestamp/internal/tee/request/Vendor"
 	awsra "attestamp/internal/tee/request/Vendor/aws"
+	snpra "attestamp/internal/tee/request/Vendor/snp"
+	tdxra "attestamp/internal/tee/request/Vendor/tdx"
 )
 
 func main() {
@@ -53,17 +56,25 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `att-ra-responder runs inside the enclave. every role's build layers this one binary as is
+	fmt.Fprintln(os.Stderr, `att-ra-responder runs inside the TEE. every role's build layers this one binary as is
 
-  ra-serve  --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
+  ra-serve  --listen tcp:<host:port> | vsock:<port>
+            --extractor nsm | tdx | snp-initrd | snp-verity | fixture=<doc>  [--user-data <hex>]
             takes a nonce per request and returns an RA document
-  lo-up     brings up loopback. once, before starting the software`)
+              nsm         AWS Nitro Enclaves (/dev/nsm), inside the enclave, usually with --listen vsock:<port>
+              tdx         Intel TDX guest: a quote from ConfigFS TSM                          (intel-tdx)
+              snp-initrd  AMD SEV-SNP guest on GCP: vTPM attestation + SNP report             (amd-sev-snp-initrd)
+              snp-verity  the same evidence, labelled for the dm-verity option                (amd-sev-snp-verity)
+            --listen defaults to tcp:127.0.0.1:5000. A confidential VM is reached over its own network, so give
+            --listen tcp:0.0.0.0:5000 explicitly there, and allow port 5000 in the firewall only from the
+            verifier's address
+  lo-up     brings up loopback in a Nitro enclave. once, before starting the software`)
 }
 
 func raServe(args []string) error {
 	fs := flag.NewFlagSet("ra-serve", flag.ContinueOnError)
-	listen := fs.String("listen", "tcp:127.0.0.1:5000", "tcp:<host:port> or vsock:<port>")
-	extractor := fs.String("extractor", "nsm", "nsm or fixture=<doc file>")
+	listen := fs.String("listen", "tcp:127.0.0.1:5000", "tcp:<host:port> or vsock:<port>; listening on every interface (tcp:0.0.0.0:<port>) must be asked for explicitly")
+	extractor := fs.String("extractor", "nsm", "nsm, tdx, snp-initrd, snp-verity or fixture=<doc file>")
 	userData := fs.String("user-data", "", "value to bind into the document (hex)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -76,6 +87,12 @@ func raServe(args []string) error {
 			return fmt.Errorf("--user-data: %w", err)
 		}
 		ex = awsra.Extractor{UserData: ud}
+	case *extractor == "tdx":
+		ex = tdxra.Extractor{}
+	case *extractor == "snp-initrd":
+		ex = snpra.Extractor{Format: snpra.FormatInitrd}
+	case *extractor == "snp-verity":
+		ex = snpra.Extractor{Format: snpra.FormatVerity}
 	case strings.HasPrefix(*extractor, "fixture="):
 		fx, err := ra.LoadFixture(awsra.Format, strings.TrimPrefix(*extractor, "fixture="))
 		if err != nil {
@@ -84,7 +101,7 @@ func raServe(args []string) error {
 		ex = fx
 		fmt.Fprintln(os.Stderr, "warning: fixture extractor: the document is not bound to the nonce; test use only")
 	default:
-		return errors.New("--extractor: nsm or fixture=<doc>")
+		return errors.New("--extractor: nsm, tdx, snp-initrd, snp-verity or fixture=<doc>")
 	}
 	var ln net.Listener
 	var err error
