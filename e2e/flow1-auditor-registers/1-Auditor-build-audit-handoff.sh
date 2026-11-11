@@ -10,7 +10,7 @@ set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
-need_host VENDOR_HOST; need_host AUDITOR_HOST
+need_host VENDOR_HOST; need_host AUDITOR_HOST; need_addr AUDITOR_ADDR
 
 # 0-Setup-local-upload.sh cross-builds the att binaries and att-ra-responder with this machine's Go, and accepts only the
 #   pinned version. build_env.go in build-config.json and in the record is therefore this machine's Go version.

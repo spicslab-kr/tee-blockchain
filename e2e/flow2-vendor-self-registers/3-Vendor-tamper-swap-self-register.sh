@@ -7,7 +7,7 @@
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."
 . "$here/../env.sh"
-need_host VENDOR_HOST
+need_host VENDOR_HOST; need_addr VENDOR_ADDR
 
 nitroBanner "Vendor"
 V 'bash -s' <<'REMOTE'

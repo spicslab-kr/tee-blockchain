@@ -17,9 +17,10 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
 - The SSH key (`PEM` in `env.sh`, default `pem2.pem`) in the repository root, and two funded key
   files in the repository root: `auditor.key` (signing key, approver in flow 1) and `deployer.key` (deployer key, pays gas,
   signing key and approver in flow 2). Key files are gitignored. Never commit them.
-- Test ETH on the chosen network for both keys. A key file holds one private key in hex. With your own keys, also set
-  `AUDITOR_ADDR` and `VENDOR_ADDR` (their addresses) in `e2e/env.local.sh`; otherwise `env.sh` uses the original
-  author's addresses and the registry is deployed with the wrong approver.
+- Test ETH on the chosen network for both keys. A key file holds one private key in hex. Set `AUDITOR_ADDR` and
+  `VENDOR_ADDR` (their addresses) in `e2e/env.local.sh`. There is no default: every script that deploys or registers
+  stops with an error until both are set. The checks that only build (`arch-*`, `toolchain-pin-check.sh`,
+  `build-env-check.sh`, `responder-check.sh`) do not need them.
 
 ## env.sh and env.local.sh
 
@@ -32,6 +33,8 @@ fill in
 VENDOR_HOST=<vendor instance public IP or DNS>
 AUDITOR_HOST=<auditor instance public IP or DNS>
 ARM64_HOST=<arm64 instance, or leave empty>
+AUDITOR_ADDR=<address of auditor.key>
+VENDOR_ADDR=<address of deployer.key>
 ```
 
 `env.sh` reads it automatically. A script that needs a host that is not set stops with a message

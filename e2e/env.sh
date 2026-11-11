@@ -26,10 +26,12 @@ case "$NET" in
 esac
 AUDITOR_SIGNING_KEY=auditor.key   # approver in flow 1
 DEPLOYER_KEY=deployer.key; VENDOR_SIGNING_KEY=$DEPLOYER_KEY   # pays gas, approver in flow 2
-# The addresses of the two key files above. The defaults are the original author's keys; with your own keys, set
-# AUDITOR_ADDR and VENDOR_ADDR in env.local.sh, or the registry is deployed with someone else's approver.
-AUDITOR_ADDR=${AUDITOR_ADDR:-0xD2082a2513781b29beeF5DB847b2c85Cbc50ECeE}
-VENDOR_ADDR=${VENDOR_ADDR:-0xAf48305C64683eB72C28be61dD0E41478A2a0Df5}
+# The addresses of the two key files above, set in env.local.sh. There is no default: a default would be somebody
+# else's address, and a registry deployed with it names the wrong approver. The scripts that use the chain call
+# need_addr first; the build-only checks run without them.
+AUDITOR_ADDR=${AUDITOR_ADDR:-}
+VENDOR_ADDR=${VENDOR_ADDR:-}
+need_addr() { eval "[ -n \"\${$1:-}\" ]" || { echo "$1 is not set. Copy e2e/env.local.example.sh to e2e/env.local.sh and set AUDITOR_ADDR and VENDOR_ADDR to the addresses of auditor.key and deployer.key."; exit 1; }; }
 
 SERVICE=nginx
 VERSION=1.31.6
