@@ -200,13 +200,41 @@ What else changes the registered values (from the evidence's structure; **not me
 | PCR4 | shim and GRUB, i.e. the OS image and its updates |
 | KERNEL | the kernel package |
 | CMDLINE | the boot entry. It names the root by an identifier that differs per disk (the file system's UUID on the stock entry with an initrd, the partition's PARTUUID on the initrdless one), so the Auditor must use the command line the Vendor publishes |
-| INITRD | the base initrd and the application archive, and **where the archive goes**: on SEV-SNP it is appended after the base initrd (`cpio.AppLast`). The 2026-11 runs on GCP did that and the guests booted (observed). On TDX the same append failed and the archive goes first (`cpio.AppFirst`). The kernel accepts an appended uncompressed archive only at an offset that is a multiple of 4, and drops it with one log line otherwise while the base still boots; so "the guests booted" does not prove the application was unpacked, and a matching INITRD does not either. See `docs/build/tdx.md`, "Before or after the base initrd" (inferred from the kernel source, not yet tested) |
+| INITRD | the base initrd and the application archive, **where the archive goes**, and the padding between them. On SEV-SNP the archive is appended after the base initrd (`cpio.AppLast`), which since 2026-11-11 zero-pads the base to a multiple of 4 bytes. Without that padding the kernel discards the archive and the guest still boots, and INITRD still changes with the application (**measured**, see "Correction: SEV-SNP Option 1 as appended in 2026-11" below) |
 
 **Initrdless boot.** GCP's Ubuntu 24.04 image sets `GRUB_FORCE_PARTUUID`, and GRUB then boots the stock entry
 **without any initrd** (confirmed: our first recording, `gcp-n2d-initrdless-*`, logs `GRUB_FORCE_PARTUUID set,
 attempting initrdless boot.` and measures no initrd). An application in an initrd is then never loaded or measured.
 `ra-parse` refuses evidence without an initrd measurement. The 2026-11 scripts avoided it by booting their own GRUB
 entry (`grub-reboot`); turning the setting off, as below, makes the stock entry load the initrd.
+
+### Correction: SEV-SNP Option 1 as appended in 2026-11
+
+The 2026-10-23 slides (slide 7) say both options work on AWS and GCP. **For SEV-SNP Option 1 that is wrong**, as
+measured on 2026-11-11 on `attestamp-snp-vendor` with the same unpadded append the 2026-11 scripts used
+(`cat i.bin app.cpio`):
+
+- The base initrd, `/boot/initrd.img-7.0.0-1017-gcp`, is 50,100,283 bytes: **length mod 4 = 3**.
+- The application archive appended directly after it was discarded by the kernel:
+  `Initramfs unpacking failed: invalid magic at start of compressed archive` (dmesg, both boots).
+- The marker the archive carries (`/dev/attestamp-app-marker`, see `docs/plan/app-fixture-recording.md`) was
+  **absent**: the application never ran.
+- The guest booted normally on the base initramfs, and GRUB measured the whole combined file, so **INITRD changed with
+  the application although the application was not there**. Nothing in the evidence shows it.
+- The cause is alignment, not the kernel or zstd. The kernel only accepts an uncompressed archive after a compressed
+  segment at a 4-byte-aligned offset (`init/initramfs.c`).
+- With the base zero-padded to 50,100,284 bytes (`truncate -s %4`), the same append unpacked: no error line, and the
+  marker read `attestamp app v1` (and `v2` on the next boot).
+
+Fixed in `cpio.Join(AppLast)`, which now pads the base (commit `3c57d4c`). Both pairs are kept as fixtures with their
+boot logs: `internal/tee/parse/snp/testdata/gcp-n2d-opt1-*` (unpadded) and `gcp-n2d-opt1p-*` (padded).
+
+Whether the 2026-11 SEV-SNP Option 1 runs, on GCP or AWS, actually ran the application depends on the length of the
+base initrd they used. Those files were not kept, so it cannot be checked now. Their boot logs, if any were kept,
+would show the line above.
+
+Option 2 does not have this problem. The image is on disk, and a failed check shows as `fail` in PCR12 or a zero PCR12
+(measured: `status ok` and the expected PCR12 in both Option 2 recordings).
 
 ### The boot setting changed on `attestamp-snp-vendor` (2026-11-11)
 

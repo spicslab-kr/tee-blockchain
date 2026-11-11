@@ -207,48 +207,31 @@ commit `067c5c24cef2`, and `Documentation/driver-api/early-userspace/buffer-form
 
 - Ubuntu 24.04's `mkinitramfs` writes the early cpios, then `cpio | zstd`, with no padding at the end, so the base
   initrd's length mod 4 is arbitrary.
-- `cpio.Join` (`internal/setup/build/cpio`) and the scripts' `cat base app.cpio` add no padding either.
+- The scripts' `cat base app.cpio` adds no padding either, and neither did `cpio.Join` until 2026-11-11 (it now pads
+  the base for `AppLast`, commit `3c57d4c`).
 - GRUB zero-pads each file to 4 bytes only when it loads several (`initrd a b`, `grub-core/loader/linux.c`). One
   combined file gets no padding.
 
-**Conclusion (inferred, not yet tested).**
+**Measured on SEV-SNP (2026-11-11): the alignment explanation holds.** On `attestamp-snp-vendor`, with the same
+Ubuntu kernel family:
 
-- Appending fails when the base initrd's length is not a multiple of 4. That is a 3-in-4 chance for any given base
-  file, and it is not a limit of zstd or of the kernel.
-- Prepending works because our archive is padded to 512 bytes, so the base initrd that follows starts aligned.
-- What this does not explain: an alignment failure should still let TDX boot (without the application). The note that
-  the TDX guest "failed" may mean the application was missing rather than that the boot stopped. The serial log of that
-  run was not kept.
-
-**Consequence for SEV-SNP (inferred, important).**
-
-- The 2026-11 SEV-SNP runs appended the archive and "the guests booted". That does not prove the application was
-  unpacked: if the base length was not a multiple of 4, the kernel dropped the archive with one log line and booted
-  the base initramfs.
-- GRUB still measures the whole combined file, so INITRD matches the expected value either way. **A matching INITRD
-  does not by itself prove the application ran.**
-- To be settled before relying on `cpio.AppLast`:
-  - check `stat -c %s` of the base initrd mod 4;
-  - search the serial console for `Initramfs unpacking failed`;
-  - check that the application's files exist after boot;
-  - then pad the base to a multiple of 4 (`truncate -s %4`) and append again.
-- Padding inside `cpio.Join` would change the combined file and so the measured value. It has not been made.
-
-**Measured so far: nothing (2026-11-11).** The hypothesis predicts that the base initrd used on TDX had a length that
-is **not** a multiple of 4, and the ones used in the 2026-11 SEV-SNP runs a length that **is**. No base initrd from
-either run is on the local machine: the scratchpad and the folder of 2026-11 scripts hold no `*initrd*`, `*.img`,
-`*.bin`, `*.cpio` or `*.zst` file. No instance was started to look. What to measure, and where:
-
-| what | where | command | the hypothesis expects |
+| base initrd | how the archive was added | kernel | marker `/dev/attestamp-app-marker` |
 |---|---|---|---|
-| the base initrd the TDX append failed with (Phase 3.2, 2026-10) | that file is not known to be kept anywhere; if it is found, measure it | `expr $(stat -c %s <file>) % 4` | not 0 |
-| the base initrd the 2026-11 SEV-SNP runs appended to (the `i.bin` the scripts published) | the 2026-11 Vendor instances, if their disks still exist | same | 0 |
-| today's distribution initrd on each recorded guest | `attestamp-tdx-vendor` and `attestamp-snp-vendor`, `/boot/initrd.img-$(uname -r)` (both now `7.0.0-1017-gcp`) | same | nothing on its own: only says how likely an append is to fail with this file. Regenerated initrds can change length |
-| whether an append actually failed | the serial console of the boot that used the combined file | `gcloud compute instances get-serial-port-output <name> --zone us-central1-a`, then search for `Initramfs unpacking failed` | present when the remainder is not 0 |
+| 50,100,283 bytes, **mod 4 = 3** | appended directly (unpadded) | `Initramfs unpacking failed: invalid magic at start of compressed archive` | absent: the application never ran |
+| the same, zero-padded to 50,100,284 bytes (mod 4 = 0) | appended after the padding | no error | present, with the application's text |
 
-The app-fixture recording session (`docs/plan/app-fixture-recording.md`) measures the third and fourth rows on both
-guests at no extra cost. Whatever the numbers are, they go here as measured, including if they contradict the
-hypothesis.
+The guest booted in both cases, and INITRD changed with the application in both (`docs/build/sev-snp.md`,
+"Correction: SEV-SNP Option 1 as appended in 2026-11"). **A changed or matching INITRD does not by itself prove the
+application ran**: only the marker (or a boot log) does. `cpio.Join(AppLast)` now pads the base (commit `3c57d4c`);
+prepending (`AppFirst`) needs no padding because our archive is padded to 512 bytes, so the base that follows starts
+aligned.
+
+**Still open:**
+
+- the base initrd the TDX append failed with in 2026-10 was not kept, so its length cannot be checked;
+- an alignment failure lets the guest boot without the application, so the 2026-10 note that the TDX guest "failed"
+  may mean the application was missing rather than that the boot stopped (its serial log was not kept);
+- the TDX base initrd's length on `attestamp-tdx-vendor` is measured in the TDX recording session (below, once done).
 
 ## The instance
 
@@ -292,4 +275,4 @@ describe` on 2026-11-11):
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the PCR→RTMR mapping and the VM-shape dependence | not confirmed on GCP |
-| the append-alignment explanation | inferred from the kernel source; not yet tested by a boot (see "Before or after the base initrd") |
+| the append-alignment explanation on TDX itself | measured on SEV-SNP (same kernel family); the 2026-10 TDX file is gone (see "Before or after the base initrd") |

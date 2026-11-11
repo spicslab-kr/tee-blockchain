@@ -189,6 +189,17 @@ chain itself extends can be forged by a changed boot chain, unless the boot chai
 | Cost | a kernel or GRUB update changes the registered value; the command line names the root disk, so the Auditor uses the command line the Vendor publishes |
 | Where | `internal/tee/parse/snp/measure.go` (`initrdNames`, `verityNames`); `docs/build/sev-snp.md`, "The values"; all five initrd values tested on the recorded evidence (PCR12 has no recording yet) |
 
+### Slide 7: "both options work on AWS and GCP" is wrong for SEV-SNP Option 1
+
+| | |
+|---|---|
+| Claim (slides) | slide 7: both options work on AWS and GCP |
+| Measured (2026-11-11, GCP, `attestamp-snp-vendor`) | with the unpadded append the 2026-11 scripts used (`cat i.bin app.cpio`), the base initrd was 50,100,283 bytes (**mod 4 = 3**); the kernel logged `Initramfs unpacking failed: invalid magic at start of compressed archive`; the application's marker was **absent**. The guest booted and INITRD changed with the application anyway, so the evidence looked right while the application never ran |
+| Fix | zero-pad the base initrd to a multiple of 4 before appending. Measured: with the padding the archive unpacked and the marker held the application's text. `cpio.Join(AppLast)` now does this (commit `3c57d4c`); padding changes the measured initrd |
+| What stands | SEV-SNP Option 2 (image on disk, verifying initrd, PCR12) worked as claimed: `status ok`, the application mounted, PCR12 as computed, recorded twice. TDX prepends (`AppFirst`), which needs no padding |
+| Not known | whether the 2026-11 SEV-SNP Option 1 runs on GCP and AWS loaded the application: it depends on the length of the base initrd each run used, and those files were not kept |
+| Where | `docs/build/sev-snp.md`, "Correction: SEV-SNP Option 1 as appended in 2026-11"; fixtures with boot logs in `internal/tee/parse/snp/testdata/gcp-n2d-opt1-*` and `gcp-n2d-opt1p-*` |
+
 ### Other decisions made after the slides
 
 Whether the slides mention these was not checked; look for them when correcting the deck.
