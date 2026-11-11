@@ -186,3 +186,22 @@ func TestBuildConfig_BuildEnvRequiredOnTDX(t *testing.T) {
 		}
 	}
 }
+
+// Both SEV-SNP formats need build_env too: the application initrd (amd-sev-snp-initrd) or the application disk image
+// (amd-sev-snp-verity) carries att-ra-responder. A complete config passes; one without build_env names every field.
+func TestBuildConfig_BuildEnvRequiredOnSNP(t *testing.T) {
+	for _, platform := range []string{"amd-sev-snp-initrd", "amd-sev-snp-verity"} {
+		c := cfgTDX()
+		c.Platform = platform
+		if err := c.Validate(); err != nil {
+			t.Fatalf("%s: a complete config must pass, got %v", platform, err)
+		}
+		c.BuildEnv = BuildEnv{}
+		err := c.Validate()
+		for _, field := range []string{"os", "arch", "go"} {
+			if err == nil || !strings.Contains(err.Error(), "build_env."+field+": required for "+platform) {
+				t.Errorf("missing build_env.%s must be rejected on %s, got %v", field, platform, err)
+			}
+		}
+	}
+}
