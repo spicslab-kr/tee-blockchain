@@ -9,4 +9,6 @@ export PATH="${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bi
 /att-ra ra-serve --listen "vsock:${ATT_RA_PORT:-5000}" --extractor nsm &
 set --
 while IFS= read -r arg; do set -- "$@" "$arg"; done < /att-app-cmd
+# 엔클레이브는 / 에서 시작하므로, 원래 이미지의 WORKDIR 로 옮긴 뒤 실행한다 (상대 경로 명령이 그대로 돈다).
+[ -f /att-app-workdir ] && { IFS= read -r wd < /att-app-workdir; cd "$wd" || echo "att: cd $wd failed" >&2; }
 exec "$@"

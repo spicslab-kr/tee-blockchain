@@ -100,11 +100,11 @@ func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, fi
 		return err
 	}
 	defer r.cmd(ctx, "docker", "rmi", "-f", checkApp, checkImage).Run()
-	appCmd, err := r.imageCommand(ctx, checkApp)
+	appCmd, workDir, err := r.imageCommand(ctx, checkApp)
 	if err != nil {
 		return err
 	}
-	if err := b.layerResponder(ctx, r, checkApp, checkImage, appCmd); err != nil {
+	if err := b.layerResponder(ctx, r, checkApp, checkImage, appCmd, workDir); err != nil {
 		return err
 	}
 	fmt.Fprintf(r.log, "\n[verify 2/3] repacking the second build\n")
