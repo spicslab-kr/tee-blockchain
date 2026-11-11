@@ -54,8 +54,14 @@ Without `CONFIRM_MAINNET=1`, `NET=mainnet` exits at once. Any other `NET` value 
 
 ```
 bash e2e/0-Setup-local-install.sh   # git, ssh, and the pinned Go on your machine
-bash e2e/0-Setup-local-upload.sh    # build Linux binaries and upload them to both instances
+bash e2e/0-Setup-local-upload.sh    # build Linux binaries, upload them to both instances, install git there if missing
 ```
+
+**The test application** is nginx's official image source, `https://github.com/nginx/docker-nginx` at commit
+`ef5a25a6314e652a2dcfbce6074bef729f4d9639` (2026-09-21), folder `mainline/alpine-slim`. The flow and arch scripts clone
+it on the instance and check out that commit. Until 2026-11-12 they cloned a personal fork; the pinned commit is an
+unmodified upstream commit (checked: it is an ancestor of upstream `master`), so the files, and the measurement, are the
+same from either URL.
 
 Stop everything when you are done (the instances themselves with `bash e2e/cloud/aws-nitro.sh stop`):
 

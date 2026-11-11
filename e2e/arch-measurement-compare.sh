@@ -24,7 +24,7 @@ if [ -z "$ARM64_HOST" ]; then
 fi
 
 need_host VENDOR_HOST; need_host AUDITOR_HOST
-SRC_REPO=https://github.com/qixiangme/docker-nginx
+SRC_REPO=https://github.com/nginx/docker-nginx
 SRC_COMMIT=ef5a25a6314e652a2dcfbce6074bef729f4d9639
 SRC_DIR=mainline/alpine-slim
 

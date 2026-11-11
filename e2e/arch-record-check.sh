@@ -102,7 +102,7 @@ cat > "$WD/build-config.json" <<EOF
   "service": "$SERVICE",
   "version": "$VERSION",
   "platform": "aws-nitro",
-  "source": { "repo": "https://github.com/qixiangme/docker-nginx", "commit": "ef5a25a6314e652a2dcfbce6074bef729f4d9639", "path": "mainline/alpine-slim" },
+  "source": { "repo": "https://github.com/nginx/docker-nginx", "commit": "ef5a25a6314e652a2dcfbce6074bef729f4d9639", "path": "mainline/alpine-slim" },
   "tee_info": { "instance_id": "i-0check", "region": "eu-north-1", "ami_id": "ami-0check" },
   "build_env": { "os": "linux", "arch": "arm64", "go": "$GOVER", "trimpath": true }
 }

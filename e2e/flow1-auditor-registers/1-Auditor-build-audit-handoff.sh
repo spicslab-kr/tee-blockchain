@@ -22,7 +22,7 @@ set -euo pipefail
 step_start() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; }
 step_stop() { :; }
 step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; shift; "$@"; }
-SRC_REPO=https://github.com/qixiangme/docker-nginx
+SRC_REPO=https://github.com/nginx/docker-nginx
 SRC_COMMIT=ef5a25a6314e652a2dcfbce6074bef729f4d9639
 SRC_DIR=mainline/alpine-slim
 umask 022
