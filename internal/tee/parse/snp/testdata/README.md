@@ -107,11 +107,22 @@ The binding changed from SHA-512 to SHA3-512 on 2026-11-11. SHA-512 was what the
 
 ## Identifying information in these files
 
-These files identify the GCP project and the instance they came from. They are committed anyway, for the same
-reason `internal/tee/parse/aws/testdata/fixture-my-web.cbor` carries an EC2 instance ID: without a committed fixture
-the parser tests cannot run in CI or for anyone else, and testing without hardware is what this project relies on.
-The values cannot be removed without breaking the signatures over them. Both recordings come from the same instance,
-so the second one discloses nothing the first did not, except the root file system's UUID.
+**These fixtures contain the GCP project ID.** Every `*-att.pb` here (eight files: `gcp-n2d-att.pb`,
+`gcp-n2d-initrdless-att.pb` and the six `gcp-n2d-opt*-att.pb`) carries it as plain text inside the Google-signed AK
+certificate, together with the project number, the zone, the instance name and the numeric instance ID (checked with
+`grep -a` on 2026-11-12). Publishing this repository publishes them. Decide before making it public.
+
+They are committed anyway, for the same reason `internal/tee/parse/aws/testdata/fixture-my-web.cbor` carries an EC2
+instance ID: without a committed fixture the parser tests cannot run in CI or for anyone else, and testing without
+hardware is what this project relies on. The values cannot be removed: they are inside the AK certificate, which
+Google signed, so changing one byte breaks the certificate chain and every test that verifies it. The alternatives are
+to keep the repository private, to re-record from a project whose identifiers may be public, or to drop these fixtures
+and the tests that use them. All recordings come from the same instance, so each discloses nothing the first did not,
+except the root file system's UUID and boot IDs.
+
+The other text files in this folder (`*-record.txt`, `*-boot.txt`, this README) and `docs/` do not contain the project
+ID, the project number or the instance ID; they were searched for on 2026-11-12, and the one place the project ID was
+written in prose (`docs/plan/night-log.md`) now says `<project-id>`.
 
 | File | Contains |
 |---|---|

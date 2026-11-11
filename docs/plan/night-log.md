@@ -8,7 +8,7 @@ the cloud, and every blocker is written down here in the order it happened.
 | Item | State |
 |---|---|
 | Local Go | `go1.26.5`; the pin is `go1.26.1`. `.claude/settings.json` sets `GOTOOLCHAIN=go1.26.1`, but the Bash shell did not inherit it (`go env GOTOOLCHAIN` = `auto`). |
-| gcloud | Installed (Cloud SDK 592.0.0) under `C:\Program Files (x86)\Google\Cloud SDK`, **not on Git Bash's PATH**. Authenticated; default project is `project-d9ca3c62-d377-4835-9b4`. Every gcloud call tonight prepends that folder to `PATH` for the one command; nothing was changed permanently. |
+| gcloud | Installed (Cloud SDK 592.0.0) under `C:\Program Files (x86)\Google\Cloud SDK`, **not on Git Bash's PATH**. Authenticated; default project is `<project-id>`. Every gcloud call tonight prepends that folder to `PATH` for the one command; nothing was changed permanently. |
 | aws | Installed under `C:\Program Files\Amazon\AWSCLIV2`, also not on Git Bash's PATH. Authenticated (root login session). |
 | anvil | Not installed. |
 | git | The working copy *is* a repository (2 commits, no remote). |
@@ -31,7 +31,7 @@ has no request. No AWS resource was created or changed.
 - Port 22: the rule `default-allow-ssh` (0.0.0.0/0, tcp:22) already exists. **No firewall rule was created.**
 - First `gcloud compute ssh`: the existing key `~/.ssh/google_compute_engine` was used; gcloud
   manages it in project metadata. Set the safety timer: `sudo shutdown -h +240` (fires 18:38 UTC).
-- The files were not in my login user's home but in `/home/bagss3366/` (the browser-SSH user).
+- The files were not in my login user's home but in the home of the user that had used the browser SSH.
   `sha256(quote.bin)` on the instance = `228da7b4…8a4d`, as expected.
 - Copied both to `/tmp/` on the instance with mode 644 (`sudo install`), then fetched each with
   `gcloud compute scp` (PuTTY's pscp refuses two remote sources in one call, so one call per file).
@@ -238,14 +238,13 @@ Not run on a new instance, by the user's instruction after the pause (only work 
 
 | what | why | command |
 |---|---|---|
-| anvil (Foundry) | `TestRun_E2E_TDX_AuditorUser` and every other anvil test skip without it | Foundry v1.8.0 for Windows is already downloaded and checked (sha256 `e31241db…982e`) at `C:\Users\bags3\AppData\Local\Temp\claude\640ae8d0b7d67827\31cf8d4a-0cc0-465b-bf27-e1c70ff9dce1\scratchpad\foundry-dl\foundry.zip`. Extract `anvil.exe` into `%USERPROFILE%\.foundry\bin\` (where `cmd/register_e2e_test.go` looks), then `go test -run TDX ./cmd/` |
+| anvil (Foundry) | `TestRun_E2E_TDX_AuditorUser` and every other anvil test skip without it | Foundry v1.8.0 for Windows is already downloaded and checked (sha256 `e31241db…982e`) in the session's scratch folder (`foundry-dl/foundry.zip`). Extract `anvil.exe` into `%USERPROFILE%\.foundry\bin\` (where `cmd/register_e2e_test.go` looks), then `go test -run TDX ./cmd/` |
 | `gotpm` on the SEV-SNP instance | the 2026-11 scripts call `~/gotpm attest --key gceAK` | on any machine with Go: `git clone --branch v0.4.11 https://github.com/google/go-tpm-tools`, `cd go-tpm-tools/cmd`, `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o gotpm ./gotpm`, then `gcloud compute scp gotpm attestamp-snp-vendor:gotpm --zone us-central1-a` |
 | `snpguest` on the SEV-SNP instance | the scripts call `~/snpguest report`, `certificates`, `fetch ca`, `verify attestation` | on the instance: `curl -L -o ~/snpguest https://github.com/virtee/snpguest/releases/download/v0.11.0/snpguest` and `chmod +x ~/snpguest`. Which version the 2026-11 runs used is unknown; `userverify_grub.py` expects the output line `VEK signed the Attestation Report` |
 | apt packages on the instance | the verity and in-VM check scripts | `sudo apt-get install -y tpm2-tools squashfs-tools cryptsetup-bin` (not blocked; not attempted because E was not run) |
 
-`verify_att` (the scripts' vTPM verifier) is already cross-compiled at
-`C:\Users\bags3\AppData\Local\Temp\claude\640ae8d0b7d67827\31cf8d4a-0cc0-465b-bf27-e1c70ff9dce1\scratchpad\vmtools\verify_att`;
-copy it to `~/verify_att` on the instance.
+`verify_att` (the scripts' vTPM verifier) is already cross-compiled in the session's scratch folder
+(`vmtools/verify_att`); copy it to `~/verify_att` on the instance.
 
 ## To run E on a new instance
 
@@ -257,7 +256,7 @@ Replace the hard-coded values in the 2026-11 scripts with this instance's (read 
 | `search --fs-uuid` (`gcp_boot_option1.sh`, `gcp_boot_option2.sh`) | `6a4d7abf-…9962` | `653dd231-d061-4b9e-bc8b-6d2ac57dffe4` |
 | `root=PARTUUID=` (same, and `vendor_publish.sh`) | `10c90fd7-…cf47` | `27c09ec4-48e8-4dfd-be36-678080b236c7` |
 | kernel (same, `auditor_publish.sh`) | `7.0.0-1014-gcp` | `7.0.0-1017-gcp` |
-| `/home/chang/` (`vendor_evidence.sh`) | | `/home/bags3/` |
+| the 2026-11 author's home directory (`vendor_evidence.sh`) | | the login user's home on the instance (`~`) |
 | `efibootmgr -n 0002` / `-n 0003` | the UEFI boot entry for GRUB | read with `efibootmgr` on the instance; not checked |
 | VM IPs (`run_round.sh`, `relay_attack.sh`) | | read with `gcloud compute instances list` after each start; do not write them into a committed file |
 
@@ -313,7 +312,7 @@ are 64 bytes, the size of REPORT_DATA.
   REPORT_DATA shown to be SHA-512; the cmd test now expects five values from `ra-parse`.
 - **Still untested on real evidence: PCR12** (no recording has the verity hook) and an initrd carrying an application.
 
-### Changes outside the repository: `C:\Users\bags3\Desktop\SEV-SNP-vTPM-코드-11-10\SEV-SNP-vTPM-코드\`
+### Changes outside the repository: the folder of 2026-11 SEV-SNP scripts (`SEV-SNP-vTPM-코드/`, kept locally, not in git)
 
 Scope, on the user's decision: every file of the **GCP** SNP+vTPM pair that makes or checks the binding. The AWS
 NitroTPM experiment (`awscollect.sh`, `awscollect2.sh`, `go-verifier/aws`, `awsverify.py`) was **not** changed. Before
@@ -566,7 +565,7 @@ against the code, the fixtures or the source before being written down.
 ## anvil installed; every chain test ran for the first time
 
 - On the user's instruction, `anvil.exe` alone was extracted from the Foundry v1.8.0 zip downloaded on 2026-11-10.
-  Its sha256 still matched the release's (`e31241db…982e`). Installed to `C:\Users\bags3\.foundry\bin\anvil.exe`,
+  Its sha256 still matched the release's (`e31241db…982e`). Installed to `%USERPROFILE%\.foundry\bin\anvil.exe`,
   where `cmd/register_e2e_test.go` looks. `anvil --version`: 1.8.0, commit `61ae26af36320d4fa1020f7db53785885e29eeb5`,
   built 2026-08-26.
 - `go test -run TDX ./cmd/`: `TestCmd_E2E_TDX_ServeRequestParse` and **`TestRun_E2E_TDX_AuditorUser` pass**.
