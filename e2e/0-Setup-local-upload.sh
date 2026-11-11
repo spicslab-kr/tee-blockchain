@@ -24,13 +24,13 @@ echo "toolchain: $HAVE_GO (pinned)"
 # Linux binaries for the instances, then binaries for this machine.
 #   -trimpath keeps the absolute build folder path out of the binary. att-ra-responder goes into the enclave image
 #   unchanged, so the checkout path would otherwise change the measurement.
-GOOS=linux GOARCH=amd64 go build -trimpath -o att-vendor ./cmd/vendor
-GOOS=linux GOARCH=amd64 go build -trimpath -o att-auditor ./cmd/auditor
-GOOS=linux GOARCH=amd64 go build -trimpath -o att-ra-responder ./cmd/ra-responder
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-vendor ./cmd/vendor
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 mkdir -p "$BIN"
-go build -trimpath -o "$VENDOR_BIN" ./cmd/vendor
-go build -trimpath -o "$AUDITOR_BIN" ./cmd/auditor
-go build -trimpath -o "$USER_BIN" ./cmd/user
+go build -trimpath -buildvcs=false -o "$VENDOR_BIN" ./cmd/vendor
+go build -trimpath -buildvcs=false -o "$AUDITOR_BIN" ./cmd/auditor
+go build -trimpath -buildvcs=false -o "$USER_BIN" ./cmd/user
 echo "responder sha256: $(sha256 att-ra-responder | cut -c1-64)"  # compared with the checksum printed on each instance after the upload
 
 # A running att-vendor or att-auditor process (the ra-proxy bridge) locks its binary, so stop it and the enclave before uploading.

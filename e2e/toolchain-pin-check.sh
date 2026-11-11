@@ -33,13 +33,13 @@ fi
 mkdir -p "$WORK/toolchain"
 step "2. CROSS-BUILDING att-vendor WITH THE WRONG TOOLCHAIN ($WRONG)"
 if GOTOOLCHAIN=$WRONG go version 2>/dev/null | grep -q "$WRONG"; then
-  GOTOOLCHAIN=$WRONG GOOS=linux GOARCH=amd64 go build -trimpath -o "$WORK/toolchain/att-vendor-wrongtc" ./cmd/vendor
+  GOTOOLCHAIN=$WRONG GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-vendor-wrongtc" ./cmd/vendor
   HAVE_WRONG=1
 else
   echo "WARNING: cannot download GOTOOLCHAIN=$WRONG (offline?) - skipping the live refusal check. The unit tests (go test ./internal/setup/build ./cmd -run Toolchain) cover the same path."
   HAVE_WRONG=0
 fi
-GOOS=linux GOARCH=amd64 go build -trimpath -o "$WORK/toolchain/att-vendor" ./cmd/vendor
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-vendor" ./cmd/vendor
 
 step "3. UPLOADING TO THE VENDOR HOST"
 nitroBanner "Vendor"

@@ -3,9 +3,11 @@
 // att-ra-responder comes from a separate `go build`. CheckToolchain guards the Go version of the
 // att binary itself, and the responder's bytes are what get layered into the enclave image and
 // measured (PCR0/PCR2). Those bytes depend on the Go patch version, on -trimpath (which keeps the
-// absolute checkout path out of the binary) and on GOOS/GOARCH. Go records all of that inside every
-// binary it produces (debug/buildinfo), so the file is read and a responder that cannot match
-// what the other side builds is refused.
+// absolute checkout path out of the binary), on -buildvcs (by default Go stamps the git commit,
+// its time and whether the tree had uncommitted changes into the binary, and -trimpath does not
+// remove them) and on GOOS/GOARCH. Go records all of that inside every binary it produces
+// (debug/buildinfo), so the file is read and a responder that cannot match what the other side
+// builds is refused.
 
 package build
 
@@ -22,6 +24,7 @@ type ResponderInfo struct {
 	GOOS     string
 	GOARCH   string
 	Trimpath bool   // -trimpath was given to go build
+	VCS      string // the "vcs" build setting (e.g. "git") when version control was stamped in; empty with -buildvcs=false
 	SHA256   string // lowercase hex sha256 of the whole file
 }
 
@@ -60,6 +63,8 @@ func ReadResponder(path string) (ResponderInfo, error) {
 			info.GOARCH = s.Value
 		case "-trimpath":
 			info.Trimpath = s.Value == "true"
+		case "vcs":
+			info.VCS = s.Value
 		}
 	}
 	if info.SHA256, err = SHA256File(path); err != nil {
@@ -69,18 +74,21 @@ func ReadResponder(path string) (ResponderInfo, error) {
 }
 
 // CheckResponder returns an error unless the responder was built with the pinned toolchain, with
-// -trimpath, for linux, and for hostGOARCH, the architecture of the parent instance, which is
-// what the enclave runs. Callers pass runtime.GOARCH.
+// -trimpath, with -buildvcs=false, for linux, and for hostGOARCH, the architecture of the parent
+// instance, which is what the enclave runs. Callers pass runtime.GOARCH.
 func CheckResponder(info ResponderInfo, hostGOARCH string) error {
 	want := RequiredToolchain()
 	rebuild := func(goarch string) string {
-		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s GOOS=linux GOARCH=%s go build -trimpath -o att-ra-responder ./cmd/ra-responder", want, goarch)
+		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s GOOS=linux GOARCH=%s go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder", want, goarch)
 	}
 	if info.Go != want {
 		return fmt.Errorf("att-ra-responder was built with %s but the project pins %s (internal/setup/build/GO_TOOLCHAIN); its bytes, and so the measurements, depend on the exact toolchain; %s", info.Go, want, rebuild(hostGOARCH))
 	}
 	if !info.Trimpath {
 		return fmt.Errorf("att-ra-responder was built without -trimpath: the absolute checkout path is baked into it, so the same source built from another folder gives different bytes and different measurements; %s", rebuild(hostGOARCH))
+	}
+	if info.VCS != "" {
+		return fmt.Errorf("att-ra-responder was built with version control stamping: the git commit and commit time are baked into it, so the same source built from a different commit, or from a tree with uncommitted changes, gives different bytes and different measurements; %s", rebuild(hostGOARCH))
 	}
 	if info.GOOS != "linux" {
 		return fmt.Errorf("att-ra-responder was built for GOOS=%s but the enclave runs linux; %s", info.GOOS, rebuild(hostGOARCH))

@@ -7,7 +7,7 @@
 // A different architecture is expected to produce a different att-ra-responder binary, and with
 // it different PCR0/PCR2 once it's layered into an enclave image. Nitro's kernel, the compiled
 // machine code, and the base image layers all differ per architecture. That is expected. What must stay equal is the hash for one architecture built from two different checkout
-// paths, which is why every build here passes -trimpath.
+// paths or from two different commits, which is why every build here passes -trimpath and -buildvcs=false.
 //
 // Add an architecture by adding one line to ArchTargets; nothing else in this package changes.
 package build
@@ -38,9 +38,10 @@ var ArchTargets = []ArchTarget{
 
 // BuildResponderForArch cross-compiles cmd/ra-responder from repoRoot (a directory containing
 // go.mod) for target.GOARCH, with -trimpath, which keeps the checkout path out of the
-// binary. The responder only ever runs inside a Nitro enclave, so GOOS is always linux.
+// binary, and -buildvcs=false, which keeps the git commit out of it. The responder only ever runs
+// inside a Nitro enclave, so GOOS is always linux.
 func BuildResponderForArch(ctx context.Context, repoRoot string, target ArchTarget, outPath string) error {
-	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", outPath, "./cmd/ra-responder")
+	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-o", outPath, "./cmd/ra-responder")
 	cmd.Dir = repoRoot
 	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+target.GOARCH)
 	out, err := cmd.CombinedOutput()

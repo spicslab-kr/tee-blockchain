@@ -10,14 +10,15 @@ The Go toolchain is pinned to exactly the version in `internal/setup/build/GO_TO
 version produces different `att-ra-responder` bytes and therefore different measurements.
 
 ```
-go build -trimpath -o att-vendor       ./cmd/vendor
-go build -trimpath -o att-auditor      ./cmd/auditor
-go build -trimpath -o att-user         ./cmd/user
-go build -trimpath -o att-ra-responder ./cmd/ra-responder
+go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
+go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
+go build -trimpath -buildvcs=false -o att-user         ./cmd/user
+go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 ```
 
-For the Nitro instances: `GOOS=linux GOARCH=amd64` (or `arm64`). Always `-trimpath`; the
-responder is layered into the enclave image, so the build path would otherwise end up in the PCRs.
+For the Nitro instances: `GOOS=linux GOARCH=amd64` (or `arm64`). Always `-trimpath -buildvcs=false`;
+the responder is layered into the enclave image, so the build path, or the git commit and its time,
+would otherwise end up in the PCRs. `build` refuses a responder built without either flag.
 
 Running `go build ./cmd/<role>/...` without `-o` drops a binary named after the package into the
 repo root; those names are in `.gitignore`, don't commit them.
@@ -71,6 +72,6 @@ type(scope): what changed, in the imperative
 ## Releases
 
 Tags are `vMAJOR.MINOR.PATCH`. A release attaches the four Linux binaries for `amd64` and
-`arm64`, built with the pinned toolchain and `-trimpath`, plus a `SHA256SUMS` file. The
+`arm64`, built with the pinned toolchain and `-trimpath -buildvcs=false`, plus a `SHA256SUMS` file. The
 `att-ra-responder` sha256 in a release is the one both Vendor and Auditor should see in their
 build logs.

@@ -23,7 +23,19 @@ In our measurements a different file in the image changed PCR0 and PCR2, and so 
 | same CPU architecture | `amd64` and `arm64` give different kernels, machine code and base layers, so different values. Each registration names its architecture | `receive` compares it with the Vendor's `build_env` |
 | Go go1.26.1 (pinned) | a different patch version gives a different `att-ra-responder`, so different values | `build` and `pack` refuse another version; `att-vendor version` and `att-auditor version` show it |
 | `-trimpath` | without it the build folder's path ends up inside the binary | `build` refuses a responder built without it; `receive` warns if the Vendor built without it |
-| one `att-ra-responder` file | it is layered into the image | `build` checks its Go version, `-trimpath`, OS and architecture and prints its sha256 |
+| `-buildvcs=false` | without it the git commit, its time and whether the tree had uncommitted changes end up inside the binary (see below) | `build` refuses a responder that carries them |
+| one `att-ra-responder` file | it is layered into the image | `build` checks its Go version, `-trimpath`, `-buildvcs=false`, OS and architecture and prints its sha256 |
+
+**Version control stamping, measured.** Go stamps `vcs.revision`, `vcs.time` and `vcs.modified` into main binaries by
+default (since Go 1.18; `-buildvcs=auto`). `-trimpath` does NOT remove them. Measured on 2026-11-11 with go1.26.1,
+`GOOS=linux GOARCH=amd64 go build -trimpath ./cmd/ra-responder` in a clone of this repository: identical Go source
+committed under two different commits (`72d62f9` and `e8ec754`; the responder's packages, `go.mod` and `go.sum` do not
+differ between them) produced two different binaries (`c46d2919…79a0` and `c2e433f2…e44f`), and a tree with
+uncommitted changes (`e8ec754` plus one line appended to `README.md`) produced a third (`11802de5…714f`). With
+`-trimpath -buildvcs=false` the first and the third gave the same file (`82aba5f6…9207`). `go version -m` shows the
+stamp, and with it a module version derived from the commit (`v0.0.0-20261111045839-72d62f927ff8`). Also observed: a
+`git worktree` checkout of the same commits (where `.git` is a file, not a directory) built with no stamp at all, so
+whether a build is stamped depends on how the source was checked out. `-buildvcs=false` removes that dependence.
 | same OS | part of `build_env` | `receive` compares it |
 
 `receive` stops when OS, architecture or Go version differ from the Vendor's `build_env`.
@@ -35,7 +47,7 @@ Anything below that differs between the two builds changes the measurements. Wit
 have to take care of all of it. The sections after this one say which items `build` handles.
 
 - the CPU architecture (`amd64` or `arm64`)
-- the Go version and `-trimpath` of `att-ra-responder`, and the very same responder file on both sides
+- the Go version, `-trimpath` and `-buildvcs=false` of `att-ra-responder`, and the very same responder file on both sides
 - the file order, timestamps and owners inside the Docker layers, which `docker build` decides anew on every run
 - `ENTRYPOINT`, `CMD` and `ENV` of the image
 - files left in `/tmp` and `/var/tmp`
@@ -125,6 +137,7 @@ checking a Vendor's self-registration later in flow 2.
 | setting | what it does | can you leave it out |
 |---|---|---|
 | `-trimpath` (go build) | keeps the build folder path out of the binary | no for `att-ra-responder`: `build` refuses it |
+| `-buildvcs=false` (go build) | keeps the git commit, its time and the uncommitted-changes flag out of the binary | no for `att-ra-responder`: `build` refuses it |
 | `--verify` (`build`) | builds twice and compares | yes, but then you do not know whether the build is reproducible |
 | `--ignore-env` (`receive`) | turns a `build_env` mismatch into a warning | only to look around; the values will not match |
 | `--build-measurements` (`launch`) | starts a received image only if it measures the same | yes, but then a swapped image starts unchecked |

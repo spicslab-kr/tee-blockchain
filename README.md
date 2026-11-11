@@ -38,14 +38,14 @@ without a key from anyone.
 ### The binaries
 
 Download the Linux binaries for your architecture (`amd64` or `arm64`) from the
-[latest release](../../releases/latest). They are built with the pinned toolchain and `-trimpath`,
-and `SHA256SUMS` covers every file. Or build from source:
+[latest release](../../releases/latest). They are built with the pinned toolchain and
+`-trimpath -buildvcs=false`, and `SHA256SUMS` covers every file. Or build from source:
 
 ```
-go build -trimpath -o att-vendor       ./cmd/vendor
-go build -trimpath -o att-auditor      ./cmd/auditor
-go build -trimpath -o att-user         ./cmd/user
-go build -trimpath -o att-ra-responder ./cmd/ra-responder
+go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
+go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
+go build -trimpath -buildvcs=false -o att-user         ./cmd/user
+go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 ```
 
 The toolchain is pinned to exactly go1.26.1. `build` refuses any other version, because a
@@ -61,7 +61,7 @@ value, it can only be trusted if both builds give the same measurements.
 measurements. The most important:
 
 1. The same CPU architecture (`amd64` or `arm64`) on both sides.
-2. The same Go toolchain (pinned, go1.26.1) with `-trimpath`, and one and the same
+2. The same Go toolchain (pinned, go1.26.1) with `-trimpath -buildvcs=false`, and one and the same
    `att-ra-responder` file on both sides.
 3. A base image pinned by digest (`FROM nginx@sha256:…`), and every package, dependency and
    `git clone` pinned to an exact version or commit.
@@ -75,8 +75,8 @@ measurements. The most important:
 
 - They repack the image files in a fixed order with fixed times and owners, and remove what only
   records when it was built (package-manager logs, apk install times, build caches, `/tmp`).
-- They refuse an `att-ra-responder` built with another Go version, without `-trimpath`, or for
-  another OS or architecture.
+- They refuse an `att-ra-responder` built with another Go version, without `-trimpath`, with the
+  git commit stamped in (no `-buildvcs=false`), or for another OS or architecture.
 - They warn about each Dockerfile line that breaks items 3 and 4. Fixing those lines is up to you.
 - `--verify` builds a second time from scratch and fails unless the measurements match.
 - `att-auditor receive` stops if the OS, architecture or Go version differs from the Vendor's.

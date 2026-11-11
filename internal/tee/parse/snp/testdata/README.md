@@ -87,7 +87,7 @@ mkdir /tmp/record && cp record/main.go /tmp/record && cd /tmp/record
 go mod init record
 go get github.com/google/go-tpm-tools@v0.4.11 github.com/google/go-tpm@v0.9.8
 go mod tidy
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o record .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o record .
 ```
 
 `crypto/sha3` needs Go 1.24 or later; the pinned go1.26.1 has it.

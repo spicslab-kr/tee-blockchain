@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// TestCheckResponder_Rules checks the four rules on hand-made values, so `-short` still covers them
+// TestCheckResponder_Rules checks the five rules on hand-made values, so `-short` still covers them
 // without compiling anything. Each refusal must name the actual and the expected value and say
 // how to rebuild.
 func TestCheckResponder_Rules(t *testing.T) {
@@ -26,7 +26,9 @@ func TestCheckResponder_Rules(t *testing.T) {
 		{"wrong go", func() ResponderInfo { i := good; i.Go = "go1.26.0"; return i }(), "amd64",
 			[]string{"built with go1.26.0", "pins " + want, "GO_TOOLCHAIN", "GOTOOLCHAIN=" + want}},
 		{"no trimpath", func() ResponderInfo { i := good; i.Trimpath = false; return i }(), "amd64",
-			[]string{"without -trimpath", "go build -trimpath"}},
+			[]string{"without -trimpath", "go build -trimpath -buildvcs=false"}},
+		{"vcs stamped", func() ResponderInfo { i := good; i.VCS = "git"; return i }(), "amd64",
+			[]string{"built with version control stamping", "different commit", "uncommitted changes", "go build -trimpath -buildvcs=false"}},
 		{"wrong os", func() ResponderInfo { i := good; i.GOOS = "windows"; return i }(), "amd64",
 			[]string{"GOOS=windows", "enclave runs linux", "GOOS=linux"}},
 		{"wrong arch", good, "arm64",
@@ -84,12 +86,27 @@ func TestReadResponder_NotAGoBinary(t *testing.T) {
 // produce the artifact the check must refuse.
 func buildResponderNoTrimpath(t *testing.T, repoRoot, goarch, out string) {
 	t.Helper()
-	cmd := exec.Command("go", "build", "-o", out, "./cmd/ra-responder")
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", out, "./cmd/ra-responder")
 	cmd.Dir = repoRoot
 	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+goarch)
 	if o, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build without -trimpath: %v\n%s", err, o)
 	}
+}
+
+// buildResponderVCS builds with -trimpath but forces version control stamping (-buildvcs=true), the
+// default when -buildvcs is left out inside a git checkout. It reports false when Go cannot stamp
+// (for example a source tree with no .git), so the caller can skip.
+func buildResponderVCS(t *testing.T, repoRoot, goarch, out string) bool {
+	t.Helper()
+	cmd := exec.Command("go", "build", "-trimpath", "-buildvcs=true", "-o", out, "./cmd/ra-responder")
+	cmd.Dir = repoRoot
+	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+goarch)
+	if o, err := cmd.CombinedOutput(); err != nil {
+		t.Logf("go build -buildvcs=true failed, so no stamped responder to test (%v): %s", err, o)
+		return false
+	}
+	return true
 }
 
 // TestReadResponder_RealBuilds cross-builds real responders and runs the check on the actual
@@ -117,8 +134,8 @@ func TestReadResponder_RealBuilds(t *testing.T) {
 	if info.Go != RequiredToolchain() {
 		t.Errorf("Go = %q, want the pin %q (is the test running under the pinned toolchain?)", info.Go, RequiredToolchain())
 	}
-	if info.GOOS != "linux" || info.GOARCH != "amd64" || !info.Trimpath {
-		t.Errorf("unexpected build facts: %+v", info)
+	if info.GOOS != "linux" || info.GOARCH != "amd64" || !info.Trimpath || info.VCS != "" {
+		t.Errorf("unexpected build facts (BuildResponderForArch must use -trimpath -buildvcs=false): %+v", info)
 	}
 	if !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(info.SHA256) {
 		t.Errorf("SHA256 = %q, want 64 hex", info.SHA256)
@@ -146,5 +163,21 @@ func TestReadResponder_RealBuilds(t *testing.T) {
 	err = CheckResponder(info, "amd64")
 	if err == nil || !strings.Contains(err.Error(), "without -trimpath") {
 		t.Errorf("responder built without -trimpath should be refused naming -trimpath: %v", err)
+	}
+
+	stamped := filepath.Join(dir, "responder-vcs")
+	if !buildResponderVCS(t, repoRoot, "amd64", stamped) {
+		t.Skip("this source tree cannot be stamped with version control information")
+	}
+	info, err = ReadResponder(stamped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.VCS == "" || !info.Trimpath {
+		t.Fatalf("a -trimpath -buildvcs=true build should report vcs and -trimpath: %+v", info)
+	}
+	err = CheckResponder(info, "amd64")
+	if err == nil || !strings.Contains(err.Error(), "built with version control stamping") || !strings.Contains(err.Error(), "-buildvcs=false") {
+		t.Errorf("responder stamped with version control should be refused naming it: %v", err)
 	}
 }

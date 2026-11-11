@@ -488,3 +488,40 @@ them (`go version -m` shows `v0.0.0-20261111052755-e8ec754a88fd`, `+dirty` when 
 code from different commits, or from a dirty tree, give different responder bytes and therefore different Nitro
 PCR2. Builds that use the one released `att-ra-responder` on both sides are not affected. Reported to the user; a fix
 (for example `-buildvcs=false`) changes how the binaries are built and was not made in this commit.
+
+## Decision 2026-11-11: `-buildvcs=false`, enforced
+
+On the user's decision. Enforced in code, not only written down:
+
+- `internal/setup/build/responder.go`: `ReadResponder` reads the `vcs` build setting into `ResponderInfo.VCS`;
+  `CheckResponder` refuses a responder that has one, right after the `-trimpath` check, with "att-ra-responder was built
+  with version control stamping: the git commit and commit time are baked into it, so the same source built from a
+  different commit, or from a tree with uncommitted changes, gives different bytes and different measurements" and the
+  rebuild command, which now reads `go build -trimpath -buildvcs=false`.
+- `-buildvcs=false` right after `-trimpath` in every `go build` in the repository: `internal/setup/build/arch.go`
+  (`BuildResponderForArch`), `e2e/0-Setup-local-upload.sh`, `e2e/arch-measurement-compare.sh`, `e2e/build-env-check.sh`,
+  `e2e/toolchain-pin-check.sh`, `e2e/responder-check.sh` (also on its deliberate no-`-trimpath` build, so that build is
+  refused only for `-trimpath`), and the build commands in `README.md`, `CONTRIBUTING.md`, `cmd/README.md` and
+  `internal/tee/parse/snp/testdata/README.md`. The test helpers that build the `att-*` binaries without `-trimpath`
+  (`cmd/e2e_helpers_test.go` and similar) were left as they are; their binaries are not layered into an image.
+- Tests: a rule case for a stamped responder; the real-build test now requires `BuildResponderForArch` to produce no
+  stamp, and builds one with `-trimpath -buildvcs=true` that must be refused naming the stamping (skipped when the source
+  tree has no `.git` directory to stamp from).
+- `CLAUDE.md` rule 3 is now "Always `-trimpath -buildvcs=false`".
+- The measurement is written up in `docs/build/aws-nitro.md`. Measured in a local clone of this repository with
+  go1.26.1, `GOOS=linux GOARCH=amd64 go build -trimpath ./cmd/ra-responder`:
+
+  | build | sha256 |
+  |---|---|
+  | commit `72d62f9` | `c46d29198432e72d5cc37a33f6094c9a70d723a098659d8f89230a09ddf079a0` |
+  | commit `e8ec754` (responder packages, `go.mod`, `go.sum` identical to `72d62f9`) | `c2e433f2cce9c3c36d3e1c673aa8dc99c38cc007812de5dac7ef187fdcfee44f` |
+  | `e8ec754` plus one uncommitted line in `README.md` | `11802de5912dfbe8652074168b6f68301461d69d8a3d76988aff830a141c714f` |
+  | `72d62f9`, and the dirty `e8ec754`, both with `-buildvcs=false` | `82aba5f6433c915e2b6580828ef2fa25af8cdc02c25498ba65b832e3020b9207` (identical) |
+
+  A first attempt with `git worktree` checkouts gave five identical files: Go put no stamp in them at all (`go version -m`
+  showed no `vcs` lines and module version `(devel)`). The worktree's `.git` is a file rather than a directory; that this
+  is the cause is an inference. The clone, with a real `.git` directory, was stamped.
+
+**Nitro PCR baseline: baseline after both.** The entrypoint translation (`a379a2c`) and this change both change what
+goes into the EIF (the entrypoint bytes, and the responder bytes, which no longer carry the commit), so PCR0 and PCR2
+change twice. Take the Nitro baseline only after both commits.

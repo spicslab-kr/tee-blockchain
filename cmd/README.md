@@ -17,10 +17,10 @@ The chain side is described in the [registry contract guide](../contracts/README
 ## Build the binaries
 
 ```
-go build -trimpath -o att-vendor       ./cmd/vendor
-go build -trimpath -o att-auditor      ./cmd/auditor
-go build -trimpath -o att-user         ./cmd/user
-go build -trimpath -o att-ra-responder ./cmd/ra-responder
+go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
+go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
+go build -trimpath -buildvcs=false -o att-user         ./cmd/user
+go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 ```
 
 Cross-compile for the Nitro instances (Linux) with `GOOS=linux GOARCH=amd64` (or `arm64` for a
@@ -35,6 +35,11 @@ pinned version and the one the binary was built with, and exit 1 if they differ.
 **`-trimpath`.** It matters most for `att-ra-responder`. That file is layered straight into the
 enclave image, so building identical source from a different folder would otherwise leave a
 different absolute path inside the binary, and the measurement (PCR) with it.
+
+**`-buildvcs=false`.** By default Go also stamps the git commit, its time and whether the tree had
+uncommitted changes into the binary, and `-trimpath` does not remove them. Identical source built
+from two different commits, or from a tree with uncommitted changes, then gives different
+`att-ra-responder` bytes (measured; see `docs/build/aws-nitro.md`).
 
 ### Where each binary runs
 
@@ -51,7 +56,8 @@ embed different responders their measurements can never match.
 
 `build` and `pack` do not take the file on trust. They read the build info Go leaves inside every
 binary and refuse a responder that was built with a different Go than the pin, without
-`-trimpath`, or for another OS or architecture than the instance they run on. The build log prints
+`-trimpath`, with version control stamping (no `-buildvcs=false`), or for another OS or
+architecture than the instance they run on. The build log prints
 the responder's sha256 so both sides can compare it by eye.
 
 `build`, `pack`, `launch` and the responder only work on a Nitro-enabled EC2 instance (Linux).

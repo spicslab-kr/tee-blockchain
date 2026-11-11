@@ -32,10 +32,10 @@ fi
 
 mkdir -p "$WORK/responder"
 step "2. CROSS-BUILDING THREE RESPONDERS (correct, without -trimpath, arm64) AND att-vendor"
-GOOS=linux GOARCH=amd64 go build -trimpath -o "$WORK/responder/att-ra-responder-ok"        ./cmd/ra-responder
-GOOS=linux GOARCH=amd64 go build           -o "$WORK/responder/att-ra-responder-notrimpath" ./cmd/ra-responder
-GOOS=linux GOARCH=arm64 go build -trimpath -o "$WORK/responder/att-ra-responder-arm64"     ./cmd/ra-responder
-GOOS=linux GOARCH=amd64 go build -trimpath -o "$WORK/responder/att-vendor" ./cmd/vendor
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-ok"        ./cmd/ra-responder
+GOOS=linux GOARCH=amd64 go build -buildvcs=false -o "$WORK/responder/att-ra-responder-notrimpath" ./cmd/ra-responder
+GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-arm64"     ./cmd/ra-responder
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-vendor" ./cmd/vendor
 OK_SHA="$(sha256 "$WORK/responder/att-ra-responder-ok" | cut -c1-16)"
 echo "correct responder sha256 (first 16): $OK_SHA - the host's build log must print the same value"
 
