@@ -2,13 +2,13 @@
 // amd-sev-snp-verity). On GCP the SNP launch measurement covers only the virtual firmware; the boot files that carry
 // the application are measured by the cloud's vTPM. So one piece of evidence is two documents from two signers:
 //
-//	report  the SNP attestation report, signed by the chip's VCEK (AMD), REPORT_DATA = SHA-512(vtpm)
+//	report  the SNP attestation report, signed by the chip's VCEK (AMD), REPORT_DATA = SHA3-512(vtpm)
 //	certs   the certificate table the host returned with the report (VCEK, ASK, ARK), possibly empty
 //	vtpm    a vTPM attestation: go-tpm-tools attest.Attestation (binary protobuf), quotes over the PCRs signed by the
 //	        cloud's attestation key, the AK certificate and the TCG event log
 //
-// They travel together as one CBOR map in RADoc.Raw (see Encode). The binding is the SHA-512: the AMD signature covers
-// REPORT_DATA, so it covers the exact vTPM bytes carried next to it.
+// They travel together as one CBOR map in RADoc.Raw (see Encode). The binding is the SHA3-512: the AMD signature covers
+// REPORT_DATA, so it covers the exact vTPM bytes carried next to it. (SHA-512 until 2026-11-11; see bindingSum.)
 //
 // What the binding does not prove: that both documents come from the same VM. A vTPM attestation from one VM and an
 // SNP report from another VM, asked for with the first one's hash, verify together. That was reproduced on GCP and
@@ -124,7 +124,7 @@ func decode(format string, raw []byte) (evidence, error) {
 // reportData is REPORT_DATA from the report, 64 bytes.
 func (ev evidence) reportData() []byte { return ev.report.GetReport().GetReportData() }
 
-// bound reports whether REPORT_DATA is SHA-512 of the vTPM attestation bytes.
+// bound reports whether REPORT_DATA is SHA3-512 of the vTPM attestation bytes.
 func (ev evidence) bound() bool {
-	return bytes.Equal(ev.reportData(), sha512Sum(ev.vtpmRaw))
+	return bytes.Equal(ev.reportData(), bindingSum(ev.vtpmRaw))
 }

@@ -3,7 +3,7 @@ package snp
 import (
 	"context"
 	"crypto"
-	"crypto/sha512"
+	"crypto/sha3"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/pem"
@@ -31,7 +31,7 @@ type Parser struct {
 
 // VerifySig runs in this order: decode both documents; check the AMD side (VCEK to the ARK go-sev-guest embeds, then
 // the report signature); check that the AK certificate chains to the cloud root (rootCert) as of Now; check the quote
-// signatures and the event log against the AK; check that REPORT_DATA is SHA-512 of the vTPM attestation.
+// signatures and the event log against the AK; check that REPORT_DATA is SHA3-512 of the vTPM attestation.
 //
 // The AMD certificates come only from the evidence (the host's certificate table); AMD's KDS is never asked, so the
 // check runs offline like the Nitro one. CRLs are not checked.
@@ -100,7 +100,7 @@ func (a Parser) VerifySig(ctx context.Context, format string, raw []byte, rootCe
 	}
 
 	if !ev.bound() {
-		return fmt.Errorf("%w: REPORT_DATA is not SHA-512 of the vTPM attestation, so the AMD signature does not cover it", ErrSignature)
+		return fmt.Errorf("%w: REPORT_DATA is not SHA3-512 of the vTPM attestation, so the AMD signature does not cover it", ErrSignature)
 	}
 	return nil
 }
@@ -122,8 +122,11 @@ func quoteExtraData(ev evidence) ([]byte, error) {
 	return extra, nil
 }
 
-func sha512Sum(b []byte) []byte {
-	s := sha512.Sum512(b)
+// bindingSum is the hash REPORT_DATA must hold: SHA3-512 of the vTPM attestation bytes. It is 64 bytes, the size of
+// REPORT_DATA. Until 2026-11-11 the binding was SHA-512 (the 2026-11 test scripts used it); evidence bound that way is
+// refused.
+func bindingSum(b []byte) []byte {
+	s := sha3.Sum512(b)
 	return s[:]
 }
 

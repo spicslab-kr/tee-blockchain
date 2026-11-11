@@ -2,11 +2,12 @@
 //
 //	att.pb      a vTPM attestation (go-tpm-tools attest.Attestation, binary protobuf) over a fixed nonce, signed by
 //	            the GCE attestation key (RSA), with the AK certificate, its intermediates and the TCG event log
-//	report.bin  the SNP attestation report, REPORT_DATA = SHA-512(att.pb), read through ConfigFS TSM
+//	report.bin  the SNP attestation report, REPORT_DATA = SHA3-512(att.pb), read through ConfigFS TSM
 //	auxblob.bin the certificate table the host returned with the report, if it returned one
 //
-// The binding (REPORT_DATA = SHA-512 of the vTPM attestation) is the one the 2026-11 SEV-SNP runs used
-// (vendor/vendor_evidence.sh), so the fixture matches what the existing scripts produce.
+// The binding is REPORT_DATA = SHA3-512 of the vTPM attestation, as internal/tee/parse/snp checks it. It was SHA-512
+// until 2026-11-11 (the hash the 2026-11 SEV-SNP scripts used in vendor/vendor_evidence.sh); the
+// gcp-n2d-initrdless-* fixture was recorded with that older binding.
 //
 // Run as root:  record -out <dir> -nonce-text attestamp-snp-fixture-0001
 package main
@@ -14,7 +15,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
-	"crypto/sha512"
+	"crypto/sha3"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -66,7 +67,7 @@ func run(out, nonceText string) error {
 	if err := os.WriteFile(filepath.Join(out, "att.pb"), attRaw, 0o644); err != nil {
 		return err
 	}
-	rd := sha512.Sum512(attRaw)
+	rd := sha3.Sum512(attRaw)
 
 	report, aux, provider, err := tsmReport(rd[:])
 	if err != nil {

@@ -1,10 +1,12 @@
 package snp
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha512"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -61,7 +63,7 @@ func TestVerifySig_TamperedReportFailsSignature(t *testing.T) {
 }
 
 // Two documents that are each genuine but not bound to each other must be refused. Appending an unknown protobuf field
-// keeps the vTPM attestation valid (the quotes are untouched) but changes its SHA-512, so REPORT_DATA no longer covers it.
+// keeps the vTPM attestation valid (the quotes are untouched) but changes its SHA3-512, so REPORT_DATA no longer covers it.
 func TestVerifySig_UnboundDocumentsAreRefused(t *testing.T) {
 	vtpm := append(append([]byte(nil), gcpVTPM...), 0xF8, 0x07, 0x01) // field 127, varint 1
 	raw, err := Encode(gcpReport, gcpCerts, vtpm)
@@ -71,6 +73,35 @@ func TestVerifySig_UnboundDocumentsAreRefused(t *testing.T) {
 	err = (Parser{}).VerifySig(context.Background(), FormatInitrd, raw, nil)
 	if !errors.Is(err, ErrSignature) || !strings.Contains(err.Error(), "REPORT_DATA") {
 		t.Fatalf("a vTPM attestation the report does not cover must be refused, got %v", err)
+	}
+}
+
+// The older recording is genuine on both sides but bound with SHA-512, the binding used until 2026-11-11. Only the
+// binding may fail: the AMD signature and the AK chain still hold.
+func TestVerifySig_SHA512BindingIsRefused(t *testing.T) {
+	err := (Parser{}).VerifySig(context.Background(), FormatInitrd, initrdlessDoc(t), nil)
+	if !errors.Is(err, ErrSignature) || !strings.Contains(err.Error(), "SHA3-512") {
+		t.Fatalf("evidence bound with SHA-512 must be refused at the binding, got %v", err)
+	}
+	ev, err := decode(FormatInitrd, initrdlessDoc(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := sha512.Sum512(ev.vtpmRaw)
+	if !bytes.Equal(ev.reportData(), old[:]) {
+		t.Fatal("the older recording is expected to carry SHA-512 of its vTPM attestation")
+	}
+}
+
+// REPORT_DATA of the current recording, checked with a SHA3-512 computed outside Go (openssl dgst -sha3-512).
+func TestBinding_MatchesOpenSSL(t *testing.T) {
+	ev, err := decode(FormatInitrd, realDoc(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := mustHex(t, "82ded2584e3611a7e4252a051a93a0536053963f98e5256a4cb8ecd822cd2013697025acbc6f1f125fd7c7b5112b809a5ddacc2ac877655f5c5ec78d354b142e")
+	if !bytes.Equal(bindingSum(ev.vtpmRaw), want) || !bytes.Equal(ev.reportData(), want) {
+		t.Fatalf("binding %x, REPORT_DATA %x", bindingSum(ev.vtpmRaw), ev.reportData())
 	}
 }
 
