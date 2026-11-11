@@ -814,3 +814,50 @@ Left alone on purpose, and what each needs:
 | 8 Nitro fixture READMEs | the person who recorded them (date, AMI, `nitro-cli` version, nonce source) |
 | 10 GCP prerequisites | a decision on how much of GCP setup the repository describes; the facts are known |
 | 12 arm64 Nitro host | an AWS session to write and test a create script for Graviton |
+
+## Unattended night 2026-11-12 (second brief)
+
+Brief: no questions; decide by the stated defaults and write each decision here. No push, no terminate, no
+identifiers, no publication or history decisions.
+
+### Decisions taken without asking, and why
+
+| decision | why |
+|---|---|
+| `e2e/env.local.sh` was **not** created | the Write tool refused it: `.claude/settings.json` denies `Read(e2e/env.local.sh)`. Writing it another way would have worked around a permission rule, so it is left for the user. The two addresses are in the morning report |
+| the two approver addresses got no default, and only the four chain scripts check them (`need_addr`) | a default would name somebody else's approver; the build-only checks have no use for an address and should keep running without one |
+| `env.sh` now keeps instance addresses already set in the environment | with `env.local.sh` not writable, this was the reversible way to pass addresses to a one-off run; `env.local.sh` still overrides |
+| the Nitro instances were **not** created | `bash e2e/cloud/aws-nitro.sh create` was refused by the session's permission classifier ("Modify Shared Resources"). Calling `aws ec2 run-instances` directly would have bypassed that refusal, so step 2 stopped there (one attempt; a second would have been the same request) |
+| T1 and T3 share one run in `arch-measurement-compare.sh` | the Auditor now checks the source out under another path; identical values prove both, and the script says that a difference could not be attributed |
+| `att-auditor ra-serve` was left without `--format` | it may be deliberate; recorded in `docs/plan/audit-2026-11-12.md` |
+| the second EC2 instance ID found in a Nitro fixture is not written anywhere | the brief forbids committing instance IDs; the review names the file only |
+
+### Done
+
+| step | result | commit |
+|---|---|---|
+| 1a | the original author's Sepolia addresses removed from `env.sh`; chain scripts stop without `AUDITOR_ADDR`/`VENDOR_ADDR` | `95ab5d6` |
+| 1b | `auditor.key` and `deployer.key` generated in the repository root (32-byte hex, the format `readPrivateKey` reads; mode 600; ignored by git, checked with `git status --ignored`). The keys were never printed | — (not committed) |
+| 1c | JSONL results contract in every Nitro e2e script and in `e2e/cvm/in-guest-verify.sh`; checked by writing awkward input and parsing it back as JSON | `1395b38` |
+| 1d | `aws-nitro.sh create-arm64` (c7g.xlarge; both types checked with `describe-instance-types`) | `145ae8e` |
+| — | addresses from the environment | `f6af95a` |
+| 2 (GCP #10) | Compute Engine API enabled, `default-allow-ssh` present, xxd in the stock image, tpm2-tools installed by hand. `attestamp-snp-vendor` started at about 17:00 UTC by the guest clock, checked, **stopped**; TERMINATED | `7fb078b` |
+| 3 | `debug-mode-check.sh` (T8) and `replay-check.sh` (T9), written, not run | `e169d3f` |
+| 4b | the four measurement-hash implementations agree on all four formats with `cast keccak`; golden tests in all four | `4329fc0` |
+| 4a, 4c, 4d | review written; stale and untypeable doc lines fixed; a second instance ID found in a Nitro fixture | `4c55014`, `21d5582`, `933adef` |
+| 5 | `docs/build/toolchain.md`: what to install per machine, which step calls which tool, the versions printed tonight | `5e17a8f` |
+
+### Not done
+
+- **The Nitro baseline (step 2)**: no instance; see the decision above. Nothing in the Nitro column of the test matrix
+  changed from a run. Needed: permission to create the instances (or the user runs `bash e2e/cloud/aws-nitro.sh
+  create` and `create-arm64`), and `e2e/env.local.sh` with the addresses. Then, in this order, with no ETH:
+  `0-Setup-local-upload.sh`, `responder-check.sh`, `toolchain-pin-check.sh`, `build-env-check.sh`,
+  `arch-measurement-compare.sh`, `arch-record-check.sh`, `debug-mode-check.sh`, and after a launch `replay-check.sh`;
+  plus the version commands in `docs/build/toolchain.md`, "Nitro parent instance".
+- #2's expected PCR0/1/2 of the test application and #8's fixture READMEs need that same run.
+
+### Instances at the end
+
+AWS: none in any of the 17 enabled regions (`describe-instances` per region). GCP: `attestamp-snp-vendor` and
+`attestamp-tdx-vendor` TERMINATED.
