@@ -49,7 +49,7 @@ Four properties the port has to reproduce on each new platform:
 
 | # | Task | Pass criterion |
 |---|---|---|
-| 0.1 | Clone the repository from GitHub (the current working copy has no `.git`) | `git status` works |
+| 0.1 | Clone the repository from GitHub with `--recursive` (a zip extract lacks `.git` and the OpenZeppelin submodule) | `git status` works; done |
 | 0.2 | `CLAUDE.md`, `.claude/settings.json`, `.claude/commands/`, `.claude/hooks/` | done |
 | 0.3 | **Record one TDX quote and commit it as a fixture** | a file under `testdata/` plus the nonce used |
 | 0.4 | Record one SEV-SNP report and one vTPM attestation from the same GCP instance | same |
@@ -112,7 +112,7 @@ Existing reference material: the SEV-SNP test scripts from the October–Novembe
 (`option1-initrd/`, `option2-dm-verity/`, `vendor/`, `auditor/`, `user/go-verifier/`,
 `relay-test/`). They are not committed here. Known blockers before any of it is reusable:
 hard-coded home paths, disk UUIDs, kernel versions and instance IPs; two separate Go modules
-outside `attestamp`; expected-value计算 in Python; Korean comments.
+outside `attestamp`; expected values computed in Python; Korean comments.
 
 ## Open decisions
 
