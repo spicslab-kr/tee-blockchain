@@ -1,0 +1,55 @@
+# Boot evidence for gcp-c3-opt2m-v1-*, copied from the session on attestamp-tdx-vendor, 2026-11-12 (local date;
+# the guest clock read 2026-11-11 UTC).
+# Option 2 with the image opened and mounted at boot (Phase 3.4): squashfs + dm-verity image, hash tree and root hash
+# inside the initrd, BEFORE the base (cpio.AppFirst). The base initrd was built with testdata/record/initramfs-hook.sh
+# and testdata/record/initramfs-local-bottom.sh installed, which were removed again right after mkinitramfs.
+
+$ sudo install -m 755 initramfs-hook.sh /etc/initramfs-tools/hooks/attestamp-verity
+$ sudo install -m 755 initramfs-local-bottom.sh /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
+$ sudo mkinitramfs -o initrd-verity-base.img 7.0.0-1017-gcp
+$ sudo rm /etc/initramfs-tools/hooks/attestamp-verity /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
+$ sudo lsinitramfs initrd-verity-base.img | grep -E 'veritysetup|attestamp|dm-verity'
+usr/lib/modules/7.0.0-1017-gcp/kernel/drivers/md/dm-verity.ko.zst
+scripts/local-bottom/attestamp-verity
+usr/sbin/veritysetup
+# (squashfs, loop and dm-mod are built into this kernel: modules.builtin)
+
+# verity-v1 is the image of gcp-c3-opt2-v1 (app.img 28bdfcff…ec1c, root hash e29ec085…af0c9), not rebuilt
+$ sudo mkdir -p /opt/app-verity
+$ sudo ./mkappinitrd -base initrd-verity-base.img -app-dir verity-v1 -placement first -out initrd-verity-v1.img
+base      initrd-verity-base.img  50140646 bytes  sha256 66cb9d5617c69aa8220e652e91f502ee04571632bd939aa0f046044a6e15d51e  size mod 4 = 2
+app       verity-v1/  10240 bytes  sha256 09c1c38663851e3dfcace17d4492b47961d420e999f57f6581f4e3fed52884df
+placement first
+combined  initrd-verity-v1.img  50150886 bytes  sha256 8b0739de8784288fc6dad552ca193dd3b23eb13d08596af953b5e9155c433aa4
+$ sudo install -m 644 initrd-verity-v1.img /boot/initrd-attestamp-verity.img
+$ sudo sh make-grub-entry.sh attestamp-verity initrd-attestamp-verity.img
+
+# after rebooting into that entry (boot ID d4bfc4e2-4ff0-4adf-93fb-1be6568b2bc1, in gcp-c3-opt2m-v1-record.txt)
+$ journalctl -b -k | grep -E 'Kernel command line|Trying to unpack|Freeing initrd|loop[01]:'
+kernel: Kernel command line: BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+kernel: Trying to unpack rootfs image as initramfs...
+kernel: Freeing initrd memory: 48976K
+kernel: loop0: detected capacity change from 0 to 8
+kernel: loop1: detected capacity change from 0 to 8
+$ cat /run/attestamp-status
+ok e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9
+$ cat /dev/attestamp-app-marker
+file app.hash 4096
+file app.img 4096
+file roothash 65
+e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9
+$ findmnt -n /opt/app-verity
+/opt/app-verity /dev/mapper/attestamp-app squashfs ro,relatime,errors=continue,threads=single
+$ sudo dmsetup status attestamp-app
+0 8 verity V -
+$ sudo dmsetup table attestamp-app
+0 8 verity 1 7:1 7:0 4096 4096 1 1 sha256 e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
+$ cat /opt/app-verity/opt/app/app
+attestamp app v1
+$ losetup -a | grep /opt/app
+/dev/loop1: []: (/opt/app/app.img (deleted))
+/dev/loop0: []: (/opt/app/app.hash (deleted))
+# (the loop devices keep the initramfs copies alive after the initramfs is freed)
+
+# Result: the image verified against the root hash carried in the initrd, opened with dm-verity (status V, verified)
+# and mounted read-only; the application is readable from it.

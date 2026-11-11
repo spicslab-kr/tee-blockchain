@@ -1,0 +1,6 @@
+nonce_text attestamp-tdx-verity-mounted-v2
+report_data 5ad72def939ebe1c2b1b81ecb1d33b74e9b11e220ffcd667c4ccca3adfb2c847d4894fad8e6f38a17cec58d6d16d1661049ccf00a3538b6e907ddc281e42b994
+provider tdx_guest
+quote_bytes 8000
+cmdline BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+boot_id ea5e60a7-1723-4d0b-a7fd-cbada7780754

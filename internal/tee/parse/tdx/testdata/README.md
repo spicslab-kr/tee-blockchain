@@ -9,6 +9,7 @@ Quotes from a real Intel TDX guest on GCP (`attestamp-tdx-vendor`), used by the 
 | `gcp-c3-quote.nonce` | The 64 bytes written to `inblob` (the TD's REPORTDATA), as 128 hex characters and a newline |
 | `gcp-c3-opt1-v1-*`, `gcp-c3-opt1-v2-*` | Option 1: a one-file application archive placed before the base initrd (`cpio.AppFirst`), recorded twice with the application changed by one byte |
 | `gcp-c3-opt2-v1-*`, `gcp-c3-opt2-v2-*` | Option 2: a squashfs + dm-verity image and its hash tree placed inside the initrd, also `AppFirst`, recorded twice with the image's content changed by one byte |
+| `gcp-c3-opt2m-v1-*`, `gcp-c3-opt2m-v2-*` | Option 2 with the image **opened and mounted at boot** (2026-11-12, Phase 3.4): the same two images, with a base initrd that carries `record/initramfs-hook.sh` and `record/initramfs-local-bottom.sh`. Nonce texts `attestamp-tdx-verity-mounted-v1` and `-v2` |
 
 sha256 of `gcp-c3-quote.bin`: `228da7b4e87f2fd21c7732d91bfe709f5fa81850f8216768b5b1d48fb46b8a4d`
 
@@ -25,6 +26,15 @@ how the initrd was built, the marker, the kernel's initramfs lines).
   naming the application text (Option 1) or `app.img`, `app.hash` and the root hash (Option 2).
 - Result, checked by `app_fixture_test.go`: in each pair only RTMR2 differs; MRTD, RTMR0 and RTMR1 are the same in all
   four quotes.
+
+## The mounted recordings (2026-11-12)
+
+The same layout as above. The base initrd was built with `mkinitramfs` while the two scripts in `record/` were
+installed (they were removed right after): 50,140,646 bytes, sha256 `66cb9d56…d51e`. On both boots
+`/run/attestamp-status` read `ok <root hash>`, `/opt/app-verity` was a read-only squashfs on
+`/dev/mapper/attestamp-app` with `dmsetup status` `V` (verified), and the application text was readable from it.
+`app_fixture_test.go` checks that MRTD, RTMR0 and RTMR1 are again the same and that RTMR2 differs between v1 and v2 and
+from the unmounted Option 2 recordings.
 
 The same identifying information as the first quote: the PCK certificate of the physical machine. `-record.txt` also
 holds the root file system's UUID (in the command line) and the boot ID.
@@ -76,7 +86,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o reco
 sudo ./record-tdx -out fx -nonce-text attestamp-tdx-fixture-0001
 ```
 
-`record-tdx` has not been run on a guest yet (2026-11-11). To record quotes with an application in the initrd, see
+`record-tdx` made the application recordings of 2026-11-11 and 2026-11-12. To record quotes with an application in the initrd, see
 `docs/plan/app-fixture-recording.md`.
 
 The quote carries no secret, but it does carry the PCK certificate of the physical machine it was made on. MROWNER is

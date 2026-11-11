@@ -1,0 +1,39 @@
+# Boot evidence for gcp-c3-opt2m-v2-*, copied from the session on attestamp-tdx-vendor, 2026-11-12 (local date;
+# the guest clock read 2026-11-11 UTC).
+# Same as gcp-c3-opt2m-v1-boot.txt, with verity-v2 (the image of gcp-c3-opt2-v2: app.img b8e2656f…fb27, root hash
+# a2f4df92…51e1) and the same base initrd.
+
+$ sudo ./mkappinitrd -base initrd-verity-base.img -app-dir verity-v2 -placement first -out initrd-verity-v2.img
+base      initrd-verity-base.img  50140646 bytes  sha256 66cb9d5617c69aa8220e652e91f502ee04571632bd939aa0f046044a6e15d51e  size mod 4 = 2
+app       verity-v2/  10240 bytes  sha256 61bc2cb4e09eaa72be07fbc8743c13715c8d3dfbdb15ca0e21e482d876cdf83d
+placement first
+combined  initrd-verity-v2.img  50150886 bytes  sha256 2e21c8dbe30eed257e0ecb4e900262ca5ba27dbfc212eeea0cfb01ad5b6142cc
+$ sudo install -m 644 initrd-verity-v2.img /boot/initrd-attestamp-verity.img
+
+# after rebooting into the same GRUB entry (boot ID ea5e60a7-1723-4d0b-a7fd-cbada7780754, in gcp-c3-opt2m-v2-record.txt)
+$ journalctl -b -k | grep -E 'Kernel command line|Trying to unpack|Freeing initrd|loop[01]:'
+kernel: Kernel command line: BOOT_IMAGE=/vmlinuz-7.0.0-1017-gcp root=UUID=9d4d258d-90ac-4d94-b296-007fa0812719 ro console=ttyS0,115200
+kernel: Trying to unpack rootfs image as initramfs...
+kernel: Freeing initrd memory: 48976K
+kernel: loop0: detected capacity change from 0 to 8
+kernel: loop1: detected capacity change from 0 to 8
+$ cat /run/attestamp-status
+ok a2f4df923b59d5ad7810b785af77146058253b06ba987b491047d6f610b951e1
+$ cat /dev/attestamp-app-marker
+file app.hash 4096
+file app.img 4096
+file roothash 65
+a2f4df923b59d5ad7810b785af77146058253b06ba987b491047d6f610b951e1
+$ findmnt -n /opt/app-verity
+/opt/app-verity /dev/mapper/attestamp-app squashfs ro,relatime,errors=continue,threads=single
+$ sudo dmsetup status attestamp-app
+0 8 verity V -
+$ sudo dmsetup table attestamp-app
+0 8 verity 1 7:1 7:0 4096 4096 1 1 sha256 a2f4df923b59d5ad7810b785af77146058253b06ba987b491047d6f610b951e1 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
+$ cat /opt/app-verity/opt/app/app
+attestamp app v2
+
+# On the same boot, sh e2e/cvm/in-guest-verify.sh tdx intel-tdx: 11 passed, 0 failed; the live quote's RTMR2 was
+# 71cd0493…b677, the same as this recording's.
+
+# Result: as for v1. RTMR2 differs from v1's; MRTD, RTMR0 and RTMR1 do not.
