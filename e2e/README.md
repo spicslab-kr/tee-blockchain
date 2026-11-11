@@ -106,6 +106,8 @@ The Vendor's registry address is saved in `e2e-work/registry-flow2.txt`.
 | `responder-check.sh` | `build --responder` refuses a responder built without `-trimpath`, with version control stamping, or for the wrong architecture |
 | `build-env-check.sh` | `receive` rejects a `build-config.json` whose `build_env` does not match the instance, and `--ignore-env` only warns |
 | `arch-record-check.sh` | the architecture in records and registrations; sends no transaction |
+| `replay-check.sh` | T9: two fresh documents from the running enclave differ, and document 1 against request 2's nonce is refused with exit 6. Needs a running enclave, no chain |
+| `debug-mode-check.sh` | T8: the same EIF started with `nitro-cli run-enclave --debug-mode` gives a document that `ra-parse` refuses (exit 7, every PCR is zero); keeps the document as a fixture. No chain |
 | `arch-measurement-compare.sh` | the same source measures the same on two x86_64 hosts checked out under two different paths (T1, T3), and differently on arm64 (only with `ARM64_HOST`) |
 
 Intermediate files go in `e2e-work/`. Every verdict is also appended to `e2e-work/results/aws-nitro.jsonl`, one JSON line

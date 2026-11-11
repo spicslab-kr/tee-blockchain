@@ -28,8 +28,8 @@ Each cell says how far the row is proven, and by what:
 | T5 | application swapped after registration | not trusted, exit 1 | **code** in part: an unregistered measurement is not trusted (`TestRun_E2E_User_NothingRegistered`). The swap itself: **script, never run** (`flow1-auditor-registers/4,5`) | **code**, both options: `TestRun_E2E_T5_ApplicationSwapIsRefused/tdx-option1`, `/tdx-option2` (recordings of 2026-11-11) ⁸ | **code**, both options: `…/snp-option1` (padded pair), `…/snp-option2` ⁸ |
 | T6 | Vendor self-registers a different image, Auditor disagrees | not trusted when both registries are required | **script, never run** (`flow2-vendor-self-registers/1..5`) | **needs VM** | **needs VM** |
 | T7 | build environment (OS / arch / Go) does not match | `receive` refuses | **code**: `TestBuildEnv_ReceiveRejectsOtherArch`, `…OtherGoVersion`, `…ConfigWithoutBuildEnv`. On instances: **script, never run** (`build-env-check.sh`) | **code** in part: an `intel-tdx` build config without `build_env` is refused (`TestBuildConfig_BuildEnvRequiredOnTDX`) | **code** in part: an `amd-sev-snp-initrd` or `amd-sev-snp-verity` build config without `build_env` is refused (`TestBuildConfig_BuildEnvRequiredOnSNP`, added 2026-11-12) |
-| T8 | TEE in debug mode | measurements refused | **missing** ⁴ | **code**: `TestParse_DebugTDIsRefused` (debug bit set in a copy of the recorded quote) | **code**: `TestParse_DebugGuestIsRefused` (debug bit set in a copy of the recorded report) |
-| T9 | replay of an earlier attestation | refused (nonce) | **code**: `TestCmd_E2E_ParseRejectsTamperedNonce` and the nonce unit tests. A replay against a live verifier: **missing** ⁵ | **code**: `tdx` nonce tests (a different REPORTDATA is refused); **live 2026-11-12**: a fresh quote presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) | **code**: `snp` nonce tests; **2026-11 run** replayed evidence and saw it refused; **live 2026-11-12**: a fresh document from the guest, presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) |
+| T8 | TEE in debug mode | measurements refused | **script, never run** (`debug-mode-check.sh`) ⁴ | **code**: `TestParse_DebugTDIsRefused` (debug bit set in a copy of the recorded quote) | **code**: `TestParse_DebugGuestIsRefused` (debug bit set in a copy of the recorded report) |
+| T9 | replay of an earlier attestation | refused (nonce) | **code**: `TestCmd_E2E_ParseRejectsTamperedNonce` and the nonce unit tests. A replay against a live enclave: **script, never run** (`replay-check.sh`) ⁵ | **code**: `tdx` nonce tests (a different REPORTDATA is refused); **live 2026-11-12**: a fresh quote presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) | **code**: `snp` nonce tests; **2026-11 run** replayed evidence and saw it refused; **live 2026-11-12**: a fresh document from the guest, presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) |
 | T10 | two attestations from different machines, combined | refused | **not applicable** ⁶ | **not applicable** ⁶ | **fails today**: reproduced in the **2026-11 run** on GCP (and on AWS, before AWS was dropped for SEV-SNP) ⁷ |
 
 ¹ From `docs/build/sev-snp.md`, "Variables". The 2026-11 numbering of "the seven SEV-SNP tests" is the scripts' own
@@ -47,11 +47,15 @@ identical source committed under two commits gave two different responder binari
 entrypoint inside the EIF: **the Nitro baseline is taken after both**.
 
 ⁴ `tee/parse/aws/measure.go` treats an all-zero PCR0 as debug (`Info.Debug`) and `Parse` fails when every PCR is
-zero, but no test or script launches a debug-mode enclave to prove it. A debug document is signed, so unlike TDX and
+zero, but nothing has launched a debug-mode enclave to prove it. A debug document is signed, so unlike TDX and
 SEV-SNP it cannot be made from the recorded one by flipping a bit; it has to be recorded from a debug enclave.
+`e2e/debug-mode-check.sh` (written 2026-11-12, **not run**) does that on the Vendor host: a normal launch as the
+control, then the same EIF with `nitro-cli run-enclave --debug-mode`, and `ra-parse` must refuse its document with
+exit 7. It needs one Nitro instance and no chain. The saved `debug.doc` then becomes a fixture, and T8 a code test.
 
-⁵ The nonce check is inside `verify` and has unit and command tests, but no e2e script replays a saved document
-against a live verifier.
+⁵ The nonce check is inside `verify` and has unit and command tests. `e2e/replay-check.sh` (written 2026-11-12, **not
+run** on Nitro) replays a fresh document against the next request's nonce on a live enclave; it needs a running
+enclave and no chain. The same check passed live on TDX and SEV-SNP (`e2e/cvm/in-guest-verify.sh`).
 
 ⁶ Nitro and TDX return one document from one TEE; there is nothing to combine.
 
