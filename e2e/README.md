@@ -7,6 +7,10 @@ script from the repository root.
 
 For tests that need no Nitro hardware, see `go test ./...` in the main README.
 
+`sev-snp/` is a separate test on AMD SEV-SNP (GCP and AWS), which Attestamp does not support yet:
+a closed VM runs Ollama and proves, with every answer, that its code has not changed since boot.
+See [sev-snp/README.md](sev-snp/README.md).
+
 ## Prerequisites
 
 - Two Nitro-enabled EC2 instances (Linux), one for the Vendor and one for the Auditor. An optional

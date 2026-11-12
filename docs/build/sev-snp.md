@@ -31,3 +31,10 @@ and 4.7.5.
 This list is what we found, not everything that can differ. There is no `--verify` for SEV-SNP yet.
 Until there is, build twice and on two machines, and compare the hashes of the application, the
 cpio archive and the disk image before registering anything.
+
+## Proving the code has not changed since boot
+
+A measurement taken at boot says nothing about code changed afterwards. Our test closes that gap
+with a VM that has no way in after boot: the application is in the measured initrd, the kernel
+starts it directly, and there is no disk, shell, SSH or cloud agent. See
+[e2e/sev-snp](../../e2e/sev-snp/README.md) for the code, how to run it and what we saw on GCP and AWS.
