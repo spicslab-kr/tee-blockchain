@@ -33,9 +33,9 @@ go build -trimpath -buildvcs=false -o "$AUDITOR_BIN" ./cmd/auditor
 go build -trimpath -buildvcs=false -o "$USER_BIN" ./cmd/user
 echo "responder sha256: $(sha256 att-ra-responder | cut -c1-64)"  # compared with the checksum printed on each instance after the upload
 
-# The flow and arch scripts clone the test application with git on the instances, and nothing installed it before.
-#   (Whether the Amazon Linux image ships git was never checked; this step makes it not matter.) Installed only when
-#   missing; git is outside the enclave image, so it does not touch the measurement.
+# The flow and arch scripts clone the test application with git on the instances, and the Amazon Linux 2023 image has
+#   no git (seen on the 2026-11-12 baseline: this step installed git 2.50.1 on both). Installed only when missing; git
+#   is outside the enclave image, so it does not touch the measurement.
 step "INSTALLING GIT"
 V 'command -v git >/dev/null || sudo dnf install -y -q git; git --version'
 A 'command -v git >/dev/null || sudo dnf install -y -q git; git --version'

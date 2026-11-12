@@ -13,7 +13,7 @@ The platform guides refer here: [AWS Nitro](aws-nitro.md), [Intel TDX](tdx.md), 
 | **your machine** (any OS; the e2e scripts need bash) | Go at exactly `internal/setup/build/GO_TOOLCHAIN`; git; ssh/scp; for the chain tests anvil | Go and git by hand or `bash e2e/0-Setup-local-install.sh`; anvil from the Foundry release (below). `go.mod` says only `go 1.26.1` (no `toolchain` line), so a newer installed Go is used as is and `build` then refuses; set `GOTOOLCHAIN=go1.26.1` (as `.claude/settings.json` does) and Go downloads and uses exactly the pinned one |
 | your machine, to create instances | `aws` CLI (Nitro) or `gcloud` (TDX, SEV-SNP), signed in | by hand; see `e2e/cloud/README.md` |
 | your machine, only to regenerate the contract binding | forge (solc 0.8.28 is fetched by forge), Python 3, OpenZeppelin as the submodule | `go generate` in `internal/chain/register/*/ether`; see "The Registry binding" |
-| **Nitro parent instance** (Amazon Linux 2023) | docker, `aws-nitro-enclaves-cli` (nitro-cli and the allocator), git | `att-* build` and `launch` install docker and nitro-cli with `dnf` themselves (no version pinned); `0-Setup-local-upload.sh` installs git when missing. No Go: the binaries are cross-built on your machine and copied |
+| **Nitro parent instance** (Amazon Linux 2023) | docker, `aws-nitro-enclaves-cli` (nitro-cli and the allocator), git | `att-* build` and `launch` install docker and nitro-cli with `dnf` themselves (no version pinned); `0-Setup-local-upload.sh` installs git, which the AMI does not have. No Go: the binaries are cross-built on your machine and copied |
 | **GCP TDX or SEV-SNP guest** (Ubuntu 24.04) | for the app fixtures: squashfs-tools, cryptsetup (veritysetup), initramfs-tools, GRUB; for SEV-SNP Option 2 also tpm2-tools; for the in-guest chain run anvil | the stock image has all but tpm2-tools (`e2e/cloud/README.md`, "GCP prerequisites"); `apt-get install -y tpm2-tools`; anvil from the Foundry release. No Go: binaries are cross-built and copied |
 
 ## Which step calls which tool
@@ -79,10 +79,23 @@ The att binaries on the guests were cross-built on the development machine (go1.
 
 ### Nitro parent instance
 
-**Not recorded.** No Nitro instance has run since the pin; the 2026-11-12 attempt to create the baseline instances was
-not permitted in the unattended session (`docs/plan/night-log.md`). `build` and `launch` install docker and
-`aws-nitro-enclaves-cli` with `dnf` without a version, so the versions are whatever Amazon Linux 2023 ships that day.
-PCR1 depends on nitro-cli's kernel files, so the baseline run must print and record:
+Recorded on both instances of the Nitro baseline, 2026-11-12 (`docs/results/aws-nitro-2026-11-12.md`); the two were
+identical in every line:
+
+| what | value, as printed |
+|---|---|
+| AMI | `ami-048b77d5ca32f6d32` (`al2023-ami-2023.12.20261109.0-kernel-6.12-x86_64`, created 2026-11-04), from instance metadata `ami-id` and `aws ec2 describe-images` |
+| OS | `PRETTY_NAME="Amazon Linux 2023.12.20261109"` |
+| kernel | `uname -r`: `6.12.114-139.210.amzn2023.x86_64`; `uname -m`: `x86_64` |
+| instance type, region | m6i.xlarge, eu-north-1 |
+| aws-nitro-enclaves-cli | `rpm -q`: `aws-nitro-enclaves-cli-1.5.0-0.amzn2023.x86_64` (and `-devel` the same); `nitro-cli --version`: `Nitro CLI 1.5.0` |
+| docker | `rpm -q`: `docker-25.0.18-1.amzn2023.0.3.x86_64`; `docker --version`: `Docker version 25.0.14, build 0bab007` (the package and the binary report different patch numbers; both are recorded as printed) |
+| git | `git version 2.50.1` (`git-2.50.1-1.amzn2023.0.1`); **not in the AMI**: `0-Setup-local-upload.sh` installed it |
+| enclave allocator | `memory_mib: 512`, `cpu_count: 2` after the builds (raised by `launch` when needed) |
+
+`build` and `launch` install docker and `aws-nitro-enclaves-cli` with `dnf` without a version, so another day's image
+may bring others. PCR1 depends on nitro-cli's kernel files: with 1.5.0 the test application's PCR1 was
+`4b4d5b36…a493`. To record a later instance the same way:
 
 ```
 rpm -q docker aws-nitro-enclaves-cli git

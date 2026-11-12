@@ -861,3 +861,27 @@ identifiers, no publication or history decisions.
 
 AWS: none in any of the 17 enabled regions (`describe-instances` per region). GCP: `attestamp-snp-vendor` and
 `attestamp-tdx-vendor` TERMINATED.
+
+## Nitro baseline, 2026-11-12 (the checks without a chain)
+
+The user created the two instances and `e2e/env.local.sh`; this session did not read that file (the scripts do).
+Code at `9a5668e`, after `a379a2c`, `e6ef9b4` and `60de6b0`. No chain was used.
+
+| step | result |
+|---|---|
+| `0-Setup-local-upload.sh` | uploaded; the AMI had no git and the new step installed git 2.50.1 on both. It exited 1 although it succeeded: the EXIT trap's key prompt failed without a terminal under `set -e` (fixed in `3403658`) |
+| `arch-measurement-compare.sh` | T1, T3: identical PCR0/1/2 on two machines and two checkout paths. arm64 skipped |
+| `toolchain-pin-check.sh` | T2: go1.26.2 build refused on the instance, pinned build passes, responder bytes differ |
+| `responder-check.sh` | three refusals as expected; the last step failed twice because this machine's network aborted the sixth SSH connection in a few seconds (sshd: "Connection reset by <client> [preauth]"). Run on its own, the step passed. Both failed lines stay in the JSONL |
+| `build-env-check.sh` | T7: refused, warning only, accepted, as expected. arm64 mirror skipped |
+| `arch-record-check.sh` | all five checks as expected (not asked for; no chain, about a minute) |
+| versions (#1) | recorded in `docs/build/toolchain.md` |
+
+Not run, on purpose: `debug-mode-check.sh` and `replay-check.sh` (not in the request, and `att-vendor launch` may open
+port 5000 in the security group to `0.0.0.0/0` when the instance role allows it), and every chain script.
+
+Also fixed today, from the user's report: `aws-nitro.sh create` failed in Git Bash because MSYS rewrote
+`DeviceName=/dev/xvda` (`3eb18b4`).
+
+**Stopped** both instances with `aws-nitro.sh stop` at about 04:00 UTC; `describe-instances` shows both `stopped`, and
+no other instance exists in any of the 17 enabled AWS regions. Not terminated.
