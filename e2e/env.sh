@@ -84,5 +84,7 @@ result() {
 }
 
 # Keep the window open after the script ends, with the exit status shown, until a key is pressed. A script started by
-# double-click in a file explorer would otherwise close the window before the result can be read.
-trap 'ec=$?; echo; if [ $ec -eq 0 ]; then echo "== done (exit 0) =="; else echo "== exited (exit $ec) =="; fi; read -n 1 -s -r -p "Press any key to close this window..."; echo' EXIT
+# double-click in a file explorer would otherwise close the window before the result can be read. Only when stdin is a
+# terminal: without one, read fails, and under set -e that failure became the script's exit status (a run that passed
+# exited 1), so the trap also exits with the status it saw.
+trap 'ec=$?; echo; if [ $ec -eq 0 ]; then echo "== done (exit 0) =="; else echo "== exited (exit $ec) =="; fi; if [ -t 0 ]; then read -n 1 -s -r -p "Press any key to close this window..." || true; echo; fi; exit $ec' EXIT
