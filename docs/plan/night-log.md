@@ -885,3 +885,20 @@ Also fixed today, from the user's report: `aws-nitro.sh create` failed in Git Ba
 
 **Stopped** both instances with `aws-nitro.sh stop` at about 04:00 UTC; `describe-instances` shows both `stopped`, and
 no other instance exists in any of the 17 enabled AWS regions. Not terminated.
+
+## Security group, SSH retry, T8/T9 (2026-11-12, later)
+
+| task | result | commit |
+|---|---|---|
+| `launch` widened the security group to `0.0.0.0/0` on its own | fixed in both role copies: by default nothing changes (the current sources and the command are printed); `--open-port-to <CIDR>` opens exactly that source, `0.0.0.0/0` only when written; what was opened is logged. Tests stand in for the aws CLI and the metadata | `4d5517a` |
+| `responder-check.sh` lost the sixth SSH connection | `net_retry` in `e2e/env.sh` retries only a connection that could not be set up (up to `SSH_TRIES`, default 3); a failing remote command is never retried | `4b2497c` |
+| T8, T9 on Nitro | **not run**: `bash e2e/cloud/aws-nitro.sh start` stopped at its first check, "aws CLI is not authenticated"; `aws` itself said "Your session has expired. Please reauthenticate using 'aws login'". Logging in needs the user. The instances were not started; their last seen state was `stopped` (this session could not read it again without a session) | — |
+
+The CVM guidance already agreed with the new rule: `docs/build/tdx.md` and `docs/build/sev-snp.md` say to allow port 5000
+only from the verifier's address, and `docs/plan/cvm-port.md` says to narrow `attestamp-ra` to it.
+
+For the next run of T8 and T9: after `start`, the instances have new public addresses (no Elastic IP), so update
+`e2e/env.local.sh` from `bash e2e/cloud/aws-nitro.sh status` first. Then `bash e2e/debug-mode-check.sh` and, while
+its relaunched normal enclave is running, `bash e2e/replay-check.sh`; both write to `e2e-work/results/aws-nitro.jsonl`.
+Neither opens the security group any more: `debug-mode-check.sh` calls `launch` without `--open-port-to`, and the
+e2e security group already allows port 5000 from the creating machine.
