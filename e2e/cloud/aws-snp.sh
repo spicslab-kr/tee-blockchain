@@ -59,7 +59,8 @@ ensure_sg() {
 }
 launch() { # launch <role> <ami>
   SG=$(ensure_sg)
-  aws ec2 run-instances --image-id "$2" --count 1 --instance-type "$TYPE" \
+  # MSYS_NO_PATHCONV=1: Git Bash would turn DeviceName=/dev/sda1 into a Windows path (see aws-nitro.sh)
+  MSYS_NO_PATHCONV=1 aws ec2 run-instances --image-id "$2" --count 1 --instance-type "$TYPE" \
     --key-name "$KEY_NAME" --security-group-ids "$SG" \
     --cpu-options AmdSevSnp=enabled \
     --block-device-mappings 'DeviceName=/dev/sda1,Ebs={VolumeSize=32,VolumeType=gp3}' \
@@ -84,13 +85,14 @@ mkami)
   id=$(id_of base); [ "$id" != "None" ] && [ -n "$id" ] || die "no base instance; run 'base' first"
   echo "stopping $id…"; aws ec2 stop-instances --instance-ids "$id" >/dev/null; aws ec2 wait instance-stopped --instance-ids "$id"
   ROOT=$(aws ec2 describe-instances --instance-ids "$id" --query 'Reservations[].Instances[].RootDeviceName' --output text)
-  VOL=$(aws ec2 describe-instances --instance-ids "$id" \
+  # $ROOT is /dev/sda1: MSYS_NO_PATHCONV=1 keeps Git Bash from rewriting it here and in register-image below
+  VOL=$(MSYS_NO_PATHCONV=1 aws ec2 describe-instances --instance-ids "$id" \
         --query "Reservations[].Instances[].BlockDeviceMappings[?DeviceName=='$ROOT'].Ebs.VolumeId" --output text)
   echo "root $ROOT  volume $VOL"
   SNAP=$(aws ec2 create-snapshot --volume-id "$VOL" --description "attestamp SEV-SNP base" --query SnapshotId --output text) || die "create-snapshot"
   echo "snapshot $SNAP, waiting…"; aws ec2 wait snapshot-completed --snapshot-ids "$SNAP"
   # The vTPM is an AMI attribute, so it can only be set by registering a new image.
-  NEW=$(aws ec2 register-image --name "$AMI_NAME-$(date +%Y%m%d%H%M)" \
+  NEW=$(MSYS_NO_PATHCONV=1 aws ec2 register-image --name "$AMI_NAME-$(date +%Y%m%d%H%M)" \
         --architecture x86_64 --root-device-name "$ROOT" --virtualization-type hvm --ena-support \
         --boot-mode uefi --tpm-support v2.0 \
         --block-device-mappings "DeviceName=$ROOT,Ebs={SnapshotId=$SNAP,VolumeSize=32,VolumeType=gp3,DeleteOnTermination=true}" \

@@ -83,7 +83,10 @@ ensure_key_and_group() {
 # launch_role <role> <instance type> <ami> - one instance with Nitro Enclaves on, unless one with that role exists.
 launch_role() {
   if [ -n "$(ids_by_role "$1")" ]; then echo "$1 instance already exists, skipping"; return 0; fi
-  id=$(aws ec2 run-instances \
+  # MSYS_NO_PATHCONV=1: Git Bash (MSYS) rewrites an argument holding /dev/xvda into a Windows path before aws.exe
+  # sees it ("Invalid device name C:/Program Files/Git/dev/xvda"), and quoting does not stop it. This turns the
+  # conversion off for this one command; every other argument here does not start with /. Ignored on Linux and macOS.
+  id=$(MSYS_NO_PATHCONV=1 aws ec2 run-instances \
     --image-id "$3" --count 1 --instance-type "$2" \
     --key-name "$KEY_NAME" --security-group-ids "$SG" \
     --enclave-options 'Enabled=true' \

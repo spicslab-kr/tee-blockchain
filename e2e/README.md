@@ -14,6 +14,10 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
   the two x86_64 instances; see [`cloud/README.md`](cloud/README.md) for the settings and cost.
 - `git`, an `ssh` client and the pinned Go version on your machine. `0-Setup-local-install.sh`
   installs what is missing.
+- On Windows, run the scripts in Git Bash. Git Bash (MSYS) rewrites any argument that starts with `/` (or holds
+  `=/…`) into a Windows path before a native program such as `aws.exe` sees it, even inside quotes; the scripts put
+  `MSYS_NO_PATHCONV=1` in front of the calls that pass such values (`/dev/xvda`, `/dev/sda1`). Do the same when you
+  type such a command yourself.
 - The SSH key (`PEM` in `env.sh`, default `pem2.pem`) in the repository root, and two funded key
   files in the repository root: `auditor.key` (signing key, approver in flow 1) and `deployer.key` (deployer key, pays gas,
   signing key and approver in flow 2). Key files are gitignored. Never commit them.
