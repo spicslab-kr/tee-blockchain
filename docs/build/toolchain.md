@@ -24,7 +24,7 @@ The platform guides refer here: [AWS Nitro](aws-nitro.md), [Intel TDX](tdx.md), 
 | `go test ./...` | your machine | go; anvil for the chain tests (looked up on `PATH`, then `~/.foundry/bin`); git for the `core/transfer` tests |
 | `go generate` (the Registry binding) | your machine | forge → solc 0.8.28; python; `go run …/abigen` |
 | `att-vendor build`, `att-auditor build`, `pack` | Nitro instance | dnf, systemctl, docker (`build`, `create`, `export`, `image inspect`), nitro-cli (`build-enclave`, `describe-eif`) |
-| `att-* launch` | Nitro instance | dnf, systemctl (the allocator), nitro-cli (`run-enclave`, `describe-enclaves`, `terminate-enclave`), aws (opening the security-group port, when the instance role allows) |
+| `att-* launch` | Nitro instance | dnf, systemctl (the allocator), nitro-cli (`run-enclave`, `describe-enclaves`, `terminate-enclave`), aws (reading the security group; opening the port only with `--open-port-to`, when the instance role allows) |
 | `att-auditor send`, `receive`; `att-vendor send`, `receive` | anywhere | git |
 | e2e flow and check scripts | your machine, then the instances over ssh | bash, ssh, scp, go (cross-builds), curl (instance metadata), git (cloning the test application on the instance) |
 | `e2e/cloud/aws-nitro.sh` | your machine | aws, curl (your public IP) |

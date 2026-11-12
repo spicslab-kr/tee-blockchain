@@ -155,10 +155,33 @@ and where each one goes:
 |---|---|---|---|
 | RA port inside the enclave | 5000 | `build`/`pack --port` | `ENV ATT_RA_PORT=<port>` in the image `build` layers on the software; `entrypoint.sh` starts `ra-serve --listen vsock:${ATT_RA_PORT:-5000} --extractor nsm`. It is in the image, so the Vendor and the Auditor must use the same `--port` (whether a different port changes PCR0/PCR2 was not measured) |
 | RA port on the parent instance | the same port | `launch --port` ("must match the value given to build or pack") | `ra-proxy --listen <listen>:<port> --vsock <cid>:<port>`, started detached by `launch`; its log is `out/proxy.log` |
-| listen address of the bridge | `0.0.0.0` | `launch --listen` | the TCP side of `ra-proxy`. After starting it, `launch` opens the port in the instance's first security group itself, **from `0.0.0.0/0`**, if the instance role allows `ec2:AuthorizeSecurityGroupIngress`; otherwise it prints the `aws ec2 authorize-security-group-ingress` command to run by hand (`OpenPort`, `port.go`) |
+| listen address of the bridge | `0.0.0.0` | `launch --listen` | the TCP side of `ra-proxy`. The security group is a separate matter: see "Opening the RA port" below |
+| source the RA port is opened to | **none**: nothing is opened | `launch --open-port-to <CIDR>` | the instance's first security group, only when given and when the instance role allows `ec2:AuthorizeSecurityGroupIngress`; see below |
 | enclave vsock CID | 16 | `launch --cid` | `nitro-cli run-enclave --enclave-cid`, and the target of `ra-proxy --vsock` (default `16:5000`) |
 | enclave CPUs | 2 | `launch --cpus` | `nitro-cli run-enclave --cpu-count`; `launch` raises `cpu_count` in `/etc/nitro_enclaves/allocator.yaml` if it is lower |
 | enclave memory | four times the EIF size, rounded up to 512 MiB, at least 512 MiB (`MemoryFor`) | `launch --memory <MiB>` | `nitro-cli run-enclave --memory`; `launch` raises `memory_mib` in the allocator file if it is lower. Raising the allocator stops any running enclave |
 | responder default when run by hand | `tcp:127.0.0.1:5000` | `att-ra-responder ra-serve --listen` | only for a manual run; inside the EIF the entrypoint always passes `vsock:` |
 
 CID, CPUs and memory are given when the enclave starts and are not part of the measured image.
+
+## Opening the RA port
+
+Users and the Auditor reach the enclave through the bridge's TCP port on the parent instance, so the instance's
+security group must allow that port from them. `launch` never widens the group on its own (changed 2026-11-12; until
+then it opened the port to `0.0.0.0/0` whenever the instance role allowed it, without saying so beforehand):
+
+| `launch` run with | what happens to the security group |
+|---|---|
+| nothing | **nothing changes.** `launch` says which sources the group allows on the port now (when the role may read the group) and prints the `aws ec2 authorize-security-group-ingress` command, with `<verifier-ip>/32` as the source |
+| `--open-port-to 203.0.113.7/32` | that one source is added, if the role allows it and the group does not already have exactly that rule. The log line starts with `OPENED` and names the group, region, port, source and time |
+| `--open-port-to 0.0.0.0/0` | the port is opened to everyone, because that is what was written; the log says so and prints the `revoke-security-group-ingress` command to undo it |
+| a bare address, a CIDR with host bits set, or IPv6 | refused before anything starts, with the CIDR it probably meant |
+| a source, but no permission | nothing changes; the command for that source is printed, and the console path |
+
+Public access is allowed by the design: anyone may verify an enclave, and the evidence is not secret. But opening to
+everyone has to be a decision someone writes down, not a side effect, and the usual source is the verifier's address.
+The confidential VMs follow the same rule: `docs/build/tdx.md` and `docs/build/sev-snp.md` say to allow port 5000
+only from the verifier's address, and `docs/plan/cvm-port.md` says to narrow the `attestamp-ra` firewall rule to it.
+
+The e2e instances made by `e2e/cloud/aws-nitro.sh create` already allow ports 22 and 5000 from the creating
+machine's address only, so the e2e scripts need no `--open-port-to`.

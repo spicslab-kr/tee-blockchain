@@ -105,7 +105,7 @@ As a **Vendor**, on a Nitro instance, with the directory that holds your Dockerf
 
 ```
 att-vendor build  --app-dir <dir> --out-dir out  # reproducible enclave image + measurements
-att-vendor launch --eif out/<name>.eif           # run it, open the attestation port
+att-vendor launch --eif out/<name>.eif           # run it; add --open-port-to <verifier-ip>/32 to open the port
 att-vendor send   --repo <git url> --config build-config.json
 ```
 
@@ -156,7 +156,10 @@ hash, and register its own signed hash. The User can then require both registrie
   line, and `--verify` builds twice and fails unless both measurements are identical.
 - **Build-environment declaration.** `build-config.json` records source, OS, CPU architecture and
   toolchain, so the Auditor can rebuild in the same environment.
-- **Launch and self-check.** `launch` starts the enclave, bridges the port, and attests itself.
+- **Launch and self-check.** `launch` starts the enclave, bridges the port, and attests itself. It
+  never opens the security group on its own: it prints the command, and opens the port only to the CIDR
+  given with `--open-port-to` (`0.0.0.0/0` only when written), logging what it opened to whom
+  ([details](docs/build/aws-nitro.md#opening-the-ra-port)).
 - **Self-registration (flow 2).** `self-register` attests, registers and checks in one command.
 
 → [Vendor guide](cmd/vendor/README.md)

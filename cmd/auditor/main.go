@@ -121,9 +121,9 @@ func usage() {
   pack        --docker-image <docker image you built>  [--image-name <n>] [--port 5000] [--out-dir out] [--responder <att-ra-responder>]
               same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
               for an image handed over as a file
-  launch      --eif <file>  [--build-measurements <file>] [--enclave-name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out-dir out]
+  launch      --eif <file>  [--build-measurements <file>] [--enclave-name <n>] [--port 5000] [--memory <MiB>] [--cpus 2] [--cid 16] [--listen 0.0.0.0] [--out-dir out] [--open-port-to <CIDR>]
               on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock,
-              requests RA from itself to confirm, then opens the security-group port (when permitted).
+              requests RA from itself to confirm, then reports the security-group port. it opens the port only with --open-port-to <CIDR> (0.0.0.0/0 only when written), else prints the command.
               --build-measurements is for a received EIF: the file it came with. the EIF is then measured itself (→ out/measurements.json) and launched only if it measures to that
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
@@ -451,11 +451,17 @@ func launchCmd(args []string) error {
 	fs.StringVar(&l.Listen, "listen", "0.0.0.0", "address the bridge listens on")
 	fs.StringVar(&l.OutDir, "out-dir", "out", "directory for logs and the self-check document")
 	fs.StringVar(&l.BuildMeasurements, "build-measurements", "", "the measurements.json that came with a received EIF: the EIF is measured itself and must match, or it is not launched")
+	openTo := fs.String("open-port-to", "", "open the RA port in this instance's security group to this IPv4 CIDR, e.g. <verifier-ip>/32. without it nothing is opened and the command is printed; 0.0.0.0/0 (everyone) only when written out")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if l.EIF == "" {
 		return errors.New("--eif is required")
+	}
+	if *openTo != "" {
+		if _, err := launch.ParseCIDR(*openTo); err != nil {
+			return fmt.Errorf("--open-port-to: %w", err)
+		}
 	}
 	ctx := context.Background()
 	started, err := l.Run(ctx, os.Stdout)
@@ -483,28 +489,9 @@ func launchCmd(args []string) error {
 	}
 	t.Done(fmt.Sprintf("%s document, %d bytes → %s", doc.Format, len(doc.Raw), selfDoc))
 
-	fmt.Printf("Security group: inbound TCP %d\n", l.Port)
-	cmd, group, perr := launch.OpenPort(ctx, l.Port, os.Stdout)
-	if perr == nil {
-		cli.Okln("✓ enclave is up and reachable. anyone can now:  att-user verify --tee-addr <this instance's public IP>:", l.Port, " --rpc … --registry …")
-		return nil
-	}
-	// Could not open it here: say what to open, where and how. The permission-denied case and
-	// other failures (metadata, aws CLI) are told apart only on the second line.
-	why := "This instance has no permission to change it. From an AWS account that does, run:"
-	if !errors.Is(perr, launch.ErrNoPermission) {
-		why = fmt.Sprintf("Could not open it from here (%v). From an AWS account that can, run:", perr)
-	}
-	if group == "" {
-		group = "<this instance's security group>"
-	}
-	fmt.Printf(`
-Inbound TCP %d must be open on this instance's security group so the Auditor and Users can reach the enclave.
-%s
-  %s
-or open it in the console: EC2 → Security Groups → %s → Inbound rules → Custom TCP %d, source 0.0.0.0/0.
-Then anyone can:  att-user ra-request --tee-addr <this instance's public IP>:%d --format aws-nitro
-`, l.Port, why, cmd, group, l.Port, l.Port)
+	// The security group is changed only with --open-port-to, and only to that source; otherwise this reports and prints
+	// the command (internal/setup/launch/<role>/aws/port.go).
+	launch.ReportPort(ctx, l.Port, *openTo, os.Stdout)
 	return nil
 }
 

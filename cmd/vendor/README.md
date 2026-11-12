@@ -29,8 +29,10 @@ att-vendor launch --eif out/app.eif
 ```
 
 `launch` (`Launch`, `EIF`) starts the enclave, bridges TCP port 5000 to its vsock (`ProxyBinary`), asks the enclave for
-an attestation to check that it answers, and opens the security-group port. If the instance may not
-change the security group, it prints the one `aws ec2` command to run yourself. `--enclave-name`
+an attestation to check that it answers, and reports the security-group port: which sources may reach it now, and the
+one `aws ec2` command that would open it. It changes the security group only with `--open-port-to <CIDR>` (for
+example the verifier's `<ip>/32`; `0.0.0.0/0` only when you write it), and logs what it opened to whom
+([docs/build/aws-nitro.md](../../docs/build/aws-nitro.md#opening-the-ra-port)). `--enclave-name`
 (`EnclaveName`), `--memory`, `--cpus`, `--cid`, `--listen` and `--port` adjust the run. For an image
 you received, add `--build-measurements <file>` (`BuildMeasurements`). `launch` then measures the image
 and starts it only if the result matches the file.

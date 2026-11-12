@@ -1,8 +1,8 @@
 // Package aws launches the EIF a build produced as an enclave, sets up a TCP-to-vsock bridge on the parent instance.
-// OpenPort (port.go) opens the security group port. Result holds the RA address to write into the configuration once everything is up.
+// port.go reports, and only on request opens, the RA port on the security group. Result holds the RA address to write into the configuration once everything is up.
 //
 // The instance itself is created by the user, who enables Nitro Enclaves and logs in. This package only calls
-// nitro-cli from there, touches the security group only when it has permission, and uses no cloud credentials.
+// nitro-cli from there, changes the security group only when asked with a CIDR and allowed to, and uses no cloud credentials.
 package aws
 
 import (
