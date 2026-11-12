@@ -37,7 +37,7 @@ have to take care of all of it. The sections after this one say which items `bui
 - the CPU architecture (`amd64` or `arm64`)
 - the Go version and `-trimpath` of `att-ra-responder`, and the very same responder file on both sides
 - the file order, timestamps and owners inside the Docker layers, which `docker build` decides anew on every run
-- `ENTRYPOINT`, `CMD` and `ENV` of the image
+- `ENTRYPOINT`, `CMD`, `ENV` and `WORKDIR` of the image
 - files left in `/tmp` and `/var/tmp`
 - package-manager logs, which record the install time
 - apk virtual-package versions, which are the install time
@@ -57,7 +57,7 @@ contents the layer bytes still differ, and PCR0 and PCR2 with them. After `docke
 
 | step | what it removes |
 |---|---|
-| repack in name order, time 0, owner 0 (`tar --sort=name --mtime=@0 --owner=0 --group=0`), then restore `ENTRYPOINT`, `CMD`, `ENV` | file order and timestamps from `docker build` |
+| repack in name order, time 0, owner 0 (`tar --sort=name --mtime=@0 --owner=0 --group=0`), then restore `ENTRYPOINT`, `CMD`, `ENV`, and `WORKDIR` as `/att-app-workdir` | file order and timestamps from `docker build` |
 | empty `/tmp` and `/var/tmp` | random-named files left by `mktemp` (memcached) |
 | remove package-manager logs: `/var/log/apk.log`, `dpkg.log`, `alternatives.log`, `apt`, `yum.log`, `dnf*.log`, `hawkey.log` | install times (nginx alpine-slim: only `apk.log` differed out of 725 files) |
 | set apk virtual-package versions to 0 in `/etc/apk/world` and `/lib/apk/db/installed` | the install time used as a version (haproxy, memcached) |
