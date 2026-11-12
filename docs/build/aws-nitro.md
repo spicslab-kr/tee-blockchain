@@ -128,5 +128,5 @@ checking a Vendor's self-registration later in flow 2.
 | `--verify` (`build`) | builds twice and compares | yes, but then you do not know whether the build is reproducible |
 | `--ignore-env` (`receive`) | turns a `build_env` mismatch into a warning | only to look around; the values will not match |
 | `--build-measurements` (`launch`) | starts a received image only if it measures the same | yes, but then a swapped image starts unchecked |
-| `--memory`, `--cpus` (`launch`) | the enclave's memory and CPU count | they are set when the enclave starts, not part of the build; the image must fit in the memory |
+| `--memory`, `--cpus` (`launch`) | the enclave's memory and CPU count | they are set when the enclave starts, not part of the build; the image must fit in the memory. Above 8192 MiB the enclave needs 1 GiB pages: `launch` frees the page cache before reserving them, and stops with the reason if they still do not fit. Then reboot and launch first, or lower `--memory` |
 | `--arch` (`register`, `self-register`, `audit`) | names the architecture of the registration; not a build setting | it defaults to `build-config.json` or this machine |
