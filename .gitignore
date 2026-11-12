@@ -19,3 +19,9 @@ pem2.pem
 
 # Local instance addresses (copy e2e/env.local.example.sh)
 e2e/env.local.sh
+
+# e2e/sev-snp: built binaries and results of a run
+e2e/sev-snp/**/snp-*
+e2e/sev-snp/**/*.json
+e2e/sev-snp/**/*.log
+e2e/sev-snp/**/*.txt
