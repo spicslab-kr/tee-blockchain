@@ -7,6 +7,11 @@ dist/
 /vendor.exe
 /user
 /user.exe
+# e2e/0-Setup-local-upload.sh cross-builds the Linux binaries for the instances into the repo root.
+/att-vendor
+/att-auditor
+/att-user
+/att-ra-responder
 
 # e2e scripts: files fetched from the instances during a run
 e2e-work/
