@@ -127,7 +127,8 @@ Set in `e2e/env.sh` unless noted.
 | `VENDOR_HOST`, `AUDITOR_HOST`, `ARM64_HOST` | instance addresses, set in `env.local.sh` and empty by default; `need_host` stops a script if a required one is empty |
 | `SSH_USER` | login user on the instances, `ec2-user` |
 | `PEM` | SSH key file, relative to the repository root, default `pem2.pem` |
-| `SSH`, `SCP` | the ssh and scp command lines built from `PEM` |
+| `SSH`, `SCP` | the ssh and scp command lines built from `PEM`; every connection goes through `net_retry` |
+| `SSH_TRIES` | attempts per ssh/scp when the connection itself cannot be set up (default 3). Some networks abort a burst of new connections ("kex_exchange_identification … Software caused connection abort"); such an attempt is retried after 3 s, then 6 s. A remote command that fails is never retried, and after the last attempt the failure stands |
 | `V`, `A`, `R` | functions that run a command on the Vendor, Auditor or arm64 instance |
 | `NET` | `sepolia` (default) or `mainnet`; mainnet also needs `CONFIRM_MAINNET=1` |
 | `RPC` | the public RPC URL chosen by `NET` |

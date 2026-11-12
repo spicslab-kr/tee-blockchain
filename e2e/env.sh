@@ -45,11 +45,41 @@ WORK=e2e-work
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE=.exe;; *) EXE="";; esac   # Git Bash reports MINGW/MSYS
 VENDOR_BIN="$BIN/att-vendor$EXE"; AUDITOR_BIN="$BIN/att-auditor$EXE"; USER_BIN="$BIN/att-user$EXE"
 
-SSH="ssh -i $PEM -o StrictHostKeyChecking=no"
-SCP="scp -q -i $PEM -o StrictHostKeyChecking=no"
-V() { need_host VENDOR_HOST; $SSH "$SSH_USER@$VENDOR_HOST" "$@"; }
-A() { need_host AUDITOR_HOST; $SSH "$SSH_USER@$AUDITOR_HOST" "$@"; }
-R() { need_host ARM64_HOST; $SSH "$SSH_USER@$ARM64_HOST" "$@"; }   # arm64 comparison instance
+SSH="ssh -i $PEM -o StrictHostKeyChecking=no -o ConnectionAttempts=2 -o ConnectTimeout=20"
+SCP="net_retry scp -q -i $PEM -o StrictHostKeyChecking=no -o ConnectionAttempts=2 -o ConnectTimeout=20"
+V() { need_host VENDOR_HOST; net_retry $SSH "$SSH_USER@$VENDOR_HOST" "$@"; }
+A() { need_host AUDITOR_HOST; net_retry $SSH "$SSH_USER@$AUDITOR_HOST" "$@"; }
+R() { need_host ARM64_HOST; net_retry $SSH "$SSH_USER@$ARM64_HOST" "$@"; }   # arm64 comparison instance
+
+# net_retry <ssh|scp> <args...> - runs ssh or scp, and runs it again when the connection itself could not be set up.
+# Some networks abort a burst of new SSH connections ("kex_exchange_identification: read: Software caused connection
+# abort"; seen on 2026-11-12 at the sixth connection within seconds), before anything ran on the instance.
+#   - Retried only when ssh/scp failed (ssh: exit 255, its own error code; scp: any failure) AND its error output
+#     names a connection-setup failure. A remote command that fails, or a session that breaks after it started, is
+#     never retried, so a failure is never hidden or a command run twice.
+#   - At most SSH_TRIES attempts (default 3), waiting 3 s, then 6 s. After the last one the original exit code is
+#     returned and the script fails as before.
+#   - stdin (the heredoc of V 'bash -s' <<REMOTE) is kept in a file and given again to every attempt; a terminal is
+#     left alone.
+# ssh/scp error output is shown after the attempt ends rather than as it is written.
+SSH_TRIES=${SSH_TRIES:-3}
+net_retry() {
+  local n=1 rc errf inf=""
+  errf=$(mktemp)
+  if [ ! -t 0 ]; then inf=$(mktemp); cat > "$inf"; fi
+  while :; do
+    if [ -n "$inf" ]; then "$@" < "$inf" 2> "$errf"; rc=$?; else "$@" 2> "$errf"; rc=$?; fi
+    cat "$errf" >&2
+    if [ $rc -eq 0 ] || { [ "$1" = ssh ] && [ $rc -ne 255 ]; } || [ $n -ge "$SSH_TRIES" ] \
+       || ! grep -qE 'kex_exchange_identification|banner exchange|Software caused connection abort|Connection (refused|reset by peer|timed out)|Operation timed out|Network is unreachable|No route to host|Connection closed by [^ ]+ port [0-9]+$' "$errf"; then
+      break
+    fi
+    echo "$1: the connection could not be set up (attempt $n of $SSH_TRIES); trying again in $((n * 3)) s" >&2
+    sleep $((n * 3)); n=$((n + 1))
+  done
+  rm -f "$errf" ${inf:+"$inf"}
+  return $rc
+}
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
 # step <title> <command...> - print a one-line green banner, then run the command.
 # step_start <title> prints the same banner for a block of several commands; step_stop closes the block and prints
