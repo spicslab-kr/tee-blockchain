@@ -215,6 +215,8 @@ hash, and register its own signed hash. The User can then require both registrie
 
 - [Project structure](STRUCTURE.md): every folder and module, and how the roles fit together
 - [End-to-end scripts](e2e/README.md): our runs against real Nitro instances
+- [Running without a public testnet](e2e/README.md#running-without-a-public-testnet): both flows on real enclaves
+  with a local chain (`anvil`) and `NET=local`, so you can run the whole thing without any ETH
 - [Releases](../../releases)
 
 ## Testing

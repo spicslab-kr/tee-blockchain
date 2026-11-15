@@ -105,12 +105,13 @@ Each verdict appends one line to `e2e-work/results/<platform>.jsonl` (done 2026-
 called by every Nitro e2e script, and the same fields from `e2e/cvm/in-guest-verify.sh` for the confidential VMs):
 
 ```json
-{"platform":"aws-nitro","test":"T5","check":"user-verify-after-swap","script":"e2e/flow1-auditor-registers/5-User-tamper-verify.sh","result":"rejected","expected":"rejected","reason":"verify exit 1 after the Vendor swapped the enclave","detail":"registry 0x…","run":"20261112T010000Z","at":"2026-11-12T01:02:03Z"}
+{"platform":"aws-nitro","chain":"sepolia","test":"T5","check":"user-verify-after-swap","script":"e2e/flow1-auditor-registers/5-User-tamper-verify.sh","result":"rejected","expected":"rejected","reason":"verify exit 1 after the Vendor swapped the enclave","detail":"registry 0x…","run":"20261112T010000Z","at":"2026-11-12T01:02:03Z"}
 ```
 
 | field | meaning |
 |---|---|
 | `platform` | the format string: `aws-nitro`, `intel-tdx`, `amd-sev-snp-initrd`, `amd-sev-snp-verity` |
+| `chain` | `NET` of the run: `sepolia`, `mainnet` or `local` (anvil; always `local` from `in-guest-verify.sh`). Meaningful on T4–T6, the rows that use the chain. Added 2026-11-15; lines written before have no `chain` field, and none of them was on a public chain |
 | `test` | the row above (`T1`…`T10`), or `-` for a check that is not a row (for example the local Go version) |
 | `check` | which verdict within the script; one script can write several lines for one row |
 | `script` | the script that wrote it |
@@ -137,7 +138,8 @@ From `e2e/README.md`:
   and `deployer.key` (pays gas, approver in flow 2), with their addresses set as `AUDITOR_ADDR` and `VENDOR_ADDR` in
   `e2e/env.local.sh`
 - **test ETH on Sepolia** for both keys, which is the default network. `NET=mainnet` spends real ETH and additionally
-  requires `CONFIRM_MAINNET=1`
+  requires `CONFIRM_MAINNET=1`. `NET=local` needs no ETH and no key files: a local anvil and its development accounts
+  (`e2e/README.md`, "Running without a public testnet")
 - `e2e/env.local.sh`, copied from `env.local.example.sh`, holding the instance addresses. It is
   gitignored; never commit it
 

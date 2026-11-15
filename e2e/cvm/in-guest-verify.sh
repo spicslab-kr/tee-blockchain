@@ -28,7 +28,7 @@ AUDITOR=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 json_str() { printf '%s' "$1" | tr '\r\n\t' '   ' | tr -d '\000-\037' | sed -e 's/\/\\/g' -e 's/"/\\"/g'; }
 # record <test> <check> <result> <expected> <reason>: one line of the results contract.
 record() {
-	printf '{"platform":"%s","test":"%s","check":"%s","script":"e2e/cvm/in-guest-verify.sh","result":"%s","expected":"%s","reason":"%s","detail":"extractor %s, on the guest over 127.0.0.1","run":"%s","at":"%s"}\n' \
+	printf '{"platform":"%s","chain":"local","test":"%s","check":"%s","script":"e2e/cvm/in-guest-verify.sh","result":"%s","expected":"%s","reason":"%s","detail":"extractor %s, on the guest over 127.0.0.1","run":"%s","at":"%s"}\n' \
 		"$(json_str "$FMT")" "$1" "$2" "$3" "$4" "$(json_str "$5")" "$EX" "$RUN" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$W/results.jsonl"
 }
 

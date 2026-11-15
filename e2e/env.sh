@@ -19,12 +19,17 @@ PEM=pem2.pem                     # SSH key, relative to the repository root (git
 
 # Chain - Sepolia testnet by default. To run on mainnet:  NET=mainnet CONFIRM_MAINNET=1 bash e2e/...  (costs real ETH:
 # deployment about 1.1M gas, one registration about 89k gas. The deployer key and the Auditor's signing key both need a mainnet balance)
+# To run with no public network and no ETH:  NET=local bash e2e/...  against a local chain (anvil) at LOCAL_RPC, default
+# http://127.0.0.1:8545. Every chain call (deploy, audit, self-register, lookup, compare, verify) runs on this machine,
+# never on an instance, so the chain only has to be reachable from here. Keep the one anvil running for a whole flow:
+# a later step reads the registry an earlier one deployed, and a restarted anvil starts empty.
 NET=${NET:-sepolia}
 case "$NET" in
   sepolia) RPC=https://ethereum-sepolia-rpc.publicnode.com;;
   mainnet) RPC=https://ethereum-rpc.publicnode.com
            [ "${CONFIRM_MAINNET:-}" = 1 ] || { echo "NET=mainnet spends real ETH. If you are sure, also pass CONFIRM_MAINNET=1."; exit 1; };;
-  *) echo "NET must be sepolia or mainnet"; exit 1;;
+  local) RPC=${LOCAL_RPC:-http://127.0.0.1:8545};;
+  *) echo "NET must be sepolia, mainnet or local"; exit 1;;
 esac
 AUDITOR_SIGNING_KEY=auditor.key   # approver in flow 1
 DEPLOYER_KEY=deployer.key; VENDOR_SIGNING_KEY=$DEPLOYER_KEY   # pays gas, approver in flow 2
@@ -33,7 +38,14 @@ DEPLOYER_KEY=deployer.key; VENDOR_SIGNING_KEY=$DEPLOYER_KEY   # pays gas, approv
 # need_addr first; the build-only checks run without them.
 AUDITOR_ADDR=${AUDITOR_ADDR:-}
 VENDOR_ADDR=${VENDOR_ADDR:-}
-need_addr() { eval "[ -n \"\${$1:-}\" ]" || { echo "$1 is not set. Copy e2e/env.local.example.sh to e2e/env.local.sh and set AUDITOR_ADDR and VENDOR_ADDR to the addresses of auditor.key and deployer.key."; exit 1; }; }
+need_addr() {
+  eval "[ -n \"\${$1:-}\" ]" || { echo "$1 is not set. Copy e2e/env.local.example.sh to e2e/env.local.sh and set AUDITOR_ADDR and VENDOR_ADDR to the addresses of auditor.key and deployer.key."; exit 1; }
+  # With NET=local, stop now rather than after a build of several minutes when no chain answers at RPC.
+  if [ "$NET" = local ] && ! curl -s -m 5 -X POST -H 'Content-Type: application/json' \
+       --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' "$RPC" | grep -q '"result"'; then
+    echo "NET=local: no chain answers at $RPC. Start one in another terminal (anvil --port 8545) and keep it running for the whole flow."; exit 1
+  fi
+}
 
 SERVICE=nginx
 VERSION=1.31.6
@@ -44,6 +56,19 @@ BIN=e2e-work/bin
 WORK=e2e-work
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE=.exe;; *) EXE="";; esac   # Git Bash reports MINGW/MSYS
 VENDOR_BIN="$BIN/att-vendor$EXE"; AUDITOR_BIN="$BIN/att-auditor$EXE"; USER_BIN="$BIN/att-user$EXE"
+mkdir -p "$WORK"
+
+# NET=local signs with anvil's development accounts 0 and 1 instead of auditor.key and deployer.key, as the cmd tests do
+# (cmd/register_e2e_test.go). Every anvil start funds those accounts with test ETH; a key you made yourself has no
+# balance there. They come from anvil's default mnemonic, are the same on every anvil, and are not secrets: never send
+# anything to them on a public network. They override AUDITOR_ADDR and VENDOR_ADDR from env.local.sh for this run only.
+if [ "$NET" = local ]; then
+  mkdir -p "$WORK/anvil-keys"
+  printf '%s\n' ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 > "$WORK/anvil-keys/deployer.key"   # account 0
+  printf '%s\n' 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d > "$WORK/anvil-keys/auditor.key"    # account 1
+  DEPLOYER_KEY=$WORK/anvil-keys/deployer.key; VENDOR_SIGNING_KEY=$DEPLOYER_KEY; VENDOR_ADDR=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  AUDITOR_SIGNING_KEY=$WORK/anvil-keys/auditor.key; AUDITOR_ADDR=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+fi
 
 SSH="ssh -i $PEM -o StrictHostKeyChecking=no -o ConnectionAttempts=2 -o ConnectTimeout=20"
 SCP="net_retry scp -q -i $PEM -o StrictHostKeyChecking=no -o ConnectionAttempts=2 -o ConnectTimeout=20"
@@ -89,7 +114,6 @@ step_stop() { :; }
 step() { printf '\033[1;32m==================== %s (in progress) ====================\033[0m\n' "$1"; shift; "$@"; }
 nitroBanner() { echo; step "CONNECTING TO NITRO ($1)"; sleep 2; }
 localBanner() { echo; step "RETURNING TO LOCAL"; sleep 2; }
-mkdir -p "$WORK"
 
 # Results contract (docs/plan/test-matrix.md, "Making the results machine-readable"). Every verdict a script reaches is
 # also appended as one JSON line to $WORK/results/<platform>.jsonl, so the test matrix can be filled from the files
@@ -100,15 +124,16 @@ mkdir -p "$WORK"
 # test is the matrix row (T1..T10, or "-" for a check that is not a matrix row); check names the verdict within the
 # script; result and expected are one of accepted, rejected, identical, different, refused, error; reason is the line
 # the script printed; detail is optional free text (for example the measured values). RESULTS_PLATFORM is the format
-# string, aws-nitro unless set.
+# string, aws-nitro unless set. chain is NET (sepolia, mainnet or local), so a run on a local chain is never mistaken for
+# one on a public network; it means something only on the rows that use the chain (T4, T5, T6).
 RESULTS_PLATFORM=${RESULTS_PLATFORM:-aws-nitro}
 RESULTS_RUN=${RESULTS_RUN:-$(date -u +%Y%m%dT%H%M%SZ)}
 json_str() { printf '%s' "$1" | tr '\r\n\t' '   ' | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
 verdict_of() { case $1 in 0) echo accepted;; 1) echo rejected;; *) echo error;; esac; }   # att verify/compare exit code
 result() {
   mkdir -p "$WORK/results"
-  printf '{"platform":"%s","test":"%s","check":"%s","script":"%s","result":"%s","expected":"%s","reason":"%s","detail":"%s","run":"%s","at":"%s"}\n' \
-    "$(json_str "$RESULTS_PLATFORM")" "$(json_str "$1")" "$(json_str "$2")" "$(json_str "${0#./}")" "$(json_str "$3")" \
+  printf '{"platform":"%s","chain":"%s","test":"%s","check":"%s","script":"%s","result":"%s","expected":"%s","reason":"%s","detail":"%s","run":"%s","at":"%s"}\n' \
+    "$(json_str "$RESULTS_PLATFORM")" "$(json_str "$NET")" "$(json_str "$1")" "$(json_str "$2")" "$(json_str "${0#./}")" "$(json_str "$3")" \
     "$(json_str "$4")" "$(json_str "$5")" "$(json_str "${6:-}")" "$(json_str "$RESULTS_RUN")" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     >> "$WORK/results/$RESULTS_PLATFORM.jsonl"
 }

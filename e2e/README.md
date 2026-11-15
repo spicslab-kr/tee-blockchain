@@ -1,6 +1,7 @@
 # End-to-end scripts
 
-These scripts run both flows against real Nitro instances and a public chain. Everything runs from
+These scripts run both flows against real Nitro instances and a public chain, or a local one
+([without a public testnet](#running-without-a-public-testnet)). Everything runs from
 your own machine, in Git Bash, macOS or Linux; steps that must build or launch inside an instance
 connect over SSH and stream the script, so nothing is uploaded except the binaries. Run every
 script from the repository root.
@@ -24,7 +25,9 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
 - Test ETH on the chosen network for both keys. A key file holds one private key in hex. Set `AUDITOR_ADDR` and
   `VENDOR_ADDR` (their addresses) in `e2e/env.local.sh`. There is no default: every script that deploys or registers
   stops with an error until both are set. The checks that only build (`arch-*`, `toolchain-pin-check.sh`,
-  `build-env-check.sh`, `responder-check.sh`) do not need them.
+  `build-env-check.sh`, `responder-check.sh`) do not need them. **No ETH?** Run on a local chain instead: see
+  [Running without a public testnet](#running-without-a-public-testnet); it needs neither the key files nor the
+  addresses.
 
 ## env.sh and env.local.sh
 
@@ -55,7 +58,47 @@ bash e2e/flow1-auditor-registers/1-Auditor-build-audit-handoff.sh
 NET=mainnet CONFIRM_MAINNET=1 bash e2e/flow1-auditor-registers/1-Auditor-build-audit-handoff.sh
 ```
 
-Without `CONFIRM_MAINNET=1`, `NET=mainnet` exits at once. Any other `NET` value is rejected.
+Without `CONFIRM_MAINNET=1`, `NET=mainnet` exits at once. `NET=local` is described next. Any other `NET` value is
+rejected.
+
+### Running without a public testnet
+
+Both flows run end to end on a local chain, so you can try the whole thing with real enclaves and no ETH at all.
+What the flows check (registered means trusted, anything else is refused) does not depend on which chain holds the
+registry; the contract is the same bytecode.
+
+1. Install [Foundry](https://getfoundry.sh) for `anvil`, the local chain the Go tests also use.
+2. Start it in a terminal of its own and leave it running until the last script of the flow has finished. A later
+   script reads the registry an earlier one deployed, and an anvil that is restarted starts empty:
+
+   ```
+   anvil --port 8545
+   ```
+
+3. Run the scripts with `NET=local`, for example:
+
+   ```
+   NET=local bash e2e/flow1-auditor-registers/1-Auditor-build-audit-handoff.sh
+   NET=local bash e2e/flow1-auditor-registers/2-Vendor-launch-check-record.sh
+   ```
+
+   `LOCAL_RPC` points them at another address (default `http://127.0.0.1:8545`).
+
+What changes with `NET=local`:
+
+- **Where the chain must be reachable.** Every chain call (`registry-deploy`, `audit`, `self-register`, `lookup`,
+  `compare`, `verify`) runs on your machine; the instances only build and launch. anvil on `127.0.0.1` is therefore
+  enough: no port is opened, and the instances never reach the chain.
+- **Keys.** The scripts sign with anvil's development accounts 0 (deployer, and the Vendor in flow 2) and 1 (the
+  Auditor in flow 1), which every anvil start funds, instead of `auditor.key` and `deployer.key`; the Go tests do the
+  same. They are written to `e2e-work/anvil-keys/` and override `AUDITOR_ADDR` and `VENDOR_ADDR` for that run. These
+  keys are public knowledge: never use them on a public network.
+- **Results.** Every line in `e2e-work/results/*.jsonl` carries `"chain":"local"`, so these runs are never confused
+  with runs on Sepolia.
+- **Records.** The measurement record handed to the Vendor in flow 1 names `http://127.0.0.1:8545` as its RPC. That
+  record is only good on the machine that ran anvil.
+
+A script that needs the chain stops at once with a message if nothing answers at `LOCAL_RPC`.
 
 ## Setup, once
 
@@ -130,11 +173,12 @@ Set in `e2e/env.sh` unless noted.
 | `SSH`, `SCP` | the ssh and scp command lines built from `PEM`; every connection goes through `net_retry` |
 | `SSH_TRIES` | attempts per ssh/scp when the connection itself cannot be set up (default 3). Some networks abort a burst of new connections ("kex_exchange_identification … Software caused connection abort"); such an attempt is retried after 3 s, then 6 s. A remote command that fails is never retried, and after the last attempt the failure stands |
 | `V`, `A`, `R` | functions that run a command on the Vendor, Auditor or arm64 instance |
-| `NET` | `sepolia` (default) or `mainnet`; mainnet also needs `CONFIRM_MAINNET=1` |
-| `RPC` | the public RPC URL chosen by `NET` |
-| `AUDITOR_SIGNING_KEY` | key file `auditor.key`, the approver in flow 1 |
-| `DEPLOYER_KEY`, `VENDOR_SIGNING_KEY` | key file `deployer.key`; pays gas and is the approver in flow 2 |
-| `AUDITOR_ADDR`, `VENDOR_ADDR` | the addresses of those two keys, used as `--approver` and in records |
+| `NET` | `sepolia` (default), `mainnet` (also needs `CONFIRM_MAINNET=1`) or `local` |
+| `RPC` | the RPC URL chosen by `NET`: a public endpoint, or `LOCAL_RPC` for `local` |
+| `LOCAL_RPC` | the local chain for `NET=local`, default `http://127.0.0.1:8545` |
+| `AUDITOR_SIGNING_KEY` | key file `auditor.key`, the approver in flow 1 (anvil account 1 with `NET=local`) |
+| `DEPLOYER_KEY`, `VENDOR_SIGNING_KEY` | key file `deployer.key`; pays gas and is the approver in flow 2 (anvil account 0 with `NET=local`) |
+| `AUDITOR_ADDR`, `VENDOR_ADDR` | the addresses of those two keys, used as `--approver` and in records; set from env.local.sh, or to the anvil accounts with `NET=local` |
 | `SERVICE`, `VERSION` | service name and version written into records, `nginx` and `1.31.6` |
 | `WORK` | work directory for intermediate files, `e2e-work` |
 | `BIN` | where local binaries are built, `e2e-work/bin` |
