@@ -3,8 +3,9 @@
 **Status.** The verifying side works on a recorded quote: `ra-parse`, `audit` and `verify` accept `intel-tdx`
 (`internal/tee/parse/tdx`). Requesting a quote from a running guest works (`att-ra-responder ra-serve --extractor
 tdx`; the whole chain passed on a live guest on 2026-11-12). Building the initrd and launching it are in the tool since
-2026-11-15 (`build` and `launch --platform intel-tdx`, both options, `--verify`), tested without a guest; the launch
-has not run on a guest yet (`docs/plan/cvm-port.md`, "Phase 3: what waits for a VM").
+2026-11-15 (`build` and `launch --platform intel-tdx`, both options, `--verify`), and **ran on real guests on
+2026-11-15**: install, reboot and `launch --check` passed for both options, and `audit` and `verify` passed from
+another machine (`docs/plan/trial-2026-11-16.md`).
 The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) passes against a local anvil chain (first run
 2026-11-11, anvil 1.8.0). Tools and versions: [toolchain.md](toolchain.md).
 
@@ -19,9 +20,13 @@ the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step pri
 
 What it shows and what it does not: everything runs against **one** guest. The Auditor registers the values the
 Vendor's guest measured, as in `e2e/cvm/in-guest-verify.sh`. An Auditor that rebuilds on a guest of its own is the
-last section, "The Auditor's own guest". The procedure has not yet been run end to end on a guest: the build and the
-post-boot check are tested without hardware, and the parts only a guest can show are listed in
-`docs/plan/cvm-port.md`, "Phase 3: what waits for a VM". If a step stops with an error, that is a finding; note it.
+last section, "The Auditor's own guest". The procedure was followed end to end in a clean environment on 2026-11-15
+(`docs/plan/trial-2026-11-16.md`); the places where it needed knowledge from outside this page have been filled in
+since. If a step stops with an error, that is a finding; note it.
+
+**Names.** The commands use the guest name `attestamp-tdx-vendor` and the zone `us-central1-a`. If your guest has
+another name (you made `create auditor`, or gave `PREFIX=…` to `gcp-cvm.sh`), replace the name in every `gcloud`
+command; `bash e2e/cloud/gcp-cvm.sh tdx status` lists the names.
 
 **Cost.** The guest is a `c3-standard-4` and is billed by the hour while it runs. Step 13 stops it.
 
@@ -36,21 +41,64 @@ post-boot check are tested without hardware, and the parts only a guest can show
 
 Both register under the same format, `intel-tdx`, with the same four values (MRTD, RTMR0, RTMR1, RTMR2).
 
-### 1. On your computer: what to install
+### 1. On your computer: the tools and the source
 
-- `bash`. On Windows that is Git Bash (part of Git for Windows); run every command below in it.
-- `git`, and Go **go1.26.1** exactly (`go version`). `bash e2e/0-Setup-local-install.sh` installs both if missing.
-- `gcloud`, signed in, with a project that has billing and C3 quota in `us-central1-a`:
-  `gcloud auth login`, then `gcloud config set project <your project id>`.
-- `anvil` from Foundry (https://getfoundry.sh), for a local chain: no ETH needed.
+Everything below runs in `bash`: a terminal on Linux or macOS; on Windows, Git Bash (part of Git for Windows,
+https://git-scm.com/download/win) or a WSL distribution. `git`, Go, `gcloud` and the clone must be in the **same**
+environment, so that `gcloud compute scp` finds the files the build made.
 
-Versions we used: [toolchain.md](toolchain.md).
-
-### 2. On your computer: the source and the binaries
+First `git` (Git for Windows and macOS already have it; on Ubuntu or Debian, also under WSL:
+`sudo apt-get install -y git`), then the source, then Go **go1.26.1** exactly, which the repository's install script
+fetches:
 
 ```
 git clone https://github.com/spicslab-kr/tee-blockchain
 cd tee-blockchain
+bash e2e/0-Setup-local-install.sh
+```
+
+The script ends with `Ready - Go 1.26.1 confirmed exactly`. On Linux it puts Go in `/usr/local/go` and adds it to
+`PATH` in `~/.bashrc`, which only a **new interactive** shell reads: open a new terminal, or run `source ~/.bashrc`,
+and check `go version`. A script or `bash -c` does not read `~/.bashrc`; there, run
+`export PATH=$PATH:/usr/local/go/bin` first. On Windows, open a new Git Bash window. On Ubuntu the script also
+installs `build-essential` (gcc); that is why every build in step 2 sets `CGO_ENABLED=0` (a native Linux build with gcc
+otherwise links cgo and gives another `att-ra-responder`).
+
+`gcloud`, the Google Cloud CLI. Install it, one way per system:
+
+| system | command |
+|---|---|
+| Ubuntu or Debian, also under WSL | `sudo apt-get install -y apt-transport-https ca-certificates gnupg curl`, then `curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \| sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg`, then `echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \| sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list`, then `sudo apt-get update` and `sudo apt-get install -y google-cloud-cli` |
+| Windows (Git Bash) | `winget install --id Google.CloudSDK` in PowerShell, then a new Git Bash window |
+| macOS | the archive and `./google-cloud-sdk/install.sh` from https://cloud.google.com/sdk/docs/install |
+
+Under WSL, Windows' own `PATH` is appended, so a `gcloud` installed on the Windows side is found too
+(`command -v gcloud` prints a `/mnt/c/…` path); install the Linux one and check that `command -v gcloud` prints
+`/usr/bin/gcloud`. Then sign in, with a project that has billing and C3 quota in `us-central1-a`:
+
+```
+gcloud auth login
+gcloud config set project <your project id>
+```
+
+`anvil` from Foundry, version 1.8.0, for a local chain (no ETH needed; used from step 11). On Linux, macOS or WSL:
+
+```
+curl -fsSL https://foundry.paradigm.xyz | bash
+source ~/.bashrc
+foundryup --install v1.8.0
+anvil --version
+```
+
+On Windows without WSL, download `foundry_v1.8.0_win32_amd64.zip` from
+https://github.com/foundry-rs/foundry/releases/tag/v1.8.0 and put `anvil.exe` on `PATH`. The `curl` line needs
+`curl` (`sudo apt-get install -y curl` on a minimal Ubuntu). Versions we used: [toolchain.md](toolchain.md).
+
+### 2. On your computer: the binaries
+
+In the `tee-blockchain` folder of step 1:
+
+```
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user    ./cmd/user
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
@@ -68,6 +116,14 @@ bash e2e/cloud/gcp-cvm.sh tdx create vendor
 This makes **one** VM, `attestamp-tdx-vendor` (`c3-standard-4`, Ubuntu 24.04, TDX, zone `us-central1-a`), and a
 firewall rule `attestamp-ra` that lets **your computer's current address** reach port 5000 on it. It ends by printing
 the VM's `EXTERNAL_IP`: that is `<guest-ip>` below (`bash e2e/cloud/gcp-cvm.sh tdx status` prints it again).
+
+It also prints the exact image it used, for example `image ubuntu-os-cloud/ubuntu-2404-noble-amd64-v20261105`.
+**Write that name down**: whoever rebuilds and checks your values needs a guest from the same image (see "Use the
+same image as the other side" below).
+
+The VM takes a minute to boot after `create` returns; if the first `gcloud compute ssh` or `scp` fails to connect, try
+again after half a minute. On Windows `gcloud` uses PuTTY, which asks once per new guest whether to store its host key:
+answer `y`.
 
 Copy the binaries to it, one file per command:
 
@@ -119,16 +175,17 @@ sudo chown $USER base-initrd.img
 ```
 
 Option 2, one with the hook that opens and mounts the image (the scripts are removed again right after, so later
-kernel updates do not carry them):
+kernel updates do not carry them). It goes into its own file, `base-initrd-v.img`, so that Option 1's
+`base-initrd.img` stays as it is and both options can be tried on one guest:
 
 ```
 sudo apt-get update
 sudo apt-get install -y squashfs-tools cryptsetup-bin
 sudo install -m 755 initramfs-hook.sh         /etc/initramfs-tools/hooks/attestamp-verity
 sudo install -m 755 initramfs-local-bottom.sh /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
-sudo mkinitramfs -o base-initrd.img $(uname -r)
+sudo mkinitramfs -o base-initrd-v.img $(uname -r)
 sudo rm /etc/initramfs-tools/hooks/attestamp-verity /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
-sudo chown $USER base-initrd.img
+sudo chown $USER base-initrd-v.img
 sudo mkdir -p /opt/app-verity      # where the image is mounted; the disk's root is read-only when the hook runs
 ```
 
@@ -153,7 +210,7 @@ Option 2 (the same with `--option 2`). It makes the image with `mksquashfs` and 
 and runs as root, as the image of our recordings was made (`internal/setup/build/cpio/testdata/make-verity-image.sh`):
 
 ```
-sudo ./att-vendor build --platform intel-tdx --app-dir app --base-initrd base-initrd.img --option 2 --verify
+sudo ./att-vendor build --platform intel-tdx --app-dir app --base-initrd base-initrd-v.img --option 2 --verify
 ```
 
 It ends with `✓ reproducible on this host` and `✓ initrd ready: out/initrd-app.img   build value:
@@ -167,8 +224,24 @@ sudo ./att-vendor launch --platform intel-tdx --initrd out/initrd-app.img --rebo
 
 It copies the initrd to `/boot/initrd-attestamp.img`, writes the GRUB entry `attestamp` (the stock entry with only its
 title and initrd changed) to `/etc/grub.d/41_attestamp`, makes it the default in
-`/etc/default/grub.d/99-attestamp.cfg`, runs `update-grub` and reboots. The connection drops. Wait a minute and log
-in again (the `gcloud compute ssh` command of step 3), then `sudo shutdown -h +240` again.
+`/etc/default/grub.d/99-attestamp.cfg`, runs `update-grub` and reboots. The connection drops.
+
+The reboot can take a few minutes, and logging in too early reaches the **old** boot, which is still shutting down
+(seen on 2026-11-15: a minute was not enough). To know the new boot is up, either watch the serial console from your
+computer until a `login:` line appears after the `reboot` lines:
+
+```
+gcloud compute instances get-serial-port-output attestamp-tdx-vendor --zone us-central1-a | tail -5
+```
+
+or log in (the `gcloud compute ssh` command of step 3) and check:
+
+```
+uptime                    # "up 1 min" or so; a longer time is the old boot: log out and wait
+cat /proc/cmdline         # our entry: root=UUID=… ; the stock boot: root=PARTUUID=…
+```
+
+Then `sudo shutdown -h +240` again.
 
 ### 8. On the guest: check the boot and read the values
 
@@ -178,7 +251,8 @@ sudo ./att-vendor launch --platform intel-tdx --check
 
 It asks the guest for a quote, verifies it, replays the boot's event log against it, requires the initrd GRUB measured
 to be the one built, and requires the application to have been unpacked. It ends with `✓ the boot measured the built
-initrd` and writes MRTD and RTMR0–2 to `out/measurements.json`. For Option 2, also:
+initrd` and writes MRTD and RTMR0–2 to `out/measurements.json`. If it says "RTMR2 has no GRUB initrd command, so no
+initrd was loaded", you are on the old boot: wait and log in again (step 7). For Option 2, also:
 
 ```
 cat /run/attestamp-status          # ok <root hash>
@@ -252,19 +326,36 @@ registered these measurements".
 
 ### 13. Put everything back, and stop
 
-On the guest (`gcloud compute ssh …` again):
+On the guest (`gcloud compute ssh …` again), one line at a time. Stop the responder first, on its own line:
 
 ```
-sudo pkill -f "att-ra-responder ra-serve"
+sudo pkill -f "[a]tt-ra-responder ra-serve"
+```
+
+`pkill -f` matches whole command lines, its own shell's included. With the plain pattern
+`"att-ra-responder ra-serve"`, sent together with other commands in one `gcloud compute ssh --command "…"`, it also
+matched, and killed, the remote shell running them, so nothing after it ran (2026-11-15). `[a]tt` matches the text
+`att` but not the text `[a]tt` in the command line that carries it, so the line above stops only the responder.
+
+Then:
+
+```
 sudo rm -f /etc/grub.d/41_attestamp /etc/default/grub.d/99-attestamp.cfg /boot/initrd-attestamp.img
 sudo cp -p /root/40-force-partuuid.cfg.orig /etc/default/grub.d/40-force-partuuid.cfg
 sudo update-grub
-sudo rmdir /opt/app-verity 2>/dev/null     # Option 2 only
 sudo systemctl reboot
 ```
 
-After that boot, `cat /proc/cmdline` shows the stock command line and `ls /boot/initrd-attestamp.img` finds nothing.
-`base-initrd.img`, `app` and `out` in the home folder are yours to keep or delete. On your computer, stop anvil
+After that boot (log in again as in step 7), for Option 2 only: the image was still mounted on `/opt/app-verity`
+before the reboot, so the folder can be removed only now:
+
+```
+sudo rmdir /opt/app-verity
+```
+
+`cat /proc/cmdline` shows the stock command line (`root=PARTUUID=… panic=-1`) and `ls /boot/initrd-attestamp.img`
+finds nothing.
+`base-initrd.img`, `base-initrd-v.img`, `app` and `out` in the home folder are yours to keep or delete. On your computer, stop anvil
 (Ctrl-C) and the VM:
 
 ```
@@ -275,19 +366,52 @@ The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rule
 
 ### The Auditor's own guest
 
-The real Auditor rebuilds on a guest of its own instead of taking the Vendor's values (step 11). Not yet run:
+The real Auditor rebuilds on a guest of its own instead of taking the Vendor's values (step 11). Steps 1 to 4 below
+ran on 2026-11-15 with two guests of one image, Option 1; step 5 has not been run yet:
 
-1. `bash e2e/cloud/gcp-cvm.sh tdx create auditor` makes `attestamp-tdx-auditor`.
-2. Give it the same inputs as the Vendor's build: the `app` folder and the Vendor's `base-initrd.img` (copy them from
-   the Vendor's guest to your computer with `gcloud compute scp`, then to the Auditor's guest), and an `att-auditor`
-   built for Linux like `att-vendor` in step 2, with `att-ra-responder`.
-3. Steps 4 (without making a new base initrd), 6 to 9 with `att-auditor` in place of `att-vendor`. `initrd_sha384` in
-   its `out/build-value.json` must equal the Vendor's: the same files give the same initrd.
-4. Compare its `out/measurements.json` with the Vendor's. **Expect RTMR2 to differ** until this is solved: the kernel
-   command line names the root disk's UUID, which differs between two disks (`docs/plan/cvm-port.md`, "Phase 3: what
-   waits for a VM", item 4). MRTD, RTMR0 and RTMR1 should match if both guests have the same firmware and kernel.
+1. Make the guest **from the Vendor's exact image** (step 3 printed its name):
+   `IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor` makes
+   `attestamp-tdx-auditor`. `bash e2e/cloud/gcp-cvm.sh tdx status` shows both disks' images; they must be the same.
+2. Give it the same inputs as the Vendor's build: the `app` folder and the Vendor's base initrd (copy them from the
+   Vendor's guest to your computer with `gcloud compute scp`, then to the Auditor's guest), and an `att-auditor` built
+   for Linux like `att-vendor` in step 2, with `att-ra-responder`. For Option 1 the base initrd is the image's own
+   `/boot/initrd.img-…`, the same file on every guest of one image (measured: `4703ec07…` on both); for Option 2 it
+   must be the Vendor's `base-initrd-v.img`, since `mkinitramfs` never makes the same file twice.
+3. Steps 4 (without making a new Option 2 base initrd), 6 to 9 with `att-auditor` in place of `att-vendor`.
+   `initrd_sha384` in its `out/build-value.json` must equal the Vendor's: the same files give the same initrd.
+4. Compare its `out/measurements.json` with the Vendor's. **All four values must be equal.** Measured on 2026-11-15:
+   two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105` gave the same MRTD, RTMR0, RTMR1 and
+   RTMR2 for the same application. If one differs, see the next section.
 5. `att-auditor audit --tee-addr <auditor-guest-ip>:5000 … --build-measurements <its own measurements.json>
    --vendor-tee <guest-ip>:5000` registers its own value and says whether the Vendor's guest runs the same.
+
+### Use the same image as the other side
+
+The Vendor's and the Auditor's guests must be made from the **same exact image version**, for example
+`ubuntu-2404-noble-amd64-v20261105`, not merely the same family (`ubuntu-2404-lts-amd64`). Why: the kernel command line
+GRUB measures into RTMR2 names the root file system by its UUID (`root=UUID=9d4d258d-…`), and the Option 1 base initrd
+is the image's own file. Both come **with the image**, not with the disk: every disk made from one image version
+carries the same file system UUID, the same partition UUID and the same `/boot` files. Measured on 2026-11-15
+(`docs/plan/trial-2026-11-16.md`): `attestamp-tdx-vendor`, made 2026-11-10, and `attestamp-tdx-auditor`, made
+2026-11-15, both from `v20261105`, had the same UUIDs, the same base initrd `4703ec07…`, built the same initrd
+`bc024887…` from `app/hello.txt` and measured the same MRTD, RTMR0, RTMR1 and RTMR2; MRTD, RTMR0 and RTMR1 also equal the
+2026-11-11 recordings.
+
+A family is a pointer that Canonical moves to a new version every few weeks. `gcp-cvm.sh` resolves it once, prints the
+exact name and takes `IMAGE=<name>` to make the other side from the same one.
+
+If the two images differ, expect:
+
+| what differs | what changes |
+|---|---|
+| another version of the same family | a new root file system UUID, so the command line and **RTMR2**; a new stock initrd, so the Option 1 base and the initrd hash; often a new kernel, so **RTMR1** too |
+| another kernel on the same image (an `apt upgrade` on one side) | **RTMR1** (the kernel), the base initrd (`/boot/initrd.img-<version>`), so **RTMR2** |
+| another machine type (`c3-standard-4` vs another shape) | not measured; **RTMR0**, the firmware's configuration, is expected to follow the VM's memory and CPU count |
+| another firmware (GCP updates TDVF) | **MRTD** and RTMR0 |
+
+The values then differ and `audit` refuses, correctly: it is another boot. Both sides move to a new image together
+and register again. An old image version can also be deleted by Canonical some time after it is deprecated;
+`gcp-cvm.sh` then says it was not found.
 
 ## The quote
 
@@ -395,14 +519,15 @@ three hours of a Nitro leaf. Freshness comes from the nonce.
 ## Variables
 
 Nothing below has been measured by changing it on TDX; the rows are what the structure above implies, or what the
-SEV-SNP runs measured for the same files.
+SEV-SNP runs measured for the same files. What was measured is the opposite case: two guests of one image, made five
+days apart, gave the same four values (see "Use the same image as the other side").
 
 | variable | which value | note |
 |---|---|---|
 | GCP's TDVF version | MRTD | GCP may update it; every registration would change |
 | VM shape (vCPUs, memory) | RTMR0 probably | the firmware's configuration includes the ACPI tables. **Not confirmed** |
 | shim, GRUB, kernel | RTMR1 | OS image updates |
-| kernel command line | RTMR2 | it carries the root PARTUUID, which differs per disk |
+| kernel command line | RTMR2 | it carries the root file system's UUID (`root=UUID=…` with our entry). That UUID comes with the image version, not the disk: two guests of one image had the same (measured 2026-11-15), so it changes only with another image |
 | base initrd | RTMR2 | `mkinitramfs` writes a random seed, so the Vendor's base initrd is used as published (as on SEV-SNP) |
 | application archive | RTMR2 | Go version, `-trimpath`, the cpio writer: the same as on SEV-SNP (`docs/build/sev-snp.md`). The archive is written by `internal/setup/build/cpio`; its output is pinned by the golden files in `internal/setup/build/cpio/testdata` |
 | archive placement | RTMR2 | the application archive goes **before** the base initrd (`cpio.AppFirst`), the placement the TDX fixtures were recorded with. An unpadded append failed in 2026-10 (Phase 3.2 record, not repeated since); the cause is 4-byte alignment, measured on SEV-SNP on 2026-11-11. See "Before or after the base initrd" below |
@@ -586,9 +711,8 @@ instead. This section only records a quote from a stock guest, as the first fixt
 
 | what | why |
 |---|---|
-| `att-ra-responder ra-serve --extractor tdx` answering a verifier on another machine | Phase 2.2. On the guest itself (127.0.0.1) the whole chain passed on 2026-11-12 (`e2e/cvm/in-guest-verify.sh`). From outside: start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address |
-| `setup/launch` for TDX on a guest | the code exists (`internal/setup/launch/tdx`, 2026-11-15); it has not booted a guest. What only a guest can show (the CC event log replaying, GRUB's file event for the initrd, the marker) is in `docs/plan/cvm-port.md`, "Phase 3: what waits for a VM" |
-| Option 2 on TDX with the real tools | `internal/setup/build/tdx` makes the image with the settings of `make-verity-image.sh`, but has not been run with real `mksquashfs` and `veritysetup`; a failed dm-verity check at boot still does not stop the boot (launch `--check` refuses it) |
+| a failed dm-verity check at boot stopping the boot | Option 2 builds and boots with the real tools (2026-11-15), but a root hash that does not match still lets the boot go on; `launch --check` refuses it (`/run/attestamp-status`) |
+| the Auditor's `audit --vendor-tee` between two guests | each guest measured the same values (2026-11-15), but `audit` with `--vendor-tee` across two guests has not been run |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |
