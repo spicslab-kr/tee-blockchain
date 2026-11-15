@@ -1008,3 +1008,24 @@ for every form of the date, the day number, the epoch-seconds prefix and the bui
 from `fc105b0` on. The recorded values are marked "before `fc105b0`" in `docs/results/aws-nitro-2026-11-12.md`, the two
 2026-11-15 results pages, build-info gaps #2, both Nitro fixture READMEs and the test matrix (T1 and the baseline mark).
 The baseline was **not** re-run, as instructed; the current reference PCR0/PCR2 are unknown until it is.
+
+## Phase 4b: SEV-SNP build and launch, without hardware (2026-11-15)
+
+No GCP instance was created or started. Design first (`a6ec365`, `docs/plan/cvm-port.md`, "Phase 4b design").
+
+| step | commit | what |
+|---|---|---|
+| shared code | `66e28d9` | the verity image maker to `setup/build/verity`, the GRUB install to `setup/launch/grub`; TDX unchanged in behaviour |
+| build | `ce08d93` | `setup/build/snp`: Option 1 appended after the padded base; Option 2 image on disk, base unchanged, PCR12 and the kernel argument predicted |
+| launch | `b5d7086` | `setup/launch/snp`: install (Option 2 also the image and the root hash), check on verified evidence |
+| CLI | `cac5d28` | `build`/`launch --platform amd-sev-snp-initrd|amd-sev-snp-verity` in both roles |
+
+What could be tested without a VM, and was:
+
+- **Option 1's archive equals the recorded guests' archive**, byte for byte, for v1 and v2: the build reproduces what
+  those guests booted.
+- **The post-boot check passes end to end on recorded evidence**: `opt1p-v1` with its INITRD, `opt2-v1` with its
+  INITRD and the PCR12 predicted from its root hash, which equals the recorded PCR12. The v2 values are refused.
+- All new packages' tests also ran on Linux under WSL; `att-ra-responder` is still sha256 `5573b538…`.
+
+What waits for a VM is in `docs/plan/cvm-port.md`, "Phase 4b: what waits for a VM".

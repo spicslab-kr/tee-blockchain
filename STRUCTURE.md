@@ -123,7 +123,7 @@ What is implemented, checked against the code:
 | gcp (Confidential Space) | No. | `tee/request/<role>/gcp` can fetch a token from the launcher socket and has a test. `tee/parse/<role>/gcp.go` returns "not implemented" for every method. Nothing in `cmd/*` constructs either. There is no gcp folder under `setup/`. |
 | azure (Confidential VM) | No. | `tee/request/<role>/azure` returns "not implemented" (it needs a vTPM library and MAA). `tee/parse/<role>/azure.go` returns "not implemented". Nothing in `cmd/*` constructs either. No azure folder under `setup/`. |
 | tdx (Intel TDX on GCP) | Verification, and requesting a quote inside the guest. | `tee/parse/tdx` (shared) and `tee/parse/<role>/tdx.go`; `tee/request/tdx` (shared) and `tee/request/{Vendor,auditor}/tdx`; `att-ra-responder ra-serve --extractor tdx`; `cmd/*` parse, audit and verify `intel-tdx`. Build and launch: `setup/build/tdx` and `setup/launch/tdx` (shared) with `setup/{build,launch}/{Vendor,auditor}/tdx` adapters; `att-vendor`/`att-auditor` `build` and `launch --platform intel-tdx`. Tested on recorded quotes and without a guest (fake TSM, fake squashfs tools, a constructed event log); the launch has not run on a guest yet. |
-| snp (AMD SEV-SNP on GCP) | Verification, and requesting evidence inside the guest. | `tee/parse/snp` (shared) and `tee/parse/<role>/snp.go`; `tee/request/snp` (shared) and `tee/request/{Vendor,auditor}/snp`; `att-ra-responder ra-serve --extractor snp-initrd` or `snp-verity`; `cmd/*` parse `amd-sev-snp-initrd` and `amd-sev-snp-verity`. Tested on recorded evidence; the request side through a fake TSM and vTPM. Nothing under `setup/` yet. |
+| snp (AMD SEV-SNP on GCP) | Verification, and requesting evidence inside the guest. | `tee/parse/snp` (shared) and `tee/parse/<role>/snp.go`; `tee/request/snp` (shared) and `tee/request/{Vendor,auditor}/snp`; `att-ra-responder ra-serve --extractor snp-initrd` or `snp-verity`; `cmd/*` parse `amd-sev-snp-initrd` and `amd-sev-snp-verity`. Build and launch: `setup/build/snp` and `setup/launch/snp` (shared) with `{Vendor,auditor}/snp` adapters; `build` and `launch --platform amd-sev-snp-*`. Tested on recorded evidence; the request side through a fake TSM and vTPM; the launch has not run on a guest yet. |
 
 Only **aws** is a working platform end to end. tdx and snp verify recorded evidence; gcp and azure
 exist so the format names, the Parser interface and the folder layout are already in place.
@@ -131,7 +131,9 @@ exist so the format names, the Parser interface and the folder layout are alread
 `internal/setup/build/cpio` is shared: the deterministic cpio writer for confidential-VM initrds.
 `internal/setup/build/tdx` and `internal/setup/launch/tdx` are shared too: the TDX build (Option 1 and 2, `--verify`)
 and launch (GRUB entry, post-boot check), with thin role adapters in `setup/{build,launch}/{Vendor,auditor}/tdx`, the
-same two-layer shape as `tee/parse` and `tee/request`.
+same two-layer shape as `tee/parse` and `tee/request`. `internal/setup/build/snp` and `internal/setup/launch/snp` are the
+same for SEV-SNP. What the two CVM platforms do alike exists once: `setup/build/verity` (the Option 2 image, with a fake
+`mksquashfs`/`veritysetup` in `verity/veritytest`) and `setup/launch/grub` (the GRUB entry and install).
 
 `ether` plays the same part for chains: `chain/register/<role>/ether` and `chain/lookup/<role>/ether`
 are the only chain modules, and they talk to any Ethereum-compatible chain.
@@ -166,6 +168,8 @@ the role-neutral logic is pulled out into the shared pieces above wherever Go al
 | `chain/register` (all of it, including the generated `registry.go`) | Vendor, auditor |
 | `setup/build/<role>/aws` and `setup/launch/<role>/aws` | Vendor, auditor |
 | `setup/build/<role>/tdx` and `setup/launch/<role>/tdx` | Vendor, auditor |
+| `setup/build/<role>/snp` and `setup/launch/<role>/snp` | Vendor, auditor |
+| `cmd/<role>/snp.go` | Vendor, auditor, apart from the next-step hint |
 | `cmd/<role>/tdx.go` | Vendor, auditor, apart from the next-step hint (the Vendor registers, the Auditor audits) |
 | `tee/request` (`request.go`, `nonce.go`, `tcp.go`, `wire.go`, `aws/*`, `gcp/*`, `azure/*`, `tdx/*`, `snp/*`) | Vendor, auditor; the user copy of `request.go`, `nonce.go`, `tcp.go`, `wire.go` is the same too |
 | `tee/parse` (`parse.go`, `aws.go`, `gcp.go`, `azure.go`, `tdx.go`, `snp.go`) | Vendor, auditor, user |
@@ -203,6 +207,8 @@ The table is read from the imports of each `cmd/*` package (`go list -deps ./cmd
 | `setup/build/<role>/aws` | Reproducible image build, scan, verify | yes | yes | no | no |
 | `setup/launch/<role>/aws` | Start the enclave, bridge the port, measure | yes | yes | no | no |
 | `setup/build/tdx`, `setup/launch/tdx` (shared) and their `<role>/tdx` adapters | Build the TDX initrd; install it under GRUB and check the boot | yes | yes | no | no |
+| `setup/build/snp`, `setup/launch/snp` (shared) and their `<role>/snp` adapters | Build the SEV-SNP initrd or image; install it and check the boot | yes | yes | no | no |
+| `setup/build/verity`, `setup/launch/grub` (shared) | The Option 2 image, and the GRUB install, for both TDX and SEV-SNP | yes | yes | no | no |
 | `core/transfer/<role>` | Build-config and measurement-record exchange, over git or files | yes | yes | no | no |
 | `chain/register/<role>` and `/ether` | Sign and register a measurement; deploy the registry | yes | yes | no | no |
 | `chain/lookup/<role>` and `/ether` | Read registrations | yes | yes | yes | no |

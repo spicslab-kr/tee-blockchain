@@ -298,6 +298,31 @@ root hash (`tee/parse/snp` refuses a verity format without it).
 recordings' boot logs give the combined initrd's sha256 (`a4504052…`) and the root hash (`e29ec085…`) the guest built,
 so a check fed the recorded evidence and those build values must pass, and fail for any other value.
 
+### Phase 4b: where it stands (2026-11-15)
+
+| | state | proved by |
+|---|---|---|
+| shared code | the verity image (`setup/build/verity`) and the GRUB install (`setup/launch/grub`) moved out of TDX (`66e28d9`) | the TDX tests unchanged, and `verity`/`grub` tests |
+| build | **done without hardware**, both formats, `--verify` (`ce08d93`, CLI `cac5d28`) | Option 1's archive from the recordings' one-file application is **byte-identical** to the archive the `opt1p-v1` and `opt1p-v2` guests booted (`TestBuild_Option1_TheArchiveTheGuestBooted`); a one-byte change fails `--verify`; run on Linux too |
+| launch check | **done on recorded evidence** (`b5d7086`) | `opt1p-v1` passes with its INITRD `a4504052…`; `opt2-v1` passes with INITRD `b0fd172d…` and the PCR12 predicted from root hash `e29ec085…`; v2's values are refused; a replayed nonce is refused |
+| launch install | code done, run against a temporary root only | `TestInstall_Option2PutsImageAndRootHash` |
+
+### Phase 4b: what waits for a VM
+
+1. **The real tools for Option 2** (any Ubuntu 24.04, as for TDX): `build --platform amd-sev-snp-verity` with the
+   one-file v1 application must give root hash `e29ec085…af0c9`; the check above already showed that this root hash
+   gives the recorded PCR12.
+2. **Install and reboot on a SEV-SNP guest** (`gcp-cvm.sh snp create vendor`, with approval), `GRUB_FORCE_PARTUUID`
+   commented out. Option 1: `build --platform amd-sev-snp-initrd --app-dir app --base-initrd /boot/initrd.img-$(uname
+   -r) --verify`, `launch --platform amd-sev-snp-initrd --reboot`, then `launch … --check`. **Pass: "✓ the same".**
+   Option 2: a base initrd built with `snp/testdata/record/initramfs-hook.sh` and `initramfs-local-bottom.sh`
+   installed, then the same with `amd-sev-snp-verity`; pass also needs `/run/attestamp-status` `ok` and PCR12 as
+   predicted.
+3. **The Auditor's half**: as on TDX, the command line names the root disk (`root=UUID=`), so CMDLINE will differ
+   between two guests' disks; and the Auditor uses the Vendor's base initrd (D1 (a)). Measure first whether CMDLINE
+   can be made equal.
+4. **T10** stays as it is: the build and launch do not change what the evidence can say about the same VM.
+
 4b (needs instances): request, build and launch, mirroring phases 2 and 3, **on GCP only**. SEV-SNP on AWS (VLEK
 signing, NitroTPM as the vTPM, an AMI re-registered with TPM support) was **decided against on 2026-11-11** and is not
 part of 4b.

@@ -199,8 +199,9 @@ hash, and register its own signed hash. The User can then require both registrie
   snp-verity` produces the evidence inside the guest; tested against the recordings, and on 2026-11-12 run on
   live TDX and SEV-SNP guests with the whole chain on the guest (`e2e/cvm/in-guest-verify.sh`). For TDX,
   `build` and `launch --platform intel-tdx` build the application initrd (both options, with `--verify`) and
-  install and check it under GRUB; tested without a guest, not yet run on one. SEV-SNP building and launching are
-  not implemented yet. SEV-SNP evidence is two documents
+  install and check it under GRUB; for SEV-SNP the same with `--platform amd-sev-snp-initrd` or
+  `amd-sev-snp-verity`. Tested without a guest (the SEV-SNP check also on recorded evidence), not yet run on one.
+  SEV-SNP evidence is two documents
   from two signers, and nothing proves they come from the same VM; see [AMD SEV-SNP](docs/build/sev-snp.md#same-vm).
   What a measurement says about a running guest: [runtime immutability](docs/build/runtime-immutability.md).
 - **GCP Confidential Space and Azure** have request-side scaffolding only.

@@ -460,7 +460,7 @@ evidence also carried.
 | what | why |
 |---|---|
 | `att-ra-responder ra-serve --extractor snp-initrd` / `snp-verity` answering a verifier on another machine | Phase 2.2. On the guest itself (127.0.0.1) `snp-initrd` passed the whole chain on 2026-11-12 (`e2e/cvm/in-guest-verify.sh`); `snp-verity` was refused on that boot because it had no verity image, and has not run on a verity boot. From outside: start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address. The guest also needs outbound access to Google's certificate host while attesting (the AK intermediates are fetched) |
-| `setup/build`, `setup/launch` for SEV-SNP | Phase 4b; until then `docs/plan/app-fixture-recording.md` does it by hand |
+| `setup/launch` for SEV-SNP on a guest | the code exists since 2026-11-15 (`build` and `launch --platform amd-sev-snp-initrd\|amd-sev-snp-verity`, `internal/setup/{build,launch}/snp`). The check passes end to end on the recorded `opt1p-v1` and `opt2-v1` evidence with those guests' build values, but install and the reboot have not run on a guest (`docs/plan/cvm-port.md`, "Phase 4b: what waits for a VM") |
 | a verity boot through the responder | the recordings `gcp-n2d-opt2-*` (2026-11-11) have the verity hook and a PCR12 that matches the formula, but were made with `record-snp`, not with `att-ra-responder`; the tamper case (an image that does not match its root hash) was not recorded |
 | TCB minimums, CRLs | not applied; the platform's patch level is not judged |
 | AMD chain errors as `ErrChain` | go-sev-guest checks the chain and the signature in one call |
