@@ -44,6 +44,10 @@ RA_PORT=${RA_PORT:-5000}
 
 die() { echo "error: $*" >&2; exit 1; }
 command -v gcloud >/dev/null 2>&1 || die "gcloud not found. Install it and run 'gcloud auth login'."
+# On Windows (Git Bash) the gcloud CLI ends every output line with a carriage return, so a value captured with $(...)
+#   keeps a trailing CR and the next command rejects it (2026-11-15: `gcp-cvm.sh tdx stop` with two guests). Strip it here, once,
+#   for every call in this script; the exit status is gcloud's own.
+gcloud() { command gcloud "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }
 gcloud config get-value project >/dev/null 2>&1 || die "no gcloud project set. Run 'gcloud config set project <id>'."
 
 case "$ACTION" in

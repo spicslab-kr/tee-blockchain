@@ -32,6 +32,10 @@ die() { echo "error: $*" >&2; exit 1; }
 
 command -v /usr/bin/env >/dev/null
 command -v aws >/dev/null 2>&1 || die "aws CLI not found. Install it and run 'aws configure' first."
+# On Windows (Git Bash) the aws CLI ends every output line with a carriage return, so a value captured with $(...)
+#   keeps a trailing CR and the next command rejects it (the same as gcloud's in gcp-cvm.sh `stop`, 2026-11-15). Strip it here, once,
+#   for every call in this script; the exit status is aws's own.
+aws() { command aws "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }
 aws sts get-caller-identity >/dev/null 2>&1 || die "aws CLI is not authenticated. Run 'aws configure'."
 
 # latest_al2023 <x86_64|arm64> - the newest Amazon Linux 2023 AMI for that architecture.
