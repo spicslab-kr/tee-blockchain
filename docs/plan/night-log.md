@@ -921,3 +921,19 @@ kept only as a marked record (`5f7a5fe`).
 | T10 | "fails today", from the 2026-11 record | **not reproduced in this repository**: the record is stated as a record, the same-VM mixing test is named as *not* T10, and the plan is "Reproducing T10" in `docs/plan/app-fixture-recording.md` |
 
 T2, T3 and T10 are weaker now than they read before. That is the point: they were never ours.
+
+## T8, T9 and the FromDir golden test on Linux (2026-11-15)
+
+The SSH timeouts of the earlier attempt were the security group, not the addresses: the user added this machine's
+address for ports 22 and 5000. `e2e/env.local.sh` was already current and was not read.
+
+| step | result |
+|---|---|
+| `0-Setup-local-upload.sh` | current binaries uploaded (code `1663a5d`; responder sha256 `5573b538…`, unchanged); exited 0, so the trap fix (`3403658`) holds on a real run |
+| T8, `debug-mode-check.sh` | passed: the debug enclave's document had a valid signature and nonce, `debug true`, all-zero PCRs, refused with exit 7; the control verified. `launch` changed no security group (it could not read it, and printed the command) |
+| T9, `replay-check.sh` | passed: both fresh documents verified, they differed, the replay was refused with exit 6 |
+| `TestFromDir_MatchesMkcpioGolden` on Linux | **passed** on the Auditor instance (Amazon Linux 2023, kernel 6.12): the cpio test binary cross-built for linux/amd64 and run there with the two golden files, all ten tests of the package passing. So the test that is skipped on Windows does hold where it runs |
+
+Results: `docs/results/aws-nitro-2026-11-15.md` and `.jsonl` (`64345ab`).
+
+**Stopped** both instances with `bash e2e/cloud/aws-nitro.sh stop`; not terminated.
