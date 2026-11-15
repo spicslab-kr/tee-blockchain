@@ -50,3 +50,52 @@ alone. The one result that still rests only on the old scripts is T10 (evidence 
 | 13 | **vsock port, CID, enclave memory and CPUs.** Done 2026-11-12: defaults, flags and where each goes, and how the RA port is opened (since 2026-11-12 only with `launch --open-port-to <CIDR>`; before, `launch` opened it to `0.0.0.0/0` whenever the role allowed) | — | `docs/build/aws-nitro.md`, "Ports, vsock address and enclave resources" and "Opening the RA port" |
 | 14 | **Intel SGX Root CA.** Done 2026-11-12: identical to Intel's published `Intel_SGX_Provisioning_Certification_RootCA.cer` (serial and full sha256 fingerprint) | — | `docs/build/tdx.md` |
 | 15 | **Identifiers in committed files.** Done 2026-11-12: the project ID and every local path were removed from `docs/plan/night-log.md`. The project ID stays inside the eight SEV-SNP `*-att.pb` fixtures, where Google signed it; `internal/tee/parse/snp/testdata/README.md` now says so at the top of its identifiers section. Still for a person to decide: publishing those fixtures; the EC2 instance ID inside the Nitro fixture (also signed, and asserted by `internal/tee/parse/aws/measure_test.go`), and a second, different EC2 instance ID in the signed `module_id` of `internal/tee/request/testdata/nitro-attestation.cbor` (found 2026-11-12, `docs/plan/audit-2026-11-12.md`); and the original author's two Sepolia addresses, which `e2e/env.sh` no longer uses (removed 2026-11-12; they remain in git history) | person (publication decision) | — |
+
+## Following the documents alone (audit of 2026-11-15)
+
+Before a person follows the documents alone on another computer, from a fresh clone, the documents were read as that
+person would read them (an independent read, then spot-checked). **Recorded, not fixed, on purpose:** the trial is
+meant to find where a person really gets stuck, and filling the gaps first would make it meaningless. [blocks] means
+the person cannot go on; [slows] means they can, after guessing. All rows need **repo** unless marked.
+
+### The path from README.md to a build and a launch
+
+| # | gap |
+|---|---|
+| 16 | [blocks] **Getting the code and the binaries.** `README.md` (Quick start) points at `../../releases/latest`, but there are no tags and no releases. No clone command is given, and the `--recursive` the contract submodule needs appears only in `docs/plan/cvm-port.md` (Phase 0.1). `CONTRIBUTING.md` calls the repository private, so access needs a **person** |
+| 17 | [blocks] **TDX and SEV-SNP build and launch have no procedure.** `README.md` (the platform list) says their documents cover verification only. The only build and launch commands are the "what waits for a VM" lists in `docs/plan/cvm-port.md`, a planning document reached as a plain path, not a link. They do not say how to cross-build `att-vendor` for Linux and copy it to the guest, how to make the `app` folder, or how to make the Option 2 base initrd with the hook. For TDX that procedure exists only in the night log (`docs/build/tdx.md` points there) |
+| 18 | [blocks] **No first-time order on TDX or SEV-SNP** (create, install, turn off `GRUB_FORCE_PARTUUID`, build, launch and reboot, `--check`, register, verify from another machine, undo, stop). `docs/build/tdx.md` and `docs/build/sev-snp.md` "From scratch" cover recording one piece of evidence. Undoing what `launch` installs (`/boot/initrd-attestamp.img`, `/etc/grub.d/41_attestamp`, `99-attestamp.cfg`, and for SEV-SNP Option 2 `/var/lib/attestamp`) is not described; only the fixture entries' undo is (`docs/plan/app-fixture-recording.md`). Nitro has a complete order, split across `e2e/cloud/README.md` and `e2e/README.md` |
+| 19 | [slows] **Two parallel paths on SEV-SNP and TDX.** `docs/build/sev-snp.md` and `app-fixture-recording.md` send the reader to the fixture recorders (`mkappinitrd`, `make-grub-entry.sh`), not to `build`/`launch --platform …`, and nothing says which one to use |
+| 20 | [slows] **`e2e/cloud/README.md` creates four SEV-SNP VMs by mistake**: `gcp-cvm.sh snp create vendor auditor user y` takes every argument after `create` as a role (`ROLES=("$@")` in `gcp-cvm.sh`), so it makes `attestamp-snp-user` and `attestamp-snp-y` too, each billed |
+| 21 | [slows] **README Quick start.** The Auditor's `audit --registry …` has no `registry-deploy` before it; nothing says how to write a key file (one private key in hex) or where to get Sepolia ETH (`NET=local` avoids both, but Quick start does not mention it); `build-config.json` has to be written by hand, which only `cmd/vendor/README.md` implies |
+| 22 | [slows] **Verifying a CVM.** `att-user verify` defaults to `--format aws-nitro`; no document tells a TDX or SEV-SNP verifier to pass `--format intel-tdx` or `amd-sev-snp-*` |
+| 23 | [slows] **The CVM `build-config.json`.** Its `tee_info` keys for GCP (`instance_name`, `project_id`, `zone`, `image`; `internal/core/transfer/*/build_config.go`) are not documented; `cmd/vendor/README.md` shows the `aws-nitro` keys only |
+| 24 | [slows] **The Go pin outside Claude.** `README.md` (Install) does not say that only go1.26.1 builds binaries `build` accepts; `GOTOOLCHAIN` is set only in `.claude/settings.json`, so it applies in Claude sessions, not in a person's shell. `docs/build/toolchain.md` explains it |
+| 25 | [slows] **`e2e/cloud/README.md` says "follow `docs/plan/cvm-port.md`"** for the confidential VMs: a plan, not a procedure |
+
+### What to install (`docs/build/toolchain.md`)
+
+| # | gap |
+|---|---|
+| 26 | [slows] **Not listed at all:** Git Bash / Git for Windows (the scripts need bash; only "need bash" is said), WSL and Docker Desktop (used on 2026-11-15 for checks that need no instance), winget and Homebrew (used by `0-Setup-local-install.sh`), `sha256sum` (used in `app-fixture-recording.md`) |
+| 27 | [slows] **Listed without a way to install:** anvil (the pinned 1.8.0 has no install command; `getfoundry.sh` from the README installs the latest); aws CLI and gcloud ("by hand"; not on Git Bash's PATH on Windows by default; the Compute Engine API must be enabled, which only a check command in `e2e/cloud/README.md` hints at); forge, Python, openssl, cast (needed only to regenerate the contract binding, not stated). Docker and nitro-cli versions are recorded, not pinned |
+| 28 | [slows] **`0-Setup-local-install.sh`:** winget may need administrator rights; on Linux it always fetches the `linux-amd64` Go tarball, also on arm64 |
+
+### Things outside the repository
+
+| # | gap |
+|---|---|
+| 29 | [blocks] **Files a fresh clone does not have:** `pem2.pem` (made by `aws-nitro.sh create`, fine), `auditor.key` and `deployer.key` (no instructions; not needed with `NET=local`), `e2e/env.local.sh` (from the example, fine) |
+| 30 | [slows] **The security group follows the first computer.** `aws-nitro.sh create` opens port 22 only to the address of the machine that created the group, and reuses the group later. From another computer SSH times out, and no document says why or what to change (**person**: the account owner changes the rule) |
+| 31 | [slows] **Instructions tied to one VM:** `app-fixture-recording.md` ("`GRUB_FORCE_PARTUUID` is already off on this instance") and `docs/build/sev-snp.md` ("The boot setting changed on `attestamp-snp-vendor`"). On a fresh VM the setting is on |
+| 32 | [slows] **Procedures that live only in the night log:** the TDX Option 2 base initrd with the hook (`docs/build/tdx.md` and `app-fixture-recording.md` cite "Overnight 2026-11-12") |
+| 33 | [slows] **Text addressed to people or to Claude rather than to the reader:** "settled with the user" (`tdx.md`), "project lead" (`sev-snp.md`), "a decision for the user" (`app-fixture-recording.md`), "the operator's machine" (`cvm-port.md`); `e2e/cloud/README.md` and `app-fixture-recording.md` address Claude and `CLAUDE.md` |
+
+### Statements that contradict each other or the code
+
+| # | gap |
+|---|---|
+| 34 | [slows] **Stale "not implemented" lines after today's build and launch:** the `docs/build/sev-snp.md` status line ("not implemented") against its own "Not done yet" and `cmd/vendor/snp.go`; `sev-snp.md` "Checking" ("no `--verify` for SEV-SNP yet"); the `README.md` platform list ("verification only") against its status section; `cmd/README.md` (build and launch only on Nitro, the responder only inside the enclave) and the three role READMEs, which never mention TDX or SEV-SNP; `STRUCTURE.md` ("tdx and snp verify recorded evidence") against its own table; `docs/build/tdx.md` "Not done yet" naming `setup/build/tdx` as the image maker, now `setup/build/verity`; the `docs/plan/cvm-port.md` header "Status (2026-11-11, evening)" |
+| 35 | [slows] **Other contradictions:** `e2e/cloud/README.md` says the `attestamp-ra` firewall rule was "added by hand", but `gcp-cvm.sh` creates it; `toolchain.md` says docker is not used here, but it was on 2026-11-15; `README.md` says the AMI, docker and nitro-cli versions are "not recorded anywhere", but `toolchain.md` records them; `docs/build/tdx.md` "From scratch" creates one VM (`tdx create vendor`) where `e2e/cloud/README.md` creates two; `cmd/vendor/README.md` uses `out/app.eif`, but the EIF is named after `--app-dir` |
+
+No current procedure depends on the scripts that no longer exist (the T10 relay uses `record-snp -relay-att`).
