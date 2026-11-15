@@ -987,3 +987,24 @@ Not done, and why:
 - Nothing ran on a TDX guest. The steps and pass criteria are in `docs/plan/cvm-port.md`, "Phase 3: what waits for a
   VM". The open question to measure first: the kernel command line names the root disk's UUID, so two guests'
   RTMR2 may differ even with byte-identical initrds.
+
+## The build day in /etc/shadow, fixed (2026-11-15)
+
+`fc105b0`: `build` and `pack` now empty field 3 ("last password change", days since 1970) of `/etc/shadow` and
+`/etc/shadow-`. It was the field that failed flow 2's `--verify` (a 2026-11-12 cache against a 2026-11-15 rebuild).
+
+**What else is left.** No instance was used. The test application was built twice with `docker build --no-cache` on
+this machine (Docker Desktop 29.8.0), both exports compared file by file (1,197 entries each), and build A searched
+for every form of the date, the day number, the epoch-seconds prefix and the build host name. Results, also in
+`docs/build/aws-nitro.md`, "Two builds compared":
+
+| file | marker | handled |
+|---|---|---|
+| `/var/log/apk.log` | install time; the only file that differed between the two same-day builds | already removed |
+| `/etc/shadow` | the day number `:20772:` | `fc105b0` |
+| none else | no date, epoch seconds or host name anywhere | — |
+
+**Measurements change.** PCR0 and PCR2 of the test application (and of any image with an `adduser` account) differ
+from `fc105b0` on. The recorded values are marked "before `fc105b0`" in `docs/results/aws-nitro-2026-11-12.md`, the two
+2026-11-15 results pages, build-info gaps #2, both Nitro fixture READMEs and the test matrix (T1 and the baseline mark).
+The baseline was **not** re-run, as instructed; the current reference PCR0/PCR2 are unknown until it is.

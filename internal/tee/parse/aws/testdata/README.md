@@ -18,9 +18,10 @@ fixture-my-web.nonce`): the signature chains to the AWS Nitro root, the nonce ma
 |---|---|
 | made | **2026-09-21 16:04:35 UTC**, the document's own signed `timestamp` |
 | added to this repository | 2026-11-10, with the initial import (`4364e19`) |
-| PCR0 | `a0099c1cd2af380adf19601ad09aa49380fc8c3c78e875ac9fe958fc6a836a8d3c30ca5ff5d66c9dc7293cd30ce67fb1` |
+| PCR0 (before `fc105b0`) | `a0099c1cd2af380adf19601ad09aa49380fc8c3c78e875ac9fe958fc6a836a8d3c30ca5ff5d66c9dc7293cd30ce67fb1` |
 | PCR1 | `4b4d5b3661b3efc12920900c80e126e4ce783c522de6c02a2a5bf7af3a2b9327b86776f188e4be1c1c404a129dbda493` |
-| PCR2 | `62f677d0dea159ce42932fa7cc14b885d53d295136f74347a8572ba5f48a36e82485055108bd4f1fa2a3302ab64424cf` |
+| PCR2 (before `fc105b0`) | `62f677d0dea159ce42932fa7cc14b885d53d295136f74347a8572ba5f48a36e82485055108bd4f1fa2a3302ab64424cf` |
+| note | a document is what it is: these values stay valid for this recording. "Before `fc105b0`" says only that a rebuild of the same image with today's `build` may give another PCR0 and PCR2, if the image has an account `adduser` made (`docs/build/aws-nitro.md`) |
 | debug | false (PCR0 is not all zero) |
 | nitro-cli | **not recorded**. PCR1 measures nitro-cli's enclave kernel and init only, and it equals the PCR1 that `aws-nitro-enclaves-cli` 1.5.0 gave on x86_64 in the 2026-11-12 baseline (`docs/results/aws-nitro-2026-11-12.md`). So the same kernel blobs were used, which is consistent with 1.5.0 on x86_64; it does not prove the package version |
 | AMI, instance type, region | **not recorded** by whoever made it |

@@ -22,9 +22,10 @@ signature chains to the AWS Nitro root.
 |---|---|
 | made | **2026-09-14 05:21:38 UTC**, the document's own signed `timestamp` |
 | added to this repository | 2026-11-10, with the initial import (`4364e19`) |
-| PCR0 | `af229a81a0d7f55ff47d6b06bda729f6680bd42220ad31c4f5ecd952084dade9cab1f08b4e7f5962352f3c9d452514fc` |
+| PCR0 (before `fc105b0`) | `af229a81a0d7f55ff47d6b06bda729f6680bd42220ad31c4f5ecd952084dade9cab1f08b4e7f5962352f3c9d452514fc` |
 | PCR1 | `3b4a7e1b5f13c5a1000b3ed32ef8995ee13e9876329f9bc72650b918329ef9cf4e2e4d1e1e37375dab0ba56ba0974d03` |
-| PCR2 | `bd1cddbb73cd08a147ac41e19fcedca0b602d24b0432562a726ea4cdabb783e1ddaee8c0ff4000752460a68575f2580f` |
+| PCR2 (before `fc105b0`) | `bd1cddbb73cd08a147ac41e19fcedca0b602d24b0432562a726ea4cdabb783e1ddaee8c0ff4000752460a68575f2580f` |
+| note | the recording stays valid as it is (the golden hash tests use it unchanged). "Before `fc105b0`": a rebuild of the same image with today's `build` may give another PCR0 and PCR2 (`docs/build/aws-nitro.md`) |
 | debug | false |
 | nitro-cli | **not recorded**. Its PCR1 differs from both `fixture-my-web` and the 2026-11-12 baseline (nitro-cli 1.5.0, x86_64), so it was made with other enclave kernel blobs: another nitro-cli version or another architecture. Which one cannot be told from the document |
 | AMI, instance type, region, application | **not recorded** |

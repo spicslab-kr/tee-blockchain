@@ -76,8 +76,32 @@ contents the layer bytes still differ, and PCR0 and PCR2 with them. After `docke
 | remove package-manager logs: `/var/log/apk.log`, `dpkg.log`, `alternatives.log`, `apt`, `yum.log`, `dnf*.log`, `hawkey.log` | install times (nginx alpine-slim: only `apk.log` differed out of 725 files) |
 | set apk virtual-package versions to 0 in `/etc/apk/world` and `/lib/apk/db/installed` | the install time used as a version (haproxy, memcached) |
 | remove `/var/cache/ldconfig/aux-cache`, `/root/.wget-hsts`, `/root/.gnupg/random_seed`, `/root/.cache` | cache state: inodes, times, seeds (mariadb, tomcat) |
+| empty field 3 ("last password change", days since 1970) of every line in `/etc/shadow` and `/etc/shadow-` (since `fc105b0`, 2026-11-15) | the **build day**, which `adduser` and `useradd` write. Measured: nginx alpine-slim built from a 2026-11-12 cache had `nginx:!:20769:…`, rebuilt on 2026-11-15 `20772`, and that one field changed PCR0 and PCR2. Empty is what the distributions' own base accounts carry; an enclave has no login, so password ageing does nothing there |
 
 The software's own files and logs are not touched.
+
+**This changes the measurements.** Every image with an account `adduser` made, the test application included, has
+a different PCR0 and PCR2 from `fc105b0` on (PCR1, the kernel and init, does not change). PCR values recorded before
+that commit are marked "before `fc105b0`" where they appear; they were not re-measured.
+
+### Two builds compared (2026-11-15)
+
+To find whatever else of this kind is left, the test application (`docker-nginx` `ef5a25a6`, `mainline/alpine-slim`)
+was built twice with `docker build --no-cache` on one machine (Docker Desktop 29.8.0, BuildKit), both root file
+systems were exported, and every file's type, mode, link target and sha256 compared (1,197 entries each). Then build A
+was searched for the day number (`:20772:`), the epoch-seconds prefix (`17947`), the date as `2026-11-15`, `20261115`,
+`Nov 15` and `15/Nov/2026`, and the build host name (`buildkitsandbox`).
+
+| where | what | handled |
+|---|---|---|
+| `/var/log/apk.log` | the install time, on every line; the **only file that differed** between the two same-day builds | yes, removed |
+| `/etc/shadow` | the build day (`:20772:`); same within a day, so the two-build comparison cannot show it; the day-number search did | yes, since `fc105b0` |
+| anything else | no other file held the date, the day, the epoch seconds or the host name | — |
+
+`/etc/hostname`, `/etc/hosts` and `/etc/resolv.conf` are in the export as empty files docker created; empty, so the
+same every time. What this does **not** cover: other Dockerfiles (each must be checked with `--verify` and, across
+days, by a rebuild on another day), a different builder (the instances use Amazon Linux's docker, not BuildKit), and
+values that change between machines rather than between runs.
 
 ## What `build` cannot change
 
@@ -95,7 +119,7 @@ The software's own files and logs are not touched.
 | `$RANDOM`, `/dev/urandom`, `openssl rand`, `uuidgen`, `ssh-keygen` | do not generate random values or keys at build time |
 | `mktemp` outside `/tmp` and `/var/tmp` | keep scratch files in those two folders |
 | `make`, `gcc`, `cmake`, `cargo build`, `go build` | compilers can embed the time, host or path (redis embeds both in `redis-server`); check with `--verify` |
-| `adduser`, `useradd`, `addgroup` | they write the **build day** into `/etc/shadow` (the "last password change" field, days since 1970). Measured 2026-11-15 on the test application (nginx alpine-slim): a build from a docker cache made on 2026-11-12 had `nginx:!:20769:…`, a `--no-cache` build on 2026-11-15 `20772`, and that one field changed PCR0 and PCR2 (`d5bbd4af…` → `47dbca56…`). **Two builds of the same source on different days do not match.** `build` does not normalise this yet; until it does, the Vendor and the Auditor have to build on the same UTC day, without a cache from an earlier day |
+| `adduser`, `useradd` setting a **password** | the build day in `/etc/shadow` is handled (above); a password hash is not: its salt is random, so the image differs on every build. Do not set a password at build time |
 
 The build tools are not fixed either. `build` installs `docker` and `aws-nitro-enclaves-cli` with
 `dnf` without a version, and `build-config.json` records only `os`, `arch`, the Go version and
