@@ -12,6 +12,300 @@ Every statement below is marked by where it comes from: **confirmed** (read from
 library's source or an official page, named next to it), **observed** (seen in our own runs, not proved in general)
 or **not confirmed**.
 
+## Getting started: from nothing to a verified SEV-SNP guest
+
+This takes one SEV-SNP guest on Google Cloud and your own computer, and goes all the way: build what carries the
+application on the guest, boot it, read the measurements, register them on a chain, and have a User verify the guest.
+Type the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; nothing else needs filling in.
+
+What it shows and what it does not: everything runs against **one** guest, and the Auditor registers the values the
+Vendor's guest measured; an Auditor with a guest of its own is the last section. The procedure has not yet been run end
+to end on a guest. The build and the post-boot check are tested without hardware, the check on recorded evidence of
+both options; what only a guest can show is in `docs/plan/cvm-port.md`, "Phase 4b: what waits for a VM". If a step
+stops with an error, that is a finding; note it. And on SEV-SNP the evidence cannot prove that its two documents come
+from the same VM ([Same VM](#same-vm)); the procedure does not change that.
+
+**Cost.** The guest is an `n2d-standard-2`, billed by the hour while it runs. Step 13 stops it.
+
+### Which option
+
+| | Option 1, `amd-sev-snp-initrd` | Option 2, `amd-sev-snp-verity` |
+|---|---|---|
+| where the application is | its files, as an archive appended to the initrd | a read-only squashfs image with a dm-verity hash tree, on the disk in `/var/lib/attestamp` |
+| what proves it | INITRD (SHA-256 of the initrd GRUB loaded) | INITRD (a base initrd with our hook), CMDLINE (it carries the image's root hash) and PCR12 (the hook extends it with the result of checking the image) |
+| after the boot | the files are unpacked into the initramfs; the boot then switches to the disk's root and the initramfs is emptied (that is what initramfs-tools does; not checked on our guest), so **nothing runs from them afterwards** | mounted read-only on `/opt/app-verity`; every block is checked against the root hash when it is read |
+| values registered | 5: MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD | 6: the same and PCR12 |
+| extra work | none | a base initrd built with our two hook scripts and `tpm2-tools` (step 4) |
+| choose it | to try the whole flow, or for small data only the boot needs | for an application that has to be there while the guest runs |
+
+The option is chosen by the format string; every command below takes it with `--platform` or `--format`. Write
+`amd-sev-snp-initrd` for Option 1 and `amd-sev-snp-verity` for Option 2, the same one everywhere.
+
+### 1. On your computer: what to install
+
+- `bash`. On Windows that is Git Bash (part of Git for Windows); run every command below in it.
+- `git`, and Go **go1.26.1** exactly (`go version`). `bash e2e/0-Setup-local-install.sh` installs both if missing.
+- `gcloud`, signed in, with a project that has billing and N2D quota in `us-central1-a`:
+  `gcloud auth login`, then `gcloud config set project <your project id>`.
+- `anvil` from Foundry (https://getfoundry.sh), for a local chain: no ETH needed.
+
+Versions we used: [toolchain.md](toolchain.md).
+
+### 2. On your computer: the source and the binaries
+
+```
+git clone https://github.com/spicslab-kr/tee-blockchain
+cd tee-blockchain
+go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
+go build -trimpath -buildvcs=false -o att-user    ./cmd/user
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+```
+
+The first two run on your computer; the `linux/` two go to the guest.
+
+### 3. On your computer: the guest
+
+```
+bash e2e/cloud/gcp-cvm.sh snp create vendor
+```
+
+This makes **one** VM, `attestamp-snp-vendor` (`n2d-standard-2`, AMD Milan, Ubuntu 24.04, SEV-SNP, zone
+`us-central1-a`), and a firewall rule `attestamp-ra` that lets **your computer's current address** reach port 5000 on
+it. It ends by printing the VM's `EXTERNAL_IP`: that is `<guest-ip>` below (`bash e2e/cloud/gcp-cvm.sh snp status`
+prints it again).
+
+Copy the binaries to it, one file per command:
+
+```
+gcloud compute scp linux/att-vendor       attestamp-snp-vendor:att-vendor       --zone us-central1-a
+gcloud compute scp linux/att-ra-responder attestamp-snp-vendor:att-ra-responder --zone us-central1-a
+```
+
+For Option 2 also the two hook scripts (SEV-SNP's own: they extend PCR12, TDX's do not):
+
+```
+gcloud compute scp internal/tee/parse/snp/testdata/record/initramfs-hook.sh         attestamp-snp-vendor:initramfs-hook.sh         --zone us-central1-a
+gcloud compute scp internal/tee/parse/snp/testdata/record/initramfs-local-bottom.sh attestamp-snp-vendor:initramfs-local-bottom.sh --zone us-central1-a
+```
+
+Log in:
+
+```
+gcloud compute ssh attestamp-snp-vendor --zone us-central1-a
+```
+
+### 4. On the guest: prepare it
+
+Everything in steps 4 to 9 is typed on the guest.
+
+```
+chmod +x att-vendor att-ra-responder
+sudo shutdown -h +240              # a safety stop in 4 hours; a reboot cancels it, so run it again after each one
+```
+
+Make the stock boot load an initrd. Google's Ubuntu images boot without one (`GRUB_FORCE_PARTUUID`; see "The boot
+setting changed" below and `docs/build/tdx.md`, "`GRUB_FORCE_PARTUUID`"), and the application, or for Option 2 the
+hook that checks it, is in the initrd. The original file is kept for step 13:
+
+```
+grep -n GRUB_FORCE_PARTUUID /etc/default/grub.d/40-force-partuuid.cfg
+sudo cp -p /etc/default/grub.d/40-force-partuuid.cfg /root/40-force-partuuid.cfg.orig
+sudo sed -i 's/^GRUB_FORCE_PARTUUID=/#GRUB_FORCE_PARTUUID=/' /etc/default/grub.d/40-force-partuuid.cfg
+sudo update-grub
+```
+
+The base initrd. `mkinitramfs` writes a random seed, so two runs never give the same file; the Vendor makes it once
+and publishes it, and an Auditor uses this file rather than its own.
+
+Option 1, the distribution's own (the build pads it to 4 bytes itself before appending the application):
+
+```
+sudo cp /boot/initrd.img-$(uname -r) base-initrd.img
+sudo chown $USER base-initrd.img
+```
+
+Option 2, one with the hook that checks, mounts and reports the image. `tpm2-tools` must be installed **before**
+`mkinitramfs`: the hook copies `tpm2_pcrextend` into the initrd. The scripts are removed again right after, so later
+kernel updates do not carry them:
+
+```
+sudo apt-get update
+sudo apt-get install -y squashfs-tools cryptsetup-bin tpm2-tools
+sudo install -m 755 initramfs-hook.sh         /etc/initramfs-tools/hooks/attestamp-verity
+sudo install -m 755 initramfs-local-bottom.sh /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
+sudo mkinitramfs -o base-initrd.img $(uname -r)
+sudo rm /etc/initramfs-tools/hooks/attestamp-verity /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
+sudo chown $USER base-initrd.img
+sudo mkdir -p /opt/app-verity      # where the image is mounted; the disk's root is read-only when the hook runs
+```
+
+### 5. On the guest: the application
+
+The application is a folder of ordinary files; a link or a device file is refused. For a first run:
+
+```
+mkdir app
+printf 'hello from attestamp\n' > app/hello.txt
+```
+
+### 6. On the guest: build
+
+Option 1:
+
+```
+./att-vendor build --platform amd-sev-snp-initrd --app-dir app --base-initrd base-initrd.img --verify
+```
+
+Option 2. It makes the image with `mksquashfs` and `veritysetup`, installed in step 4, and runs as root, as the image of
+our recordings was made (`internal/setup/build/cpio/testdata/make-verity-image.sh`):
+
+```
+sudo ./att-vendor build --platform amd-sev-snp-verity --app-dir app --base-initrd base-initrd.img --verify
+```
+
+It ends with `✓ reproducible on this host` and `✓ ready: out/initrd-app.img   build value: out/build-value.json`.
+`build-value.json` holds INITRD (the initrd's SHA-256); for Option 2 also the root hash, the PCR12 the hook will
+extend for it, and the kernel argument `attestamp.roothash=<root hash>`. Option 2 also writes `out/app.img` and
+`out/app.hash`.
+
+### 7. On the guest: install and boot
+
+```
+sudo ./att-vendor launch --platform amd-sev-snp-initrd --build-value out/build-value.json --reboot
+```
+
+(`amd-sev-snp-verity` for Option 2.) It copies the initrd to `/boot/initrd-attestamp.img`, writes the GRUB entry
+`attestamp` (the stock entry with only its title and initrd changed, and for Option 2 `attestamp.roothash=…` added to
+the kernel command line) to `/etc/grub.d/41_attestamp`, makes it the default in
+`/etc/default/grub.d/99-attestamp.cfg`, for Option 2 copies `app.img` and `app.hash` to `/var/lib/attestamp`, runs
+`update-grub` and reboots. The connection drops. Wait a minute and log in again (the `gcloud compute ssh` command of
+step 3), then `sudo shutdown -h +240` again.
+
+### 8. On the guest: check the boot and read the values
+
+```
+sudo ./att-vendor launch --platform amd-sev-snp-initrd --check
+```
+
+(`amd-sev-snp-verity` for Option 2.) It asks the guest for evidence (the SNP report and the vTPM attestation),
+verifies it as a User would, requires INITRD to be the built initrd's and, for Option 2, PCR12 to be what the built
+image gives, and requires the application to have been unpacked or mounted. It ends with `✓ the boot measured the
+build` and writes the values to `out/measurements.json`. For Option 2, also:
+
+```
+cat /run/attestamp-status          # ok
+cat /run/attestamp-log             # the check's error output, if any: read it when the status is fail
+ls /opt/app-verity/opt/app         # hello.txt
+```
+
+### 9. On the guest: answer attestation requests
+
+```
+sudo nohup ./att-ra-responder ra-serve --extractor snp-initrd --listen tcp:0.0.0.0:5000 > ra.log 2>&1 &
+```
+
+(`--extractor snp-verity` for Option 2.) It is not a service: after every reboot, start it again. While it attests, the
+guest fetches Google's AK certificates over the network; a GCP VM can by default. Log out (`exit`).
+
+### 10. On your computer: get the evidence
+
+```
+./att-user ra-request --tee-addr <guest-ip>:5000 --format amd-sev-snp-initrd --out-file evidence.cbor
+./att-user ra-parse   --doc evidence.cbor --format amd-sev-snp-initrd
+```
+
+`ra-parse` prints `signature ok`, `nonce ok` and the values; they are the ones in `out/measurements.json` on the guest.
+If `ra-request` times out, your address is not the one the firewall rule allows (it was set when the rule was first
+made): `gcloud compute firewall-rules describe attestamp-ra` shows it.
+
+### 11. On your computer: register with audit
+
+A local chain, in a second terminal, left running until step 12 is done:
+
+```
+anvil --port 8545
+```
+
+Two keys. These are anvil's development accounts 1 and 0, which every anvil start funds with test ETH; they are public
+knowledge, never use them on a public network:
+
+```
+printf '%s\n' 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d > auditor.key
+printf '%s\n' ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 > deployer.key
+```
+
+A registry whose approver is the Auditor (account 1, `0x70997970C51812dc3A010C7d01b50e0d17dc79C8`). It prints
+`Registry deployed at 0x…`; that address is `<0x…>` below (on a fresh anvil it is
+`0x5FbDB2315678afecb367f032d93F642f64180aa3`):
+
+```
+./att-auditor registry-deploy --rpc http://127.0.0.1:8545 --deployer-key-file deployer.key --approver 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+```
+
+The values the guest measured, then the audit: it asks the guest for fresh evidence, checks it equals those values,
+and registers them.
+
+```
+gcloud compute scp attestamp-snp-vendor:out/measurements.json measurements.json --zone us-central1-a
+./att-auditor audit --tee-addr <guest-ip>:5000 --format amd-sev-snp-initrd --build-measurements measurements.json \
+  --rpc http://127.0.0.1:8545 --registry <0x…> --signing-key-file auditor.key \
+  --service hello --version 1.0.0 --arch amd64
+```
+
+It ends with `PASS: audited and registered`.
+
+### 12. On your computer: verify, as any User
+
+```
+./att-user verify --tee-addr <guest-ip>:5000 --format amd-sev-snp-initrd --rpc http://127.0.0.1:8545 --registry <0x…>
+```
+
+Exit 0 and a `✓ matches  hello 1.0.0 (amd64) by 0x7099…` line: the guest runs what was registered. To see a refusal,
+rebuild with one byte changed in `app/hello.txt`, launch it (steps 6 to 9) and verify again: exit 1, "nobody has
+registered these measurements".
+
+### 13. Put everything back, and stop
+
+On the guest (`gcloud compute ssh …` again):
+
+```
+sudo pkill -f "att-ra-responder ra-serve"
+sudo rm -f /etc/grub.d/41_attestamp /etc/default/grub.d/99-attestamp.cfg /boot/initrd-attestamp.img
+sudo rm -rf /var/lib/attestamp                  # Option 2 only
+sudo cp -p /root/40-force-partuuid.cfg.orig /etc/default/grub.d/40-force-partuuid.cfg
+sudo update-grub
+sudo systemctl reboot
+```
+
+After that boot, `cat /proc/cmdline` shows the stock command line, and for Option 2 the image is no longer mounted:
+then `sudo rmdir /opt/app-verity`. `base-initrd.img`, `app` and `out` in the home folder are yours to keep or delete.
+On your computer, stop anvil (Ctrl-C) and the VM:
+
+```
+bash e2e/cloud/gcp-cvm.sh snp stop        # the disk still costs a little; "delete" removes the VM and its disk
+```
+
+The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rules delete attestamp-ra` removes it.
+
+### The Auditor's own guest
+
+The real Auditor rebuilds on a guest of its own instead of taking the Vendor's values (step 11). Not yet run:
+
+1. `bash e2e/cloud/gcp-cvm.sh snp create auditor` makes `attestamp-snp-auditor`.
+2. Give it the same inputs as the Vendor's build: the `app` folder and the Vendor's `base-initrd.img` (copy them from
+   the Vendor's guest to your computer with `gcloud compute scp`, then to the Auditor's guest), and an `att-auditor`
+   built for Linux like `att-vendor` in step 2, with `att-ra-responder`.
+3. Steps 4 (without making a new base initrd; for Option 2 still `apt-get install` the three packages and
+   `mkdir /opt/app-verity`), then 6 to 9 with `att-auditor` in place of `att-vendor`. `initrd_sha256` in its
+   `out/build-value.json`, and for Option 2 `root_hash` and `pcr12`, must equal the Vendor's.
+4. Compare its `out/measurements.json` with the Vendor's. **Expect CMDLINE to differ** until this is solved: the kernel
+   command line names the root disk's UUID, which differs between two disks (`docs/plan/cvm-port.md`, "Phase 4b: what
+   waits for a VM", item 3). MEASUREMENT, PCR4, KERNEL and INITRD (and PCR12) should match if both guests have the
+   same firmware, boot loader and kernel.
+5. `att-auditor audit --tee-addr <auditor-guest-ip>:5000 … --build-measurements <its own measurements.json>
+   --vendor-tee <guest-ip>:5000` registers its own value and says whether the Vendor's guest runs the same.
+
 ## How the evidence is shaped
 
 On GCP the SNP launch measurement covers only the virtual firmware. The boot files that carry the application are

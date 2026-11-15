@@ -113,7 +113,8 @@ All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md), [Intel
 [AMD SEV-SNP](docs/build/sev-snp.md).
 
 **Step by step, from nothing:** Nitro, the two flows in [e2e/README.md](e2e/README.md) (instances:
-[e2e/cloud/README.md](e2e/cloud/README.md)); Intel TDX, [Getting started](docs/build/tdx.md#getting-started-from-nothing-to-a-verified-tdx-guest). What each platform's evidence
+[e2e/cloud/README.md](e2e/cloud/README.md)); Intel TDX, [Getting started](docs/build/tdx.md#getting-started-from-nothing-to-a-verified-tdx-guest); AMD SEV-SNP,
+[Getting started](docs/build/sev-snp.md#getting-started-from-nothing-to-a-verified-sev-snp-guest). What each platform's evidence
 gives the verifier, side by side: [RA comparison](docs/build/ra-comparison.md).
 
 ## Quick start
