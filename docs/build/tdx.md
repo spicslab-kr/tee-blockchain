@@ -11,6 +11,284 @@ The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) passes against a
 Statements are marked **confirmed** (read from our recorded quote, a spec, a library's source or an official page),
 **observed** (seen in our runs) or **not confirmed**.
 
+## Getting started: from nothing to a verified TDX guest
+
+This takes one TDX guest on Google Cloud and your own computer, and goes all the way: build the application's
+initrd on the guest, boot it, read the measurements, register them on a chain, and have a User verify the guest. Type
+the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; nothing else needs filling in.
+
+What it shows and what it does not: everything runs against **one** guest. The Auditor registers the values the
+Vendor's guest measured, as in `e2e/cvm/in-guest-verify.sh`. An Auditor that rebuilds on a guest of its own is the
+last section, "The Auditor's own guest". The procedure has not yet been run end to end on a guest: the build and the
+post-boot check are tested without hardware, and the parts only a guest can show are listed in
+`docs/plan/cvm-port.md`, "Phase 3: what waits for a VM". If a step stops with an error, that is a finding; note it.
+
+**Cost.** The guest is a `c3-standard-4` and is billed by the hour while it runs. Step 13 stops it.
+
+### Which option
+
+| | Option 1: files in the initrd | Option 2: a dm-verity image in the initrd |
+|---|---|---|
+| what the boot measures | the initrd, which holds your files (RTMR2) | the initrd, which holds a read-only image of your files and its root hash (RTMR2) |
+| where the files are after the boot | they are unpacked into the initramfs; the boot then switches to the disk's root and the initramfs is emptied (that is what initramfs-tools does; not checked on our guest), so **nothing runs from them afterwards** | mounted read-only on `/opt/app-verity`; every block is checked against the root hash when it is read |
+| extra work | none | a base initrd built with our two hook scripts (step 4) |
+| choose it | to try the whole flow, or for small data only the boot needs | for an application that has to be there while the guest runs |
+
+Both register under the same format, `intel-tdx`, with the same four values (MRTD, RTMR0, RTMR1, RTMR2).
+
+### 1. On your computer: what to install
+
+- `bash`. On Windows that is Git Bash (part of Git for Windows); run every command below in it.
+- `git`, and Go **go1.26.1** exactly (`go version`). `bash e2e/0-Setup-local-install.sh` installs both if missing.
+- `gcloud`, signed in, with a project that has billing and C3 quota in `us-central1-a`:
+  `gcloud auth login`, then `gcloud config set project <your project id>`.
+- `anvil` from Foundry (https://getfoundry.sh), for a local chain: no ETH needed.
+
+Versions we used: [toolchain.md](toolchain.md).
+
+### 2. On your computer: the source and the binaries
+
+```
+git clone https://github.com/spicslab-kr/tee-blockchain
+cd tee-blockchain
+go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
+go build -trimpath -buildvcs=false -o att-user    ./cmd/user
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+```
+
+The first two run on your computer; the `linux/` two go to the guest.
+
+### 3. On your computer: the guest
+
+```
+bash e2e/cloud/gcp-cvm.sh tdx create vendor
+```
+
+This makes **one** VM, `attestamp-tdx-vendor` (`c3-standard-4`, Ubuntu 24.04, TDX, zone `us-central1-a`), and a
+firewall rule `attestamp-ra` that lets **your computer's current address** reach port 5000 on it. It ends by printing
+the VM's `EXTERNAL_IP`: that is `<guest-ip>` below (`bash e2e/cloud/gcp-cvm.sh tdx status` prints it again).
+
+Copy the binaries to it, one file per command:
+
+```
+gcloud compute scp linux/att-vendor       attestamp-tdx-vendor:att-vendor       --zone us-central1-a
+gcloud compute scp linux/att-ra-responder attestamp-tdx-vendor:att-ra-responder --zone us-central1-a
+```
+
+For Option 2 also the two hook scripts:
+
+```
+gcloud compute scp internal/tee/parse/tdx/testdata/record/initramfs-hook.sh         attestamp-tdx-vendor:initramfs-hook.sh         --zone us-central1-a
+gcloud compute scp internal/tee/parse/tdx/testdata/record/initramfs-local-bottom.sh attestamp-tdx-vendor:initramfs-local-bottom.sh --zone us-central1-a
+```
+
+Log in:
+
+```
+gcloud compute ssh attestamp-tdx-vendor --zone us-central1-a
+```
+
+### 4. On the guest: prepare it
+
+Everything in steps 4 to 9 is typed on the guest.
+
+```
+chmod +x att-vendor att-ra-responder
+sudo shutdown -h +240              # a safety stop in 4 hours; a reboot cancels it, so run it again after each one
+```
+
+Make the stock boot load an initrd. Google's Ubuntu images boot without one (`GRUB_FORCE_PARTUUID`, explained below
+in "`GRUB_FORCE_PARTUUID`"), and the application is in the initrd. The original file is kept for step 13:
+
+```
+grep -n GRUB_FORCE_PARTUUID /etc/default/grub.d/40-force-partuuid.cfg
+sudo cp -p /etc/default/grub.d/40-force-partuuid.cfg /root/40-force-partuuid.cfg.orig
+sudo sed -i 's/^GRUB_FORCE_PARTUUID=/#GRUB_FORCE_PARTUUID=/' /etc/default/grub.d/40-force-partuuid.cfg
+sudo update-grub
+```
+
+The base initrd. `mkinitramfs` writes a random seed, so two runs never give the same file; the Vendor makes it once
+and publishes it, and an Auditor uses this file rather than its own.
+
+Option 1, the distribution's own:
+
+```
+sudo cp /boot/initrd.img-$(uname -r) base-initrd.img
+sudo chown $USER base-initrd.img
+```
+
+Option 2, one with the hook that opens and mounts the image (the scripts are removed again right after, so later
+kernel updates do not carry them):
+
+```
+sudo apt-get update
+sudo apt-get install -y squashfs-tools cryptsetup-bin
+sudo install -m 755 initramfs-hook.sh         /etc/initramfs-tools/hooks/attestamp-verity
+sudo install -m 755 initramfs-local-bottom.sh /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
+sudo mkinitramfs -o base-initrd.img $(uname -r)
+sudo rm /etc/initramfs-tools/hooks/attestamp-verity /etc/initramfs-tools/scripts/local-bottom/attestamp-verity
+sudo chown $USER base-initrd.img
+sudo mkdir -p /opt/app-verity      # where the image is mounted; the disk's root is read-only when the hook runs
+```
+
+### 5. On the guest: the application
+
+The application is a folder of ordinary files; a link or a device file is refused. For a first run:
+
+```
+mkdir app
+printf 'hello from attestamp\n' > app/hello.txt
+```
+
+### 6. On the guest: build
+
+Option 1:
+
+```
+./att-vendor build --platform intel-tdx --app-dir app --base-initrd base-initrd.img --option 1 --verify
+```
+
+Option 2 (the same with `--option 2`). It makes the image with `mksquashfs` and `veritysetup`, installed in step 4,
+and runs as root, as the image of our recordings was made (`internal/setup/build/cpio/testdata/make-verity-image.sh`):
+
+```
+sudo ./att-vendor build --platform intel-tdx --app-dir app --base-initrd base-initrd.img --option 2 --verify
+```
+
+It ends with `✓ reproducible on this host` and `✓ initrd ready: out/initrd-app.img   build value:
+out/build-value.json`. `build-value.json` holds the initrd's SHA-384, the digest GRUB will measure.
+
+### 7. On the guest: install and boot
+
+```
+sudo ./att-vendor launch --platform intel-tdx --initrd out/initrd-app.img --reboot
+```
+
+It copies the initrd to `/boot/initrd-attestamp.img`, writes the GRUB entry `attestamp` (the stock entry with only its
+title and initrd changed) to `/etc/grub.d/41_attestamp`, makes it the default in
+`/etc/default/grub.d/99-attestamp.cfg`, runs `update-grub` and reboots. The connection drops. Wait a minute and log
+in again (the `gcloud compute ssh` command of step 3), then `sudo shutdown -h +240` again.
+
+### 8. On the guest: check the boot and read the values
+
+```
+sudo ./att-vendor launch --platform intel-tdx --check
+```
+
+It asks the guest for a quote, verifies it, replays the boot's event log against it, requires the initrd GRUB measured
+to be the one built, and requires the application to have been unpacked. It ends with `✓ the boot measured the built
+initrd` and writes MRTD and RTMR0–2 to `out/measurements.json`. For Option 2, also:
+
+```
+cat /run/attestamp-status          # ok <root hash>
+ls /opt/app-verity/opt/app         # hello.txt
+```
+
+### 9. On the guest: answer attestation requests
+
+```
+sudo nohup ./att-ra-responder ra-serve --extractor tdx --listen tcp:0.0.0.0:5000 > ra.log 2>&1 &
+```
+
+It is not a service: after every reboot, start it again. Log out (`exit`).
+
+### 10. On your computer: get the evidence
+
+```
+./att-user ra-request --tee-addr <guest-ip>:5000 --format intel-tdx --out-file quote.bin
+./att-user ra-parse   --doc quote.bin --format intel-tdx
+```
+
+`ra-parse` prints `signature ok`, `nonce ok` and the four values; they are the ones in `out/measurements.json` on the
+guest. If `ra-request` times out, your address is not the one the firewall rule allows (it was set when the rule was
+first made): `gcloud compute firewall-rules describe attestamp-ra` shows it.
+
+### 11. On your computer: register with audit
+
+A local chain, in a second terminal, left running until step 12 is done:
+
+```
+anvil --port 8545
+```
+
+Two keys. These are anvil's development accounts 1 and 0, which every anvil start funds with test ETH; they are public
+knowledge, never use them on a public network:
+
+```
+printf '%s\n' 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d > auditor.key
+printf '%s\n' ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 > deployer.key
+```
+
+A registry whose approver is the Auditor (account 1, `0x70997970C51812dc3A010C7d01b50e0d17dc79C8`). It prints
+`Registry deployed at 0x…`; that address is `<0x…>` below (on a fresh anvil it is
+`0x5FbDB2315678afecb367f032d93F642f64180aa3`):
+
+```
+./att-auditor registry-deploy --rpc http://127.0.0.1:8545 --deployer-key-file deployer.key --approver 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+```
+
+The values the guest measured, then the audit: it asks the guest for a fresh quote, checks it equals those values, and
+registers them.
+
+```
+gcloud compute scp attestamp-tdx-vendor:out/measurements.json measurements.json --zone us-central1-a
+./att-auditor audit --tee-addr <guest-ip>:5000 --format intel-tdx --build-measurements measurements.json \
+  --rpc http://127.0.0.1:8545 --registry <0x…> --signing-key-file auditor.key \
+  --service hello --version 1.0.0 --arch amd64
+```
+
+It ends with `PASS: audited and registered`.
+
+### 12. On your computer: verify, as any User
+
+```
+./att-user verify --tee-addr <guest-ip>:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry <0x…>
+```
+
+Exit 0 and a `✓ matches  hello 1.0.0 (amd64) by 0x7099…` line: the guest runs what was registered. To see a refusal,
+rebuild with one byte changed in `app/hello.txt`, launch it (steps 6 to 9) and verify again: exit 1, "nobody has
+registered these measurements".
+
+### 13. Put everything back, and stop
+
+On the guest (`gcloud compute ssh …` again):
+
+```
+sudo pkill -f "att-ra-responder ra-serve"
+sudo rm -f /etc/grub.d/41_attestamp /etc/default/grub.d/99-attestamp.cfg /boot/initrd-attestamp.img
+sudo cp -p /root/40-force-partuuid.cfg.orig /etc/default/grub.d/40-force-partuuid.cfg
+sudo update-grub
+sudo rmdir /opt/app-verity 2>/dev/null     # Option 2 only
+sudo systemctl reboot
+```
+
+After that boot, `cat /proc/cmdline` shows the stock command line and `ls /boot/initrd-attestamp.img` finds nothing.
+`base-initrd.img`, `app` and `out` in the home folder are yours to keep or delete. On your computer, stop anvil
+(Ctrl-C) and the VM:
+
+```
+bash e2e/cloud/gcp-cvm.sh tdx stop        # the disk still costs a little; "delete" removes the VM and its disk
+```
+
+The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rules delete attestamp-ra` removes it.
+
+### The Auditor's own guest
+
+The real Auditor rebuilds on a guest of its own instead of taking the Vendor's values (step 11). Not yet run:
+
+1. `bash e2e/cloud/gcp-cvm.sh tdx create auditor` makes `attestamp-tdx-auditor`.
+2. Give it the same inputs as the Vendor's build: the `app` folder and the Vendor's `base-initrd.img` (copy them from
+   the Vendor's guest to your computer with `gcloud compute scp`, then to the Auditor's guest), and an `att-auditor`
+   built for Linux like `att-vendor` in step 2, with `att-ra-responder`.
+3. Steps 4 (without making a new base initrd), 6 to 9 with `att-auditor` in place of `att-vendor`. `initrd_sha384` in
+   its `out/build-value.json` must equal the Vendor's: the same files give the same initrd.
+4. Compare its `out/measurements.json` with the Vendor's. **Expect RTMR2 to differ** until this is solved: the kernel
+   command line names the root disk's UUID, which differs between two disks (`docs/plan/cvm-port.md`, "Phase 3: what
+   waits for a VM", item 4). MRTD, RTMR0 and RTMR1 should match if both guests have the same firmware and kernel.
+5. `att-auditor audit --tee-addr <auditor-guest-ip>:5000 … --build-measurements <its own measurements.json>
+   --vendor-tee <guest-ip>:5000` registers its own value and says whether the Vendor's guest runs the same.
+
 ## The quote
 
 One request returns one signed document, like Nitro: a TDX quote (version 4 on GCP, confirmed). It is the TD report
@@ -295,6 +573,9 @@ describe` on 2026-11-11):
 | quote interface | ConfigFS TSM, provider `tdx_guest` |
 
 ## From scratch: record and check one quote
+
+To build and run an application, follow [Getting started](#getting-started-from-nothing-to-a-verified-tdx-guest)
+instead. This section only records a quote from a stock guest, as the first fixture was made.
 
 1. `bash e2e/cloud/gcp-cvm.sh tdx create vendor`, then on the instance `sudo shutdown -h +240` as a safety stop.
 2. Record a quote with ConfigFS TSM, as in `internal/tee/parse/tdx/testdata/README.md`.
