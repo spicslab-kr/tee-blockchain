@@ -29,8 +29,8 @@ Each cell says how far the row is proven, and by what:
 | T5 | application swapped after registration | not trusted, exit 1 | **code** in part: an unregistered measurement is not trusted (`TestRun_E2E_User_NothingRegistered`). The swap itself: **script, never run** (`flow1-auditor-registers/4,5`) | **code**, both options: `TestRun_E2E_T5_ApplicationSwapIsRefused/tdx-option1`, `/tdx-option2` (recordings of 2026-11-11) ⁸ | **code**, both options: `…/snp-option1` (padded pair), `…/snp-option2` ⁸ |
 | T6 | Vendor self-registers a different image, Auditor disagrees | not trusted when both registries are required | **script, never run** (`flow2-vendor-self-registers/1..5`) | **needs VM** | **needs VM** |
 | T7 | build environment (OS / arch / Go) does not match | `receive` refuses | **code**: `TestBuildEnv_ReceiveRejectsOtherArch`, `…OtherGoVersion`, `…ConfigWithoutBuildEnv`. **Nitro baseline 2026-11-12** on the x86_64 Vendor (`build-env-check.sh`): a config declaring arm64 is refused naming both architectures, `--ignore-env` only warns, amd64 passes; `send` refuses a record without `build_env` (`arch-record-check.sh`). The arm64 mirror **not run** | **code** in part: an `intel-tdx` build config without `build_env` is refused (`TestBuildConfig_BuildEnvRequiredOnTDX`) | **code** in part: an `amd-sev-snp-initrd` or `amd-sev-snp-verity` build config without `build_env` is refused (`TestBuildConfig_BuildEnvRequiredOnSNP`, added 2026-11-12) |
-| T8 | TEE in debug mode | measurements refused | **script, never run** (`debug-mode-check.sh`) ⁴ | **code**: `TestParse_DebugTDIsRefused` (debug bit set in a copy of the recorded quote) | **code**: `TestParse_DebugGuestIsRefused` (debug bit set in a copy of the recorded report) |
-| T9 | replay of an earlier attestation | refused (nonce) | **code**: `TestCmd_E2E_ParseRejectsTamperedNonce` and the nonce unit tests. A replay against a live enclave: **script, never run** (`replay-check.sh`) ⁵ | **code**: `tdx` nonce tests (a different REPORTDATA is refused); **live 2026-11-12**: a fresh quote presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) | **code**: `snp` nonce tests; **live 2026-11-12**: a fresh document from the guest, presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) ¹⁰ |
+| T8 | TEE in debug mode | measurements refused | **Nitro, live 2026-11-15** (`debug-mode-check.sh`): the same EIF started with `--debug-mode` gave a genuinely signed document with the right nonce and all-zero PCRs; `ra-parse` refused it with exit 7 ("every PCR is zero"). The normal launch of the same EIF, the control, verified ⁴ | **code**: `TestParse_DebugTDIsRefused` (debug bit set in a copy of the recorded quote) | **code**: `TestParse_DebugGuestIsRefused` (debug bit set in a copy of the recorded report) |
+| T9 | replay of an earlier attestation | refused (nonce) | **code**: `TestCmd_E2E_ParseRejectsTamperedNonce` and the nonce unit tests. **Nitro, live 2026-11-15** (`replay-check.sh`): two fresh documents from the running enclave each verified against their own nonce and differed; document 1 presented against request 2's nonce was refused with exit 6 ("document nonce is not the one sent") ⁵ | **code**: `tdx` nonce tests (a different REPORTDATA is refused); **live 2026-11-12**: a fresh quote presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) | **code**: `snp` nonce tests; **live 2026-11-12**: a fresh document from the guest, presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) ¹⁰ |
 | T10 | two attestations from different machines, combined | refused | **not applicable** ⁶ | **not applicable** ⁶ | **not reproduced in this repository.** The **2026-11 run** record says it **fails** (the combination verified), on GCP and AWS ⁷ ¹⁰. `TestVerifySig_MixedRecordingsFailTheBinding` is **not** this row: it mixes two recordings of one VM, which the binding refuses by construction. Procedure to measure it: `docs/plan/app-fixture-recording.md`, "Reproducing T10" (written, not run) |
 
 ¹ `docs/build/sev-snp.md`, "Variables", keeps the 2026-11 observations as a record. The 2026-11 numbering of "the seven
@@ -49,15 +49,17 @@ entrypoint inside the EIF, and `60de6b0`, which changed the responder: **the bas
 `9a5668e`, after all three.**
 
 ⁴ `tee/parse/aws/measure.go` treats an all-zero PCR0 as debug (`Info.Debug`) and `Parse` fails when every PCR is
-zero, but nothing has launched a debug-mode enclave to prove it. A debug document is signed, so unlike TDX and
-SEV-SNP it cannot be made from the recorded one by flipping a bit; it has to be recorded from a debug enclave.
-`e2e/debug-mode-check.sh` (written 2026-11-12, **not run**) does that on the Vendor host: a normal launch as the
-control, then the same EIF with `nitro-cli run-enclave --debug-mode`, and `ra-parse` must refuse its document with
-exit 7. It needs one Nitro instance and no chain. The saved `debug.doc` then becomes a fixture, and T8 a code test.
+zero. A debug document is signed, so unlike TDX and SEV-SNP it cannot be made from the recorded one by flipping a bit;
+it has to be recorded from a debug enclave. `e2e/debug-mode-check.sh` did that on 2026-11-15 (code at `1663a5d`; the
+same test-application PCRs as the 2026-11-12 baseline). The debug document's signature and nonce verified and it was
+marked `debug true`; then every PCR was zero and it was refused. The document is **not committed** as a fixture: its
+signed `module_id` carries the EC2 instance ID, which may not be committed (`CLAUDE.md`, rule 4). So T8 on Nitro stays
+a live result, not a code test.
 
-⁵ The nonce check is inside `verify` and has unit and command tests. `e2e/replay-check.sh` (written 2026-11-12, **not
-run** on Nitro) replays a fresh document against the next request's nonce on a live enclave; it needs a running
-enclave and no chain. The same check passed live on TDX and SEV-SNP (`e2e/cvm/in-guest-verify.sh`).
+⁵ The nonce check is inside `verify` and has unit and command tests. `e2e/replay-check.sh` replayed a fresh document
+against the next request's nonce on a live Nitro enclave on 2026-11-15 (the enclave `debug-mode-check.sh` relaunched;
+no chain), and it was refused. The same check passed live on TDX and SEV-SNP (`e2e/cvm/in-guest-verify.sh`), so T9 is
+now live on all three.
 
 ⁶ Nitro and TDX return one document from one TEE; there is nothing to combine.
 
