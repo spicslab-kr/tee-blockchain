@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -145,7 +144,9 @@ func TestWrite_RefusesDuplicatesAndBadNames(t *testing.T) {
 	}
 }
 
-// The archives mkcpio.py wrote, kept as files. Each must be reproduced byte for byte.
+// The archives mkcpio.py wrote, kept as files. Each must be reproduced byte for byte. mkcpio.py itself, a script of the
+// 2026-11 SEV-SNP runs, is no longer available (testdata/README.md), so these files are the only record of its output:
+// they pin that this package still writes what the archives of those runs were.
 func TestWrite_MatchesMkcpioGolden(t *testing.T) {
 	for file, tree := range map[string][]Entry{
 		"mkcpio-golden-flat.cpio": flatTree(),
@@ -162,23 +163,19 @@ func TestWrite_MatchesMkcpioGolden(t *testing.T) {
 	}
 }
 
-// With ATTESTAMP_MKCPIO pointing at mkcpio.py and python3 on PATH, run it now on the same tree and compare. On Windows
-// only the flat tree is comparable (see flatTree).
-func TestWrite_MatchesMkcpioLive(t *testing.T) {
-	script := os.Getenv("ATTESTAMP_MKCPIO")
-	if script == "" {
-		t.Skip("set ATTESTAMP_MKCPIO to the path of mkcpio.py to compare against it live")
-	}
-	py, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 not on PATH")
-	}
-	tree := appTree()
+// The same golden archive, reached through the files on disk: write the tree out, read it back with FromDir, and the
+// archive must still be the one mkcpio.py wrote. (This replaces a comparison against mkcpio.py run live, removed on
+// 2026-11-15 because the script no longer exists; that test skipped this part on Windows too.)
+func TestFromDir_MatchesMkcpioGolden(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		tree = flatTree()
+		t.Skip("Windows keeps no execute bit on disk, so FromDir cannot tell 0755 from 0644 there")
 	}
-	dir := t.TempDir()
-	root := filepath.Join(dir, "root")
+	tree, file := appTree(), "mkcpio-golden-app.cpio"
+	want, err := os.ReadFile(filepath.Join("testdata", file))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "root")
 	for _, e := range tree {
 		p := filepath.Join(root, filepath.FromSlash(e.Name))
 		if e.Dir {
@@ -198,25 +195,12 @@ func TestWrite_MatchesMkcpioLive(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	out := filepath.Join(dir, "py.cpio")
-	if b, err := exec.Command(py, script, root, out).CombinedOutput(); err != nil {
-		t.Fatalf("mkcpio.py: %v\n%s", err, b)
-	}
-	want, err := os.ReadFile(out)
+	fromDisk, err := FromDir(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := mustBytes(t, tree); !bytes.Equal(got, want) {
-		t.Fatalf("Go writes %s, mkcpio.py writes %s", short(got), short(want))
-	}
-	if runtime.GOOS != "windows" {
-		fromDisk, err := FromDir(root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := mustBytes(t, fromDisk); !bytes.Equal(got, want) {
-			t.Fatalf("FromDir then Write gives %s, mkcpio.py %s", short(got), short(want))
-		}
+	if got := mustBytes(t, fromDisk); !bytes.Equal(got, want) {
+		t.Fatalf("%s: FromDir then Write gives %s, mkcpio.py wrote %s", file, short(got), short(want))
 	}
 }
 

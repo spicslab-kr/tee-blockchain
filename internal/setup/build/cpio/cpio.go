@@ -8,8 +8,9 @@
 // 0755 with two links, files are 0644 or 0755 with one link. The format is "newc" (magic 070701), the one the Linux
 // kernel unpacks from an initrd.
 //
-// The output is byte-for-byte what option1-initrd/mkcpio.py from the October-November SEV-SNP runs writes for the
-// same tree; testdata/mkcpio-golden.cpio holds one archive it wrote, and cpio_test.go compares against it.
+// The output is byte-for-byte what mkcpio.py, the packing script of the October-November SEV-SNP runs, wrote for the
+// same tree. That script no longer exists; the two archives it wrote are kept in testdata/mkcpio-golden-*.cpio, and
+// cpio_test.go holds this package to them (testdata/README.md).
 //
 // The role does not matter, so this package is shared by every binary that builds an image.
 package cpio
