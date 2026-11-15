@@ -95,6 +95,7 @@ The software's own files and logs are not touched.
 | `$RANDOM`, `/dev/urandom`, `openssl rand`, `uuidgen`, `ssh-keygen` | do not generate random values or keys at build time |
 | `mktemp` outside `/tmp` and `/var/tmp` | keep scratch files in those two folders |
 | `make`, `gcc`, `cmake`, `cargo build`, `go build` | compilers can embed the time, host or path (redis embeds both in `redis-server`); check with `--verify` |
+| `adduser`, `useradd`, `addgroup` | they write the **build day** into `/etc/shadow` (the "last password change" field, days since 1970). Measured 2026-11-15 on the test application (nginx alpine-slim): a build from a docker cache made on 2026-11-12 had `nginx:!:20769:…`, a `--no-cache` build on 2026-11-15 `20772`, and that one field changed PCR0 and PCR2 (`d5bbd4af…` → `47dbca56…`). **Two builds of the same source on different days do not match.** `build` does not normalise this yet; until it does, the Vendor and the Auditor have to build on the same UTC day, without a cache from an earlier day |
 
 The build tools are not fixed either. `build` installs `docker` and `aws-nitro-enclaves-cli` with
 `dnf` without a version, and `build-config.json` records only `os`, `arch`, the Go version and
