@@ -98,7 +98,7 @@ adapters in `internal/tee/request/{Vendor,auditor}/{tdx,snp}`, and `request/{Ven
 | # | Task | Pass criterion | State |
 |---|---|---|---|
 | 2.1 | `internal/tee/request/tdx` (ConfigFS TSM, REPORTDATA = nonce then zeros) and `internal/tee/request/snp` (GCE vTPM attestation, SHA3-512 into REPORT_DATA, SNP report and certificate table, the parse/snp container), with role adapters | the returned evidence parses with the Phase 1 and 4a parsers | **done, without hardware**: a fake TSM (go-configfs-tsm `faketsm`) answers only for the REPORTDATA each recording was made for, and the quote and evidence produced verify with the parsers |
-| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **Answered on the guest over 127.0.0.1, 2026-11-12** (`tdx`, `snp-initrd`); not yet from another machine |
+| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **Answered on the guest over 127.0.0.1, 2026-11-12** (`tdx`, `snp-initrd`); **from another machine on 2026-11-15** (TDX: `docs/plan/trial-2026-11-16.md`) |
 | 2.3 | End to end: `att-user verify` against a running TDX and SEV-SNP instance | exit 0 and a `✓ matches` line | **Passed 2026-11-12, all on one guest** (`e2e/cvm/in-guest-verify.sh`, 11 of 11 checks each): `amd-sev-snp-initrd` on a stock boot; `intel-tdx` on a stock boot and again on a boot with the dm-verity application mounted (3.4) |
 
 **How 2.3 was run.** Without a firewall rule, everything runs on the guest and talks over `127.0.0.1`: the responder
@@ -233,7 +233,7 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
    lays the image out the same way (application under `opt/app`, every mode 755, every time 0, the same flags, padding,
    salt and UUID), and a test keeps the flags equal to the script's, but only the real tools can show the bytes are the
    same. WSL on the operator's machine has squashfs-tools 4.7.5 and no veritysetup, so this was not run.
-2. **Launch on a TDX guest** (`gcp-cvm.sh tdx create vendor`, with approval). On the guest, `GRUB_FORCE_PARTUUID`
+2. **Done 2026-11-15** (`docs/plan/trial-2026-11-16.md`): on a new guest, install, reboot and `--check` passed; the CC event log replayed, GRUB's initrd event carried the path of its `initrd` command and the SHA-384 of the file, the marker was there. What was asked: **Launch on a TDX guest** (`gcp-cvm.sh tdx create vendor`, with approval). On the guest, `GRUB_FORCE_PARTUUID`
    commented out (the install refuses otherwise):
    ```
    sudo ./att-vendor build --platform intel-tdx --app-dir app --base-initrd /boot/initrd.img-$(uname -r) --option 1 --verify
@@ -250,16 +250,16 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
    - `/dev/attestamp-app-marker` is present after the boot.
    **Pass: the check prints "✓ the same" and writes `out/measurements.json`.** Its RTMR2 differs from the stock boot's;
    MRTD, RTMR0 and RTMR1 equal the stock boot's (as the 2026-11-11 recordings showed).
-3. **Option 2 on the guest.** The base initrd built with `tdx/testdata/record/initramfs-hook.sh` and
+3. **Done 2026-11-15**: check passed, `/run/attestamp-status` `ok <root hash>`, `dmsetup` `V`, the application readable; the root hash equal to the one built in WSL. What was asked: **Option 2 on the guest.** The base initrd built with `tdx/testdata/record/initramfs-hook.sh` and
    `initramfs-local-bottom.sh` installed (as for the `gcp-c3-opt2m-*` recordings), then the same three commands with
    `--option 2`. Pass as above, and `/run/attestamp-status` reads `ok <root hash>`.
-4. **The Auditor's half.** A second TDX guest builds from the same files and the Vendor's base initrd: the initrd
+4. **Measured 2026-11-15: the values match.** Two guests made five days apart from one image have the same root UUID, PARTUUID and stock base initrd (they come with the image), so the same application gave the same initrd and **the same MRTD and RTMR0–2**. Both sides must pin the exact image, not the family. What was asked: **The Auditor's half.** A second TDX guest builds from the same files and the Vendor's base initrd: the initrd
    SHA-384 must be equal (`build-value.json`), and after its own launch the four values must equal the Vendor's, if both
    guests have the same firmware, kernel and command line. The command line names the root disk's UUID, which differs
    per disk (`docs/build/tdx.md`, "Variables"): **expect RTMR2 to differ between two guests until the command line is
    fixed**, for example by a root UUID set at image build. This is the open question that decides whether an
    independent rebuild can ever match on TDX, and it is the first thing to measure.
-5. **The verifier from another machine.** `att-user verify` against the guest's responder (Phase 2.2), with
+5. **Done 2026-11-15**: from a WSL on another machine, `ra-request`, `audit` (registered on a local anvil) and `verify` (exit 0, `✓ matches`). What was asked: **The verifier from another machine.** `att-user verify` against the guest's responder (Phase 2.2), with
    `measurements.json` registered by the Vendor or audited by the Auditor.
 
 ## Phase 4 — AMD SEV-SNP
