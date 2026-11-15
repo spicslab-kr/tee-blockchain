@@ -11,7 +11,8 @@ Status (2026-11-11, evening):
     2026-11-12, with everything on one guest.
 - Phase 3 is partly done: 3.2–3.4 were measured in the recording sessions; on 2026-11-12 the TDX boot also opened and
   mounted the dm-verity image (3.4). On 2026-11-15 the TDX build (both options, `--verify`) and launch went into the
-  tool, tested without a guest; what waits for a guest is listed under "Phase 3: what waits for a VM".
+  tool and **ran on real guests** (install, reboot, `--check`, both options; `audit` and `verify` from another
+  machine; two guests of one image gave the same values). What is left is listed under "Phase 3: what waits for a VM".
 - Phase 5 (a locked guest) is designed below, not started.
 - See `docs/plan/night-log.md`.
 
@@ -253,7 +254,7 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
 3. **Done 2026-11-15**: check passed, `/run/attestamp-status` `ok <root hash>`, `dmsetup` `V`, the application readable; the root hash equal to the one built in WSL. What was asked: **Option 2 on the guest.** The base initrd built with `tdx/testdata/record/initramfs-hook.sh` and
    `initramfs-local-bottom.sh` installed (as for the `gcp-c3-opt2m-*` recordings), then the same three commands with
    `--option 2`. Pass as above, and `/run/attestamp-status` reads `ok <root hash>`.
-4. **Measured 2026-11-15: the values match.** Two guests made five days apart from one image have the same root UUID, PARTUUID and stock base initrd (they come with the image), so the same application gave the same initrd and **the same MRTD and RTMR0–2**. Both sides must pin the exact image, not the family. What was asked: **The Auditor's half.** A second TDX guest builds from the same files and the Vendor's base initrd: the initrd
+4. **Measured 2026-11-15: the values match.** Two guests made five days apart from one image have the same root UUID, PARTUUID and stock base initrd (they come with the image), so the same application gave the same initrd and **the same MRTD and RTMR0–2**. Both sides must pin the exact image, not the family: since 2026-11-16 `gcp-cvm.sh` takes `IMAGE=<exact name>` and prints the name it resolved (`3520a56`), and both procedures say why ("Use the same image as the other side"). Not measured: whether RTMR0 follows the machine type. What was asked: **The Auditor's half.** A second TDX guest builds from the same files and the Vendor's base initrd: the initrd
    SHA-384 must be equal (`build-value.json`), and after its own launch the four values must equal the Vendor's, if both
    guests have the same firmware, kernel and command line. The command line names the root disk's UUID, which differs
    per disk (`docs/build/tdx.md`, "Variables"): **expect RTMR2 to differ between two guests until the command line is
@@ -318,7 +319,7 @@ so a check fed the recorded evidence and those build values must pass, and fail 
    Option 2: a base initrd built with `snp/testdata/record/initramfs-hook.sh` and `initramfs-local-bottom.sh`
    installed, then the same with `amd-sev-snp-verity`; pass also needs `/run/attestamp-status` `ok` and PCR12 as
    predicted.
-3. **Measured 2026-11-15: CMDLINE is the same.** The root UUID comes with the image, so two guests of `ubuntu-2404-noble-amd64-v20261105` gave the same MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD for the same application. Pin the exact image on both sides. What was asked: **The Auditor's half**: as on TDX, the command line names the root disk (`root=UUID=`), so CMDLINE will differ
+3. **Measured 2026-11-15: CMDLINE is the same.** The root UUID comes with the image, so two guests of `ubuntu-2404-noble-amd64-v20261105` gave the same MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD for the same application. Pin the exact image on both sides: `gcp-cvm.sh` `IMAGE=` since 2026-11-16 (`3520a56`). Not measured: whether MEASUREMENT follows the machine type. What was asked: **The Auditor's half**: as on TDX, the command line names the root disk (`root=UUID=`), so CMDLINE will differ
    between two guests' disks; and the Auditor uses the Vendor's base initrd (D1 (a)). Measure first whether CMDLINE
    can be made equal.
 4. **T10** stays as it is: the build and launch do not change what the evidence can say about the same VM.

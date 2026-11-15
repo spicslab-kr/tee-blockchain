@@ -20,6 +20,39 @@ filled** (closed: the information no longer exists anywhere, and the row says wh
 | `e2e/cloud/` not reachable from the e2e guide; "stop the instances from the console" | linked from `e2e/README.md`, which now names `aws-nitro.sh stop` |
 | stale and non-English lines in `docs/plan/cvm-port.md` | fixed |
 
+## Filled on 2026-11-16, from the trial
+
+The trial of 2026-11-15 (`docs/plan/trial-2026-11-16.md`) followed the TDX and SEV-SNP getting-started procedures in a
+clean WSL and on real guests, with the documents frozen. What it found, and where each is now:
+
+| trial step | gap | where it is now |
+|---|---|---|
+| 2.3 | `att-ra-responder` differed with cgo (`a71bedfc…` native Linux with gcc, `5573b538…` cross-built); nothing set `CGO_ENABLED=0` | `CGO_ENABLED=0` in every build command, `build` refuses a cgo responder, test for it (`ade66e6`); hashes in `docs/build/aws-nitro.md` (`d8475f3`) |
+| 2.3 (found running the suite there) | `TestGit_RepoAccessError` failed with git 2.43 | classifier fixed (`d6b97e9`) |
+| two-guest comparison | `gcp-cvm.sh` made guests from the image family, which moves | `IMAGE=<exact name>`, the resolved name printed, each disk's image in `status` (`3520a56`); "Use the same image as the other side" in both procedures |
+| 1.1 | step 1 ran a repository script before step 2 cloned it | git, clone, install script in one step, in that order (`efef3e7`, `025813c`) |
+| 1.3 | the install script ended "Next: …upload.sh", the Nitro script | names the next step of each platform (`0b5f822`) |
+| 1.4 | Go on `PATH` only in a new interactive shell | said in step 1, with the fix for scripts |
+| 1.5, 3.2 | no install command for `gcloud`; `gcloud` and the clone in different environments | per-system commands (the apt ones run in the clean WSL on 2026-11-16, core 2026.11.06); one environment for all; WSL's appended Windows `PATH` |
+| 1.6, 11 | no install command for anvil 1.8.0 | `foundryup --install v1.8.0`, or the release zip on Windows |
+| 3.1 | the procedure assumes one guest name | "Names" paragraph: replace it, `status` lists them |
+| 3.3 | the first ssh to a new guest failed; PuTTY's host key prompt | step 3 |
+| 8a | "wait a minute" after the reboot was too short | `uptime`, `/proc/cmdline` or the serial console in step 7; what `--check` says on the old boot in step 8 |
+| Opt. 2 | Option 2's base initrd overwrote Option 1's | `base-initrd-v.img` in steps 4 and 6 |
+| 13a | `pkill -f` in one remote command line killed its own shell | `[a]tt-ra-responder` pattern on its own line, with the reason (checked: the plain pattern's `bash -c` exited 143, the new one's 0) |
+| 13b | TDX: `rmdir /opt/app-verity` before the reboot, while mounted, error hidden | after the reboot, without `2>/dev/null`, as on SEV-SNP |
+| stop | `gcp-cvm.sh stop` with two guests failed on Windows (CR in the names) | each cloud script strips the CR its CLI prints; `aws` showed the same, so `aws-nitro.sh` and `aws-snp.sh` too (`1af3f87`) |
+
+**Not filled, and why.**
+
+| trial step | gap | why |
+|---|---|---|
+| 2.1 | the documented clone URL holds an older `main` | the commits are not pushed; only a push fills it (a person's decision) |
+| environment | the trial ran as root (`wsl --install --no-launch` makes no user) | the trial's own setup; a normal WSL install has a user with `sudo`, and the procedures use `sudo` either way |
+| Option 2 in WSL | a stand-in base initrd, since WSL has no `/boot` | not a procedure step: the procedures build on the guest |
+| two-guest comparison | the recordings' application was used to compare with 2026-11-11 | the trial's own check, not a procedure step |
+| 6 | whether `veritysetup format` works as an ordinary user | only tried as root (the procedure says `sudo`); unknown, not a gap in the procedure |
+
 ## Still missing
 
 Most important first.
@@ -78,7 +111,7 @@ the person cannot go on; [slows] means they can, after guessing. All rows need *
 | # | gap |
 |---|---|
 | 26 | [slows] **Not listed at all:** Git Bash / Git for Windows (the scripts need bash; only "need bash" is said), WSL and Docker Desktop (used on 2026-11-15 for checks that need no instance), winget and Homebrew (used by `0-Setup-local-install.sh`), `sha256sum` (used in `app-fixture-recording.md`) |
-| 27 | [slows] **Listed without a way to install:** anvil (the pinned 1.8.0 has no install command; `getfoundry.sh` from the README installs the latest); aws CLI and gcloud ("by hand"; not on Git Bash's PATH on Windows by default; the Compute Engine API must be enabled, which only a check command in `e2e/cloud/README.md` hints at); forge, Python, openssl, cast (needed only to regenerate the contract binding, not stated). Docker and nitro-cli versions are recorded, not pinned |
+| 27 | [slows] **Listed without a way to install:** anvil (the pinned 1.8.0 has no install command; `getfoundry.sh` from the README installs the latest); aws CLI and gcloud ("by hand"; not on Git Bash's PATH on Windows by default; the Compute Engine API must be enabled, which only a check command in `e2e/cloud/README.md` hints at); forge, Python, openssl, cast (needed only to regenerate the contract binding, not stated). Docker and nitro-cli versions are recorded, not pinned *Partly, 2026-11-16:* anvil 1.8.0 and gcloud now have install commands per system in the TDX and SEV-SNP procedures (step 1); the aws CLI and the rest are as listed |
 | 28 | [slows] **`0-Setup-local-install.sh`:** winget may need administrator rights; on Linux it always fetches the `linux-amd64` Go tarball, also on arm64 |
 
 ### Things outside the repository
@@ -95,7 +128,7 @@ the person cannot go on; [slows] means they can, after guessing. All rows need *
 
 | # | gap |
 |---|---|
-| 34 | [slows] **Stale "not implemented" lines after today's build and launch:** the `docs/build/sev-snp.md` status line ("not implemented") against its own "Not done yet" and `cmd/vendor/snp.go`; `sev-snp.md` "Checking" ("no `--verify` for SEV-SNP yet"); the `README.md` platform list ("verification only") against its status section; `cmd/README.md` (build and launch only on Nitro, the responder only inside the enclave) and the three role READMEs, which never mention TDX or SEV-SNP; `STRUCTURE.md` ("tdx and snp verify recorded evidence") against its own table; `docs/build/tdx.md` "Not done yet" naming `setup/build/tdx` as the image maker, now `setup/build/verity`; the `docs/plan/cvm-port.md` header "Status (2026-11-11, evening)" *Partly, 2026-11-15:* the README platform list now links the two getting-started procedures; the other stale lines are as listed |
+| 34 | [slows] **Stale "not implemented" lines after today's build and launch:** the `docs/build/sev-snp.md` status line ("not implemented") against its own "Not done yet" and `cmd/vendor/snp.go`; `sev-snp.md` "Checking" ("no `--verify` for SEV-SNP yet"); the `README.md` platform list ("verification only") against its status section; `cmd/README.md` (build and launch only on Nitro, the responder only inside the enclave) and the three role READMEs, which never mention TDX or SEV-SNP; `STRUCTURE.md` ("tdx and snp verify recorded evidence") against its own table; `docs/build/tdx.md` "Not done yet" naming `setup/build/tdx` as the image maker, now `setup/build/verity`; the `docs/plan/cvm-port.md` header "Status (2026-11-11, evening)" *Partly, 2026-11-15:* the README platform list now links the two getting-started procedures. *Partly, 2026-11-16:* the `sev-snp.md` status line and both procedures' "Not done yet" rows now say what ran on 2026-11-15; the other stale lines are as listed |
 | 35 | [slows] **Other contradictions:** `e2e/cloud/README.md` says the `attestamp-ra` firewall rule was "added by hand", but `gcp-cvm.sh` creates it; `toolchain.md` says docker is not used here, but it was on 2026-11-15; `README.md` says the AMI, docker and nitro-cli versions are "not recorded anywhere", but `toolchain.md` records them; `docs/build/tdx.md` "From scratch" creates one VM (`tdx create vendor`) where `e2e/cloud/README.md` creates two; `cmd/vendor/README.md` uses `out/app.eif`, but the EIF is named after `--app-dir` |
 
 No current procedure depends on the scripts that no longer exist (the T10 relay uses `record-snp -relay-att`).
