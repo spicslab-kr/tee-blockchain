@@ -29,6 +29,40 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
   [Running without a public testnet](#running-without-a-public-testnet); it needs neither the key files nor the
   addresses.
 
+### Key files
+
+A fresh clone has no `auditor.key` and no `deployer.key`; they are gitignored and must never be committed.
+
+- **With `NET=local` you need neither.** The scripts sign with anvil's development accounts, which every anvil start
+  funds ([Running without a public testnet](#running-without-a-public-testnet)). The CVM getting-started procedures do
+  the same (`docs/build/tdx.md` and `docs/build/sev-snp.md`, step 11).
+- **Only to deploy and register on a public network** (`NET=sepolia`, the default, or `NET=mainnet`) do you need two
+  keys of your own, each with a balance on that network:
+
+| file | role | pays gas for |
+|---|---|---|
+| `auditor.key` | the Auditor's signing key: the approver of flow 1's registry | nothing; it only signs registrations |
+| `deployer.key` | deploys every registry, and is the Vendor's signing key and approver in flow 2 | deployment (about 1.1M gas) and flow 2's registrations (about 89k gas each) |
+
+A key file is one line: a 32-byte private key in hex, with or without `0x` (the commands read it with
+`--signing-key-file` and `--deployer-key-file`). To make one, in the repository root:
+
+```
+openssl rand -hex 32 > auditor.key
+openssl rand -hex 32 > deployer.key
+```
+
+The addresses, for `AUDITOR_ADDR` and `VENDOR_ADDR` in `e2e/env.local.sh`, come from `cast`, which Foundry installs
+together with `anvil`:
+
+```
+cast wallet address --private-key 0x$(cat auditor.key)
+cast wallet address --private-key 0x$(cat deployer.key)
+```
+
+Then send test ETH to both addresses on Sepolia. These files hold private keys: keep them out of every commit, message
+and screenshot, and use them for nothing but these tests.
+
 ## env.sh and env.local.sh
 
 `e2e/env.sh` holds the shared settings: SSH user and key, chain and RPC, signing and deployer key files, service name and
