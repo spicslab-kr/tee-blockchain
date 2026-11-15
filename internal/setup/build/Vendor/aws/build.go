@@ -315,6 +315,9 @@ func normalize(ctx context.Context, r runner, image, workDir string) (manifest, 
 	for _, p := range fixApkVirtualVersions(ctx, r, extract) {
 		fmt.Fprintf(r.log, "    pinned apk virtual-package versions (they were the install time): /%s\n", p)
 	}
+	for _, p := range fixShadowDates(ctx, r, extract) {
+		fmt.Fprintf(r.log, "    emptied the password-change dates (they were the build day): /%s\n", p)
+	}
 	for _, p := range stripBuildLogs(ctx, r, extract) {
 		fmt.Fprintf(r.log, "    dropped a log stamped with the build time: /%s\n", p)
 	}

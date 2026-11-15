@@ -114,6 +114,39 @@ func TestFixApkVirtualVersions_NoApk(t *testing.T) {
 	}
 }
 
+// The nginx alpine-slim /etc/shadow as built on 2026-11-12 and on 2026-11-15 (day 20769 vs 20772): after the fix the
+// two files are the same, and every other field is unchanged.
+func TestFixShadowDates_TwoBuildDaysBecomeOne(t *testing.T) {
+	day := func(d string) string {
+		return "root:*::0:::::\nbin:!::0:::::\nnobody:!::0:::::\nnginx:!:" + d + ":0:99999:7:::\n"
+	}
+	var got [2][]byte
+	for i, d := range []string{"20769", "20772"} {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "etc"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "etc", "shadow"), []byte(day(d)), 0o640); err != nil {
+			t.Fatal(err)
+		}
+		if fixed := fixShadowDates(context.Background(), runner{log: io.Discard}, root); len(fixed) != 1 || fixed[0] != "etc/shadow" {
+			t.Fatalf("fixed %v", fixed)
+		}
+		got[i], _ = os.ReadFile(filepath.Join(root, "etc", "shadow"))
+	}
+	want := "root:*::0:::::\nbin:!::0:::::\nnobody:!::0:::::\nnginx:!::0:99999:7:::\n"
+	if string(got[0]) != want || string(got[1]) != want {
+		t.Fatalf("got\n%s\n%s\nwant\n%s", got[0], got[1], want)
+	}
+	// Already empty: nothing to change, and a file without shadow lines is left alone.
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "etc"), 0o755)
+	os.WriteFile(filepath.Join(root, "etc", "shadow"), []byte(want), 0o640)
+	if fixed := fixShadowDates(context.Background(), runner{log: io.Discard}, root); len(fixed) != 0 {
+		t.Fatalf("changed an already normalised file: %v", fixed)
+	}
+}
+
 func TestStripBuildCaches(t *testing.T) {
 	root := t.TempDir()
 	writeAt(t, root, "var/cache/ldconfig/aux-cache", "x")

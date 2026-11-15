@@ -103,6 +103,58 @@ func fixApkVirtualVersions(ctx context.Context, r runner, root string) []string 
 	return fixed
 }
 
+// shadowFiles hold the "last password change" date of every account: field 3, in days since 1970-01-01. adduser and
+// useradd write the day they ran, so the same Dockerfile built on two days gives two files (measured 2026-11-15: the
+// official nginx alpine-slim image built from a 2026-11-12 cache had nginx:!:20769:..., the rebuild on 2026-11-15
+// 20772, and PCR0 and PCR2 differed in that one field). /etc/shadow- is the backup shadow-utils writes beside it.
+var shadowFiles = []string{"etc/shadow", "etc/shadow-"}
+
+// fixShadowDates empties field 3 of every line in shadowFiles and returns the relative paths it changed. Empty is what
+// the distributions' own base accounts carry (alpine: root:*::0:::::) and means "password ageing off". That changes
+// nothing an enclave does: there is no login into an enclave, so no password is ever checked or aged there. A line
+// with a real password hash is left as it is apart from the date; its salt is random anyway, and a Dockerfile that
+// sets a password is not reproducible for that reason (docs/build/aws-nitro.md).
+func fixShadowDates(ctx context.Context, r runner, root string) []string {
+	var fixed []string
+	for _, rel := range shadowFiles {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if !exists(ctx, r, path) {
+			continue
+		}
+		b, err := readRoot(ctx, r, path)
+		if err != nil {
+			fmt.Fprintf(r.log, "warning: could not read /%s (the build day stays in the measurements): %v\n", rel, err)
+			continue
+		}
+		out, changed := blankShadowDates(b)
+		if !changed {
+			continue
+		}
+		if err := writeRoot(ctx, r, path, out); err != nil {
+			fmt.Fprintf(r.log, "warning: could not rewrite /%s (the build day stays in the measurements): %v\n", rel, err)
+			continue
+		}
+		fixed = append(fixed, rel)
+	}
+	return fixed
+}
+
+// blankShadowDates empties the third colon-separated field of each line that has one. Other fields are untouched.
+func blankShadowDates(b []byte) ([]byte, bool) {
+	lines := strings.Split(string(b), "\n")
+	changed := false
+	for i, l := range lines {
+		f := strings.Split(l, ":")
+		if len(f) < 3 || f[2] == "" {
+			continue
+		}
+		f[2] = ""
+		lines[i] = strings.Join(f, ":")
+		changed = true
+	}
+	return []byte(strings.Join(lines, "\n")), changed
+}
+
 // buildCaches are caches tools leave during the build. Their content is the state of that moment, such as times and inodes, not file
 // content, so it differs on every build of the same source, and nothing inside the enclave uses it again (measured: the official
 // mariadb Dockerfile on two instances; of 13,063 entries only root/.wget-hsts (wget's HSTS store, with visit times) and
