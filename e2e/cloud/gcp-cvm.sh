@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Create, inspect and remove the GCP Confidential VM instances for TDX or SEV-SNP.
 #
-#   bash e2e/cloud/gcp-cvm.sh tdx create [roles…]   # default roles: vendor auditor
-#   bash e2e/cloud/gcp-cvm.sh snp create [roles…]   # SEV-SNP; T10 (docs/plan/app-fixture-recording.md) needs a second VM
+#   bash e2e/cloud/gcp-cvm.sh tdx create [vendor] [auditor]   # one VM per role; default both (2 VMs)
+#   bash e2e/cloud/gcp-cvm.sh snp create [vendor] [auditor]   # SEV-SNP; T10 (docs/plan/app-fixture-recording.md) needs a second VM
 #   bash e2e/cloud/gcp-cvm.sh tdx status
 #   bash e2e/cloud/gcp-cvm.sh tdx stop | start | delete
 #
@@ -22,6 +22,13 @@ PLAT=${1:-}; ACTION=${2:-}
 [ -n "$PLAT" ] && [ -n "$ACTION" ] || { sed -n '2,20p' "$0"; exit 2; }
 shift 2
 ROLES=("$@"); [ ${#ROLES[@]} -gt 0 ] || ROLES=(vendor auditor)
+# Every role is one billable VM, so only the two roles the project uses are accepted: a stray word on the command line
+# (it happened in e2e/cloud/README.md: "create vendor auditor user y" would have made four VMs) stops the script.
+if [ "$ACTION" = create ]; then
+  for role in "${ROLES[@]}"; do
+    case "$role" in vendor|auditor) ;; *) echo "unknown role '$role': each role is one VM; use vendor and/or auditor" >&2; exit 2 ;; esac
+  done
+fi
 
 case "$PLAT" in
   tdx) CC_TYPE=TDX;     MACHINE=${MACHINE:-c3-standard-4}; ZONE=${ZONE:-us-central1-a}; FEATURE=TDX_CAPABLE;     MINCPU=() ;;

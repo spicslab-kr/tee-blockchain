@@ -45,9 +45,13 @@ compared against.
 ```
 1. Nitro baseline        bash e2e/cloud/aws-nitro.sh create      # 2 instances, eu-north-1
    (architecture rows)   bash e2e/cloud/aws-nitro.sh create-arm64  # 1 more, c7g.xlarge (Graviton), for ARM64_HOST
-2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create    # 2 instances, us-central1-a
-3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create vendor auditor user y
+2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create    # 2 instances (vendor, auditor), us-central1-a
+3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create    # 2 instances (vendor, auditor), us-central1-a
 ```
+
+Every word after `create` is a role, and every role is **one billable VM**. Without roles you get `vendor` and
+`auditor`; `create vendor` makes only the Vendor's. The script accepts no other role names, so a typo stops it
+instead of creating a VM.
 
 Each platform runs on one cloud: Nitro on AWS, TDX and SEV-SNP on GCP. SEV-SNP on AWS was decided against on
 2026-11-11; `aws-snp.sh` is kept only as a record of how that path works.
