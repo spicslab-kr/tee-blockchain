@@ -130,8 +130,88 @@ well. The request packages do not import the parsers, so no verifier code is lin
 | 3.2 | Prepend the application cpio to the base initrd (appending broke decompression in 2026-10; on 2026-11-11 the cause was measured on SEV-SNP as missing 4-byte padding, and `cpio.Join` now pads; TDX + append was not re-tested) | the instance boots. **Done 2026-11-11**: four boots with `AppFirst`, the application unpacked every time (marker present) |
 | 3.3 | Turn off `GRUB_FORCE_PARTUUID` so the initrd is actually read and measured | RTMR[2] changes when the initrd changes. **Done 2026-11-11**: RTMR2 changed with the application; MRTD, RTMR0, RTMR1 did not |
 | 3.4 | Option 2: squashfs + dm-verity (ext4 is not reproducible even with fixed UUID and hash_seed) | two builds give the same root hash. **Done 2026-11-11 for the image**: the same image and root hash on the SEV-SNP and the TDX guest. **Done 2026-11-12 on TDX at boot**: the initrd verifies the image against its root hash, opens it with dm-verity and mounts it read-only on `/opt/app-verity` (status `V`), for v1 and v2; an image that does not match its root hash is not opened (`fail`, nothing mounted), but the boot continues. Fixtures `gcp-c3-opt2m-*`. Still a test setup: scripts in `tdx/testdata/record/`, not `setup/build` |
-| 3.5 | `setup/launch/<role>/tdx/` — write a GRUB entry, boot into it once, read the measurement back | the measured value equals the built value |
-| 3.6 | A `--verify` equivalent: build twice and refuse on a mismatch | a deliberate one-byte change fails the build |
+| 3.5 | `setup/launch/<role>/tdx/` — write a GRUB entry, boot into it once, read the measurement back | the measured value equals the built value. Designed 2026-11-15, below |
+| 3.6 | A `--verify` equivalent: build twice and refuse on a mismatch | a deliberate one-byte change fails the build. Designed 2026-11-15, below |
+
+### Phase 3 design: TDX build and launch in the tool (2026-11-15)
+
+Until now Phase 3 existed as test scripts under `testdata/`; `att-vendor build` and `launch` were Nitro only. This is
+the design for putting TDX into the tool. **TDX only**: SEV-SNP (4b) follows the same shape once this is in place.
+
+**The same skeleton on every platform.** Nitro's `build` (`internal/setup/build/<role>/aws/build.go`) is five steps.
+The TDX build keeps the five, so all three platforms read alike:
+
+| step | Nitro (`aws`) | TDX (`tdx`) |
+|---|---|---|
+| 1 tools | install `docker`, `nitro-cli` | check `mksquashfs` and `veritysetup` (Option 2 only) and record their versions; nothing is installed |
+| 2 the software | `docker build` of the Vendor's Dockerfile | read the application tree (`--app-dir`) as files; a link or special file is refused, as `cpio.FromDir` does |
+| 3 what we add | the attestation responder, layered into the image | the **boot marker** (`conf/conf.d/zz-attestamp-app-marker`, the one `mkappinitrd` used) that lets `launch` prove the archive was unpacked; for Option 2, the squashfs + dm-verity image of the tree |
+| 4 make it reproducible | repack the docker layers in name order with time 0 | write the cpio archive with fixed metadata (`internal/setup/build/cpio`) and put it **before** the Vendor's base initrd (`cpio.AppFirst`) |
+| 5 the measured thing | `nitro-cli build-enclave` → EIF and PCR0·1·2 | the combined initrd and its **SHA-384**, the digest GRUB extends into RTMR2 |
+
+**Where they differ.**
+
+- **Docker → EIF becomes files → cpio/squashfs → initrd.** There is no container: the application is a tree of files
+  that lands under `/opt/app` in the initramfs (Option 1), or inside a read-only squashfs image verified by dm-verity
+  (Option 2, `/opt/app/{app.img,app.hash,roothash}` in the archive, mounted read-only on `/opt/app-verity` by the
+  base initrd's local-bottom script).
+- **The responder is not in the measured image.** On Nitro it has to be inside, because an enclave has no other way
+  in. In a confidential VM it runs in the guest OS and only relays a quote the hardware signs, so it cannot forge one;
+  its bytes stay out of the measurement, and Go version and `-trimpath` matter only for the application itself. When
+  the guest is locked (Phase 5), the responder moves into the locked root image.
+- **The build cannot produce the registered values.** Nitro's build ends with PCR0·1·2. A TDX build ends with the
+  initrd's digest only: MRTD is the firmware, RTMR0 its configuration, RTMR1 the boot loader and kernel, and RTMR2
+  also holds the GRUB commands and the kernel command line, all of which exist only on the machine. So **`launch` boots
+  once and reads the four values back**; it is Nitro's `launch --build-measurements` and the measuring step in one.
+- **The base initrd is the Vendor's binary (D1 option (a)).** `mkinitramfs` writes a random seed, so the Auditor uses
+  the Vendor's published base initrd and reproduces only the application part. For Option 2 that base must carry the
+  dm-verity hook (`internal/tee/parse/tdx/testdata/record/initramfs-hook.sh` and `initramfs-local-bottom.sh`).
+- **One format string.** Option 1 and Option 2 both move only RTMR2 (`docs/build/tdx.md`), so both register
+  `intel-tdx` with MRTD, RTMR0, RTMR1, RTMR2. The build record says which option was built.
+
+**Shell or Go (brief item 2.2).**
+
+| material | decision | why |
+|---|---|---|
+| `internal/setup/build/cpio` | used as it is | already the reproducible writer, pinned by the mkcpio golden files |
+| `cpio/testdata/mkappinitrd` | its logic (entries, marker, `cpio.Join`) moves into the build; the command stays in `testdata` as the recorder that made the fixtures | the product must not depend on a `testdata` main package; the recorder stays as the record of how the fixtures were made |
+| `make-verity-image.sh` | **ported to Go**, still calling `mksquashfs` and `veritysetup` through exec | the fixed parameters (squashfs flags, times 0, 4096-byte blocks and padding, salt, UUID, modes) decide the root hash, so they belong in reviewed, tested code in one place. The tools themselves stay: no Go writer is known to produce the same bytes, and writing one would be a new reproducibility risk. A test reads the script and fails if its parameters and the Go constants drift apart; the script stays as the record of the measured images |
+| `make-grub-entry.sh` | **ported to Go** (the entry is a text transform of the stock entry; `update-grub` is exec'd) | the entry decides the GRUB commands that go into RTMR2; a Go function is testable without a VM |
+| `initramfs-local-bottom.sh`, `initramfs-hook.sh` (TDX) | **stay shell** | they run inside the initramfs, under busybox `sh`, where there is no Go. They are part of the Vendor's base initrd, not of `build` |
+| `snp/testdata/record/initramfs-local-bottom.sh` | untouched | SEV-SNP (PCR12); 4b |
+
+**Code layout**, the "one core + role adapters" shape of `tee/parse` and `tee/request`:
+
+| path | what |
+|---|---|
+| `internal/setup/build/tdx/` | the build: five steps, Option 1 and 2, `--verify` |
+| `internal/setup/build/{Vendor,auditor}/tdx/` | thin adapters |
+| `internal/setup/launch/tdx/` | the launch: GRUB entry, install, and the post-boot check (quote, event-log replay, compare) |
+| `internal/setup/launch/{Vendor,auditor}/tdx/` | thin adapters |
+| `internal/setup/{build,launch}/*/aws/` | **unchanged** |
+
+**Launch (3.5), in two runs separated by a reboot.**
+
+1. `launch --platform intel-tdx --initrd out/initrd-app.img`: refuses if `GRUB_FORCE_PARTUUID` is set (the initrd
+   would never be loaded, `docs/build/tdx.md`), copies the initrd into `/boot`, writes a GRUB entry made from the stock
+   `Ubuntu` entry with only the title and initrd file changed, makes it the default, runs `update-grub`. With `--reboot`
+   it reboots.
+2. After the boot, `launch --platform intel-tdx --check`: a fresh quote over a random nonce from ConfigFS TSM; the
+   quote is verified with `internal/tee/parse/tdx` (chain to the Intel root, nonce, debug bit); the CC event log
+   (`/sys/firmware/acpi/tables/data/CCEL`) is replayed against the quote's RTMR0–2; in RTMR2's events, the file GRUB
+   loaded with `initrd` must have the build's SHA-384; the boot marker must be present (and for Option 2
+   `/run/attestamp-status` must read `ok <root hash>`). Then MRTD and RTMR0–2 go to `measurements.json`.
+   **Pass: the measured initrd digest equals the built one.** A digest that does not match, a log that does not replay,
+   or a missing marker stops it.
+
+**`--verify` (3.6).** The build runs steps 2–5 a second time from the files, into a temporary folder, and compares the
+combined initrd byte for byte (for Option 2 also the image, hash tree and root hash). A difference fails the build and
+names what differed: the archive entries, or the image. Pass: a one-byte change between the two builds fails it.
+
+**What can be tested without a VM (2.6).** Everything in the build (Option 2 with fake `mksquashfs`/`veritysetup`
+runners), `--verify` with a one-byte change, the GRUB entry text, the install step against a temporary root, the quote
+check on the recorded quotes, and the event-log replay on a constructed log. **What needs a VM** is listed in
+"Phase 3: what waits for a VM" below once the code is in.
 
 ## Phase 4 — AMD SEV-SNP
 
