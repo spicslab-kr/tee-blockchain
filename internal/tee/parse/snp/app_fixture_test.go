@@ -61,6 +61,12 @@ func TestAppFixtures_VerifyAndNonce(t *testing.T) {
 // Two genuine recordings from the same guest, minutes apart, mixed: the report of one with the vTPM attestation of the
 // other. Each half verifies on its own (the AMD signature, the AK chain and the quotes are all genuine), so only the
 // SHA3-512 binding can catch it: REPORT_DATA of A is the hash of A's attestation, not B's.
+//
+// This is NOT test-matrix row T10. Both halves come from one VM, and each report was requested over its own
+// attestation, so the binding fails by construction. T10 is the relay: a vTPM attestation from VM X, whose hash is
+// written into a report requested on another VM Y. There the binding holds, and the question is whether anything else
+// refuses it; the 2026-11 record says nothing does. It needs recordings from two VMs (docs/plan/app-fixture-recording.md,
+// "Reproducing T10"); this test cannot stand in for it.
 func TestVerifySig_MixedRecordingsFailTheBinding(t *testing.T) {
 	read := func(cell, name string) []byte {
 		b, err := os.ReadFile(filepath.Join("testdata", "gcp-n2d-"+cell+"-"+name))

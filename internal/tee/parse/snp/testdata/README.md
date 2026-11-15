@@ -148,6 +148,10 @@ To record evidence with an application in the initrd, see `docs/plan/app-fixture
 
 Then on an SEV-SNP guest booted with an initrd: `sudo ./record-snp -out fx -nonce-text attestamp-snp-fixture-0001`.
 
+For test-matrix row T10 the recorder also has `-relay-att <att.pb from another VM>`: it makes no vTPM attestation and
+requests this VM's report over SHA3-512 of the given file. The procedure is `docs/plan/app-fixture-recording.md`,
+"Reproducing T10" (not run yet).
+
 ## Checking a recording with `ra-parse`
 
 A recording is three files; `att-user ra-parse` reads the one CBOR container the responder sends. `pack/main.go` joins

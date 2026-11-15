@@ -10,6 +10,10 @@
 // gcp-n2d-initrdless-* fixture was recorded with that older binding.
 //
 // Run as root:  record -out <dir> -nonce-text attestamp-snp-fixture-0001
+//
+// For test-matrix row T10 (docs/plan/app-fixture-recording.md, "Reproducing T10"), -relay-att <att.pb from another VM>
+// makes no vTPM attestation here: it copies that file to att.pb and requests this VM's SNP report over SHA3-512 of it.
+// The result is the relay: another VM's vTPM evidence, bound by this VM's AMD-signed report. record.txt says so.
 package main
 
 import (
@@ -32,36 +36,29 @@ import (
 func main() {
 	out := flag.String("out", ".", "output directory")
 	nonceText := flag.String("nonce-text", "attestamp-snp-fixture-0001", "the vTPM nonce is SHA-256 of this ASCII string (32 bytes, the tee/request nonce size)")
+	relayAtt := flag.String("relay-att", "", "T10 only: an att.pb recorded on another VM. no vTPM attestation is made here; this VM's report is requested over SHA3-512 of that file")
 	flag.Parse()
-	if err := run(*out, *nonceText); err != nil {
+	if err := run(*out, *nonceText, *relayAtt); err != nil {
 		fmt.Fprintln(os.Stderr, "record:", err)
 		os.Exit(1)
 	}
 }
 
-func run(out, nonceText string) error {
+func run(out, nonceText, relayAtt string) error {
 	if err := os.MkdirAll(out, 0o755); err != nil {
 		return err
 	}
 	n := sha256.Sum256([]byte(nonceText))
 	nonce := n[:]
 
-	rwc, err := tpm2.OpenTPM("/dev/tpmrm0")
-	if err != nil {
-		return fmt.Errorf("open TPM: %w", err)
-	}
-	defer rwc.Close()
-	ak, err := client.GceAttestationKeyRSA(rwc)
-	if err != nil {
-		return fmt.Errorf("GCE AK: %w", err)
-	}
-	defer ak.Close()
-	att, err := ak.Attest(client.AttestOpts{Nonce: nonce, CertChainFetcher: http.DefaultClient})
-	if err != nil {
-		return fmt.Errorf("attest: %w", err)
-	}
-	attRaw, err := proto.Marshal(att)
-	if err != nil {
+	var attRaw []byte
+	var err error
+	if relayAtt != "" {
+		// T10: the vTPM evidence is another VM's, unchanged; only the report is this VM's.
+		if attRaw, err = os.ReadFile(relayAtt); err != nil {
+			return fmt.Errorf("relay attestation: %w", err)
+		}
+	} else if attRaw, err = attest(nonce); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(out, "att.pb"), attRaw, 0o644); err != nil {
@@ -83,8 +80,30 @@ func run(out, nonceText string) error {
 	}
 	info := fmt.Sprintf("nonce_text %s\nnonce %s\nreport_data %s\nprovider %s\natt_pb_bytes %d\nreport_bytes %d\nauxblob_bytes %d\n",
 		nonceText, hex.EncodeToString(nonce), hex.EncodeToString(rd[:]), provider, len(attRaw), len(report), len(aux))
+	if relayAtt != "" {
+		info += fmt.Sprintf("relay_att %s (another VM's vTPM attestation; the report is this VM's)\n", filepath.Base(relayAtt))
+	}
 	fmt.Print(info)
 	return os.WriteFile(filepath.Join(out, "record.txt"), []byte(info), 0o644)
+}
+
+// attest makes a vTPM attestation over nonce with the GCE attestation key and returns it as binary protobuf.
+func attest(nonce []byte) ([]byte, error) {
+	rwc, err := tpm2.OpenTPM("/dev/tpmrm0")
+	if err != nil {
+		return nil, fmt.Errorf("open TPM: %w", err)
+	}
+	defer rwc.Close()
+	ak, err := client.GceAttestationKeyRSA(rwc)
+	if err != nil {
+		return nil, fmt.Errorf("GCE AK: %w", err)
+	}
+	defer ak.Close()
+	att, err := ak.Attest(client.AttestOpts{Nonce: nonce, CertChainFetcher: http.DefaultClient})
+	if err != nil {
+		return nil, fmt.Errorf("attest: %w", err)
+	}
+	return proto.Marshal(att)
 }
 
 // tsmReport asks the kernel for a report through /sys/kernel/config/tsm/report: make an entry, write REPORT_DATA to

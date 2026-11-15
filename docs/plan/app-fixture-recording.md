@@ -293,3 +293,94 @@ nonce, and its boot log is committed next to it (`*-boot.txt`).
 - the SEV-SNP Option 2 tamper case (a changed image under an unchanged root hash) was not recorded;
 - one boot ID (SEV-SNP Option 2 v2) was not captured; that boot's command line, carrying the v2 root hash, shows it
   happened.
+
+## Reproducing T10: evidence from two VMs combined (planned, not run)
+
+**Status: written 2026-11-15, not run.** Test-matrix row T10 asks whether a vTPM attestation from one VM, combined with
+an SNP report from another, is refused. The only answer so far is the 2026-11 record ("it verifies"), made with a
+relay script that no longer exists. It is the project's main claim about SEV-SNP's weakness, so it has to be measured
+here.
+
+**What T10 is, and what `TestVerifySig_MixedRecordingsFailTheBinding` is not.** That test puts the report of one
+recording next to the vTPM attestation of another recording **of the same VM**. Each report was requested over its
+own attestation, so the SHA3-512 binding fails, as it must. The relay is different: VM B is asked for a report whose
+REPORT_DATA is the SHA3-512 of **VM A's** attestation. The binding then holds by construction, and the question is
+whether anything else in the evidence ties the two halves to the same VM. Two VMs are needed for that, and the
+recorder has a mode for it (`-relay-att`, `internal/tee/parse/snp/testdata/record/main.go`).
+
+### Before you start
+
+- **A second SEV-SNP VM is a billable cloud resource: ask before creating it** (`CLAUDE.md`, rule 5). The first VM is
+  `attestamp-snp-vendor`. The second one can be made with `bash e2e/cloud/gcp-cvm.sh snp create auditor` (same
+  machine type, image and zone; it becomes `attestamp-snp-auditor`).
+- On VM A, `GRUB_FORCE_PARTUUID` must be off (`docs/build/sev-snp.md`, "The boot setting changed"), so that its vTPM
+  event log measures an initrd and `ra-parse` gets as far as the binding. `attestamp-snp-vendor` already has it off.
+  VM B's boot setting does not matter: only its SNP report is used.
+- On both: `sudo shutdown -h +240` as a safety stop.
+- Build the recorder and the packer on your machine:
+
+```
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o record-snp ./internal/tee/parse/snp/testdata/record
+```
+
+Copy `record-snp` to both VMs (`gcloud compute scp`, one file per call).
+
+### Record (one nonce text for everything)
+
+```
+# VM A: its own, honest pair (the control that must verify)
+sudo ./record-snp -out t10-a -nonce-text attestamp-snp-t10
+
+# VM B: its own, honest pair (a second control; and the source of the "naive mix" below)
+sudo ./record-snp -out t10-b -nonce-text attestamp-snp-t10
+
+# copy t10-a/att.pb from A to B as t10-a-att.pb (through your machine), then on VM B: the relay
+sudo ./record-snp -out t10-relay -nonce-text attestamp-snp-t10 -relay-att t10-a-att.pb
+```
+
+`t10-relay` then holds A's `att.pb` unchanged and B's `report.bin` and `auxblob.bin`, with B's REPORT_DATA equal to
+SHA3-512 of A's attestation; `record.txt` says `relay_att`. Also save on each VM, for the record: `uname -r`,
+`cat /proc/cmdline`, `/proc/sys/kernel/random/boot_id`, and `sudo dmesg | grep -i sev`.
+
+Copy the three folders back, then **stop both VMs**. Deleting VM B is a separate decision for the user.
+
+### Check, with no VM
+
+```
+go run ./internal/tee/parse/snp/testdata/pack -report t10-a/report.bin -certs t10-a/auxblob.bin -vtpm t10-a/att.pb -out a.cbor
+go run ./internal/tee/parse/snp/testdata/pack -report t10-relay/report.bin -certs t10-relay/auxblob.bin -vtpm t10-relay/att.pb -out relay.cbor
+go run ./internal/tee/parse/snp/testdata/pack -report t10-b/report.bin -certs t10-b/auxblob.bin -vtpm t10-a/att.pb -out naive.cbor
+att-user ra-parse --doc <each> --format amd-sev-snp-initrd --nonce <the nonce from record.txt>
+```
+
+| document | what it is | expected |
+|---|---|---|
+| `a.cbor` | VM A, honest | accepted (exit 0) |
+| `naive.cbor` | B's own report with A's attestation | refused at the binding (exit 5, "REPORT_DATA is not SHA3-512"), as in the same-VM test |
+| `relay.cbor` | **T10**: B's report over A's attestation | the row expects **refused**; the 2026-11 record says it was **accepted** |
+
+Record for `relay.cbor`, whatever happens:
+
+- the exit code and the full message, and **which step refused it, if any**: the AMD chain or report signature (5),
+  the AK chain or quotes (5), the binding (5, "REPORT_DATA"), the nonce (6), the measurements (7);
+- if accepted: the values it yields, next to `a.cbor`'s. MEASUREMENT is B's firmware digest and the vTPM values are
+  A's; whether the two VMs' MEASUREMENT is equal tells whether a verifier comparing against a registration could even
+  notice;
+- `CHIP_ID` of A's and B's report (64 bytes at offset 0x1A0): whether the two VMs ran on the same physical machine;
+- what in A's vTPM evidence names A (the AK certificate carries the instance's identity from Google), and whether
+  anything in B's report could be compared with it. If nothing can, that is the structural reason T10 fails, and it
+  goes into `docs/build/sev-snp.md`, "Same VM".
+
+### Commit, so T10 runs with no VM
+
+- the three folders as fixtures `internal/tee/parse/snp/testdata/gcp-n2d-t10-{a,b,relay}-*`, with a `-boot.txt` each,
+  in the same layout as the other recordings;
+- a test in `internal/tee/parse/snp` that pins what was observed: if the relay verifies, a test named for the known
+  weakness that asserts it is accepted (so a future fix shows up as a deliberate test change); if it is refused, a test
+  that asserts the refusal and the step;
+- the T10 cell in `docs/plan/test-matrix.md` becomes **code**, with the date of the recording.
+
+**Identifiers.** Every `att.pb` carries the project ID inside the Google-signed AK certificate, and may carry the
+instance's identity too; check with `grep -a` before committing, as for the other SEV-SNP fixtures
+(`internal/tee/parse/snp/testdata/README.md`). An instance ID must not be committed (`CLAUDE.md`, rule 4); if the
+certificate holds one, committing these fixtures waits for the same publication decision as the others.
