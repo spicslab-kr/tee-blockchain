@@ -3,12 +3,8 @@ package tdx
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,69 +12,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"attestamp/internal/setup/build/verity/veritytest"
 )
-
-// fakeTools stands in for mksquashfs and veritysetup. The "image" it writes is a digest of everything about the staged
-// tree that the real mksquashfs would put in the image (names, modes, times, content), so a one-byte change in the
-// application, a mode or a time changes it, as it would change the real one. It also records the arguments.
-type fakeTools struct {
-	calls   [][]string
-	badMode []string // staged paths whose mode or time was not the fixed one
-}
-
-func (f *fakeTools) Run(_ context.Context, name string, args ...string) ([]byte, error) {
-	f.calls = append(f.calls, append([]string{name}, args...))
-	switch {
-	case name == "mksquashfs" && len(args) == 1:
-		return []byte("mksquashfs version 4.6.1 (2023/03/25)\n"), nil
-	case name == "veritysetup" && len(args) == 1:
-		return []byte("veritysetup 2.7.0 flags: UDEV BLKID KEYRING\n"), nil
-	case name == "mksquashfs":
-		stage, img := args[0], args[1]
-		h := sha256.New()
-		err := filepath.WalkDir(stage, func(p string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			info, err := d.Info()
-			if err != nil {
-				return err
-			}
-			rel, _ := filepath.Rel(stage, p)
-			if !info.ModTime().Equal(time.Unix(0, 0)) || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o755) {
-				f.badMode = append(f.badMode, rel)
-			}
-			fmt.Fprintf(h, "%s %v %d|", filepath.ToSlash(rel), info.IsDir(), info.ModTime().Unix())
-			if !info.IsDir() {
-				b, err := os.ReadFile(p)
-				if err != nil {
-					return err
-				}
-				h.Write(b)
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		return nil, os.WriteFile(img, append([]byte("hsqs"), h.Sum(nil)...), 0o644)
-	case name == "veritysetup" && args[0] == "format":
-		img, err := os.ReadFile(args[1])
-		if err != nil {
-			return nil, err
-		}
-		if len(img)%verityBlock != 0 {
-			return nil, fmt.Errorf("image is %d bytes, not whole blocks", len(img))
-		}
-		tree := sha256.Sum256(append([]byte("tree"), img...))
-		if err := os.WriteFile(args[2], tree[:], 0o644); err != nil {
-			return nil, err
-		}
-		root := sha256.Sum256(append([]byte(veritySalt), tree[:]...))
-		return []byte("VERITY header information for " + args[2] + "\nUUID:            \t" + verityUUID + "\nRoot hash:      \t" + hex.EncodeToString(root[:]) + "\n"), nil
-	}
-	return nil, fmt.Errorf("unexpected call %s %v", name, args)
-}
 
 // fixture writes an application tree and a base initrd whose length is not a multiple of 4, like Ubuntu's.
 func fixture(t *testing.T) (appDir, base string) {
@@ -161,30 +97,12 @@ func TestBuild_Option1_SameBytesFromTwoRuns(t *testing.T) {
 	}
 }
 
-func TestBuild_Option2_ImageInArchiveWithFixedSettings(t *testing.T) {
+// The image settings themselves are tested in internal/setup/build/verity; here, that the image is in the archive.
+func TestBuild_Option2_ImageInArchive(t *testing.T) {
 	appDir, base := fixture(t)
-	tools := &fakeTools{}
-	res, log, err := run(t, Build{AppDir: appDir, BaseInitrd: base, Option: Option2, Runner: tools})
+	res, log, err := run(t, Build{AppDir: appDir, BaseInitrd: base, Option: Option2, Runner: &veritytest.Fake{}})
 	if err != nil {
 		t.Fatalf("%v\n%s", err, log)
-	}
-	if len(tools.badMode) > 0 {
-		t.Fatalf("staged with a mode other than 755 or a time other than 0: %v", tools.badMode)
-	}
-	var sq, vs []string
-	for _, c := range tools.calls {
-		switch {
-		case c[0] == "mksquashfs" && len(c) > 2:
-			sq = c
-		case c[0] == "veritysetup" && c[1] == "format":
-			vs = c
-		}
-	}
-	if strings.Join(sq[3:], " ") != strings.Join(mksquashfsFlags, " ") {
-		t.Fatalf("mksquashfs flags: %v", sq[3:])
-	}
-	if !strings.Contains(strings.Join(vs, " "), "--salt="+veritySalt) || !strings.Contains(strings.Join(vs, " "), "--uuid="+verityUUID) {
-		t.Fatalf("veritysetup without the fixed salt and uuid: %v", vs)
 	}
 	initrd, _ := os.ReadFile(res.Initrd)
 	for _, name := range []string{"opt/app/app.img", "opt/app/app.hash", "opt/app/roothash", markerEntry} {
@@ -203,7 +121,7 @@ func TestBuild_Option2_ImageInArchiveWithFixedSettings(t *testing.T) {
 func TestVerify_PassesWhenNothingChanges(t *testing.T) {
 	for _, opt := range []int{Option1, Option2} {
 		appDir, base := fixture(t)
-		_, log, err := run(t, Build{AppDir: appDir, BaseInitrd: base, Option: opt, Runner: &fakeTools{}, Verify: true})
+		_, log, err := run(t, Build{AppDir: appDir, BaseInitrd: base, Option: opt, Runner: &veritytest.Fake{}, Verify: true})
 		if err != nil {
 			t.Fatalf("option %d: %v\n%s", opt, err, log)
 		}
@@ -232,7 +150,7 @@ func TestVerify_OneByteChangedFailsTheBuild(t *testing.T) {
 			b[len(b)-2] ^= 0x01 // "v1" -> "v0"
 			return os.WriteFile(p, b, 0o755)
 		}
-		_, log, err := run(t, Build{AppDir: appDir, BaseInitrd: base, Option: tc.opt, Runner: &fakeTools{}, Verify: true, betweenBuilds: flip})
+		_, log, err := run(t, Build{AppDir: appDir, BaseInitrd: base, Option: tc.opt, Runner: &veritytest.Fake{}, Verify: true, betweenBuilds: flip})
 		if !errors.Is(err, ErrNotReproducible) {
 			t.Fatalf("option %d: want ErrNotReproducible, got %v\n%s", tc.opt, err, log)
 		}
@@ -280,29 +198,5 @@ func TestMarker_SameAsTheRecorder(t *testing.T) {
 	}
 	if !bytes.Contains(src, []byte("const markerScript = `"+MarkerScript+"`")) {
 		t.Fatal("MarkerScript differs from mkappinitrd's markerScript")
-	}
-}
-
-// The Option 2 settings are the ones of make-verity-image.sh, which made the images measured byte-identical on two
-// guests. If one side changes, this fails, so the script stays a true record of what the build does.
-func TestVeritySettings_SameAsTheScript(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join("..", "cpio", "testdata", "make-verity-image.sh"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	script := strings.Join(strings.Fields(strings.ReplaceAll(string(b), "\\\n", " ")), " ")
-	for _, want := range []string{
-		strings.Join(mksquashfsFlags, " "),
-		"--hash=sha256 --data-block-size=4096 --hash-block-size=4096",
-		"--salt=" + veritySalt,
-		"--uuid=" + verityUUID,
-		"umask 022",
-		`chmod 755 "$WORK" "$WORK/opt" "$WORK/opt/app" "$WORK/opt/app/app"`,
-		"touch -h -d @0",
-		"PAD=$(( (4096 - SZ % 4096) % 4096 ))",
-	} {
-		if !strings.Contains(script, want) {
-			t.Errorf("make-verity-image.sh has no %q", want)
-		}
 	}
 }

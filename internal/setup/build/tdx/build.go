@@ -16,7 +16,6 @@
 package tdx
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -29,11 +28,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strings"
 
 	"attestamp/internal/cli"
 	"attestamp/internal/setup/build"
 	"attestamp/internal/setup/build/cpio"
+	"attestamp/internal/setup/build/verity"
 )
 
 // Format is the format string a TDX guest's quote is labelled with. Option 1 and Option 2 both register under it:
@@ -256,9 +255,11 @@ func (b Build) make(ctx context.Context, work string, step func(what, why string
 		}
 	} else {
 		say("Adding the boot marker and making the squashfs + dm-verity image", "the image is read-only and every block is checked against the root hash when it is read; the base initrd's hook opens it and mounts it on /opt/app-verity")
-		if a.image, a.hashTree, a.rootHash, err = b.verityImage(ctx, work, tree); err != nil {
+		im, err := verity.Make(ctx, b.Runner, work, tree)
+		if err != nil {
 			return a, err
 		}
+		a.image, a.hashTree, a.rootHash = im.Data, im.HashTree, im.RootHash
 		a.entries = append(a.entries,
 			cpio.Entry{Name: "opt/app/app.img", Data: a.image},
 			cpio.Entry{Name: "opt/app/app.hash", Data: a.hashTree},
@@ -287,33 +288,14 @@ func (b Build) tools(ctx context.Context) (map[string]string, error) {
 	if b.Option != Option2 {
 		return nil, nil
 	}
-	out := map[string]string{}
-	for _, t := range [][]string{{"mksquashfs", "-version"}, {"veritysetup", "--version"}} {
-		v, err := b.Runner.Run(ctx, t[0], t[1:]...)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w (Option 2 needs squashfs-tools and cryptsetup: apt-get install squashfs-tools cryptsetup-bin)", t[0], err)
-		}
-		line, _, _ := strings.Cut(strings.TrimSpace(string(v)), "\n")
-		out[t[0]] = line
-	}
-	return out, nil
+	return verity.Tools(ctx, b.Runner)
 }
 
-// Runner runs an external tool and returns its standard output and error together.
-type Runner interface {
-	Run(ctx context.Context, name string, args ...string) ([]byte, error)
-}
+// Runner runs mksquashfs and veritysetup (internal/setup/build/verity).
+type Runner = verity.Runner
 
-// ExecRunner runs the tool with os/exec.
-type ExecRunner struct{}
-
-func (ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
-	out, err := execCommand(ctx, name, args...).CombinedOutput()
-	if err != nil {
-		return out, fmt.Errorf("%s: %w\n%s", name, err, bytes.TrimSpace(out))
-	}
-	return out, nil
-}
+// ExecRunner runs them with os/exec.
+type ExecRunner = verity.ExecRunner
 
 func writeJSON(path string, v any) error {
 	b, err := json.MarshalIndent(v, "", "  ")

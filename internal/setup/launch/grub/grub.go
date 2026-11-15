@@ -1,14 +1,7 @@
-// Package tdx launches a built initrd on an Intel TDX guest and reads back what the boot measured. It is the
-// role-independent core; internal/setup/launch/{Vendor,auditor}/tdx are thin adapters.
-//
-// On a confidential VM, booting the VM is the launch. It takes two runs with a reboot between them
-// (docs/plan/cvm-port.md, "Phase 3 design"):
-//
-//  1. Install: put the initrd in /boot and write a GRUB entry made from the stock one, as the default (grub.go, install.go).
-//  2. Check, after the reboot: a fresh quote, verified; the CC event log replayed against its RTMRs; the initrd GRUB
-//     loaded must have the build's SHA-384; the boot marker must be there. Then MRTD and RTMR0-2 are written out as the
-//     measurements to register (check.go, eventlog.go).
-package tdx
+// Package grub installs a built initrd on a confidential VM's Ubuntu guest and makes a GRUB entry for it the default:
+// the first of the two runs of a launch, the same on Intel TDX and AMD SEV-SNP. internal/setup/launch/tdx and
+// internal/setup/launch/snp use it and add their own post-boot check.
+package grub
 
 import (
 	"errors"
