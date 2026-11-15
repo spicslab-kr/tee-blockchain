@@ -35,22 +35,46 @@ without a key from anyone.
 
 ## Build
 
+### Get the source
+
+```
+git clone https://github.com/spicslab-kr/tee-blockchain
+cd tee-blockchain
+git submodule update --init contracts/evm/lib/openzeppelin-contracts
+```
+
+The last line fetches OpenZeppelin Contracts v5.7.0, which `contracts/evm/Registry.sol` is compiled against
+([contracts/README.md](contracts/README.md)). The Go code does not need it: the contract's Go binding is committed. You
+need it to compile or change the contract. `git clone --recursive` fetches it too, but also OpenZeppelin's own test
+submodules, which are not needed and can fail on Windows when the folder path is long.
+
+There are no release binaries yet; build them from source as below.
+
 ### The binaries
 
-Download the Linux binaries for your architecture (`amd64` or `arm64`) from the
-[latest release](../../releases/latest). They are built with the pinned toolchain and
-`-trimpath -buildvcs=false`, and `SHA256SUMS` covers every file. Or build from source:
+You need Go **go1.26.1** exactly (`go version` must print it): `build` refuses any other version, because a different
+patch version produces a different `att-ra-responder` and therefore different measurements. How to install it, and
+everything else each platform needs: [docs/build/toolchain.md](docs/build/toolchain.md).
+
+For your own machine (the User's `verify`, and every chain command):
 
 ```
 go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
 go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
 go build -trimpath -buildvcs=false -o att-user         ./cmd/user
-go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 ```
 
-The toolchain is pinned to exactly go1.26.1. `build` refuses any other version, because a
-different patch version produces a different `att-ra-responder` and therefore different
-measurements.
+For a TEE instance or guest, which is Linux on x86_64 (add `.exe` nowhere; on Windows run this in Git Bash):
+
+```
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-auditor      ./cmd/auditor
+GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+```
+
+`att-ra-responder` goes next to `att-vendor` or `att-auditor` on the instance: on Nitro, `build` layers that file
+into the enclave image; on TDX and SEV-SNP it runs on the guest and answers attestation requests.
+`go test ./...` checks everything without any TEE (see [Testing](#testing)).
 
 ### The TEE image, with the same measurements every time
 
@@ -220,7 +244,6 @@ hash, and register its own signed hash. The User can then require both registrie
 - [End-to-end scripts](e2e/README.md): our runs against real Nitro instances
 - [Running without a public testnet](e2e/README.md#running-without-a-public-testnet): both flows on real enclaves
   with a local chain (`anvil`) and `NET=local`, so you can run the whole thing without any ETH
-- [Releases](../../releases)
 
 ## Testing
 
