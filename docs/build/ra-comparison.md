@@ -82,6 +82,10 @@ one booted with an initrd (`gcp-n2d-*`) and one without (`gcp-n2d-initrdless-*`)
   those offsets).
 - So on GCP the AMD signature identifies the firmware and says nothing about the workload: a different kernel
   command line, a different initrd, or none at all, gives the same AMD-signed value.
+- Since 2026-11-15 this holds on all eight reports of that instance (adding six boots with an application, and
+  AUTHOR_KEY_DIGEST, also zero), and is a code test: `TestReports_IdentifyFirmwareNotVM`. The same reports show that
+  REPORT_ID is new on every boot and CHIP_ID changes with the host. It is also why the same-VM relay of the last
+  section can pass (see there).
 
 **Consequence for Attestamp.** An `intel-tdx` measurement set has one root of trust; an `amd-sev-snp-*` set has two.
 This is the same gap that `internal/tee/parse/snp/doc.go` records as the same-VM problem (test-matrix row T10).
@@ -102,7 +106,7 @@ A debug TEE lets the host read and change the guest's memory, so its measurement
 |---|---|---|---|
 | Signal | PCR0 all zero | TDATTRIBUTES bit 0 (TUD.DEBUG) | POLICY bit 19 (DEBUG) |
 | What the parser does | `Parse` drops every all-zero PCR and fails if all three are zero; `Info.Debug` reports PCR0 all zero | `Parse` refuses (`ErrBadDocument`); `Info.Debug` reports it | `Parse` refuses (`ErrBadDocument`); `Info.Debug` reports it; a POLICY that does not parse counts as debug |
-| Tested by | **not tested**: `aws/measure_test.go` only checks that the real document reports `Debug` false. A debug document is signed, so it cannot be made up, and none has been recorded (test-matrix row T8) | `TestParse_DebugTDIsRefused` (bit set in a copy of the fixture) | `TestParse_DebugGuestIsRefused` (bit set in a copy of the fixture) |
+| Tested by | **live, 2026-11-15** (`e2e/debug-mode-check.sh`): a real debug enclave's document, genuinely signed, had all-zero PCRs and was refused (exit 7). Not a code test: a debug document is signed, so it cannot be made up, and the recorded one carries an instance ID and is not committed (test-matrix row T8) | `TestParse_DebugTDIsRefused` (bit set in a copy of the fixture) | `TestParse_DebugGuestIsRefused` (bit set in a copy of the fixture) |
 
 ## Values left out, and why
 
@@ -127,8 +131,18 @@ the run. Otherwise the same image would register differently on every instance.
 
 | | Nitro | TDX | SEV-SNP |
 |---|---|---|---|
-| Same-VM guarantee | **yes, by construction**: one document, one signer, produced inside the enclave's own platform | **yes, by construction**: one quote over one TD report | **no**. A vTPM attestation from approved VM X, hashed into an SNP report requested on VM Y, verifies. *Record:* seen on GCP (and on AWS) in the 2026-11 runs, with scripts that are no longer available; not yet reproduced in this repository (test-matrix row T10) |
+| Same-VM guarantee | **yes, by construction**: one document, one signer, produced inside the enclave's own platform | **yes, by construction**: one quote over one TD report | **no**. A vTPM attestation from approved VM X, hashed into an SNP report requested on VM Y, verifies. *Record:* seen on GCP (and on AWS) in the 2026-11 runs, with scripts that are no longer available; not yet reproduced in this repository (test-matrix row T10). Why it can pass is measured: nothing in the report names the VM (below) |
 | What would fix it | n/a | n/a | boot files in the SNP launch measurement itself, or a vTPM inside the guest's trust boundary; neither is available to us on GCP today (`docs/build/sev-snp.md`, "Same VM") |
 
 "By construction" is a statement about the document format: there is only one signed object, so there is nothing to
 mix. It has not been tested by a relay experiment (nor has SEV-SNP in this repository yet; see T10).
+
+**Why the SEV-SNP relay goes unnoticed, from our own measurements.** The relaying VM B asks its own firmware for a
+report over SHA3-512 of VM A's vTPM attestation, so the binding holds by construction, and each half is genuinely
+signed. What is left for a verifier is to find something in B's AMD-signed report that ties it to A, and there is
+nothing: the finding under "Roots of trust" above, measured on 2026-11-11 (MEASUREMENT identifies only the firmware,
+equal across boots with and without an initrd; HOST_DATA, FAMILY_ID, IMAGE_ID, ID_KEY_DIGEST all zero), is exactly
+that absence. REPORT_ID changes on every boot and CHIP_ID names the host, and neither appears in the vTPM evidence. So the
+two findings fit together: T10 was an observation from the 2026-11 runs, and the measurement now explains why it can
+pass. Pinned by `TestReports_IdentifyFirmwareNotVM` on our eight reports; `docs/build/sev-snp.md`, "Same VM". The
+relay itself still waits for `docs/plan/app-fixture-recording.md`, "Reproducing T10".

@@ -424,13 +424,36 @@ limits.
 ## Same VM
 
 The binding proves that the AMD-signed report covers this vTPM evidence. It does not prove that both come from the
-same VM: a vTPM attestation from an approved VM X, hashed into an SNP report requested on another VM Y, verifies.
-*Record:* that was seen on GCP and AWS in the 2026-11 runs, with a relay script that is no longer available (test
-matrix row T10). This repository has not reproduced it yet: its mixed-recording test combines two recordings of the
-**same** VM, which is a different case. `docs/plan/app-fixture-recording.md`, "Reproducing T10", is the procedure to
-measure it with two VMs. Nitro and TDX return one document from one TEE and do not have this problem. It goes away only if the boot files are in the SNP
-launch measurement itself (direct kernel boot; whether GCP allows it is not confirmed) or if the vTPM runs inside
-the SNP guest's own trust boundary.
+same VM: a vTPM attestation from an approved VM A, hashed into an SNP report requested on another VM B, verifies.
+That is test-matrix row T10.
+
+**The attack.** VM B computes SHA3-512 of A's vTPM attestation and asks its own AMD firmware for a report with that
+as REPORT_DATA. B's report is genuine and signed by AMD; A's attestation is genuine and signed by Google's AK; and
+REPORT_DATA really is the hash of the attestation next to it, so the binding holds by construction. Simply putting
+A's attestation next to a report B made over its *own* attestation is not the attack: the binding refuses that, as
+`TestVerifySig_MixedRecordingsFailTheBinding` shows (on recordings of one VM).
+
+**Why a verifier cannot notice: nothing on the AMD side names the VM.** Read from our own eight reports of
+`attestamp-snp-vendor` (2026-11-10 and 2026-11-11), and now pinned by `TestReports_IdentifyFirmwareNotVM`:
+
+| field of the SNP report | what it was in our recordings | can it tell A from B? |
+|---|---|---|
+| MEASUREMENT | **the same on every boot**: initrdless, with the distribution initrd, and with each application (Option 1 and 2) | no: it identifies the firmware GCP launched, which every VM of the same type shares |
+| FAMILY_ID, IMAGE_ID, HOST_DATA, ID_KEY_DIGEST, AUTHOR_KEY_DIGEST | **all zero** in every report | no: GCP sets no launch identity at all |
+| REPORT_ID | **different on every boot** of the same VM | no: it does not stay with a VM, and nothing in A's vTPM evidence carries it |
+| CHIP_ID | **changed** between our recordings of the same VM, as it moved hosts | no: it names the physical host, not the VM, and two VMs may share a host |
+
+The two findings fit together. T10 was an observation (the 2026-11 record says the relay verified); these
+measurements explain why it can work: B's report contains nothing a verifier could compare with A's vTPM evidence, so
+once the binding holds, there is no remaining check that could tell the two VMs apart. Whatever names A sits on the
+Google side (the AK certificate), and nothing on the AMD side matches it. The relay itself has still not been run in
+this repository; `docs/plan/app-fixture-recording.md`, "Reproducing T10", is the procedure, and it would confirm
+the explanation with real relayed evidence.
+
+Nitro and TDX return one document from one TEE and do not have this problem. On SEV-SNP it goes away only if the boot
+files are in the SNP launch measurement itself (direct kernel boot; whether GCP allows it is not confirmed), or if
+the vTPM runs inside the SNP guest's own trust boundary, or if GCP set a per-VM value such as HOST_DATA that the vTPM
+evidence also carried.
 
 ## Not done yet
 
