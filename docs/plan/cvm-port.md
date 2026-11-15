@@ -312,13 +312,13 @@ so a check fed the recorded evidence and those build values must pass, and fail 
 1. **Done 2026-11-15, no VM**: root hash `e29ec085…` (v1) and `a2f4df92…` (v2), and the predicted PCR12 `470379c7…` equals the recorded `opt2-v1` PCR12 (`docs/plan/trial-2026-11-16.md`). What was asked: **The real tools for Option 2** (any Ubuntu 24.04, as for TDX): `build --platform amd-sev-snp-verity` with the
    one-file v1 application must give root hash `e29ec085…af0c9`; the check above already showed that this root hash
    gives the recorded PCR12.
-2. **Install and reboot on a SEV-SNP guest** (`gcp-cvm.sh snp create vendor`, with approval), `GRUB_FORCE_PARTUUID`
+2. **Done 2026-11-15** (`docs/plan/trial-2026-11-16.md`): on a new guest, both options: install, reboot and `--check` passed; Option 2's PCR12 in the verified evidence was the predicted value; `audit` and `verify` passed from another machine; the undo returned the stock boot. What was asked: **Install and reboot on a SEV-SNP guest** (`gcp-cvm.sh snp create vendor`, with approval), `GRUB_FORCE_PARTUUID`
    commented out. Option 1: `build --platform amd-sev-snp-initrd --app-dir app --base-initrd /boot/initrd.img-$(uname
    -r) --verify`, `launch --platform amd-sev-snp-initrd --reboot`, then `launch … --check`. **Pass: "✓ the same".**
    Option 2: a base initrd built with `snp/testdata/record/initramfs-hook.sh` and `initramfs-local-bottom.sh`
    installed, then the same with `amd-sev-snp-verity`; pass also needs `/run/attestamp-status` `ok` and PCR12 as
    predicted.
-3. **The Auditor's half**: as on TDX, the command line names the root disk (`root=UUID=`), so CMDLINE will differ
+3. **Measured 2026-11-15: CMDLINE is the same.** The root UUID comes with the image, so two guests of `ubuntu-2404-noble-amd64-v20261105` gave the same MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD for the same application. Pin the exact image on both sides. What was asked: **The Auditor's half**: as on TDX, the command line names the root disk (`root=UUID=`), so CMDLINE will differ
    between two guests' disks; and the Auditor uses the Vendor's base initrd (D1 (a)). Measure first whether CMDLINE
    can be made equal.
 4. **T10** stays as it is: the build and launch do not change what the evidence can say about the same VM.
