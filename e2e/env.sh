@@ -5,14 +5,18 @@
 # script file is uploaded. nitroBanner and localBanner print which environment is running and pause 2 seconds so the
 # switch is visible.
 #
-# Instance addresses live in e2e/env.local.sh (gitignored; see env.local.example.sh). A value already set in the
-# environment is kept unless env.local.sh sets it, so a one-off run can pass them on the command line:
+# Instance addresses live in e2e/env.local.sh (gitignored; see env.local.example.sh). A value set in the environment
+# wins over env.local.sh, so a one-off run can pass them on the command line:
 #   VENDOR_HOST=... AUDITOR_HOST=... bash e2e/responder-check.sh
+# An instance without a fixed address gets a new public IP every time it is started (bash e2e/cloud/aws-nitro.sh status
+# prints them), and this is how to run with the new ones before env.local.sh is edited.
 here_env="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+env_given=$(declare -p VENDOR_HOST AUDITOR_HOST ARM64_HOST AUDITOR_ADDR VENDOR_ADDR 2>/dev/null | grep -E '="[^"]+"$')
+[ -f "$here_env/env.local.sh" ] && . "$here_env/env.local.sh"
+[ -n "$env_given" ] && eval "$env_given"
 VENDOR_HOST=${VENDOR_HOST:-}
 AUDITOR_HOST=${AUDITOR_HOST:-}
 ARM64_HOST=${ARM64_HOST:-}
-[ -f "$here_env/env.local.sh" ] && . "$here_env/env.local.sh"
 need_host() { eval "[ -n \"\${$1:-}\" ]" || { echo "$1 is not set. Copy e2e/env.local.example.sh to e2e/env.local.sh and fill it in."; exit 1; }; }
 SSH_USER=ec2-user
 PEM=pem2.pem                     # SSH key, relative to the repository root (gitignored)

@@ -44,8 +44,15 @@ AUDITOR_ADDR=<address of auditor.key>
 VENDOR_ADDR=<address of deployer.key>
 ```
 
-`env.sh` reads it automatically. A script that needs a host that is not set stops with a message
-telling you to create the file. `ARM64_HOST` may stay empty: the architecture scripts then only
+`env.sh` reads it automatically. A value set in the environment wins over the file, so a one-off run can pass
+the addresses on the command line. An instance without a fixed address gets a new public IP each time it is started
+(`bash e2e/cloud/aws-nitro.sh status` prints them):
+
+```
+VENDOR_HOST=<new vendor IP> AUDITOR_HOST=<new auditor IP> bash e2e/replay-check.sh
+```
+
+A script that needs a host that is not set stops with a message telling you to create the file. `ARM64_HOST` may stay empty: the architecture scripts then only
 print guidance.
 
 ### Choosing the chain
