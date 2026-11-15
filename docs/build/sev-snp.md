@@ -26,11 +26,10 @@ They are bound by **REPORT_DATA = SHA3-512 of the vTPM attestation bytes**: the 
 it covers exactly the vTPM evidence carried next to it. SHA3-512 gives 64 bytes, the size of REPORT_DATA, so the hash
 goes in unchanged.
 
-The binding was SHA-512 until **2026-11-11**, when it was changed to SHA3-512 by decision of the project lead. SHA-512
-is what the 2026-11 test scripts used (`vendor/vendor_evidence.sh`); they were changed the same day, and their
-SHA-512 versions are kept next to them as `<file>.sha512.bak` (outside this repository; see the night log). Results
-from 2026-11-10 and earlier were produced with SHA-512. Evidence bound with SHA-512 is now refused
-(`TestVerifySig_SHA512BindingIsRefused`).
+The binding was SHA-512 until **2026-11-11**, when it was changed to SHA3-512 by decision of the project lead.
+*Record:* SHA-512 is what the 2026-11 test scripts used; those scripts are no longer available (build-info gaps #5).
+Results from 2026-11-10 and earlier were produced with SHA-512. Evidence bound with SHA-512 is now refused
+(`TestVerifySig_SHA512BindingIsRefused`, on the one SHA-512 recording this repository keeps).
 
 The SHA3-512 binding applies to the GCP path, the only one we use; if an AWS path is ever added, its binding must be
 changed to match.
@@ -39,8 +38,9 @@ changed to match.
 
 SEV-SNP is done on GCP only (decided 2026-11-11); AWS is used for Nitro Enclaves. **The AWS path is not ours:** on
 AWS, SEV-SNP is an instance option and the vTPM (NitroTPM) an AMI attribute, so a guest with both needs a snapshot of
-a running instance re-registered as an AMI with TPM support (`e2e/cloud/aws-snp.sh`, kept for reference). The 2026-11
-AWS runs remain a valid record: they gave the same results as GCP, including the same-VM weakness below.
+a running instance re-registered as an AMI with TPM support (`e2e/cloud/aws-snp.sh`, kept for reference). *Record:*
+the 2026-11 AWS runs, made with scripts that are no longer available, reported the same results as GCP, including the
+same-VM weakness below; they cannot be re-run.
 
 ### Decision: one CBOR container, two format strings
 
@@ -88,8 +88,9 @@ Why more than the application's hash: GRUB and the kernel are what measure and l
 alone would let a changed boot loader or kernel report the expected initrd while booting another. PCR4, KERNEL and
 CMDLINE close that gap. The same reasoning made TDX register MRTD and RTMR0–2, and Nitro PCR0–2.
 
-Why SHA-256: the verity hook (`verity_boot.sh`) extends only the SHA-256 bank, and the 2026-11 Auditor scripts
-computed their expected values with SHA-256.
+Why SHA-256: the verity hook (`internal/tee/parse/snp/testdata/record/initramfs-local-bottom.sh`) extends only the
+SHA-256 bank, and PCR12's expected value is computed with SHA-256 (`app_fixture_test.go`; it matched the Option 2
+recordings of 2026-11-11).
 
 Left out, because they describe the machine or the run rather than the image: `CHIP_ID`, the TCB versions, the
 report's `HOST_DATA`, and every other PCR. Nitro leaves out PCR3, PCR4 and PCR8 for the same reason.
@@ -179,20 +180,24 @@ updated.
 
 ## Variables
 
-Each row changed a hash in the 2026-11 tests, with the same source code (observed on GCP and AWS).
+*Record:* each row changed a hash in the 2026-11 tests, with the same source code (observed on GCP and AWS, with
+scripts that are no longer available and cannot be re-run). Where this repository has measured the same thing itself,
+the row says so.
 
 | variable | what changed | how we kept it fixed |
 |---|---|---|
-| Go version | Go 1.22.2 and 1.23.4 gave different application binaries | the same Go version on both sides |
-| build path | without `-trimpath`, two folders gave two different binaries | `-trimpath` |
-| cpio tool | GNU cpio 2.13 (Amazon Linux 2023) and 2.15 (Ubuntu) packed the same files into different bytes (directory link counts) | our own cpio writer: `internal/setup/build/cpio` (sorted names, time 0, owner 0, fixed inode numbers), byte-identical to the scripts' `mkcpio.py` |
+| Go version | Go 1.22.2 and 1.23.4 gave different application binaries (record) | the same Go version on both sides. **Ours:** the responder built with go1.26.1 and go1.26.2 differs (Nitro baseline 2026-11-12, `toolchain-pin-check.sh`), and `build` refuses another version |
+| build path | without `-trimpath`, two folders gave two different binaries (record) | `-trimpath`. **Ours:** `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`, and two checkout paths gave the same Nitro PCRs (2026-11-12) |
+| cpio tool | GNU cpio 2.13 (Amazon Linux 2023) and 2.15 (Ubuntu) packed the same files into different bytes (directory link counts) (record) | our own cpio writer: `internal/setup/build/cpio` (sorted names, time 0, owner 0, fixed inode numbers). It was byte-identical to the 2026-11 scripts' `mkcpio.py`, which is no longer available; the golden files in `internal/setup/build/cpio/testdata` pin that output |
 | distribution base initrd | `mkinitramfs` and `dracut` build a different file every time (it contains a random seed) | none possible. The Auditor uses the base initrd the Vendor publishes and rebuilds only the application part |
 | folder permissions (umask) | the same files in a squashfs image gave a different image and root hash under umask 022 (folders 755) and umask 002 (folders 775) | **fixed (2026-11-11):** `internal/setup/build/cpio/testdata/make-verity-image.sh` sets **`umask 022`** and sets every folder and file to mode **755** explicitly. With it, the image built on `attestamp-snp-vendor` and on `attestamp-tdx-vendor` was byte-identical (`app.img` sha256 `28bdfcff…ec1c`, root hash `e29ec085…af0c9`). A build that sets neither still depends on the caller's umask |
 | squashfs timestamps | `mksquashfs` writes the build time by default | `-mkfs-time 0 -all-time 0`, file times set to 0 |
 | dm-verity salt and UUID | `veritysetup format` picks them at random | fixed `--salt` and `--uuid` |
 
-With all of the above fixed, the application, its cpio archive and the dm-verity image hashed the same on GCP
-(Ubuntu 24.04, 26.04) and AWS (Amazon Linux 2023), across squashfs-tools 4.4, 4.6.1 and 4.7.5.
+*Record:* with all of the above fixed, the application, its cpio archive and the dm-verity image hashed the same on GCP
+(Ubuntu 24.04, 26.04) and AWS (Amazon Linux 2023), across squashfs-tools 4.4, 4.6.1 and 4.7.5, in the 2026-11 runs.
+**Ours:** the dm-verity image was byte-identical on the SEV-SNP and the TDX guest (2026-11-11, squashfs-tools 4.6.1 on
+both; `docs/plan/test-matrix.md`, T1).
 
 What else changes the registered values (from the evidence's structure; **not measured by changing each one**):
 
@@ -207,14 +212,16 @@ What else changes the registered values (from the evidence's structure; **not me
 **Initrdless boot.** GCP's Ubuntu 24.04 image sets `GRUB_FORCE_PARTUUID`, and GRUB then boots the stock entry
 **without any initrd** (confirmed: our first recording, `gcp-n2d-initrdless-*`, logs `GRUB_FORCE_PARTUUID set,
 attempting initrdless boot.` and measures no initrd). An application in an initrd is then never loaded or measured.
-`ra-parse` refuses evidence without an initrd measurement. The 2026-11 scripts avoided it by booting their own GRUB
-entry (`grub-reboot`); turning the setting off, as below, makes the stock entry load the initrd.
+`ra-parse` refuses evidence without an initrd measurement. Turning the setting off, as below, makes the stock entry
+load the initrd; `internal/setup/build/cpio/testdata/make-grub-entry.sh` makes a separate entry from it for an
+application (`docs/plan/app-fixture-recording.md`). (*Record:* the 2026-11 scripts avoided it by booting their own
+GRUB entry with `grub-reboot`.)
 
 ### Correction: SEV-SNP Option 1 as appended in 2026-11
 
 The 2026-10-23 slides (slide 7) say both options work on AWS and GCP. **For SEV-SNP Option 1 that is wrong**, as
-measured on 2026-11-11 on `attestamp-snp-vendor` with the same unpadded append the 2026-11 scripts used
-(`cat i.bin app.cpio`):
+measured on 2026-11-11 on `attestamp-snp-vendor` with the same unpadded append the 2026-11 scripts used (*record:* they
+ran `cat i.bin app.cpio`):
 
 - The base initrd, `/boot/initrd.img-7.0.0-1017-gcp`, is 50,100,283 bytes: **length mod 4 = 3**.
 - The application archive appended directly after it was discarded by the kernel:
@@ -232,8 +239,7 @@ Fixed in `cpio.Join(AppLast)`, which now pads the base (commit `3c57d4c`). Both 
 boot logs: `internal/tee/parse/snp/testdata/gcp-n2d-opt1-*` (unpadded) and `gcp-n2d-opt1p-*` (padded).
 
 Whether the 2026-11 SEV-SNP Option 1 runs, on GCP or AWS, actually ran the application depends on the length of the
-base initrd they used. Those files were not kept, so it cannot be checked now. Their boot logs, if any were kept,
-would show the line above.
+base initrd they used. Those files, their scripts and any boot logs are gone, so it cannot be checked.
 
 Option 2 does not have this problem. The image is on disk, and a failed check shows as `fail` in PCR12 or a zero PCR12
 (measured: `status ok` and the expected PCR12 in both Option 2 recordings).
@@ -289,7 +295,7 @@ describe` on 2026-11-11):
 | maintenance | `TERMINATE` |
 | OS, kernel | Ubuntu 24.04.5, `7.0.0-1017-gcp`, with `GRUB_FORCE_PARTUUID` turned off since 2026-11-11 |
 | devices | `/dev/sev-guest`, `/dev/tpm0`, `/dev/tpmrm0`; ConfigFS TSM provider `sev_guest`; SEV-SNP active in `dmesg` |
-| tools on the guest | OpenSSL 3.0.13 (image default). No Go, tpm2-tools, `snpguest` or `gotpm` |
+| tools on the guest | OpenSSL 3.0.13 (image default); tpm2-tools 5.6-1build4, installed by hand later the same day for the Option 2 hook. No Go, `snpguest` or `gotpm` |
 
 ## From scratch: record and check one evidence pair
 
@@ -300,15 +306,16 @@ describe` on 2026-11-11):
 3. On the instance: `sudo ./record -out fx -nonce-text <your text>`. It writes `att.pb`, `report.bin`, `auxblob.bin`
    and `record.txt` (the nonce and REPORT_DATA).
 4. Copy the files back and stop the instance: `gcloud compute instances stop <name> --zone <zone>`.
-5. Pack and check them the way `cmd/snp_e2e_test.go` does: `snp.Encode(report, auxblob, att)`, then
-   `att-user ra-parse --doc <file> --format amd-sev-snp-initrd --nonce <hex nonce>`.
+5. Pack the three files into the document `ra-parse` reads, and check it:
+   `go run ./internal/tee/parse/snp/testdata/pack -report report.bin -certs auxblob.bin -vtpm att.pb -out doc.cbor`,
+   then `att-user ra-parse --doc doc.cbor --format amd-sev-snp-initrd --nonce <hex nonce>`.
 
 On a stock GCP boot step 5 verifies both signatures and the nonce and then refuses, because the boot was initrdless.
 Turn `GRUB_FORCE_PARTUUID` off first, as in "The boot setting changed on `attestamp-snp-vendor`" above; the stock
 entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five values. To boot an initrd that carries
-an application, or the verity setup, use `option1-initrd/gcp_boot_option1.sh` (Option 1) or
-`option2-dm-verity/gcp_boot_option2.sh` (Option 2) from the 2026-11 scripts, after replacing their hard-coded disk
-UUID, PARTUUID, kernel version and UEFI boot entry number with the new instance's.
+an application (Option 1), or the dm-verity image with its root hash on the command line (Option 2), follow
+`docs/plan/app-fixture-recording.md`: it builds the initrd with `mkappinitrd`, the image with `make-verity-image.sh`,
+and the boot entry with `make-grub-entry.sh` from the instance's own stock entry, so nothing is hard-coded.
 
 The two roots of trust in one SEV-SNP measurement set (AMD for MEASUREMENT, Google's vTPM for the rest), and the
 check that MEASUREMENT is identical across our initrd and initrdless recordings, are written up in
@@ -418,8 +425,10 @@ limits.
 
 The binding proves that the AMD-signed report covers this vTPM evidence. It does not prove that both come from the
 same VM: a vTPM attestation from an approved VM X, hashed into an SNP report requested on another VM Y, verifies.
-That was reproduced on GCP and AWS in the 2026-11 runs (`relay-test/relay_attack.sh`; test matrix row T10). Nitro and
-TDX return one document from one TEE and do not have this problem. It goes away only if the boot files are in the SNP
+*Record:* that was seen on GCP and AWS in the 2026-11 runs, with a relay script that is no longer available (test
+matrix row T10). This repository has not reproduced it yet: its mixed-recording test combines two recordings of the
+**same** VM, which is a different case. `docs/plan/app-fixture-recording.md`, "Reproducing T10", is the procedure to
+measure it with two VMs. Nitro and TDX return one document from one TEE and do not have this problem. It goes away only if the boot files are in the SNP
 launch measurement itself (direct kernel boot; whether GCP allows it is not confirmed) or if the vTPM runs inside
 the SNP guest's own trust boundary.
 
@@ -428,19 +437,20 @@ the SNP guest's own trust boundary.
 | what | why |
 |---|---|
 | `att-ra-responder ra-serve --extractor snp-initrd` / `snp-verity` answering a verifier on another machine | Phase 2.2. On the guest itself (127.0.0.1) `snp-initrd` passed the whole chain on 2026-11-12 (`e2e/cvm/in-guest-verify.sh`); `snp-verity` was refused on that boot because it had no verity image, and has not run on a verity boot. From outside: start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address. The guest also needs outbound access to Google's certificate host while attesting (the AK intermediates are fetched) |
-| `setup/build`, `setup/launch` for SEV-SNP | Phase 4b; the 2026-11 scripts do it by hand |
+| `setup/build`, `setup/launch` for SEV-SNP | Phase 4b; until then `docs/plan/app-fixture-recording.md` does it by hand |
 | a verity boot through the responder | the recordings `gcp-n2d-opt2-*` (2026-11-11) have the verity hook and a PCR12 that matches the formula, but were made with `record-snp`, not with `att-ra-responder`; the tamper case (an image that does not match its root hash) was not recorded |
 | TCB minimums, CRLs | not applied; the platform's patch level is not judged |
 | AMD chain errors as `ErrChain` | go-sev-guest checks the chain and the signature in one call |
-| the seven 2026-11 tests on a new instance | `snpguest` and `gotpm`, which those scripts call, could not be installed on the instance (see the night log of 2026-11-10) |
+| T10 measured by this repository | the only evidence is the 2026-11 record; the procedure is written (`docs/plan/app-fixture-recording.md`, "Reproducing T10") and not run |
 
 AWS evidence is not on this list: SEV-SNP on AWS was decided against (see "Only GCP").
 
-**The 2026-10/11 shell scripts.** The scripts the SEV-SNP tests use (`vendor/`, `auditor/`, `user/`, `option1-initrd/`,
-`option2-dm-verity/`, `relay-test/`) are the scaffolding of the 2026-10 and 2026-11 experiments, and they live outside
-this repository. The final implementation goes into Go, in `internal/setup/build/snp` and `internal/setup/launch/snp`.
-Until then, whenever results of the seven tests are reported, the procedure that produced them is written into this
-document in enough detail to reproduce them.
+**The 2026-10/11 shell scripts (removed 2026-11-15).** *Record:* the SEV-SNP experiments of 2026-10 and 2026-11 used
+shell scripts outside this repository (`vendor/`, `auditor/`, `user/`, `option1-initrd/`, `option2-dm-verity/`,
+`relay-test/`, `mkcpio.py`). Their author has left the lab and they are no longer available anywhere (build-info gaps
+#5, #6). This document no longer points to them. Everything they did that this repository relies on was redone here:
+the recordings, their measured values and the procedures in `docs/plan/app-fixture-recording.md`. Lost and not
+replaced: "the seven 2026-11 tests" as one runnable set, and the relay test (T10, see above).
 
 ## Checking
 

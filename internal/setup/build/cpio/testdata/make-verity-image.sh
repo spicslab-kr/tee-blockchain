@@ -6,8 +6,8 @@
 #   - mksquashfs -mkfs-time 0 -all-time 0, every file and directory time set to 0, owners root
 #   - veritysetup format with a fixed --salt and --uuid (it picks both at random otherwise)
 #   - umask 022 and explicit modes: folder modes 755 and 775 gave different root hashes, an open issue
-# The image layout and the fixed parameters follow the 2026-11 script option2-dm-verity/mkverity.sh (outside this
-# repository).
+# Record: the image layout and the fixed parameters follow a 2026-11 script that is no longer available; this file is
+# now the only definition.
 #
 # Usage, as root on the guest:  sh make-verity-image.sh "<one line of application text>" <out dir>
 # Writes <out dir>/app.img, <out dir>/app.hash and <out dir>/roothash, and prints their sha256 and the tool versions.

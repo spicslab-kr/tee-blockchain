@@ -9,9 +9,9 @@
 # checked, and stays zero if this script never ran. The status and any error output go to /run, which initramfs-tools
 # moves onto the real root, so they can be read after boot.
 #
-# Follows the 2026-11 script option2-dm-verity/verity_boot.sh (outside this repository); the PCR12 value is the same,
-# so the 2026-11 Auditor formula (auditor/auditor_exp_verity.py) gives the expected PCR12:
+# The expected PCR12 (checked against the recordings in internal/tee/parse/snp/app_fixture_test.go):
 #   PCR12 = SHA-256( 32 zero bytes || SHA-256("attestamp-verity-ok:" || root hash) )
+# Record: the logic and the PCR12 value follow a 2026-11 script that is no longer available.
 PREREQ=""
 prereqs() { echo "$PREREQ"; }
 case "$1" in prereqs) prereqs; exit 0;; esac

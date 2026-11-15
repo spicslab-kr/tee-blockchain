@@ -158,16 +158,16 @@ Designed, not started. The reasoning and what is confirmed versus reasoned are i
 | 5.2 | Boot it, with the root image's verity root hash on the kernel command line (`root=/dev/mapper/...` set up by the initrd against that hash) | the guest boots; SSH is refused; the responder answers from outside (Phase 2.3) |
 | 5.3 | Record evidence from the locked guest through the responder, not over SSH | a fixture recorded with `att-user ra-request` from the verifier's machine |
 | 5.4 | A test in which the verifier reads the root hash out of the measured command line (CMDLINE on SEV-SNP, the command-line event behind RTMR2 on TDX) and compares it with the hash of the image it was given | the hash in the evidence equals the published image's; a different image gives a different measurement |
-| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the 2026-11 script `option2-dm-verity/verity_tamper.sh` (flips one byte of the image at offset 5000 and reboots), outside the repository |
+| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the TDX tamper boot of 2026-11-12 (v2's image under v1's root hash: `fail`, nothing mounted, the boot went on; `docs/plan/night-log.md`). Still to do: the same on SEV-SNP, a changed data block under an unchanged root hash, and the root image. (*Record:* the 2026-11 script for this flipped one byte at offset 5000; it is no longer available) |
 
 5.4 and 5.5 turn layer 3 from reasoning into a measured result; until they pass, `runtime-immutability.md` keeps
 calling it reasoned.
 
-Existing reference material: the SEV-SNP test scripts from the October–November runs
-(`option1-initrd/`, `option2-dm-verity/`, `vendor/`, `auditor/`, `user/go-verifier/`,
-`relay-test/`). They are not committed here. Known blockers before any of it is reusable:
-hard-coded home paths, disk UUIDs, kernel versions and instance IPs; two separate Go modules
-outside `attestamp`; expected values computed in Python; Korean comments.
+*Record:* the October–November SEV-SNP runs used test scripts outside this repository (`option1-initrd/`,
+`option2-dm-verity/`, `vendor/`, `auditor/`, `user/go-verifier/`, `relay-test/`). Their author has left the lab and
+they are no longer available (build-info gaps #5, #6); nothing here depends on them. What replaced them is in
+`docs/plan/app-fixture-recording.md` and the recordings under `internal/tee/parse/snp/testdata/`. The one result not
+yet replaced is T10 (two machines' evidence combined); its procedure is "Reproducing T10" in the same document.
 
 ## Open decisions
 
@@ -180,7 +180,8 @@ reproducible — `mkinitramfs` and `dracut` write a random seed — so the Audit
 Vendor's base initrd as a binary. Options:
 
 - (a) the Vendor publishes the base initrd; the Auditor reproduces only the application part.
-  Fastest, matches what the test scripts already do, and weakens the Auditor's independence.
+  Fastest, matches what the 2026-11 test scripts did and what `docs/plan/app-fixture-recording.md` does, and weakens
+  the Auditor's independence.
   If chosen, say so plainly in `README.md` and `docs/build/`.
 - (b) build a reproducible base initrd ourselves. Keeps the original claim; much more work.
 - (c) put the kernel and initrd into the launch measurement directly. `sev-snp-measure` accepts
@@ -249,7 +250,7 @@ chain itself extends can be forged by a changed boot chain, unless the boot chai
 | | |
 |---|---|
 | Claim (slides) | slide 7: both options work on AWS and GCP |
-| Measured (2026-11-11, GCP, `attestamp-snp-vendor`) | with the unpadded append the 2026-11 scripts used (`cat i.bin app.cpio`), the base initrd was 50,100,283 bytes (**mod 4 = 3**); the kernel logged `Initramfs unpacking failed: invalid magic at start of compressed archive`; the application's marker was **absent**. The guest booted and INITRD changed with the application anyway, so the evidence looked right while the application never ran |
+| Measured (2026-11-11, GCP, `attestamp-snp-vendor`) | with the unpadded append the 2026-11 scripts used (*record:* `cat i.bin app.cpio`; the scripts are no longer available), the base initrd was 50,100,283 bytes (**mod 4 = 3**); the kernel logged `Initramfs unpacking failed: invalid magic at start of compressed archive`; the application's marker was **absent**. The guest booted and INITRD changed with the application anyway, so the evidence looked right while the application never ran |
 | Fix | zero-pad the base initrd to a multiple of 4 before appending. Measured: with the padding the archive unpacked and the marker held the application's text. `cpio.Join(AppLast)` now does this (commit `3c57d4c`); padding changes the measured initrd |
 | What stands | SEV-SNP Option 2 (image on disk, verifying initrd, PCR12) worked as claimed: `status ok`, the application mounted, PCR12 as computed, recorded twice. TDX prepends (`AppFirst`), which needs no padding |
 | Not known | whether the 2026-11 SEV-SNP Option 1 runs on GCP and AWS loaded the application: it depends on the length of the base initrd each run used, and those files were not kept |
@@ -261,7 +262,7 @@ Whether the slides mention these was not checked; look for them when correcting 
 
 | | before | now | decided |
 |---|---|---|---|
-| SEV-SNP binding | REPORT_DATA = SHA-512 of the vTPM attestation (the 2026-11 scripts) | SHA3-512 | 2026-11-11 |
+| SEV-SNP binding | REPORT_DATA = SHA-512 of the vTPM attestation (*record:* the 2026-11 scripts, no longer available) | SHA3-512 | 2026-11-11 |
 | SEV-SNP cloud | runs on GCP and AWS | GCP only; AWS for Nitro only | 2026-11-11 |
 | Measurement names | — | `<NAME><n>` like Nitro's `PCR<n>` (`RTMR0`), and plain names for SNP (`KERNEL`) | 2026-11-10 |
 

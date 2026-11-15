@@ -6,7 +6,7 @@
 //	auxblob.bin the certificate table the host returned with the report, if it returned one
 //
 // The binding is REPORT_DATA = SHA3-512 of the vTPM attestation, as internal/tee/parse/snp checks it. It was SHA-512
-// until 2026-11-11 (the hash the 2026-11 SEV-SNP scripts used in vendor/vendor_evidence.sh); the
+// until 2026-11-11 (the hash the 2026-11 SEV-SNP scripts used; they are no longer available); the
 // gcp-n2d-initrdless-* fixture was recorded with that older binding.
 //
 // Run as root:  record -out <dir> -nonce-text attestamp-snp-fixture-0001

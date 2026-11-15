@@ -2,7 +2,7 @@
 # Create, inspect and remove the GCP Confidential VM instances for TDX or SEV-SNP.
 #
 #   bash e2e/cloud/gcp-cvm.sh tdx create [roles…]   # default roles: vendor auditor
-#   bash e2e/cloud/gcp-cvm.sh snp create [roles…]   # SEV-SNP; the relay test also needs: user y
+#   bash e2e/cloud/gcp-cvm.sh snp create [roles…]   # SEV-SNP; T10 (docs/plan/app-fixture-recording.md) needs a second VM
 #   bash e2e/cloud/gcp-cvm.sh tdx status
 #   bash e2e/cloud/gcp-cvm.sh tdx stop | start | delete
 #

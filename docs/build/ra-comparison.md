@@ -127,8 +127,8 @@ the run. Otherwise the same image would register differently on every instance.
 
 | | Nitro | TDX | SEV-SNP |
 |---|---|---|---|
-| Same-VM guarantee | **yes, by construction**: one document, one signer, produced inside the enclave's own platform | **yes, by construction**: one quote over one TD report | **no**. A vTPM attestation from approved VM X, hashed into an SNP report requested on VM Y, verifies. Reproduced on GCP (and on AWS before AWS was dropped for SEV-SNP) in the 2026-11 runs, test-matrix row T10 |
+| Same-VM guarantee | **yes, by construction**: one document, one signer, produced inside the enclave's own platform | **yes, by construction**: one quote over one TD report | **no**. A vTPM attestation from approved VM X, hashed into an SNP report requested on VM Y, verifies. *Record:* seen on GCP (and on AWS) in the 2026-11 runs, with scripts that are no longer available; not yet reproduced in this repository (test-matrix row T10) |
 | What would fix it | n/a | n/a | boot files in the SNP launch measurement itself, or a vTPM inside the guest's trust boundary; neither is available to us on GCP today (`docs/build/sev-snp.md`, "Same VM") |
 
 "By construction" is a statement about the document format: there is only one signed object, so there is nothing to
-mix. It has not been tested by a relay experiment the way SEV-SNP was.
+mix. It has not been tested by a relay experiment (nor has SEV-SNP in this repository yet; see T10).

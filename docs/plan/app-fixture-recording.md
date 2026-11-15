@@ -288,8 +288,8 @@ nonce, and its boot log is committed next to it (`*-boot.txt`).
 
 ### Not done
 
-- the image of TDX Option 2 is carried and measured, not opened or mounted at boot;
-- the SEV-SNP Option 2 tamper case (a changed image under an unchanged root hash, the 2026-11 `verity_tamper.sh`) was
-  not recorded;
+- the image of TDX Option 2 is carried and measured, not opened or mounted at boot (done since, on 2026-11-12:
+  `gcp-c3-opt2m-*`, with a tamper boot);
+- the SEV-SNP Option 2 tamper case (a changed image under an unchanged root hash) was not recorded;
 - one boot ID (SEV-SNP Option 2 v2) was not captured; that boot's command line, carrying the v2 root hash, shows it
   happened.

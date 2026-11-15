@@ -124,7 +124,7 @@ SEV-SNP runs measured for the same files.
 | shim, GRUB, kernel | RTMR1 | OS image updates |
 | kernel command line | RTMR2 | it carries the root PARTUUID, which differs per disk |
 | base initrd | RTMR2 | `mkinitramfs` writes a random seed, so the Vendor's base initrd is used as published (as on SEV-SNP) |
-| application archive | RTMR2 | Go version, `-trimpath`, the cpio writer: the same as on SEV-SNP (`docs/build/sev-snp.md`). The archive is written by `internal/setup/build/cpio`, byte-identical to the scripts' `mkcpio.py` |
+| application archive | RTMR2 | Go version, `-trimpath`, the cpio writer: the same as on SEV-SNP (`docs/build/sev-snp.md`). The archive is written by `internal/setup/build/cpio`; its output is pinned by the golden files in `internal/setup/build/cpio/testdata` |
 | archive placement | RTMR2 | the application archive goes **before** the base initrd (`cpio.AppFirst`), the placement the TDX fixtures were recorded with. An unpadded append failed in 2026-10 (Phase 3.2 record, not repeated since); the cause is 4-byte alignment, measured on SEV-SNP on 2026-11-11. See "Before or after the base initrd" below |
 | `GRUB_FORCE_PARTUUID` | RTMR2 | GCP's Ubuntu 24.04 image boots its stock entry without an initrd when this is set (confirmed on the SEV-SNP image of the same family). An application in an initrd is then never loaded. See "`GRUB_FORCE_PARTUUID`" below |
 

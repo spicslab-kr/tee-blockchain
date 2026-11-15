@@ -157,8 +157,8 @@ const (
 	// first. The kernel only recognises an uncompressed archive after a compressed segment at a 4-byte-aligned offset
 	// (init/initramfs.c). Measured on GCP SEV-SNP, 2026-11-11: with the Ubuntu base initrd (length mod 4 = 3) and no
 	// padding, the kernel logged "Initramfs unpacking failed: invalid magic at start of compressed archive", dropped the
-	// archive and still booted; with the padding the archive was unpacked. The 2026-11 scripts appended without padding
-	// (option1-initrd/gcp_boot_option1.sh: cat i.bin app.cpio).
+	// archive and still booted; with the padding the archive was unpacked. (Record: the 2026-11 scripts, no longer
+	// available, appended without padding: cat i.bin app.cpio.)
 	AppLast
 )
 
