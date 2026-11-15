@@ -77,6 +77,23 @@ Image `ubuntu-2404-noble-amd64-v20261105`, Ubuntu 24.04.5 LTS, kernel `7.0.0-101
 The att binaries on the guests were cross-built on the development machine (go1.26.1, `GOOS=linux GOARCH=amd64
 -trimpath -buildvcs=false`); no Go was installed on a guest.
 
+### A clean Ubuntu 24.04 under WSL (2026-11-15): Option 2 with the real tools, no VM
+
+A new WSL 2 distribution (`wsl --install Ubuntu-24.04 --name attestamp-trial`, Ubuntu 24.04.5 LTS, WSL 2.7.14.0,
+kernel 6.18.33.2-2), with `apt-get install -y squashfs-tools cryptsetup-bin` and nothing else for the image:
+
+| package or tool | version |
+|---|---|
+| squashfs-tools | `1:4.6.1-1build1` (`mksquashfs version 4.6.1 (2023/03/25)`) |
+| cryptsetup-bin | `2:2.7.0-1ubuntu4.2` (`veritysetup 2.7.0`) |
+| Go | go1.26.1 linux/amd64, from `bash e2e/0-Setup-local-install.sh` |
+
+The same package versions as on the two guests, and the same bytes: `att-vendor build --platform amd-sev-snp-verity`
+(and `--platform intel-tdx --option 2`) on the recordings' one-file application gave `app.img` sha256 `28bdfcff…ec1c`
+and root hash `e29ec085…af0c9` for v1, `b8e2656f…fb27` and `a2f4df92…51e1` for v2, which is what
+`make-verity-image.sh` gave on both guests on 2026-11-11, and the PCR12 predicted for v1 (`470379c7…`) is the PCR12
+in the recorded `gcp-n2d-opt2-v1` evidence. `--verify` passed each time.
+
 ### Nitro parent instance
 
 Recorded on both instances of the Nitro baseline, 2026-11-12 (`docs/results/aws-nitro-2026-11-12.md`); the two were

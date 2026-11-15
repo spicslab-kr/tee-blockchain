@@ -226,7 +226,7 @@ check on the recorded quotes, and the event-log replay on a constructed log. **W
 
 Each item says what to run and what must come out. The pass criterion of 3.5 is the last line of the second step.
 
-1. **The build with the real tools** (any Ubuntu 24.04 machine with squashfs-tools 4.6.1 and cryptsetup 2.7.0; not a
+1. **Done 2026-11-15, no VM** (`docs/plan/trial-2026-11-16.md`): in a clean Ubuntu 24.04 WSL with squashfs-tools 4.6.1 and cryptsetup 2.7.0, `--option 2` on the recordings' v1 application gave root hash `e29ec085…af0c9` and `app.img` `28bdfcff…ec1c`, the measured values. What was asked: **The build with the real tools** (any Ubuntu 24.04 machine with squashfs-tools 4.6.1 and cryptsetup 2.7.0; not a
    TDX VM). `att-vendor build --platform intel-tdx --option 2 --app-dir <a folder holding one file app containing
    "attestamp app v1">` must give root hash `e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9`, the
    value `make-verity-image.sh` gave on both guests on 2026-11-11 (`tdx/testdata/gcp-c3-opt2-v1-boot.txt`). The Go port
@@ -309,7 +309,7 @@ so a check fed the recorded evidence and those build values must pass, and fail 
 
 ### Phase 4b: what waits for a VM
 
-1. **The real tools for Option 2** (any Ubuntu 24.04, as for TDX): `build --platform amd-sev-snp-verity` with the
+1. **Done 2026-11-15, no VM**: root hash `e29ec085…` (v1) and `a2f4df92…` (v2), and the predicted PCR12 `470379c7…` equals the recorded `opt2-v1` PCR12 (`docs/plan/trial-2026-11-16.md`). What was asked: **The real tools for Option 2** (any Ubuntu 24.04, as for TDX): `build --platform amd-sev-snp-verity` with the
    one-file v1 application must give root hash `e29ec085…af0c9`; the check above already showed that this root hash
    gives the recorded PCR12.
 2. **Install and reboot on a SEV-SNP guest** (`gcp-cvm.sh snp create vendor`, with approval), `GRUB_FORCE_PARTUUID`
