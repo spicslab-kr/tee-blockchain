@@ -115,6 +115,14 @@ func usage() {
               on the Nitro parent instance. runs the EIF as an enclave, bridges TCP→vsock,
               requests RA from itself to confirm, then reports the security-group port. it opens the port only with --open-port-to <CIDR> (0.0.0.0/0 only when written), else prints the command.
               --build-measurements is for a received EIF: the file it came with. the EIF is then measured itself (→ out/measurements.json) and launched only if it measures to that
+  build       --platform intel-tdx --app-dir <dir of files> --base-initrd <file> [--option 1|2] [--out-dir out] [--verify]
+              Intel TDX: puts the files (Option 1) or a squashfs + dm-verity image of them (Option 2) in an archive before the
+              base initrd, and records the initrd's SHA-384. MRTD and RTMR0-2 come from launch, after one boot
+  launch      --platform intel-tdx --initrd <file> [--entry-id attestamp] [--kernel-args <args>] [--reboot]
+              Intel TDX, as root on the guest: puts the initrd in /boot and makes a GRUB entry for it the default
+  launch      --platform intel-tdx --check [--build-value out/build-value.json] [--out-dir out]
+              after that reboot: verifies a fresh quote, replays the event log, requires the measured initrd to be the built
+              one and the application to be unpacked, then writes MRTD and RTMR0-2 to out/measurements.json
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc> [--format <fmt>]  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
   lo-up       brings up loopback inside the enclave. once, before starting the software
@@ -269,6 +277,14 @@ func raServe(args []string) error {
 }
 
 func buildCmd(args []string) error {
+	switch p, rest := platformOf(args); p {
+	case tdxFormat:
+		return buildTDX(rest)
+	case "", awsra.Format:
+		args = rest
+	default:
+		return fmt.Errorf("--platform %s: build supports %s and %s", p, awsra.Format, tdxFormat)
+	}
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	b := build.Build{}
 	fs.StringVar(&b.AppDir, "app-dir", "", "directory with the software's Dockerfile")
@@ -316,6 +332,14 @@ func packCmd(args []string) error {
 }
 
 func launchCmd(args []string) error {
+	switch p, rest := platformOf(args); p {
+	case tdxFormat:
+		return launchTDX(rest)
+	case "", awsra.Format:
+		args = rest
+	default:
+		return fmt.Errorf("--platform %s: launch supports %s and %s", p, awsra.Format, tdxFormat)
+	}
 	fs := flag.NewFlagSet("launch", flag.ContinueOnError)
 	l := launch.Launch{}
 	fs.StringVar(&l.EIF, "eif", "", "EIF file to run")
