@@ -965,3 +965,25 @@ and `VENDOR_ADDR` for the run. `auditor.key` and `deployer.key` were not touched
 | attempt 2: `nitro-cli run-enclave` E29/E39 | flow 1 step 4's tampered enclave still held the Vendor's enclave resources | terminated only the Vendor's enclave (the Auditor's was needed for flow 2 step 4); attempt 3 passed |
 
 **Stopped** both instances with `bash e2e/cloud/aws-nitro.sh stop`; `status` shows both `stopped`. Not terminated.
+
+## Phase 3 for TDX in the tool, without hardware (2026-11-15)
+
+TDX only; SEV-SNP 4b not started. No GCP instance was created or started.
+
+| step | commit | what |
+|---|---|---|
+| design (2.1, 2.2) | `6bb9415` | `docs/plan/cvm-port.md`, "Phase 3 design": the five Nitro build steps with the TDX column, why launch must boot once, which scripts became Go (`make-verity-image.sh`, `make-grub-entry.sh`, the `mkappinitrd` logic) and which stay shell (the initramfs hook and local-bottom script, which run under busybox) |
+| build (2.4, 2.5) | `63d138f` | `internal/setup/build/tdx` and role adapters: Option 1 and Option 2, `--verify`. A one-byte change between the two builds fails and is named |
+| launch (2.3) | `400d2cd` | `internal/setup/launch/tdx` and role adapters: GRUB entry and install; post-boot check (quote, CC event-log replay with go-eventlog, measured initrd = built, marker). go-eventlog became a direct dependency; `att-ra-responder` still sha256 `5573b538…` |
+| CLI | `fc0f460` | `build` and `launch --platform intel-tdx` in `att-vendor` and `att-auditor` |
+
+Tests run on Windows and, cross-compiled, on Linux under WSL (all 19 TDX build and launch tests pass on both). On
+Windows the CLI build test can only see the Linux refusal; the build itself ran on Linux through the package tests.
+
+Not done, and why:
+
+- The real `mksquashfs`/`veritysetup` were not run: WSL has squashfs-tools 4.7.5 (the measured images used 4.6.1) and
+  no `veritysetup`; installing it would change the operator's WSL. It needs an Ubuntu 24.04 machine, not a TDX VM.
+- Nothing ran on a TDX guest. The steps and pass criteria are in `docs/plan/cvm-port.md`, "Phase 3: what waits for a
+  VM". The open question to measure first: the kernel command line names the root disk's UUID, so two guests'
+  RTMR2 may differ even with byte-identical initrds.

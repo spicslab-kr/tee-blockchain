@@ -2,7 +2,9 @@
 
 **Status.** The verifying side works on a recorded quote: `ra-parse`, `audit` and `verify` accept `intel-tdx`
 (`internal/tee/parse/tdx`). Requesting a quote from a running guest works (`att-ra-responder ra-serve --extractor
-tdx`; the whole chain passed on a live guest on 2026-11-12). Building the image and launching it are not implemented.
+tdx`; the whole chain passed on a live guest on 2026-11-12). Building the initrd and launching it are in the tool since
+2026-11-15 (`build` and `launch --platform intel-tdx`, both options, `--verify`), tested without a guest; the launch
+has not run on a guest yet (`docs/plan/cvm-port.md`, "Phase 3: what waits for a VM").
 The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) passes against a local anvil chain (first run
 2026-11-11, anvil 1.8.0). Tools and versions: [toolchain.md](toolchain.md).
 
@@ -304,8 +306,8 @@ describe` on 2026-11-11):
 | what | why |
 |---|---|
 | `att-ra-responder ra-serve --extractor tdx` answering a verifier on another machine | Phase 2.2. On the guest itself (127.0.0.1) the whole chain passed on 2026-11-12 (`e2e/cvm/in-guest-verify.sh`). From outside: start it with `--listen tcp:0.0.0.0:5000` and allow port 5000 only from the verifier's address |
-| `setup/build` and `setup/launch` for TDX | Phase 3: build the archive, put it first, boot a custom GRUB entry once, read the values back |
-| Option 2 on TDX as product code | booted and mounted with test scripts on 2026-11-12 (above); not in `setup/build`, and a failed check does not stop the boot |
+| `setup/launch` for TDX on a guest | the code exists (`internal/setup/launch/tdx`, 2026-11-15); it has not booted a guest. What only a guest can show (the CC event log replaying, GRUB's file event for the initrd, the marker) is in `docs/plan/cvm-port.md`, "Phase 3: what waits for a VM" |
+| Option 2 on TDX with the real tools | `internal/setup/build/tdx` makes the image with the settings of `make-verity-image.sh`, but has not been run with real `mksquashfs` and `veritysetup`; a failed dm-verity check at boot still does not stop the boot (launch `--check` refuses it) |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |

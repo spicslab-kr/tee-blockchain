@@ -10,7 +10,8 @@ Status (2026-11-11, evening):
   - Phase 2 code (TDX and SEV-SNP request), tested on the recorded evidence. Its live run (2.3) passed on both guests on
     2026-11-12, with everything on one guest.
 - Phase 3 is partly done: 3.2–3.4 were measured in the recording sessions; on 2026-11-12 the TDX boot also opened and
-  mounted the dm-verity image (3.4).
+  mounted the dm-verity image (3.4). On 2026-11-15 the TDX build (both options, `--verify`) and launch went into the
+  tool, tested without a guest; what waits for a guest is listed under "Phase 3: what waits for a VM".
 - Phase 5 (a locked guest) is designed below, not started.
 - See `docs/plan/night-log.md`.
 
@@ -211,7 +212,55 @@ names what differed: the archive entries, or the image. Pass: a one-byte change 
 **What can be tested without a VM (2.6).** Everything in the build (Option 2 with fake `mksquashfs`/`veritysetup`
 runners), `--verify` with a one-byte change, the GRUB entry text, the install step against a temporary root, the quote
 check on the recorded quotes, and the event-log replay on a constructed log. **What needs a VM** is listed in
-"Phase 3: what waits for a VM" below once the code is in.
+"Phase 3: what waits for a VM" below.
+
+### Phase 3: where it stands (2026-11-15)
+
+| # | state | proved by |
+|---|---|---|
+| 3.5 build | **done without hardware**, both options: `internal/setup/build/tdx` and adapters (`63d138f`), `att-vendor`/`att-auditor build --platform intel-tdx` (`fc0f460`) | `internal/setup/build/tdx` tests (also run on Linux under WSL); `TestCmd_E2E_TDXBuild_VendorAndAuditorAgree` (on Linux the two roles' builds are byte-identical) |
+| 3.5 launch | **code done, not run on a guest**: install and the post-boot check (`400d2cd`, CLI `fc0f460`) | GRUB entry and install against a temporary root; a recorded quote verifies and a foreign event log is refused; the replay, the initrd comparison and the marker checks on constructed input |
+| 3.6 `--verify` | **done**: a one-byte change between the two builds fails the build and names `/opt/app/app` (Option 1) or the root hash (Option 2); a replaced base initrd is named too | `TestVerify_OneByteChangedFailsTheBuild`, `TestVerify_ChangedBaseInitrdIsNamed` |
+
+### Phase 3: what waits for a VM
+
+Each item says what to run and what must come out. The pass criterion of 3.5 is the last line of the second step.
+
+1. **The build with the real tools** (any Ubuntu 24.04 machine with squashfs-tools 4.6.1 and cryptsetup 2.7.0; not a
+   TDX VM). `att-vendor build --platform intel-tdx --option 2 --app-dir <a folder holding one file app containing
+   "attestamp app v1">` must give root hash `e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9`, the
+   value `make-verity-image.sh` gave on both guests on 2026-11-11 (`tdx/testdata/gcp-c3-opt2-v1-boot.txt`). The Go port
+   lays the image out the same way (application under `opt/app`, every mode 755, every time 0, the same flags, padding,
+   salt and UUID), and a test keeps the flags equal to the script's, but only the real tools can show the bytes are the
+   same. WSL on the operator's machine has squashfs-tools 4.7.5 and no veritysetup, so this was not run.
+2. **Launch on a TDX guest** (`gcp-cvm.sh tdx create vendor`, with approval). On the guest, `GRUB_FORCE_PARTUUID`
+   commented out (the install refuses otherwise):
+   ```
+   sudo ./att-vendor build --platform intel-tdx --app-dir app --base-initrd /boot/initrd.img-$(uname -r) --option 1 --verify
+   sudo ./att-vendor launch --platform intel-tdx --initrd out/initrd-app.img --reboot
+   # after the boot
+   sudo ./att-vendor launch --platform intel-tdx --check
+   ```
+   Things only the guest can show, each a reason the check might stop:
+   - `/sys/firmware/acpi/tables/data/CCEL` exists and **replays** to the quote's RTMR0–2 with go-eventlog (it replays
+     Google's own TDX logs in its tests; ours is not yet confirmed);
+   - GRUB's file event for the initrd is named with the same path as its `initrd` command
+     (`/boot/initrd-attestamp.img`), and its digest is the **SHA-384 of the file**; on SEV-SNP's vTPM the same
+     convention holds (`tee/parse/snp/measure.go`), on TDX's CC measurement it is assumed;
+   - `/dev/attestamp-app-marker` is present after the boot.
+   **Pass: the check prints "✓ the same" and writes `out/measurements.json`.** Its RTMR2 differs from the stock boot's;
+   MRTD, RTMR0 and RTMR1 equal the stock boot's (as the 2026-11-11 recordings showed).
+3. **Option 2 on the guest.** The base initrd built with `tdx/testdata/record/initramfs-hook.sh` and
+   `initramfs-local-bottom.sh` installed (as for the `gcp-c3-opt2m-*` recordings), then the same three commands with
+   `--option 2`. Pass as above, and `/run/attestamp-status` reads `ok <root hash>`.
+4. **The Auditor's half.** A second TDX guest builds from the same files and the Vendor's base initrd: the initrd
+   SHA-384 must be equal (`build-value.json`), and after its own launch the four values must equal the Vendor's, if both
+   guests have the same firmware, kernel and command line. The command line names the root disk's UUID, which differs
+   per disk (`docs/build/tdx.md`, "Variables"): **expect RTMR2 to differ between two guests until the command line is
+   fixed**, for example by a root UUID set at image build. This is the open question that decides whether an
+   independent rebuild can ever match on TDX, and it is the first thing to measure.
+5. **The verifier from another machine.** `att-user verify` against the guest's responder (Phase 2.2), with
+   `measurements.json` registered by the Vendor or audited by the Auditor.
 
 ## Phase 4 — AMD SEV-SNP
 
