@@ -272,6 +272,32 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
 | 4.2 | `internal/tee/parse/snp/`: AMD signature on the report, cloud AK chain on the vTPM quote, `Report Data == SHA3-512(vTPM evidence)` (SHA-512 until 2026-11-11), event-log replay against the signed PCRs, `POLICY.DEBUG`, TCB version | `go test` against the fixtures |
 | 4.3 | Adapters, maps and CLI cases, as in 1.2-1.4 | `go build ./...`, `go test ./...` |
 
+### Phase 4b design: SEV-SNP build and launch (2026-11-15)
+
+The same shape as TDX (`internal/setup/{build,launch}/snp/` core, `{Vendor,auditor}/snp/` adapters, `build` and
+`launch --platform amd-sev-snp-initrd|amd-sev-snp-verity`), and where TDX and SEV-SNP do the same thing they now share
+one implementation: the dm-verity image maker moves from `setup/build/tdx` to `setup/build/verity`, and the GRUB entry
+and install from `setup/launch/tdx` to `setup/launch/grub`. What differs from TDX:
+
+| | TDX | SEV-SNP |
+|---|---|---|
+| formats | one, `intel-tdx`, for both options | **two**: `amd-sev-snp-initrd` (Option 1, 5 values) and `amd-sev-snp-verity` (Option 2, 6 values); the option picks the format |
+| Option 1 placement | archive **before** the base (`cpio.AppFirst`) | archive **after** the base zero-padded to 4 bytes (`cpio.AppLast`), as the `opt1p` recordings were made; without the padding the kernel drops the archive (`docs/build/sev-snp.md`, "Correction") |
+| Option 2 image | inside the initrd, covered by RTMR2 | **on disk** (`/var/lib/attestamp/app.img`, `app.hash`); the initrd is the Vendor's base built with the hook (`snp/testdata/record/initramfs-hook.sh`, `initramfs-local-bottom.sh`), and the root hash goes on the **kernel command line** (`attestamp.roothash=`) |
+| Option 2 at boot | the hook opens and mounts the image; nothing is extended | the hook verifies, opens and mounts the image and **extends vTPM PCR12** with SHA-256(`attestamp-verity-<ok\|fail>:` root hash); so the build can predict PCR12 = SHA-256(32 zero bytes ‖ SHA-256(`attestamp-verity-ok:` ‖ root hash)) |
+| what the build can predict | the initrd's SHA-384 | the initrd's **SHA-256** (INITRD) and, for Option 2, the root hash and **PCR12**. MEASUREMENT, PCR4, KERNEL, CMDLINE come from the machine |
+| the evidence | one quote | **two documents**: the SNP report and the vTPM attestation, bound by REPORT_DATA = SHA3-512(vTPM attestation); the check takes it from `tee/request/snp` and verifies it with `tee/parse/snp`, which already replays the vTPM event log and returns INITRD, CMDLINE and PCR12 |
+| launch's own event-log code | yes (CCEL, go-eventlog) | **none**: `tee/parse/snp` already does it (go-tpm-tools) |
+| marker | `/dev/attestamp-app-marker` | Option 1: the same marker, in the appended archive. Option 2: `/run/attestamp-status` reads `ok` (the SNP hook writes the status without the root hash) |
+
+**Pass criteria.** Build: as TDX (`--verify`, a one-byte change fails). Launch check: INITRD from verified evidence
+equals the built SHA-256; for Option 2 also PCR12 equals the predicted value, and the command line carries the built
+root hash (`tee/parse/snp` refuses a verity format without it).
+
+**Without a VM.** Unlike TDX, the launch check can be run end to end on recorded evidence: the `opt1p` and `opt2`
+recordings' boot logs give the combined initrd's sha256 (`a4504052…`) and the root hash (`e29ec085…`) the guest built,
+so a check fed the recorded evidence and those build values must pass, and fail for any other value.
+
 4b (needs instances): request, build and launch, mirroring phases 2 and 3, **on GCP only**. SEV-SNP on AWS (VLEK
 signing, NitroTPM as the vTPM, an AMI re-registered with TPM support) was **decided against on 2026-11-11** and is not
 part of 4b.
