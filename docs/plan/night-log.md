@@ -937,3 +937,31 @@ address for ports 22 and 5000. `e2e/env.local.sh` was already current and was no
 Results: `docs/results/aws-nitro-2026-11-15.md` and `.jsonl` (`64345ab`).
 
 **Stopped** both instances with `bash e2e/cloud/aws-nitro.sh stop`; not terminated.
+
+## T4, T5 and T6 on a local chain (2026-11-15)
+
+No Sepolia ETH, so both flows ran on the two Nitro instances with the registry on a local anvil (`NET=local`, added in
+`503e269`). All 11 verdicts matched; results in `docs/results/aws-nitro-2026-11-15-local-chain.md` and `.jsonl`, and the
+test-matrix T4–T6 Nitro cells with footnote ¹¹.
+
+**Where anvil ran, and why (brief item 1.2).** On the operator's machine, at `127.0.0.1:8545`. The brief assumed the
+two instances and the laptop all have to see the chain; reading the flow scripts showed they do not. Every chain call
+(`registry-deploy`, `audit`, `self-register`, `lookup`, `compare`, `verify`) runs from the laptop's `e2e-work/bin`
+binaries; the instances only build and launch, and the Vendor's `compare` against the registration (flow 1 step 2)
+also runs on the laptop, from the RPC named in the measurement record. So no SSH tunnel, no port 8545 between
+instances and no security-group change were needed. If an instance ever has to reach the chain, a reverse tunnel
+(`ssh -R 8545:127.0.0.1:8545`) is the way, still without opening a port.
+
+**Keys (1.3).** The cmd tests sign with anvil's development accounts (`cmd/register_e2e_test.go`), which every anvil
+start funds. `NET=local` does the same: accounts 0 and 1, written to `e2e-work/anvil-keys/`, overriding `AUDITOR_ADDR`
+and `VENDOR_ADDR` for the run. `auditor.key` and `deployer.key` were not touched.
+
+**Blocked, then resolved.**
+
+| what | why | what was done |
+|---|---|---|
+| the instances' public IPs changed on start | they have no fixed address; `env.local.sh` held the old ones and, sourced after the environment, overrode any address passed on the command line | `env.sh` now lets an address given in the environment win (`cc4ab2f`); the new addresses were passed on the command line from a scratch wrapper. `env.local.sh` was neither read nor written |
+| flow 2 step 1, attempt 1: `--verify` failed | `/etc/shadow` differed: the cached first build was from 2026-11-12, the `--no-cache` rebuild from 2026-11-15, and `adduser` writes the build day. **A real finding**: different build days give different PCR0/PCR2 | recorded (results page, `docs/build/aws-nitro.md`, test-matrix T1). The Vendor's cached app image was rebuilt the same day; not fixed in `build`, since normalising the field changes every image's measurement |
+| attempt 2: `nitro-cli run-enclave` E29/E39 | flow 1 step 4's tampered enclave still held the Vendor's enclave resources | terminated only the Vendor's enclave (the Auditor's was needed for flow 2 step 4); attempt 3 passed |
+
+**Stopped** both instances with `bash e2e/cloud/aws-nitro.sh stop`; `status` shows both `stopped`. Not terminated.
