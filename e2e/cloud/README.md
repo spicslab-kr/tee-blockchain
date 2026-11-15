@@ -53,6 +53,13 @@ Every word after `create` is a role, and every role is **one billable VM**. With
 `auditor`; `create vendor` makes only the Vendor's. The script accepts no other role names, so a typo stops it
 instead of creating a VM.
 
+**One exact image for both guests.** `gcp-cvm.sh` resolves the image family once, prints the exact image it picked
+(for example `ubuntu-2404-noble-amd64-v20261105`) and makes every VM of that call from it. When the second guest is
+made later, pass that name: `IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor`.
+The family moves to a new version every few weeks, and the disk UUIDs and the stock initrd that end up in TDX RTMR2
+and the SEV-SNP CMDLINE come with the image (`docs/build/tdx.md`, "Use the same image as the other side").
+`gcp-cvm.sh <plat> status` shows each boot disk's image.
+
 Each platform runs on one cloud: Nitro on AWS, TDX and SEV-SNP on GCP. SEV-SNP on AWS was decided against on
 2026-11-11; `aws-snp.sh` is kept only as a record of how that path works.
 

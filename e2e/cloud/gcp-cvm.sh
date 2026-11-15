@@ -6,6 +6,16 @@
 #   bash e2e/cloud/gcp-cvm.sh tdx status
 #   bash e2e/cloud/gcp-cvm.sh tdx stop | start | delete
 #
+# Image: IMAGE=<exact image name> pins one image version, e.g.
+#   IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor
+# Without IMAGE the family (IMAGE_FAMILY, default ubuntu-2404-lts-amd64) is resolved once to the image it points at
+# now, that exact name is printed, and every VM of this call is made from it. The Vendor's and the Auditor's guests
+# must be made from the same exact image: the root file system UUID, the partition UUID and the stock initrd come with
+# the image, and they go into the kernel command line (TDX RTMR2, SEV-SNP CMDLINE) and the base initrd. A family moves
+# to a new version every few weeks, so creating the second side later from the family can give another image and
+# other values. Record the printed name and pass it as IMAGE= when creating the other side. `status` shows each
+# disk's image.
+#
 # Verified against the Google Cloud docs (2026-11):
 #   SEV-SNP  N2D machine types only, CPU platform AMD Milan, --confidential-compute-type=SEV_SNP
 #            zones: asia-southeast1-a/b/c, europe-west3-a/b/c, europe-west4-a/b/c, us-central1-a/b/c
@@ -19,7 +29,7 @@
 set -uo pipefail
 
 PLAT=${1:-}; ACTION=${2:-}
-[ -n "$PLAT" ] && [ -n "$ACTION" ] || { sed -n '2,20p' "$0"; exit 2; }
+[ -n "$PLAT" ] && [ -n "$ACTION" ] || { sed -n '2,28p' "$0"; exit 2; }
 shift 2
 ROLES=("$@"); [ ${#ROLES[@]} -gt 0 ] || ROLES=(vendor auditor)
 # Every role is one billable VM, so only the two roles the project uses are accepted: a stray word on the command line
@@ -38,6 +48,7 @@ esac
 
 IMAGE_PROJECT=${IMAGE_PROJECT:-ubuntu-os-cloud}
 IMAGE_FAMILY=${IMAGE_FAMILY:-ubuntu-2404-lts-amd64}
+IMAGE=${IMAGE:-}   # an exact image name in IMAGE_PROJECT; empty: resolve IMAGE_FAMILY once at create
 PREFIX=${PREFIX:-attestamp-$PLAT}
 NET_TAG=attestamp-ra
 RA_PORT=${RA_PORT:-5000}
@@ -52,16 +63,29 @@ gcloud config get-value project >/dev/null 2>&1 || die "no gcloud project set. R
 
 case "$ACTION" in
 create)
-  echo "platform $PLAT   machine $MACHINE   zone $ZONE   image $IMAGE_PROJECT/$IMAGE_FAMILY"
+  # One exact image for every VM of this call, and a name to record for the other side.
+  if [ -n "$IMAGE" ]; then
+    gcloud compute images describe "$IMAGE" --project "$IMAGE_PROJECT" --format='value(name)' >/dev/null \
+      || die "image $IMAGE_PROJECT/$IMAGE not found (an old version can be deleted; then both sides move to a new one together)"
+    from="given as IMAGE"
+  else
+    IMAGE=$(gcloud compute images describe-from-family "$IMAGE_FAMILY" --project "$IMAGE_PROJECT" --format='value(name)')
+    [ -n "$IMAGE" ] || die "cannot resolve the image family $IMAGE_PROJECT/$IMAGE_FAMILY"
+    from="what the family $IMAGE_FAMILY points at now"
+  fi
+  echo "platform $PLAT   machine $MACHINE   zone $ZONE"
+  echo "image    $IMAGE_PROJECT/$IMAGE   ($from)"
   echo "roles: ${ROLES[*]}"
+  echo "Record the image name: the other side's guest must be made from the same one, with"
+  echo "    IMAGE=$IMAGE bash e2e/cloud/gcp-cvm.sh $PLAT create <role>"
   echo "This creates ${#ROLES[@]} billable instances. Ctrl-C now to stop."; sleep 4
 
-  # Confirm the chosen image family really carries the guest OS feature this platform needs.
-  if ! gcloud compute images describe-from-family "$IMAGE_FAMILY" --project "$IMAGE_PROJECT" \
+  # Confirm the chosen image really carries the guest OS feature this platform needs.
+  if ! gcloud compute images describe "$IMAGE" --project "$IMAGE_PROJECT" \
         --flatten="guestOsFeatures[]" --format='value(guestOsFeatures.type)' 2>/dev/null \
         | grep -qx "$FEATURE"; then
-    echo "warning: $IMAGE_PROJECT/$IMAGE_FAMILY does not advertise $FEATURE."
-    echo "Pick one of these instead and re-run with IMAGE_PROJECT=… IMAGE_FAMILY=…:"
+    echo "warning: $IMAGE_PROJECT/$IMAGE does not advertise $FEATURE."
+    echo "Pick one of these families instead and re-run with IMAGE_PROJECT=… IMAGE_FAMILY=… (or an exact IMAGE=…):"
     gcloud compute images list --filter="guestOsFeatures[].type:($FEATURE)" \
       --format='value(family)' | sort -u
     die "image does not support $FEATURE"
@@ -89,7 +113,7 @@ create)
       --confidential-compute-type="$CC_TYPE" \
       --maintenance-policy=TERMINATE \
       --image-project="$IMAGE_PROJECT" \
-      --image-family="$IMAGE_FAMILY" \
+      --image="$IMAGE" \
       --boot-disk-size=64GB \
       --tags="$NET_TAG" \
       --labels="project=attestamp,platform=$PLAT,role=$role" || die "instances create ($role)"
@@ -104,6 +128,9 @@ status)
   echo "Confidential setting as the API reports it:"
   gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT" \
     --format='table(name,confidentialInstanceConfig.confidentialInstanceType,scheduling.onHostMaintenance)'
+  echo
+  echo "Image of each boot disk (the Vendor's and the Auditor's must be the same):"
+  gcloud compute disks list --filter="name~^$PREFIX-" --format='table(name,zone.basename(),sourceImage.basename():label=IMAGE)'
   echo
   echo "ssh in with:  gcloud compute ssh <name> --zone $ZONE"
   ;;
@@ -124,5 +151,5 @@ delete)
   echo "the firewall rule $NET_TAG was left alone (the other platform may still use it)."
   ;;
 
-*) sed -n '2,20p' "$0"; exit 2 ;;
+*) sed -n '2,28p' "$0"; exit 2 ;;
 esac
