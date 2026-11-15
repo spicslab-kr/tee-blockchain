@@ -51,10 +51,10 @@ Versions we used: [toolchain.md](toolchain.md).
 ```
 git clone https://github.com/spicslab-kr/tee-blockchain
 cd tee-blockchain
-go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
-go build -trimpath -buildvcs=false -o att-user    ./cmd/user
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user    ./cmd/user
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
 ```
 
 The first two run on your computer; the `linux/` two go to the guest.

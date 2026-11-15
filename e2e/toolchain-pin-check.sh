@@ -35,20 +35,20 @@ fi
 mkdir -p "$WORK/toolchain"
 step "2. CROSS-BUILDING att-vendor WITH THE WRONG TOOLCHAIN ($WRONG)"
 if GOTOOLCHAIN=$WRONG go version 2>/dev/null | grep -q "$WRONG"; then
-  GOTOOLCHAIN=$WRONG GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-vendor-wrongtc" ./cmd/vendor
+  GOTOOLCHAIN=$WRONG CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-vendor-wrongtc" ./cmd/vendor
   HAVE_WRONG=1
 else
   echo "WARNING: cannot download GOTOOLCHAIN=$WRONG (offline?) - skipping the live refusal check. The unit tests (go test ./internal/setup/build ./cmd -run Toolchain) cover the same path."
   result T2 wrong-toolchain-refused error refused "skipped: GOTOOLCHAIN=$WRONG could not be downloaded"
   HAVE_WRONG=0
 fi
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-vendor" ./cmd/vendor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-vendor" ./cmd/vendor
 
 # 2b. The fact the refusal protects against (test matrix T2, footnote 2): the same responder source built with another
 #     Go patch version gives other bytes, so the image measurement would differ. Checked on the binary, locally.
 if [ $HAVE_WRONG = 1 ]; then
-  GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-ra-responder-pinned" ./cmd/ra-responder
-  GOTOOLCHAIN=$WRONG GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-ra-responder-wrongtc" ./cmd/ra-responder
+  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-ra-responder-pinned" ./cmd/ra-responder
+  GOTOOLCHAIN=$WRONG CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/toolchain/att-ra-responder-wrongtc" ./cmd/ra-responder
   a=$(sha256 "$WORK/toolchain/att-ra-responder-pinned" | cut -c1-64); b=$(sha256 "$WORK/toolchain/att-ra-responder-wrongtc" | cut -c1-64)
   if [ "$a" != "$b" ]; then
     echo "✅ the responder built with $WRONG differs from the one built with $WANT ($a vs $b)"

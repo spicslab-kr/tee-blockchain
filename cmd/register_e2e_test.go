@@ -38,6 +38,7 @@ func buildBin(t *testing.T, dir, pkg string) string {
 	}
 	cmd := exec.Command("go", "build", "-o", bin, pkg)
 	cmd.Dir = repoRootReg(t)
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build %s: %v\n%s", pkg, err, out)
 	}

@@ -17,14 +17,15 @@ The chain side is described in the [registry contract guide](../contracts/README
 ## Build the binaries
 
 ```
-go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
-go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
-go build -trimpath -buildvcs=false -o att-user         ./cmd/user
-go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user         ./cmd/user
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 ```
 
-Cross-compile for the Nitro instances (Linux) with `GOOS=linux GOARCH=amd64` (or `arm64` for a
-Graviton instance).
+Cross-compile for the Nitro instances (Linux) with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or `arm64` for a
+Graviton instance). Keep `CGO_ENABLED=0` on every build: on Linux with a C compiler installed Go otherwise links
+cgo into `att-ra-responder`, the file differs from a cross-build, and `build` refuses it.
 
 **Pinned toolchain.** The required Go toolchain is exactly the version in
 `internal/setup/build/GO_TOOLCHAIN` (currently go1.26.1). A different patch version produces

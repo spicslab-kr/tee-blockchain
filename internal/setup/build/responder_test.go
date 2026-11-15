@@ -6,16 +6,17 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 )
 
-// TestCheckResponder_Rules checks the five rules on hand-made values, so `-short` still covers them
+// TestCheckResponder_Rules checks the six rules on hand-made values, so `-short` still covers them
 // without compiling anything. Each refusal must name the actual and the expected value and say
 // how to rebuild.
 func TestCheckResponder_Rules(t *testing.T) {
 	want := RequiredToolchain()
-	good := ResponderInfo{Go: want, GOOS: "linux", GOARCH: "amd64", Trimpath: true, SHA256: strings.Repeat("ab", 32)}
+	good := ResponderInfo{Go: want, GOOS: "linux", GOARCH: "amd64", Trimpath: true, CGO: "0", SHA256: strings.Repeat("ab", 32)}
 	cases := []struct {
 		name  string
 		info  ResponderInfo
@@ -29,6 +30,10 @@ func TestCheckResponder_Rules(t *testing.T) {
 			[]string{"without -trimpath", "go build -trimpath -buildvcs=false"}},
 		{"vcs stamped", func() ResponderInfo { i := good; i.VCS = "git"; return i }(), "amd64",
 			[]string{"built with version control stamping", "different commit", "uncommitted changes", "go build -trimpath -buildvcs=false"}},
+		{"cgo", func() ResponderInfo { i := good; i.CGO = "1"; return i }(), "amd64",
+			[]string{"built with CGO_ENABLED=1", "C compiler", "CGO_ENABLED=0 GOOS=linux"}},
+		{"cgo not recorded", func() ResponderInfo { i := good; i.CGO = ""; return i }(), "amd64",
+			[]string{"no CGO_ENABLED setting", "CGO_ENABLED=0 GOOS=linux"}},
 		{"wrong os", func() ResponderInfo { i := good; i.GOOS = "windows"; return i }(), "amd64",
 			[]string{"GOOS=windows", "enclave runs linux", "GOOS=linux"}},
 		{"wrong arch", good, "arm64",
@@ -88,7 +93,7 @@ func buildResponderNoTrimpath(t *testing.T, repoRoot, goarch, out string) {
 	t.Helper()
 	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", out, "./cmd/ra-responder")
 	cmd.Dir = repoRoot
-	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+goarch)
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+goarch)
 	if o, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build without -trimpath: %v\n%s", err, o)
 	}
@@ -101,7 +106,7 @@ func buildResponderVCS(t *testing.T, repoRoot, goarch, out string) bool {
 	t.Helper()
 	cmd := exec.Command("go", "build", "-trimpath", "-buildvcs=true", "-o", out, "./cmd/ra-responder")
 	cmd.Dir = repoRoot
-	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+goarch)
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+goarch)
 	if o, err := cmd.CombinedOutput(); err != nil {
 		t.Logf("go build -buildvcs=true failed, so no stamped responder to test (%v): %s", err, o)
 		return false
@@ -134,8 +139,8 @@ func TestReadResponder_RealBuilds(t *testing.T) {
 	if info.Go != RequiredToolchain() {
 		t.Errorf("Go = %q, want the pin %q (is the test running under the pinned toolchain?)", info.Go, RequiredToolchain())
 	}
-	if info.GOOS != "linux" || info.GOARCH != "amd64" || !info.Trimpath || info.VCS != "" {
-		t.Errorf("unexpected build facts (BuildResponderForArch must use -trimpath -buildvcs=false): %+v", info)
+	if info.GOOS != "linux" || info.GOARCH != "amd64" || !info.Trimpath || info.VCS != "" || info.CGO != "0" {
+		t.Errorf("unexpected build facts (BuildResponderForArch must use -trimpath -buildvcs=false CGO_ENABLED=0): %+v", info)
 	}
 	if !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(info.SHA256) {
 		t.Errorf("SHA256 = %q, want 64 hex", info.SHA256)
@@ -179,5 +184,54 @@ func TestReadResponder_RealBuilds(t *testing.T) {
 	err = CheckResponder(info, "amd64")
 	if err == nil || !strings.Contains(err.Error(), "built with version control stamping") || !strings.Contains(err.Error(), "-buildvcs=false") {
 		t.Errorf("responder stamped with version control should be refused naming it: %v", err)
+	}
+}
+
+// envWithout returns the environment with every NAME=... entry for the given names removed.
+func envWithout(names ...string) []string {
+	var env []string
+next:
+	for _, kv := range os.Environ() {
+		for _, n := range names {
+			if strings.HasPrefix(kv, n+"=") {
+				continue next
+			}
+		}
+		env = append(env, kv)
+	}
+	return env
+}
+
+// TestReadResponder_NativeBuildLinksCgo builds the responder the way the README did before
+// CGO_ENABLED=0 was added: for the host's own linux/GOARCH, with -trimpath -buildvcs=false and no
+// CGO_ENABLED in the environment. On Linux with a C compiler (gcc) Go then links cgo, and on
+// 2026-11-15 that gave sha256 a71bedfc... instead of the 5573b538... every cross-build gives. The
+// check must refuse that file. Where Go does not enable cgo by itself (no C compiler, or a
+// cross-build from Windows or macOS) there is nothing to refuse and the test skips.
+func TestReadResponder_NativeBuildLinksCgo(t *testing.T) {
+	if testing.Short() {
+		t.Skip("compiles a real binary; slow")
+	}
+	repoRoot, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "responder-default-cgo")
+	cmd := exec.Command("go", "build", "-trimpath", "-buildvcs=false", "-o", out, "./cmd/ra-responder")
+	cmd.Dir = repoRoot
+	cmd.Env = append(envWithout("CGO_ENABLED", "GOOS", "GOARCH"), "GOOS=linux", "GOARCH="+runtime.GOARCH)
+	if o, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build without CGO_ENABLED: %v\n%s", err, o)
+	}
+	info, err := ReadResponder(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.CGO != "1" {
+		t.Skipf("Go did not enable cgo here (CGO_ENABLED=%q; no C compiler, or not a native linux build), so this machine cannot produce the file to refuse", info.CGO)
+	}
+	err = CheckResponder(info, runtime.GOARCH)
+	if err == nil || !strings.Contains(err.Error(), "built with CGO_ENABLED=1") || !strings.Contains(err.Error(), "CGO_ENABLED=0 GOOS=linux") {
+		t.Errorf("a responder linked with cgo should be refused naming CGO_ENABLED: %v", err)
 	}
 }

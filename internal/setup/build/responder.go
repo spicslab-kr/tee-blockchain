@@ -5,7 +5,8 @@
 // measured (PCR0/PCR2). Those bytes depend on the Go patch version, on -trimpath (which keeps the
 // absolute checkout path out of the binary), on -buildvcs (by default Go stamps the git commit,
 // its time and whether the tree had uncommitted changes into the binary, and -trimpath does not
-// remove them) and on GOOS/GOARCH. Go records all of that inside every binary it produces
+// remove them), on CGO_ENABLED (a native Linux build with a C compiler present links the cgo DNS
+// resolver and libc, a cross-build does not, and the two files differ) and on GOOS/GOARCH. Go records all of that inside every binary it produces
 // (debug/buildinfo), so the file is read and a responder that cannot match what the other side
 // builds is refused.
 
@@ -25,6 +26,7 @@ type ResponderInfo struct {
 	GOARCH   string
 	Trimpath bool   // -trimpath was given to go build
 	VCS      string // the "vcs" build setting (e.g. "git") when version control was stamped in; empty with -buildvcs=false
+	CGO      string // the "CGO_ENABLED" build setting: "0" or "1"; empty if the binary does not record it
 	SHA256   string // lowercase hex sha256 of the whole file
 }
 
@@ -65,6 +67,8 @@ func ReadResponder(path string) (ResponderInfo, error) {
 			info.Trimpath = s.Value == "true"
 		case "vcs":
 			info.VCS = s.Value
+		case "CGO_ENABLED":
+			info.CGO = s.Value
 		}
 	}
 	if info.SHA256, err = SHA256File(path); err != nil {
@@ -74,12 +78,12 @@ func ReadResponder(path string) (ResponderInfo, error) {
 }
 
 // CheckResponder returns an error unless the responder was built with the pinned toolchain, with
-// -trimpath, with -buildvcs=false, for linux, and for hostGOARCH, the architecture of the parent
+// -trimpath, with -buildvcs=false, with CGO_ENABLED=0, for linux, and for hostGOARCH, the architecture of the parent
 // instance, which is what the enclave runs. Callers pass runtime.GOARCH.
 func CheckResponder(info ResponderInfo, hostGOARCH string) error {
 	want := RequiredToolchain()
 	rebuild := func(goarch string) string {
-		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s GOOS=linux GOARCH=%s go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder", want, goarch)
+		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s CGO_ENABLED=0 GOOS=linux GOARCH=%s go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder", want, goarch)
 	}
 	if info.Go != want {
 		return fmt.Errorf("att-ra-responder was built with %s but the project pins %s (internal/setup/build/GO_TOOLCHAIN); its bytes, and so the measurements, depend on the exact toolchain; %s", info.Go, want, rebuild(hostGOARCH))
@@ -89,6 +93,13 @@ func CheckResponder(info ResponderInfo, hostGOARCH string) error {
 	}
 	if info.VCS != "" {
 		return fmt.Errorf("att-ra-responder was built with version control stamping: the git commit and commit time are baked into it, so the same source built from a different commit, or from a tree with uncommitted changes, gives different bytes and different measurements; %s", rebuild(hostGOARCH))
+	}
+	if info.CGO != "0" {
+		got := "CGO_ENABLED=" + info.CGO
+		if info.CGO == "" {
+			got = "no CGO_ENABLED setting"
+		}
+		return fmt.Errorf("att-ra-responder was built with %s: Go links cgo whenever a C compiler is present and the build is not a cross-build, so the same source built on Linux with gcc and built anywhere else gives different bytes and different measurements; %s", got, rebuild(hostGOARCH))
 	}
 	if info.GOOS != "linux" {
 		return fmt.Errorf("att-ra-responder was built for GOOS=%s but the enclave runs linux; %s", info.GOOS, rebuild(hostGOARCH))

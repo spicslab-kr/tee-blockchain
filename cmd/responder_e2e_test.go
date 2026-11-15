@@ -73,7 +73,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 	noTrim := filepath.Join(t.TempDir(), "att-ra-responder-notrimpath")
 	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", noTrim, "./cmd/ra-responder")
 	cmd.Dir = repoRoot(t)
-	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+runtime.GOARCH)
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+runtime.GOARCH)
 	if o, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build without -trimpath: %v\n%s", err, o)
 	}

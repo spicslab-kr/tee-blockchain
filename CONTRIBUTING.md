@@ -10,15 +10,17 @@ The Go toolchain is pinned to exactly the version in `internal/setup/build/GO_TO
 version produces different `att-ra-responder` bytes and therefore different measurements.
 
 ```
-go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
-go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
-go build -trimpath -buildvcs=false -o att-user         ./cmd/user
-go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user         ./cmd/user
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 ```
 
-For the Nitro instances: `GOOS=linux GOARCH=amd64` (or `arm64`). Always `-trimpath -buildvcs=false`;
-the responder is layered into the enclave image, so the build path, or the git commit and its time,
-would otherwise end up in the PCRs. `build` refuses a responder built without either flag.
+For the instances: `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or `arm64`). Always `-trimpath -buildvcs=false`
+and `CGO_ENABLED=0`; the responder is layered into the enclave image, so the build path, or the git commit and
+its time, would otherwise end up in the PCRs, and without `CGO_ENABLED=0` a native Linux build with gcc
+installed links cgo and gives other bytes than a cross-build. `build` refuses a responder built without any of
+the three.
 
 Running `go build ./cmd/<role>/...` without `-o` drops a binary named after the package into the
 repo root; those names are in `.gitignore`, don't commit them.

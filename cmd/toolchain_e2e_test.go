@@ -34,7 +34,7 @@ func buildWith(t *testing.T, dir, pkg, gotoolchain string) (bin string, ok bool)
 	}
 	cmd := exec.Command("go", "build", "-o", bin, pkg)
 	cmd.Dir = repoRoot(t)
-	cmd.Env = append(os.Environ(), "GOTOOLCHAIN="+gotoolchain)
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOTOOLCHAIN="+gotoolchain)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build %s with %s: %v\n%s", pkg, gotoolchain, err, out)
 	}

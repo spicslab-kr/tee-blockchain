@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Responder build-info check. The enclave image measurement covers the att-ra-responder file that sits next to att, and
-#    that file's bytes depend on the Go patch version, on -trimpath, on -buildvcs, and on GOOS/GOARCH. The toolchain-pin
+#    that file's bytes depend on the Go patch version, on -trimpath, on -buildvcs, on CGO_ENABLED and on GOOS/GOARCH. The toolchain-pin
 #    check (toolchain-pin-check.sh) covers the Go version that built att itself. At the start of build and pack, att reads
 #    the build info Go left inside the responder binary (the output of go version -m) and refuses when the toolchain
-#    differs from the pin, -trimpath is missing, version control was stamped in, the OS is not linux, or the architecture
+#    differs from the pin, -trimpath is missing, version control was stamped in, cgo was linked, the OS is not linux, or the architecture
 #    differs from this instance. This script checks that the refusal happens on a real Nitro host:
 #      1. cross-build four responders on your machine: a correct one (linux/amd64 -trimpath -buildvcs=false), one without
-#         -trimpath, one with -buildvcs=true, one for arm64
+#         -trimpath, one with -buildvcs=true, one for arm64 (all with CGO_ENABLED=0, so each has exactly one fault; the
+#         cgo refusal needs a native Linux build with gcc and is covered by TestReadResponder_NativeBuildLinksCgo instead)
 #      2. upload them to the Vendor host under different names and run `build --responder <file>` with each
 #      3. the one without -trimpath is refused with "without -trimpath", the stamped one with "built with version control
 #         stamping", the arm64 one with "GOARCH=arm64 ... this instance is amd64" (exit != 0), and the correct one passes
@@ -37,11 +38,11 @@ fi
 
 mkdir -p "$WORK/responder"
 step "2. CROSS-BUILDING FOUR RESPONDERS (correct, without -trimpath, with VCS stamping, arm64) AND att-vendor"
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-ok"        ./cmd/ra-responder
-GOOS=linux GOARCH=amd64 go build -buildvcs=false -o "$WORK/responder/att-ra-responder-notrimpath" ./cmd/ra-responder
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -o "$WORK/responder/att-ra-responder-vcs"        ./cmd/ra-responder
-GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-arm64"     ./cmd/ra-responder
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-vendor" ./cmd/vendor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-ok"        ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -o "$WORK/responder/att-ra-responder-notrimpath" ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -o "$WORK/responder/att-ra-responder-vcs"        ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-arm64"     ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-vendor" ./cmd/vendor
 OK_SHA="$(sha256 "$WORK/responder/att-ra-responder-ok" | cut -c1-16)"
 echo "correct responder sha256 (first 16): $OK_SHA - the host's build log must print the same value"
 

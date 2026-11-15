@@ -24,7 +24,7 @@
 //
 // It is under testdata so that `go build ./...` skips it; build it explicitly:
 //
-//	GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o mkappinitrd ./internal/setup/build/cpio/testdata/mkappinitrd
+//	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o mkappinitrd ./internal/setup/build/cpio/testdata/mkappinitrd
 package main
 
 import (

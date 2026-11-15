@@ -22,15 +22,16 @@ if [ "$HAVE_GO" != "$WANT_GO" ]; then
 fi
 echo "toolchain: $HAVE_GO (pinned)"
 # Linux binaries for the instances, then binaries for this machine.
+#   CGO_ENABLED=0 keeps a native Linux build with gcc from linking cgo (a different att-ra-responder than a cross-build).
 #   -trimpath keeps the absolute build folder path out of the binary. att-ra-responder goes into the enclave image
 #   unchanged, so the checkout path would otherwise change the measurement.
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-vendor ./cmd/vendor
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-vendor ./cmd/vendor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 mkdir -p "$BIN"
-go build -trimpath -buildvcs=false -o "$VENDOR_BIN" ./cmd/vendor
-go build -trimpath -buildvcs=false -o "$AUDITOR_BIN" ./cmd/auditor
-go build -trimpath -buildvcs=false -o "$USER_BIN" ./cmd/user
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o "$VENDOR_BIN" ./cmd/vendor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o "$AUDITOR_BIN" ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o "$USER_BIN" ./cmd/user
 echo "responder sha256: $(sha256 att-ra-responder | cut -c1-64)"  # compared with the checksum printed on each instance after the upload
 
 # The flow and arch scripts clone the test application with git on the instances, and the Amazon Linux 2023 image has

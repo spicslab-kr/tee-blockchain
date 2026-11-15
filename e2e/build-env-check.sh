@@ -24,12 +24,12 @@ cd "$here/.."
 need_host VENDOR_HOST
 GOVER=$(go env GOVERSION)
 
-# Cross-compile att-auditor for each architecture. -trimpath keeps the checkout path out of the binary.
+# Cross-compile att-auditor for each architecture. -trimpath keeps the checkout path out of the binary; CGO_ENABLED=0 keeps cgo out of it.
 step "CROSS-BUILDING att-auditor PER ARCHITECTURE ($GOVER)"
 declare -A GOARCH_OF=( [x86_64]=amd64 [arm64]=arm64 )
 mkdir -p "$WORK/arch"
 for arch in x86_64 arm64; do
-  GOOS=linux GOARCH=${GOARCH_OF[$arch]} go build -trimpath -buildvcs=false -o "$WORK/arch/att-auditor-$arch" ./cmd/auditor || exit 1
+  CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH_OF[$arch]} go build -trimpath -buildvcs=false -o "$WORK/arch/att-auditor-$arch" ./cmd/auditor || exit 1
 done
 
 host_of() { case $1 in V) echo "$VENDOR_HOST";; A) echo "$AUDITOR_HOST";; R) echo "$ARM64_HOST";; esac; }

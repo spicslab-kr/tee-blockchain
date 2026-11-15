@@ -56,20 +56,23 @@ You need Go **go1.26.1** exactly (`go version` must print it): `build` refuses a
 patch version produces a different `att-ra-responder` and therefore different measurements. How to install it, and
 everything else each platform needs: [docs/build/toolchain.md](docs/build/toolchain.md).
 
-For your own machine (the User's `verify`, and every chain command):
+For your own machine (the User's `verify`, and every chain command). The `NAME=value command` form is POSIX shell;
+on Windows run these in Git Bash. `CGO_ENABLED=0` matters for `att-ra-responder`: with gcc installed, a native Linux
+build otherwise links cgo and gives a different file, and with it different measurements, than a build anywhere else.
+`build` refuses such a responder. It is on every line so the binaries are the same however they are built:
 
 ```
-go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
-go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
-go build -trimpath -buildvcs=false -o att-user         ./cmd/user
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user         ./cmd/user
 ```
 
 For a TEE instance or guest, which is Linux on x86_64 (add `.exe` nowhere; on Windows run this in Git Bash):
 
 ```
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-auditor      ./cmd/auditor
-GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-auditor      ./cmd/auditor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
 ```
 
 `att-ra-responder` goes next to `att-vendor` or `att-auditor` on the instance: on Nitro, `build` layers that file
