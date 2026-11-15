@@ -123,6 +123,13 @@ func usage() {
   launch      --platform intel-tdx --check [--build-value out/build-value.json] [--out-dir out]
               after that reboot: verifies a fresh quote, replays the event log, requires the measured initrd to be the built
               one and the application to be unpacked, then writes MRTD and RTMR0-2 to out/measurements.json
+  build       --platform amd-sev-snp-initrd | amd-sev-snp-verity --app-dir <dir of files> --base-initrd <file> [--out-dir out] [--verify]
+              AMD SEV-SNP: -initrd appends the files as an archive to the base initrd padded to 4 bytes (Option 1); -verity
+              makes a dm-verity image to keep on disk and predicts PCR12 (Option 2). INITRD (sha256) goes to build-value.json
+  launch      --platform amd-sev-snp-* [--build-value out/build-value.json] [--entry-id attestamp] [--reboot]
+              AMD SEV-SNP, as root on the guest: installs the initrd (and for -verity the image and the root hash) under GRUB
+  launch      --platform amd-sev-snp-* --check [--build-value out/build-value.json] [--out-dir out]
+              after that reboot: verifies fresh evidence, requires INITRD (and PCR12) to be the built values, writes measurements.json
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc> [--format <fmt>]  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
   lo-up       brings up loopback inside the enclave. once, before starting the software
@@ -280,10 +287,12 @@ func buildCmd(args []string) error {
 	switch p, rest := platformOf(args); p {
 	case tdxFormat:
 		return buildTDX(rest)
+	case snpInitrdFormat, snpVerityFormat:
+		return buildSNP(p, rest)
 	case "", awsra.Format:
 		args = rest
 	default:
-		return fmt.Errorf("--platform %s: build supports %s and %s", p, awsra.Format, tdxFormat)
+		return fmt.Errorf("--platform %s: build supports %s, %s, %s and %s", p, awsra.Format, tdxFormat, snpInitrdFormat, snpVerityFormat)
 	}
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	b := build.Build{}
@@ -335,10 +344,12 @@ func launchCmd(args []string) error {
 	switch p, rest := platformOf(args); p {
 	case tdxFormat:
 		return launchTDX(rest)
+	case snpInitrdFormat, snpVerityFormat:
+		return launchSNP(p, rest)
 	case "", awsra.Format:
 		args = rest
 	default:
-		return fmt.Errorf("--platform %s: launch supports %s and %s", p, awsra.Format, tdxFormat)
+		return fmt.Errorf("--platform %s: launch supports %s, %s, %s and %s", p, awsra.Format, tdxFormat, snpInitrdFormat, snpVerityFormat)
 	}
 	fs := flag.NewFlagSet("launch", flag.ContinueOnError)
 	l := launch.Launch{}
