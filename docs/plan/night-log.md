@@ -1029,3 +1029,21 @@ What could be tested without a VM, and was:
 - All new packages' tests also ran on Linux under WSL; `att-ra-responder` is still sha256 `5573b538…`.
 
 What waits for a VM is in `docs/plan/cvm-port.md`, "Phase 4b: what waits for a VM".
+
+## Documents a newcomer can follow (2026-11-15)
+
+Writing, not code, for a trial by a person on another computer. No instance was created or started.
+
+| gap | commit | what |
+|---|---|---|
+| #20 | `19ad87c` | the SEV-SNP example in `e2e/cloud/README.md` would have made four VMs; fixed, and `gcp-cvm.sh` now refuses unknown roles |
+| #16 | `50fa441`, `7007fb2` | the tree had **no OpenZeppelin gitlink**, so no clone could fetch it; recorded at v5.7.0. The README now starts from the source |
+| #17, #18 | `3a0be09`, `a52e842` | "Getting started" in `docs/build/tdx.md` and `docs/build/sev-snp.md`, both options, with putting everything back |
+| #29 | `82e9076` | key files in `e2e/README.md` |
+
+Checked by running, without a guest: a fresh clone builds and passes the same 45 packages; the README's build commands
+give `att-ra-responder` sha256 `5573b538…` from another folder; the guest-side build of both platforms' Option 1 ran
+as written on Linux (WSL); the responder's flags; `registry-deploy` prints the documented address on a fresh anvil;
+`ra-request`, `audit` and `verify` accept every flag as written for all three CVM formats; an `openssl` key is read.
+Not run: anything on a guest, Option 2 with the real tools, and `cast wallet address` (cast is not installed here).
+The gaps not filled stay open in `docs/plan/build-info-gaps.md` on purpose.
