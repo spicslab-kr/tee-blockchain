@@ -14,7 +14,7 @@ Each cell says how far the row is proven, and by what:
 | mark | meaning |
 |---|---|
 | **code** | a test in this repository passes on recorded evidence, with no instance running (`go test ./...`, anvil 1.8.0). It proves the software's verdict, not the platform's behaviour on a fresh run |
-| **2026-11 run** | observed in the 2026-11 SEV-SNP runs, made with scripts outside this repository and with the SHA-512 binding of that time. Not re-run since |
+| **2026-11 run** | observed in the 2026-11 SEV-SNP runs, made with scripts that are no longer available and cannot be re-run. Kept as a record of what was seen, not as a result this repository can reproduce. Where this repository has measured the same thing, the cell shows our result and the 2026-11 observation is in footnote ¹⁰ |
 | **Nitro baseline 2026-11-12** | run on two real Nitro instances at commit `9a5668e`, no chain; results in `docs/results/aws-nitro-2026-11-12.md` and its `.jsonl` |
 | **script, never run** | a Nitro e2e script exists for the row but has never been run against real instances |
 | **needs VM** | nothing has run; it needs instances (and, for TDX and SEV-SNP, the request/build/launch code of Phases 2–4) |
@@ -22,19 +22,19 @@ Each cell says how far the row is proven, and by what:
 
 | id | test | expected | Nitro | TDX | SEV-SNP (GCP) |
 |---|---|---|---|---|---|
-| T1 | same source built on two machines | identical measurement | **Nitro baseline 2026-11-12**: two x86_64 machines gave identical PCR0/1/2 for the test application (`arch-measurement-compare.sh`). The arm64 side (expected: different) **not run**, no `ARM64_HOST` | **measured 2026-11-11** for the application image ⁹ | **measured 2026-11-11** for the application image ⁹; also **2026-11 run**: the application, its cpio archive and the dm-verity image hashed the same on two GCP machines ¹ |
-| T2 | only the Go version differs | different measurement (Nitro: `build` refuses) | **code**: `TestToolchain_E2E_WrongToolchainRefused` (refused). **Nitro baseline 2026-11-12** (`toolchain-pin-check.sh`): an `att-vendor` built with go1.26.2 is refused by `build` on the instance, the pinned one passes, and the responder's bytes differ between the two toolchains. The differing PCRs themselves were not built, since `build` refuses ² | **needs VM** | **2026-11 run**: Go 1.22.2 and 1.23.4 gave different binaries ¹ |
-| T3 | only the build path differs, with `-trimpath` | identical measurement | **code** for the responder: `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`. **Nitro baseline 2026-11-12**: the whole EIF built from two checkout paths (on two machines) gave identical PCR0/1/2; `build` refused a responder without `-trimpath` and one with VCS stamping (`arch-measurement-compare.sh`, `responder-check.sh`) ³ | **needs VM** | **2026-11 run** (without `-trimpath`, two folders gave two binaries) ¹ |
+| T1 | same source built on two machines | identical measurement | **Nitro baseline 2026-11-12**: two x86_64 machines gave identical PCR0/1/2 for the test application (`arch-measurement-compare.sh`). The arm64 side (expected: different) **not run**, no `ARM64_HOST` | **measured 2026-11-11** for the application image ⁹ | **measured 2026-11-11** for the application image ⁹ (the same image on the SEV-SNP and the TDX guest); the cpio archive's bytes are pinned by **code** (`internal/setup/build/cpio` golden tests) ¹⁰ |
+| T2 | only the Go version differs | different measurement (Nitro: `build` refuses) | **code**: `TestToolchain_E2E_WrongToolchainRefused` (refused). **Nitro baseline 2026-11-12** (`toolchain-pin-check.sh`): an `att-vendor` built with go1.26.2 is refused by `build` on the instance, the pinned one passes, and the responder's bytes differ between the two toolchains. The differing PCRs themselves were not built, since `build` refuses ² | **needs VM** | **needs VM** for the SEV-SNP measurement itself. What it rests on is measured: the responder's bytes differ under go1.26.1 and go1.26.2 (the same linux/amd64 binary on every platform; Nitro baseline 2026-11-12), and **code** refuses a SEV-SNP build config without `build_env` (T7) ¹⁰ |
+| T3 | only the build path differs, with `-trimpath` | identical measurement | **code** for the responder: `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`. **Nitro baseline 2026-11-12**: the whole EIF built from two checkout paths (on two machines) gave identical PCR0/1/2; `build` refused a responder without `-trimpath` and one with VCS stamping (`arch-measurement-compare.sh`, `responder-check.sh`) ³ | **needs VM** | **code** for the responder (`TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`, the same binary as on Nitro); the whole initrd built from two paths: **needs VM** ¹⁰ |
 | T4 | normal flow: Auditor rebuilds, registers, User verifies | trusted, exit 0 | **code**: `TestRun_E2E_AuditorVendorUser` (recorded document, anvil). Real instances: **script, never run** (`flow1-auditor-registers/1,2,3`) | **code**: `TestRun_E2E_TDX_AuditorUser` (recorded quote, anvil; first passed 2026-11-11). **Live 2026-11-12** on one guest, twice (stock boot; boot with the dm-verity application mounted): audit registered, verify exit 0 with `✓ matches`, but the Auditor's values came from the guest, not from a rebuild | **code** for verification only: `TestCmd_E2E_SNP_ParseInitrdBoot`; the audit/verify chain on recordings in `TestRun_E2E_T5_ApplicationSwapIsRefused/snp-*`. **Live 2026-11-12** on one guest (`amd-sev-snp-initrd`): audit registered, verify exit 0 with `✓ matches`, but the Auditor's values came from the guest, not from a rebuild |
 | T5 | application swapped after registration | not trusted, exit 1 | **code** in part: an unregistered measurement is not trusted (`TestRun_E2E_User_NothingRegistered`). The swap itself: **script, never run** (`flow1-auditor-registers/4,5`) | **code**, both options: `TestRun_E2E_T5_ApplicationSwapIsRefused/tdx-option1`, `/tdx-option2` (recordings of 2026-11-11) ⁸ | **code**, both options: `…/snp-option1` (padded pair), `…/snp-option2` ⁸ |
 | T6 | Vendor self-registers a different image, Auditor disagrees | not trusted when both registries are required | **script, never run** (`flow2-vendor-self-registers/1..5`) | **needs VM** | **needs VM** |
 | T7 | build environment (OS / arch / Go) does not match | `receive` refuses | **code**: `TestBuildEnv_ReceiveRejectsOtherArch`, `…OtherGoVersion`, `…ConfigWithoutBuildEnv`. **Nitro baseline 2026-11-12** on the x86_64 Vendor (`build-env-check.sh`): a config declaring arm64 is refused naming both architectures, `--ignore-env` only warns, amd64 passes; `send` refuses a record without `build_env` (`arch-record-check.sh`). The arm64 mirror **not run** | **code** in part: an `intel-tdx` build config without `build_env` is refused (`TestBuildConfig_BuildEnvRequiredOnTDX`) | **code** in part: an `amd-sev-snp-initrd` or `amd-sev-snp-verity` build config without `build_env` is refused (`TestBuildConfig_BuildEnvRequiredOnSNP`, added 2026-11-12) |
 | T8 | TEE in debug mode | measurements refused | **script, never run** (`debug-mode-check.sh`) ⁴ | **code**: `TestParse_DebugTDIsRefused` (debug bit set in a copy of the recorded quote) | **code**: `TestParse_DebugGuestIsRefused` (debug bit set in a copy of the recorded report) |
-| T9 | replay of an earlier attestation | refused (nonce) | **code**: `TestCmd_E2E_ParseRejectsTamperedNonce` and the nonce unit tests. A replay against a live enclave: **script, never run** (`replay-check.sh`) ⁵ | **code**: `tdx` nonce tests (a different REPORTDATA is refused); **live 2026-11-12**: a fresh quote presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) | **code**: `snp` nonce tests; **2026-11 run** replayed evidence and saw it refused; **live 2026-11-12**: a fresh document from the guest, presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) |
-| T10 | two attestations from different machines, combined | refused | **not applicable** ⁶ | **not applicable** ⁶ | **fails today**: reproduced in the **2026-11 run** on GCP (and on AWS, before AWS was dropped for SEV-SNP) ⁷ |
+| T9 | replay of an earlier attestation | refused (nonce) | **code**: `TestCmd_E2E_ParseRejectsTamperedNonce` and the nonce unit tests. A replay against a live enclave: **script, never run** (`replay-check.sh`) ⁵ | **code**: `tdx` nonce tests (a different REPORTDATA is refused); **live 2026-11-12**: a fresh quote presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) | **code**: `snp` nonce tests; **live 2026-11-12**: a fresh document from the guest, presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) ¹⁰ |
+| T10 | two attestations from different machines, combined | refused | **not applicable** ⁶ | **not applicable** ⁶ | **not reproduced in this repository.** The **2026-11 run** record says it **fails** (the combination verified), on GCP and AWS ⁷ ¹⁰. `TestVerifySig_MixedRecordingsFailTheBinding` is **not** this row: it mixes two recordings of one VM, which the binding refuses by construction. Procedure to measure it: `docs/plan/app-fixture-recording.md`, "Reproducing T10" (written, not run) |
 
-¹ From `docs/build/sev-snp.md`, "Variables". The 2026-11 numbering of "the seven SEV-SNP tests" is the scripts' own
-and is not the same as T1–T10 here; only rows whose meaning matches are filled.
+¹ `docs/build/sev-snp.md`, "Variables", keeps the 2026-11 observations as a record. The 2026-11 numbering of "the seven
+SEV-SNP tests" was the scripts' own and is not the same as T1–T10 here.
 
 ² Nitro behaves differently here by design. Attestamp pins the toolchain and `build` **refuses**
 to run under another patch version, rather than producing a different measurement. The underlying fact
@@ -77,9 +77,22 @@ and file set to mode 755 (`internal/setup/build/cpio/testdata/make-verity-image.
 2.7.0 on both). This covers the image, not a whole measurement: the base initrd and the boot chain were the
 distribution's on both guests.
 
-⁷ A vTPM attestation from an approved VM plus an SNP report from a different VM passes verification. This row is the
-honest reason SEV-SNP is weaker than the other two, and it has to appear in the table rather than in a footnote. The
-switch to the SHA3-512 binding (2026-11-11) does not change it.
+⁷ The claim: a vTPM attestation from an approved VM plus an SNP report from a different VM passes verification. It is
+the reason SEV-SNP is weaker than the other two, and it has to appear in the table rather than in a footnote. By the
+structure of the evidence it should hold with the SHA3-512 binding too (the relaying VM writes the hash of the
+other's attestation into its own report), but the only observation is the 2026-11 record, made with the SHA-512
+binding and scripts that are gone. Until "Reproducing T10" is run, this repository cannot show it.
+
+¹⁰ The 2026-11 observations these SEV-SNP cells used to show, kept as a record (scripts no longer available, results
+not reproducible; `docs/build/sev-snp.md`, "Variables"):
+
+| row | 2026-11 observation | what replaced it in the cell |
+|---|---|---|
+| T1 | the application, its cpio archive and the dm-verity image hashed the same on two GCP machines | our measurement of the image on two guests (2026-11-11) and the cpio golden tests |
+| T2 | Go 1.22.2 and 1.23.4 gave different application binaries | our responder bytes under two Go patch versions (2026-11-12); the SEV-SNP measurement itself is "needs VM" |
+| T3 | without `-trimpath`, two folders gave two binaries | our code test of the responder across checkout paths; the whole initrd is "needs VM" |
+| T9 | replayed evidence was refused | our live replay refusal on the guest (2026-11-12) |
+| T10 | a vTPM attestation from one VM with an SNP report from another verified | nothing yet: the cell says so, and "Reproducing T10" is the plan |
 
 ## Making the results machine-readable
 

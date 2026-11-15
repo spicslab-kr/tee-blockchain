@@ -902,3 +902,22 @@ For the next run of T8 and T9: after `start`, the instances have new public addr
 its relaunched normal enclave is running, `bash e2e/replay-check.sh`; both write to `e2e-work/results/aws-nitro.jsonl`.
 Neither opens the security group any more: `debug-mode-check.sh` calls `launch` without `--open-port-to`, and the
 e2e security group already allows port 5000 from the creating machine.
+
+## The 2026-10/11 SEV-SNP scripts are gone (2026-11-15)
+
+Their author has left the lab and they are not available anywhere. Build-info gaps #5 and #6 were closed as
+unfillable (`ae98c43`); every instruction that pointed at them now points to our own procedures, and what they did is
+kept only as a marked record (`5f7a5fe`).
+
+**Test matrix, "2026-11 run" cells.** There were five, all in the SEV-SNP column (the brief said six; the sixth
+"2026-11 run" is the mark's own definition, which was rewritten as asked). What each now shows:
+
+| row | before | now |
+|---|---|---|
+| T1 | our image measurement, plus the 2026-11 record of two GCP machines | our image measurement on two guests (2026-11-11) and the cpio golden tests; the record moved to footnote ¹⁰ |
+| T2 | 2026-11 record only (Go 1.22.2 vs 1.23.4) | **needs VM**, with what it rests on that we measured: the responder's bytes under go1.26.1 vs go1.26.2 (2026-11-12) and the SEV-SNP `build_env` code test; record in ¹⁰ |
+| T3 | 2026-11 record only (no `-trimpath`) | **code** for the responder across checkout paths; the whole initrd **needs VM**; record in ¹⁰ |
+| T9 | code, the 2026-11 record, and our live replay | code and our live replay (2026-11-12); record in ¹⁰ |
+| T10 | "fails today", from the 2026-11 record | **not reproduced in this repository**: the record is stated as a record, the same-VM mixing test is named as *not* T10, and the plan is "Reproducing T10" in `docs/plan/app-fixture-recording.md` |
+
+T2, T3 and T10 are weaker now than they read before. That is the point: they were never ours.
