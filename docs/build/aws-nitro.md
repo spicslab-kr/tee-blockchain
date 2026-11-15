@@ -26,7 +26,9 @@ In our measurements a different file in the image changed PCR0 and PCR2, and so 
 | Go go1.26.1 (pinned) | a different patch version gives a different `att-ra-responder`, so different values | `build` and `pack` refuse another version; `att-vendor version` and `att-auditor version` show it |
 | `-trimpath` | without it the build folder's path ends up inside the binary | `build` refuses a responder built without it; `receive` warns if the Vendor built without it |
 | `-buildvcs=false` | without it the git commit, its time and whether the tree had uncommitted changes end up inside the binary (see below) | `build` refuses a responder that carries them |
-| one `att-ra-responder` file | it is layered into the image | `build` checks its Go version, `-trimpath`, `-buildvcs=false`, OS and architecture and prints its sha256 |
+| `CGO_ENABLED=0` | without it a native Linux build with a C compiler links cgo and gives other bytes than a cross-build (see below) | `build` refuses a responder built with cgo (since `ade66e6`) |
+| one `att-ra-responder` file | it is layered into the image | `build` checks its Go version, `-trimpath`, `-buildvcs=false`, `CGO_ENABLED=0`, OS and architecture and prints its sha256 |
+| same OS | part of `build_env` | `receive` compares it |
 
 **Version control stamping, measured.** Go stamps `vcs.revision`, `vcs.time` and `vcs.modified` into main binaries by
 default (since Go 1.18; `-buildvcs=auto`). `-trimpath` does NOT remove them. Measured on 2026-11-11 with go1.26.1,
@@ -38,7 +40,21 @@ uncommitted changes (`e8ec754` plus one line appended to `README.md`) produced a
 stamp, and with it a module version derived from the commit (`v0.0.0-20261111045839-72d62f927ff8`). Also observed: a
 `git worktree` checkout of the same commits (where `.git` is a file, not a directory) built with no stamp at all, so
 whether a build is stamped depends on how the source was checked out. `-buildvcs=false` removes that dependence.
-| same OS | part of `build_env` | `receive` compares it |
+
+**cgo, measured.** Go links cgo by default when the build is native (target OS and architecture equal the host's)
+and a C compiler is on PATH. `att-ra-responder` imports `net`, so with cgo it carries the cgo DNS resolver and links
+libc dynamically. Measured on 2026-11-15 in a clean Ubuntu 24.04 under WSL (go1.26.1, gcc from `build-essential`),
+commit `a5c4306`, the same `-trimpath -buildvcs=false` command:
+
+| build | `go version -m` | sha256 of `att-ra-responder` |
+|---|---|---|
+| native Linux build, no `CGO_ENABLED` (the README's command before `ade66e6`) | `CGO_ENABLED=1` | `a71bedfc6b81fc5c535d29fc938c57398626e48fa885f18784c1b559d764a186` |
+| the same machine with `CGO_ENABLED=0` | `CGO_ENABLED=0` | `5573b5381ac72b1812263b886d04b667854bcb60c5d84573e1fcc34f8124d668` |
+| cross-build from Windows (no C compiler; cgo is off) | `CGO_ENABLED=0` | `5573b5381ac72b1812263b886d04b667854bcb60c5d84573e1fcc34f8124d668` |
+
+Rebuilt at `ade66e6` on 2026-11-16 the three gave the same hashes again. So before `ade66e6` the PCR0 and PCR2 of an
+image depended on whether the machine that built the responder was Linux with gcc. Since `ade66e6` every build
+command sets `CGO_ENABLED=0` and `build` refuses a responder that records anything else.
 
 `receive` stops when OS, architecture or Go version differ from the Vendor's `build_env`.
 `--ignore-env` turns that into a warning. Use it only to look around, since the values will not match.
@@ -83,6 +99,14 @@ The software's own files and logs are not touched.
 **This changes the measurements.** Every image with an account `adduser` made, the test application included, has
 a different PCR0 and PCR2 from `fc105b0` on (PCR1, the kernel and init, does not change). PCR values recorded before
 that commit are marked "before `fc105b0`" where they appear; they were not re-measured.
+
+**The Nitro reference values have to be taken again at `ade66e6` or later.** Two commits changed what `build`
+produces: `fc105b0` (the `/etc/shadow` build day, above) changes PCR0 and PCR2 of the test application, and
+`ade66e6` (`CGO_ENABLED=0`, see "cgo, measured") fixes which responder file goes in. Every recorded Nitro PCR0 and PCR2
+was built with the cross-built responder `5573b538…`, which is exactly the `CGO_ENABLED=0` file, so `ade66e6` by
+itself does not move them; `fc105b0` does. The recorded values are therefore marked "before `fc105b0`" only, and the
+baseline (`docs/results/aws-nitro-2026-11-12.md`) has not been run again: the next run, at `ade66e6` or later, gives
+the reference PCR0 and PCR2.
 
 ### Two builds compared (2026-11-15)
 
@@ -165,6 +189,7 @@ checking a Vendor's self-registration later in flow 2.
 |---|---|---|
 | `-trimpath` (go build) | keeps the build folder path out of the binary | no for `att-ra-responder`: `build` refuses it |
 | `-buildvcs=false` (go build) | keeps the git commit, its time and the uncommitted-changes flag out of the binary | no for `att-ra-responder`: `build` refuses it |
+| `CGO_ENABLED=0` (environment of go build) | keeps cgo out, so a native Linux build gives the same file as a cross-build | no for `att-ra-responder`: `build` refuses it |
 | `--verify` (`build`) | builds twice and compares | yes, but then you do not know whether the build is reproducible |
 | `--ignore-env` (`receive`) | turns a `build_env` mismatch into a warning | only to look around; the values will not match |
 | `--build-measurements` (`launch`) | starts a received image only if it measures the same | yes, but then a swapped image starts unchecked |
