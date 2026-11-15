@@ -150,4 +150,5 @@ if [ "$HAVE_GO" != "$GO_VERSION" ]; then
   exit 1
 fi
 echo
-echo "Ready - Go $GO_VERSION confirmed exactly. Next: bash e2e/0-Setup-local-upload.sh"
+echo "Ready - Go $GO_VERSION confirmed exactly."
+echo "Next: Nitro: bash e2e/0-Setup-local-upload.sh   TDX: docs/build/tdx.md step 2   SEV-SNP: docs/build/sev-snp.md step 2"
