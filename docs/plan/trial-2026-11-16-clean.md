@@ -273,3 +273,35 @@ All of Option 1's five values **equal the 2026-11-15 trial**.
 | `aws-nitro.sh create` / `gcp-cvm.sh … create` | 1 (F1), then 126 (F2) | 126 (F2) | 126 (F2) |
 | `flow1/4` | 255, then 1 (F4), then 0 | — | — |
 | `go test ./...` (local) | 0 | | |
+
+## Afterwards (2026-11-16)
+
+What changed in the repository because of this trial. Nothing here was run again on an instance: the script fixes were
+checked with a stand-in `aws` that records its arguments, a read-only `gcp-cvm.sh status`, and `go test ./...`.
+
+| finding | change | commit |
+|---|---|---|
+| F3 | `env.sh` no longer ends a `set -e` script when an address variable is unset | `593a38f` |
+| F1 | the key is written to a `.partial.pem` (gitignored) and moved on success; the error names `KEY_NAME`, `SG_NAME`, `TAG` | `ee00116` |
+| F2 | `exec bash "$0" status` in all three cloud scripts | `ee00116` |
+| F11, F12, D16 | `gcp-cvm.sh status`, `stop`, `start`, `delete` act only on `PREFIX`; `create` says a name is reused and how to choose another | `b26465d` |
+| F10 | `in-guest-verify.sh`'s `json_str` fixed, so `platform` and `reason` are written | `dc9a995` |
+| F4 | flow 1 step 4 (and flow 2 step 3) start docker before `docker build` | `948e73c` |
+| F14 | `/linux/`, `/quote.bin*`, `/evidence.cbor*`, `/measurements.json` in `.gitignore` | `70b271f` |
+| D12 | every command prints the values sorted by name, in one column | `641ab10` |
+| F5, F6, F13, F15, D18, step 9, `PREFIX`, the anvil archive, gcloud under WSL | `tdx.md` and `sev-snp.md` steps 1, 3, 7, 8, 9, 13 | `9c0073f`, `1bd1ede` |
+| F7, F11, D19, Go `PATH`, a Nitro safety stop | `e2e/README.md`, `e2e/cloud/README.md` | `85ea837` |
+| — | found while fixing F2: `1af3f87` had dropped `--region` from every `aws` call in `aws-nitro.sh` and `aws-snp.sh` (the CR-stripping wrapper replaced the one that added it), so they used the region of the profile or the environment. This trial's Nitro instances are in `eu-north-1`, the script's default, so that is what the profile gave here; another profile would have made them elsewhere | `ac9635f` |
+
+Not changed, and why:
+
+| finding | why |
+|---|---|
+| D3 (no independent rebuild on the CVMs) | needs a second guest; "The Auditor's own guest" in each doc is still unrun |
+| D1, D2, D4–D9, D11 | differences of the platforms themselves, not defects; the User's side is the same command |
+| D13 | TDX and SEV-SNP evidence has no module ID and no time to show |
+| D14 | the getting-started steps are typed by hand and write no JSONL; `in-guest-verify.sh` and `replay-check.sh` do |
+| D17 | "enclave" in the CLI wording on VMs: cosmetic, left for a pass over all CLI text |
+| F9 | the Nitro AMI and the `dnf` packages are unpinned; this run's versions are recorded above and equal the baseline's except git |
+| `net_retry` not retrying `Connection closed by …` | not reproduced |
+| `sudo` working although `sudo -n true` asked for a password | not investigated; outside the repository |

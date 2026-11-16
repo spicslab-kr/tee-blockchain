@@ -53,6 +53,22 @@ clean WSL and on real guests, with the documents frozen. What it found, and wher
 | two-guest comparison | the recordings' application was used to compare with 2026-11-11 | the trial's own check, not a procedure step |
 | 6 | whether `veritysetup format` works as an ordinary user | only tried as root (the procedure says `sudo`); unknown, not a gap in the procedure |
 
+## Filled on 2026-11-16, from the clean trial
+
+The clean trial of 2026-11-16 (`docs/plan/trial-2026-11-16-clean.md`) followed Nitro, TDX and SEV-SNP from the
+documents alone, at `e29d028`, and all three reached the same verdicts. Its findings, and the commit for each, are in
+that file's "Afterwards" section. The ones about building and following the procedure:
+
+| finding | gap | where it is now |
+|---|---|---|
+| F3 | `0-Setup-local-upload.sh` exited 1 with no output unless all five address variables were set | `env.sh` (`593a38f`) |
+| F1, F2, F11, F12 | the cloud scripts: an empty `.pem` after a failed create, exit 126 after every create, default names already taken in a shared project, `stop` acting on other people's VMs | `ee00116`, `b26465d`; names in `e2e/cloud/README.md` |
+| F4 | flow 1 step 4 needs docker, which nothing had started on the Vendor | `948e73c` |
+| F6 (row 8a above) | the serial console cannot tell the new boot from the old | the boot ID before and after, steps 7 and 13 of both procedures (`9c0073f`, `1bd1ede`) |
+| F7, row 1.6 above | the anvil install command only in `tdx.md`; the release archive's checksum file name | `e2e/README.md` and both procedures (`85ea837`, `9c0073f`) |
+| F14 | the procedures' files in the repository root were not ignored | `.gitignore` (`70b271f`) |
+| — | `1af3f87` (row "stop" above) had dropped `--region` from the AWS scripts | `ac9635f` |
+
 ## Still missing
 
 Most important first.
