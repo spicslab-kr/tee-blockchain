@@ -25,7 +25,7 @@ printf '%s\n' ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 >
 printf '%s\n' 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d > "$W/auditor.key"
 AUDITOR=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 
-json_str() { printf '%s' "$1" | tr '\r\n\t' '   ' | tr -d '\000-\037' | sed -e 's/\/\\/g' -e 's/"/\\"/g'; }
+json_str() { printf '%s' "$1" | tr '\r\n\t' '   ' | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
 # record <test> <check> <result> <expected> <reason>: one line of the results contract.
 record() {
 	printf '{"platform":"%s","chain":"local","test":"%s","check":"%s","script":"e2e/cvm/in-guest-verify.sh","result":"%s","expected":"%s","reason":"%s","detail":"extractor %s, on the guest over 127.0.0.1","run":"%s","at":"%s"}\n' \
