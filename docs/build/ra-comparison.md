@@ -47,6 +47,30 @@ on-chain value.
 | Code | `aws/measure.go`, `imagePCRs` | `tdx/measure.go`, `imageRTMRs` | `snp/measure.go`, `initrdNames`, `verityNames` |
 | Asserted on recorded evidence | yes (`aws/measure_test.go`, also against the `nitrite` library) | yes (`tdx/measure_test.go`) | yes, the five initrd values (`snp/measure_test.go`), each checked against a value read outside the parser. PCR12 has no recording yet |
 
+### What covering the responder costs: a code change no one runs still moves Nitro's values
+
+A measurement covers the whole binary, so it moves when **any package linked into it** changes, even code that never
+runs. That is not intuitive, and it happened: commit `029bbdc` added one function, `TEENoun`, to `internal/cli`.
+`att-ra-responder` imports `internal/cli` but never calls that function, and the responder's bytes still changed,
+`5573b538…` (built at `029bbdc~1`) → `c61c988e…` (built at `029bbdc`), both go1.26.1 `CGO_ENABLED=0 -trimpath
+-buildvcs=false` linux/amd64 (2026-11-16). Every PCR0 and PCR2 recorded before it, the clean trial's at `e29d028`
+included, became stale at once.
+
+**This is Nitro only.** On Nitro the responder is layered into the EIF, so PCR2 (and PCR0) cover it. On TDX and SEV-SNP
+the responder runs from the guest's disk and is not measured, so the same change leaves RTMR2 and INITRD where they
+were.
+
+The asymmetry is a trade-off, and this is one case of each side:
+
+| | Nitro | TDX and SEV-SNP |
+|---|---|---|
+| what the measurement covers | wide: the whole image, the program that produces the evidence included | narrow: the initrd (the application), not the program that produces the evidence |
+| cost | reference values go stale easily: any change to the responder or anything it links moves them | the responder is not covered: which program answered the request is not in the evidence. Its answer is signed by the hardware, so it cannot forge values, but nothing proves which responder ran |
+| consequence for records | every value needs the commit it was measured at (`docs/plan/nitro-baseline-2026-11-16.md`) | values follow the application and the image, not the repository's code |
+
+Whether the responder should link `internal/cli` at all is an open design question (`docs/plan/build-info-gaps.md`),
+not decided here.
+
 ## Roots of trust
 
 Who vouches for each registered value. A value is only as trustworthy as the key that signed it.

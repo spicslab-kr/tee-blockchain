@@ -135,7 +135,7 @@ the person cannot go on; [slows] means they can, after guessing. All rows need *
 | # | gap |
 |---|---|
 | 29 | [blocks] **Files a fresh clone does not have:** `pem2.pem` (made by `aws-nitro.sh create`, fine), `auditor.key` and `deployer.key` (no instructions; not needed with `NET=local`), `e2e/env.local.sh` (from the example, fine) **Filled 2026-11-15** for the key files (`82e9076`, `e2e/README.md`, "Key files"): not needed with `NET=local`, needed funded only on a public network, and how to make them; the `openssl` step was checked, the `cast wallet address` step was **not run** (cast is not installed on our machine) |
-| 30 | [slows] **The security group follows the first computer.** `aws-nitro.sh create` opens port 22 only to the address of the machine that created the group, and reuses the group later. From another computer SSH times out, and no document says why or what to change (**person**: the account owner changes the rule) |
+| 30 | [slows] **The security group follows the first computer.** `aws-nitro.sh create` opens port 22 only to the address of the machine that created the group, and reuses the group later. From another computer SSH times out, and no document says why or what to change (**person**: the account owner changes the rule). **Partly 2026-11-16:** `aws-nitro.sh status` and `start` now say whether this machine's current address is allowed and print the `/32` commands if not (`c50c9b1`); the change itself is still the account owner's |
 | 31 | [slows] **Instructions tied to one VM:** `app-fixture-recording.md` ("`GRUB_FORCE_PARTUUID` is already off on this instance") and `docs/build/sev-snp.md` ("The boot setting changed on `attestamp-snp-vendor`"). On a fresh VM the setting is on |
 | 32 | [slows] **Procedures that live only in the night log:** the TDX Option 2 base initrd with the hook (`docs/build/tdx.md` and `app-fixture-recording.md` cite "Overnight 2026-11-12") |
 | 33 | [slows] **Text addressed to people or to Claude rather than to the reader:** "settled with the user" (`tdx.md`), "project lead" (`sev-snp.md`), "a decision for the user" (`app-fixture-recording.md`), "the operator's machine" (`cvm-port.md`); `e2e/cloud/README.md` and `app-fixture-recording.md` address Claude and `CLAUDE.md` |
@@ -148,3 +148,11 @@ the person cannot go on; [slows] means they can, after guessing. All rows need *
 | 35 | [slows] **Other contradictions:** `e2e/cloud/README.md` says the `attestamp-ra` firewall rule was "added by hand", but `gcp-cvm.sh` creates it; `toolchain.md` says docker is not used here, but it was on 2026-11-15; `README.md` says the AMI, docker and nitro-cli versions are "not recorded anywhere", but `toolchain.md` records them; `docs/build/tdx.md` "From scratch" creates one VM (`tdx create vendor`) where `e2e/cloud/README.md` creates two; `cmd/vendor/README.md` uses `out/app.eif`, but the EIF is named after `--app-dir` |
 
 No current procedure depends on the scripts that no longer exist (the T10 relay uses `record-snp -relay-att`).
+
+## Design questions to review
+
+Not gaps in the documents and not decided here; each needs a person's decision.
+
+| # | question | what is known | where |
+|---|---|---|---|
+| Q1 | **Should `att-ra-responder` link `internal/cli`?** On Nitro the responder is inside the measured EIF, so any change to a package it links moves PCR0 and PCR2, even code it never runs | measured 2026-11-16: `029bbdc` added one function to `internal/cli`, which the responder imports but does not call, and the responder went from `5573b538…` (at `029bbdc~1`) to `c61c988e…` (at `029bbdc`); every recorded Nitro reference value became stale. The responder's dependencies are `internal/cli` and `internal/tee/request/...` (`go list -deps ./cmd/ra-responder`). Options to weigh, not tried: keep it as is and re-take the values whenever these packages change; give the responder its own minimal output code so that `internal/cli` can change freely; or something else. TDX and SEV-SNP are not affected (the responder is not measured there) | `docs/build/ra-comparison.md`, "What covering the responder costs"; `docs/plan/nitro-baseline-2026-11-16.md` |

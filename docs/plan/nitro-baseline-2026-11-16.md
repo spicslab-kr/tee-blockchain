@@ -22,6 +22,10 @@ The test application's PCR0/PCR2 also depend on the day: the Dockerfile starts `
 `apk` packages without versions (`docs/results/aws-nitro-2026-11-12.md`). A re-measurement gives today's values; what
 the baseline tests is that two machines agree on the same day.
 
+**Recording rule, from this finding:** every measured value is written next to the commit it was measured at (and,
+for Nitro, the responder's sha256). Without it, the next person who builds at another commit sees another value and
+takes it for a fault. All documents changed by this session follow it.
+
 ## What to measure again
 
 At the current HEAD (responder `c61c988e…`), on the same two `m6i.xlarge` (`attestamp-e2e`, eu-north-1, started again)
