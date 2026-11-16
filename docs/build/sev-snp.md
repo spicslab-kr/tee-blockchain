@@ -22,14 +22,18 @@ Type the commands in order. `<guest-ip>` and `<0x…>` are values an earlier ste
 
 What it shows and what it does not: everything runs against **one** guest, and the Auditor registers the values the
 Vendor's guest measured; an Auditor with a guest of its own is the last section. The procedure was followed end to
-end in a clean environment on 2026-11-15 (`docs/plan/trial-2026-11-16.md`); the places where it needed knowledge from
-outside this page have been filled in since. If a step stops with an error, that is a finding; note it. And on
+end in a clean environment on 2026-11-15 (`docs/plan/trial-2026-11-16.md`), and again from the documents alone, both
+options, on 2026-11-16 (`docs/plan/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside
+this page have been filled in since. If a step stops with an error, that is a finding; note it. And on
 SEV-SNP the evidence cannot prove that its two documents come from the same VM ([Same VM](#same-vm)); the procedure
 does not change that.
 
 **Names.** The commands use the guest name `attestamp-snp-vendor` and the zone `us-central1-a`. If your guest has
 another name (you made `create auditor`, or gave `PREFIX=…` to `gcp-cvm.sh`), replace the name in every `gcloud`
-command; `bash e2e/cloud/gcp-cvm.sh snp status` lists the names.
+command; `bash e2e/cloud/gcp-cvm.sh snp status` lists the names. If somebody else in the same project already has an
+`attestamp-snp-vendor`, `create` says `already exists, reusing it (not created)` and makes nothing: choose your own
+names with `PREFIX=<you>-snp` (the guest is then `<you>-snp-vendor`), and pass the same `PREFIX=` to `status` and
+`stop`, which act only on VMs whose name starts with it.
 
 **Cost.** The guest is an `n2d-standard-2`, billed by the hour while it runs. Step 13 stops it.
 
@@ -59,9 +63,10 @@ The same as [TDX step 1](tdx.md#1-on-your-computer-the-tools-and-the-source), wh
 3. `gcloud`, installed as in the TDX table (apt repository on Ubuntu/Debian and WSL, `winget install --id
    Google.CloudSDK` on Windows, the archive on macOS), then `gcloud auth login` and
    `gcloud config set project <your project id>`, with a project that has billing and **N2D** quota in
-   `us-central1-a`.
-4. `anvil` 1.8.0: `curl -fsSL https://foundry.paradigm.xyz | bash`, `source ~/.bashrc`, `foundryup --install v1.8.0`
-   (on Windows without WSL, `anvil.exe` from the v1.8.0 release zip).
+   `us-central1-a`. Under WSL a Windows `gcloud` is also found and works, slowly; the Linux one is meant.
+4. `anvil` 1.8.0: `curl -fsSL https://foundry.paradigm.xyz | bash`, `source ~/.bashrc`, `foundryup --install v1.8.0`;
+   or the release archive `foundry_v1.8.0_linux_amd64.tar.gz`, checked against `foundry_v1.8.0_linux_amd64.sha256`
+   (commands in the TDX step); on Windows without WSL, `anvil.exe` from the v1.8.0 release zip.
 
 Versions we used: [toolchain.md](toolchain.md).
 
@@ -96,6 +101,14 @@ same image as the other side" below).
 The VM takes a minute to boot after `create` returns; if the first `gcloud compute ssh` or `scp` fails to connect, try
 again after half a minute. On Windows `gcloud` uses PuTTY, which asks once per new guest whether to store its host key
 (or to update it, when the new guest got an address an earlier VM had): answer `y`.
+
+The first `gcloud compute ssh` or `scp` on a computer that has no `~/.ssh/google_compute_engine` yet makes that key
+and prints `Updating project ssh metadata`: it adds the public key to the **project**, so every VM in the project,
+other people's included, accepts it from then on. That is how `gcloud` works unless the project uses OS Login; if that
+is not acceptable in a shared project, ask its owner before this step.
+
+A stopped VM can get a **new** external address when it is started again (seen twice on SEV-SNP on 2026-11-16). After
+every `start`, take `<guest-ip>` again from `status`.
 
 Copy the binaries to it, one file per command:
 
@@ -195,6 +208,7 @@ extend for it, and the kernel argument `attestamp.roothash=<root hash>`. Option 
 ### 7. On the guest: install and boot
 
 ```
+cat /proc/sys/kernel/random/boot_id     # note it: it is new on every boot, and tells the new boot from the old below
 sudo ./att-vendor launch --platform amd-sev-snp-initrd --build-value out/build-value.json --reboot
 ```
 
@@ -205,19 +219,19 @@ the kernel command line) to `/etc/grub.d/41_attestamp`, makes it the default in
 `update-grub` and reboots. The connection drops.
 
 The reboot can take a few minutes, and logging in too early reaches the **old** boot, which is still shutting down
-(seen on TDX on 2026-11-15: a minute was not enough). To know the new boot is up, either watch the serial console from
-your computer until a `login:` line appears after the `reboot` lines:
+(seen on TDX on 2026-11-15: a minute was not enough; on 2026-11-16 the new boot answered 55 to 166 seconds after the
+reboot command). The surest test is the boot ID noted above. Log in (the `gcloud compute ssh` command of step 3) and
+check:
 
 ```
-gcloud compute instances get-serial-port-output attestamp-snp-vendor --zone us-central1-a | tail -5
+cat /proc/sys/kernel/random/boot_id   # must differ from the one noted; the same one is the old boot: log out and wait
+uptime                                # "up 1 min" or so
+cat /proc/cmdline                     # our entry: root=UUID=… ; the stock boot: root=PARTUUID=…
 ```
 
-or log in (the `gcloud compute ssh` command of step 3) and check:
-
-```
-uptime                    # "up 1 min" or so; a longer time is the old boot: log out and wait
-cat /proc/cmdline         # our entry: root=UUID=… ; the stock boot: root=PARTUUID=…
-```
+Do not rely on the serial console (`gcloud compute instances get-serial-port-output`) for this: it returns only the
+newest part of the log, and the old boot's `login:` line looks the same as the new one's (2026-11-16: one wait ended too
+early, another never ended).
 
 Then `sudo shutdown -h +240` again.
 
@@ -230,8 +244,9 @@ sudo ./att-vendor launch --platform amd-sev-snp-initrd --check
 (`amd-sev-snp-verity` for Option 2.) It asks the guest for evidence (the SNP report and the vTPM attestation),
 verifies it as a User would, requires INITRD to be the built initrd's and, for Option 2, PCR12 to be what the built
 image gives, and requires the application to have been unpacked or mounted. It ends with `✓ the boot measured the
-build` and writes the values to `out/measurements.json`. If it refuses because INITRD is not the built initrd and
-`uptime` shows a long time, you are on the old boot: wait and log in again (step 7). For Option 2, also:
+build` and writes the values to `out/measurements.json`. If it refuses because INITRD is not the built initrd, or
+because GRUB loaded no initrd, and the boot ID is the old one, you are on the old boot: wait and log in again (step 7).
+For Option 2, also:
 
 ```
 cat /run/attestamp-status          # ok
@@ -242,11 +257,19 @@ ls /opt/app-verity/opt/app         # hello.txt
 ### 9. On the guest: answer attestation requests
 
 ```
-sudo nohup ./att-ra-responder ra-serve --extractor snp-initrd --listen tcp:0.0.0.0:5000 > ra.log 2>&1 &
+sudo nohup ./att-ra-responder ra-serve --extractor snp-initrd --listen tcp:0.0.0.0:5000 > ra.log 2>&1 < /dev/null &
 ```
 
-(`--extractor snp-verity` for Option 2.) It is not a service: after every reboot, start it again. While it attests, the
-guest fetches Google's AK certificates over the network; a GCP VM can by default. Log out (`exit`).
+(`--extractor snp-verity` for Option 2. The extractor names are not the format names: `snp-initrd` answers for
+`amd-sev-snp-initrd`, `snp-verity` for `amd-sev-snp-verity`.) It is not a service: after every reboot, start it again.
+While it attests, the guest fetches Google's AK certificates over the network; a GCP VM can by default. Log out
+(`exit`). The `< /dev/null` matters only when the line is sent through `gcloud compute ssh --command '…'` instead of
+typed: without it the background process holds the session's input and the command does not return.
+
+Evidence is usable only from our boot. A responder started on the **stock** boot (before step 7, or after step 13)
+answers, but every format refuses its evidence with exit 7, `GRUB loaded no initrd, so the application archive was
+never measured`, after `signature ok` and `nonce ok`: Google's stock boot loads no initrd (2026-11-16). TDX evidence
+from the same state parses; there the refusal comes only at `verify`, when the values are not registered.
 
 ### 10. On your computer: get the evidence
 
@@ -325,6 +348,7 @@ sudo rm -f /etc/grub.d/41_attestamp /etc/default/grub.d/99-attestamp.cfg /boot/i
 sudo rm -rf /var/lib/attestamp                  # Option 2 only
 sudo cp -p /root/40-force-partuuid.cfg.orig /etc/default/grub.d/40-force-partuuid.cfg
 sudo update-grub
+cat /proc/sys/kernel/random/boot_id     # note it, as in step 7
 sudo systemctl reboot
 ```
 
@@ -341,6 +365,10 @@ On your computer, stop anvil (Ctrl-C) and the VM:
 ```
 bash e2e/cloud/gcp-cvm.sh snp stop        # the disk still costs a little; "delete" removes the VM and its disk
 ```
+
+With `PREFIX=…` in step 3, give it here too (`PREFIX=<you>-snp bash e2e/cloud/gcp-cvm.sh snp stop`): `stop` acts only
+on the VMs whose name starts with the prefix, default `attestamp-snp`. To stop one VM by name:
+`gcloud compute instances stop <name> --zone us-central1-a`.
 
 The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rules delete attestamp-ra` removes it.
 
