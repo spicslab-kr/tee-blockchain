@@ -39,7 +39,9 @@ on-chain value.
 |---|---|---|---|
 | Names | PCR0, PCR1, PCR2 | MRTD, RTMR0, RTMR1, RTMR2 | initrd: MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD. verity: the same and PCR12 |
 | Count | 3 | 4 | 5 or 6 (two format strings, so each list is fixed) |
-| Option 2 (squashfs + dm-verity application image) | n/a | the image goes inside the initrd, covered by RTMR2: the same format and the same four names (`docs/build/tdx.md`, "Option 1 and Option 2"; not built yet) | the image sits on disk; a boot-time hook extends PCR12, so `amd-sev-snp-verity` has a sixth value |
+| Option 2 (squashfs + dm-verity application image) | n/a | the image goes inside the initrd, covered by RTMR2: the same format and the same four names (`docs/build/tdx.md`, "Option 1 and Option 2"; built and booted on guests since 2026-11-15) | the image sits on disk; a boot-time hook extends PCR12, so `amd-sev-snp-verity` has a sixth value |
+| Is `att-ra-responder` measured? | **yes**: `build` layers it into the EIF, so its bytes are in PCR0 and PCR2, and its Go version changes them (`toolchain-pin-check.sh`) | **no**: it runs from the guest's disk after the boot; the measurement covers the initrd `att` writes. Measured 2026-11-16: the Go version moves RTMR2 only when the Go program is the application inside the initrd | **no**, as on TDX: the vTPM measures the initrd `att` writes (and for verity the image's root hash), not the responder |
+| What the toolchain pin protects | the responder's bytes, so the PCRs | that the Vendor and the Auditor run the same `att`, which writes the measured initrd (and Option 2 image) | the same as TDX |
 | Size of each value | 48 bytes (SHA-384) | 48 bytes (SHA-384) | MEASUREMENT 48 bytes; the others 32 bytes (vTPM SHA-256 bank, GRUB's SHA-256 file digests) |
 | Signed by | AWS | Intel | MEASUREMENT by AMD; the rest by Google's vTPM |
 | Code | `aws/measure.go`, `imagePCRs` | `tdx/measure.go`, `imageRTMRs` | `snp/measure.go`, `initrdNames`, `verityNames` |

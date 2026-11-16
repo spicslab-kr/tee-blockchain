@@ -71,7 +71,7 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	if runtime.GOOS != "linux" {
 		return res, ErrNotLinux
 	}
-	if err := build.CheckToolchain(); err != nil {
+	if err := build.CheckToolchainFor("aws-nitro"); err != nil {
 		return res, err
 	}
 	if (b.AppDir == "") == (b.DockerImage == "") {

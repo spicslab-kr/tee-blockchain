@@ -81,7 +81,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `att-vendor
 
   version          print the pinned Go toolchain (internal/setup/build/GO_TOOLCHAIN) and the one this binary was built with;
-                   exit 1 if they differ. build/pack refuse to run in that case, since the responder's bytes and the measurements depend on it
+                   exit 1 if they differ. build/pack refuse to run in that case (Nitro: the responder's bytes are measured; TDX, SEV-SNP: the initrd att writes is)
   registry-deploy  --rpc <url> --deployer-key-file <file> --approver <0x…>
                    deploy the Registry contract. one approver per registry, fixed at deploy time. the deployer key only pays gas
   register         --rpc <url> --registry <0x…> --signing-key-file <file> --measurements <measurements.json | NAME=hex,…>
