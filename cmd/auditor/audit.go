@@ -29,6 +29,7 @@ func auditCmd(args []string) error {
 	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
+	vendorNonce := fs.String("vendor-nonce", "", "with --vendor-tee: fixed nonce for the Vendor's document (e.g. for a test fixture). empty uses the one just sent")
 	buildMeasurements := fs.String("build-measurements", "", "the value I built or measured myself (out/measurements.json). with --tee-addr the attested value must match it, or nothing is registered")
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
 	registry := fs.String("registry", "", "Registry contract address")
@@ -167,7 +168,11 @@ func auditCmd(args []string) error {
 			t.Fail("no answer")
 			return err
 		}
-		if err := raParse([]string{"--doc", vDoc, "--format", *format, "--out-file", vParsed}); err != nil {
+		vArgs := []string{"--doc", vDoc, "--format", *format, "--out-file", vParsed}
+		if *vendorNonce != "" {
+			vArgs = append(vArgs, "--nonce", *vendorNonce)
+		}
+		if err := raParse(vArgs); err != nil {
 			t.Fail("invalid attestation")
 			return err
 		}
@@ -272,10 +277,18 @@ func auditCmd(args []string) error {
 	cli.Okln("PASS: audited and registered. Users can now verify against registry ", *registry)
 	fmt.Printf("this registration is for %s only. Put \"arch\": \"%s\" in measurement-record.json; a build for the other architecture measures differently and is registered on its own\n", *arch, *arch)
 	if vendorRunsSomethingElse {
-		cli.Errorln("but note: the Vendor's ", tee, " at ", *vendorTee, " does NOT run this value. a User verifying that ", tee, " against this registry will be told not to trust it")
+		return fmt.Errorf("%w: the registration above SUCCEEDED (record key %s on registry %s). Only the comparison "+
+			"with the Vendor's %s at %s failed: it does not run this value, so a User verifying that %s against this "+
+			"registry will be told not to trust it. Do not run audit again: the registration is already done, and a second "+
+			"run ends with exit 5, already registered", errVendorDiffers, recordKey, *registry, tee, *vendorTee, tee)
 	}
 	return nil
 }
+
+// errVendorDiffers is audit's result when its own value was registered but the Vendor's TEE, asked with --vendor-tee,
+// runs something else. It maps to exit code 12, so a script sees the mismatch without reading the output; until
+// 2026-11-16 this case exited 0. It is not a failed audit: the registration stands.
+var errVendorDiffers = errors.New("registered, but the Vendor's TEE runs something else")
 
 // requireBuildOnCVM refuses an audit of a TDX or SEV-SNP guest that has no value the Auditor built itself. Without
 // one, audit registers whatever the guest reports. Measured on 2026-11-16 (docs/results/sessions-2026-11-16/

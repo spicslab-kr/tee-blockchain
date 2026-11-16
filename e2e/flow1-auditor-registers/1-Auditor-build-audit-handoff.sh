@@ -113,12 +113,19 @@ extra=(); [ -n "$CHECK_VENDOR" ] && extra=(--vendor-tee "$VENDOR_HOST:5000")
 step "AUDITING" "$AUDITOR_BIN" audit --config "$WORK/auditor-build-config.json" --tee-addr "$AUDITOR_HOST:5000" --build-measurements "$WORK/auditor-measured.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$AUDITOR_SIGNING_KEY" "${extra[@]}"
 rc=$?
 echo "audit exit=$rc   registry=$REGISTRY"
-if [ $rc -eq 0 ]; then
+# Exit 12 (since 2026-11-16): the Auditor's own value WAS registered, and only the --vendor-tee comparison (-v) found
+# that the Vendor's enclave runs something else. In this flow the Vendor launches the Auditor's image only in step 2,
+# so with -v that can be expected here; the registration stands and the flow goes on. Do not run audit again (exit 5).
+if [ $rc -eq 0 ] || [ $rc -eq 12 ]; then
   result T4 auditor-audit-registers accepted accepted "audit matched the Auditor's own build and registered it" "registry $REGISTRY"
 else
   result T4 auditor-audit-registers rejected accepted "audit exit $rc" "registry $REGISTRY"
 fi
-[ $rc -eq 0 ] || exit $rc
+if [ $rc -eq 12 ]; then
+  echo "note: registered; the Vendor's enclave (-v) runs something else for now. Step 2 launches the Auditor's image there."
+  result - vendor-differs-at-audit different different "audit exit 12: registered; the Vendor's enclave runs something else before step 2" "registry $REGISTRY"
+fi
+[ $rc -eq 0 ] || [ $rc -eq 12 ] || exit $rc
 
 # Handoff: this script copies the image, the measurements and a measurement record (naming the registry and record key the
 # value was registered under) to the Vendor instance as plain files.

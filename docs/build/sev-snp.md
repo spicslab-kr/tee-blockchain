@@ -536,7 +536,8 @@ gcloud compute scp attestamp-snp-auditor:out/measurements.json auditor-measureme
 (`identical: the guest runs exactly what I built`); otherwise it stops with `not registering anything`. With
 `--vendor-tee` it also asks the Vendor's guest and prints `same: the Vendor's guest runs exactly what I built` or
 `the Vendor's guest runs something else`. In the second case it **still registers the Auditor's own value and exits
-0**: read the output, not only the exit code. A User verifying the Vendor's guest will then be refused (A9), which is
+12**, saying that the registration succeeded and only the Vendor comparison failed; do not run it again (that ends
+with exit 5, already registered). A User verifying the Vendor's guest will then be refused (A9), which is
 correct.
 
 **A9. On any computer: the User verifies the Vendor's guest.** Step 12 against the registry of A8:

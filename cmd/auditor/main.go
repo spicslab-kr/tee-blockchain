@@ -101,12 +101,12 @@ func usage() {
                    in one go: request and verify the attestation document from my own TEE, check the attested value against --build-measurements (the value I
                    built or measured myself), register that value only if they match, then read it back and check it.
                    --config takes service, version and the build env from the Vendor's build-config.json (receive put it in the
-                   clone root); the flags override it, with a warning. --nonce pins the nonce. with --service/--version empty and no
+                   clone root); the flags override it, with a warning. --nonce pins the nonce (--vendor-nonce the Vendor's). with --service/--version empty and no
                    --config, takes them from an existing registration of the same measurements on this registry. without --tee-addr
                    registers --build-measurements as is (no audit). on intel-tdx and amd-sev-snp-* --build-measurements is required:
                    without it the guest's report would be registered as it is, whatever it booted.
                    --vendor-tee also asks the Vendor's running TEE and says whether it runs the same value; what is
-                   registered is still my value
+                   registered is still my value. if it runs something else: registered, and exit 12 (do not run again)
   receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
                    clone the source repository and read the build config. build from that directory
   send             --repo <url> --config <build-config.json> --measurements <out/measurements.json> --eif <file> [--build-tool-version <v>] [--workdir <clone>]
@@ -584,6 +584,8 @@ func exitCode(err error) int {
 		return 10
 	case errors.Is(err, tr.ErrPushRejected):
 		return 11
+	case errors.Is(err, errVendorDiffers):
+		return 12
 	}
 	var ne net.Error
 	if errors.As(err, &ne) {

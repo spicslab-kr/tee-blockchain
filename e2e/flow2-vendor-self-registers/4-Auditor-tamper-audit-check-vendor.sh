@@ -28,15 +28,17 @@ echo "$REGISTRY" > "$WORK/registry.txt"  # the later steps read the registry add
 # att-auditor audit - registers my value; with --vendor-tee it also requests an attestation document from the Vendor's
 #   enclave and compares it with my value. That comparison reports the swap.
 step "AUDITING (checking Vendor's enclave)"
-#   audit exits 0 either way (it registers the Auditor's own value); the swap shows only in its output, so that is kept.
+#   audit registers the Auditor's own value either way; since 2026-11-16 it exits 12 when the Vendor's enclave runs
+#   something else (0 when it runs the same). The output is kept too.
 "$AUDITOR_BIN" audit --tee-addr "$AUDITOR_HOST:5000" --build-measurements "$WORK/auditor-measured.json" --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$AUDITOR_SIGNING_KEY" --service "$SERVICE" --version "$VERSION" --vendor-tee "$VENDOR_HOST:5000" 2>&1 | tee "$WORK/audit-vendor-check.txt"
 rc=${PIPESTATUS[0]}
 echo "audit exit=$rc   registry=$REGISTRY   next: 5-User-tamper-verify-both-registries"
-if grep -q "runs something else" "$WORK/audit-vendor-check.txt"; then
-  result T6 auditor-sees-vendor-swap rejected rejected "audit --vendor-tee: the Vendor's enclave runs something else (audit exit $rc)" "registry $REGISTRY"
-elif grep -q "runs exactly what I built" "$WORK/audit-vendor-check.txt"; then
-  result T6 auditor-sees-vendor-swap accepted rejected "audit --vendor-tee: the Vendor's enclave runs what the Auditor built (audit exit $rc)" "registry $REGISTRY"
+if [ $rc -eq 12 ] && grep -q "runs something else" "$WORK/audit-vendor-check.txt"; then
+  result T6 auditor-sees-vendor-swap rejected rejected "audit --vendor-tee: the Vendor's enclave runs something else (audit exit 12, registered)" "registry $REGISTRY"
+  exit 0   # the expected outcome of this tamper step
+elif [ $rc -eq 0 ] && grep -q "runs exactly what I built" "$WORK/audit-vendor-check.txt"; then
+  result T6 auditor-sees-vendor-swap accepted rejected "audit --vendor-tee: the Vendor's enclave runs what the Auditor built (audit exit 0)" "registry $REGISTRY"
 else
-  result T6 auditor-sees-vendor-swap error rejected "audit --vendor-tee printed no verdict on the Vendor's enclave (audit exit $rc)" "registry $REGISTRY"
+  result T6 auditor-sees-vendor-swap error rejected "audit --vendor-tee gave no verdict on the Vendor's enclave (audit exit $rc)" "registry $REGISTRY"
 fi
 exit $rc
