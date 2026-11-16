@@ -1,6 +1,6 @@
 // Package tdx is this role's adapter to internal/setup/launch/tdx, which launches a built initrd on an Intel TDX guest
 // and reads back what the boot measured. The work is done once there; this file only converts the input and the
-// result. The Vendor and auditor copies are deliberately the same (CLAUDE.md, "Role code is deliberately duplicated").
+// result. The Vendor and auditor copies are deliberately the same (STRUCTURE.md, "Why role code is copied per role").
 //
 // A launch is two runs with a reboot between them: Install, then Check after the guest has booted the new entry.
 package tdx

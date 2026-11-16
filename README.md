@@ -53,8 +53,9 @@ There are no release binaries yet; build them from source as below.
 ### The binaries
 
 You need Go **go1.26.1** exactly (`go version` must print it): `build` refuses any other version, because a different
-patch version produces a different `att-ra-responder` and therefore different measurements. How to install it, and
-everything else each platform needs: [docs/build/toolchain.md](docs/build/toolchain.md).
+patch version produces a different `att-ra-responder` and therefore different measurements. If another Go is
+installed, set `GOTOOLCHAIN=go1.26.1` (for example `export GOTOOLCHAIN=go1.26.1`) and Go fetches and uses exactly that
+one. How to install it, and everything else each platform needs: [docs/build/toolchain.md](docs/build/toolchain.md).
 
 For your own machine (the User's `verify`, and every chain command). The `NAME=value command` form is POSIX shell;
 on Windows run these in Git Bash. `CGO_ENABLED=0` matters for `att-ra-responder`: with gcc installed, a native Linux

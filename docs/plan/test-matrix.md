@@ -66,7 +66,7 @@ zero. A debug document is signed, so unlike TDX and SEV-SNP it cannot be made fr
 it has to be recorded from a debug enclave. `e2e/debug-mode-check.sh` did that on 2026-11-15 (code at `1663a5d`; the
 same test-application PCRs as the 2026-11-12 baseline). The debug document's signature and nonce verified and it was
 marked `debug true`; then every PCR was zero and it was refused. The document is **not committed** as a fixture: its
-signed `module_id` carries the EC2 instance ID, which may not be committed (`CLAUDE.md`, rule 4). So T8 on Nitro stays
+signed `module_id` carries the EC2 instance ID, which may not be committed (`CONTRIBUTING.md`, "Secrets and certificates"). So T8 on Nitro stays
 a live result, not a code test.
 
 ⁵ The nonce check is inside `verify` and has unit and command tests. `e2e/replay-check.sh` replayed a fresh document

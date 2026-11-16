@@ -4,9 +4,9 @@ Scripts that create, stop and delete the instances each platform needs. Every co
 printed in the script's header comment, and every flag was taken from the vendor's own
 documentation (see the comments for which page).
 
-**These scripts create billable resources.** `.claude/settings.json` marks every `create`,
-`run-instances`, `delete` and `terminate-instances` as a command Claude must ask about before
-running. Do not loosen that.
+**These scripts create billable resources.** Every `create`, `run-instances`, `delete` and
+`terminate-instances` they run costs money or destroys state. Run them only when you mean to, and if an automated
+agent runs commands for you, have it ask before each of these.
 
 ## What you have to do yourself, once
 

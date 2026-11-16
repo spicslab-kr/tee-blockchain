@@ -140,6 +140,22 @@ same for SEV-SNP. What the two CVM platforms do alike exists once: `setup/build/
 `ether` plays the same part for chains: `chain/register/<role>/ether` and `chain/lookup/<role>/ether`
 are the only chain modules, and they talk to any Ethereum-compatible chain.
 
+### What every platform's parser must do
+
+Two rules hold for every platform, and a new platform's parser (`internal/tee/parse/<plat>`) needs its own version of
+both:
+
+- **Drop the values that identify the machine, not the image.** A registration names software, so a value that
+  differs per host, per instance or per launcher would make the same software look different on every machine. Nitro
+  discards PCR3 (the parent instance's IAM role), PCR4 (the parent instance's ID) and PCR8 (the image's signing
+  certificate); SEV-SNP leaves out `CHIP_ID` (the physical processor), the TCB versions and HOST_DATA; TDX leaves out
+  MROWNER, MROWNERCONFIG, MRCONFIGID and MRSEAM. The full list, with where each is enforced and tested:
+  `docs/build/ra-comparison.md`, "Values left out, and why".
+- **Refuse a TEE in debug mode.** A debug TEE can be inspected and changed from outside, so its values must not be
+  trusted however they look. Each platform signals it differently and needs its own check: Nitro gives an all-zero PCR0
+  (`aws/measure.go`, every PCR zero is refused), SEV-SNP sets POLICY bit 19 (`snp`, refused), TDX sets the DEBUG bit in
+  TDATTRIBUTES (`tdx`, refused). `docs/build/ra-comparison.md`, "Debug mode".
+
 ### The shared pieces
 
 Two pieces of logic do not depend on the role and exist once:

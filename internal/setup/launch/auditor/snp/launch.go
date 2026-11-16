@@ -1,6 +1,6 @@
 // Package snp is this role's adapter to internal/setup/launch/snp, which launches a SEV-SNP build on a GCP guest and
 // reads back what the boot measured. The work is done once there; this file only converts the input and the result.
-// The Vendor and auditor copies are deliberately the same (CLAUDE.md, "Role code is deliberately duplicated").
+// The Vendor and auditor copies are deliberately the same (STRUCTURE.md, "Why role code is copied per role").
 //
 // A launch is two runs with a reboot between them: Install, then Check after the guest has booted the new entry.
 package snp

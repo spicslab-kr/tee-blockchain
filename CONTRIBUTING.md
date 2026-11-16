@@ -17,8 +17,8 @@ CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-re
 ```
 
 For the instances: `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or `arm64`). Always `-trimpath -buildvcs=false`
-and `CGO_ENABLED=0`; the responder is layered into the enclave image, so the build path, or the git commit and
-its time, would otherwise end up in the PCRs, and without `CGO_ENABLED=0` a native Linux build with gcc
+and `CGO_ENABLED=0`; on Nitro the responder is layered into the enclave image, so the build path, or the git commit
+and its time, would otherwise end up in the PCRs, and without `CGO_ENABLED=0` a native Linux build with gcc
 installed links cgo and gives other bytes than a cross-build. `build` refuses a responder built without any of
 the three.
 
@@ -49,14 +49,77 @@ Files the `e2e/` scripts fetch from instances land in `e2e-work/`, which is igno
 | path | what |
 |---|---|
 | `cmd/<role>` | one `main` per role: `vendor`, `auditor`, `user`, `ra-responder`. A role's binary only has that role's commands. |
-| `internal/tee` | attestation request / parse, per cloud (`aws`, `azure`, `gcp` stubs) |
-| `internal/setup` | `build` (image → EIF, normalized layers) and `launch` (enclave + vsock bridge) |
+| `internal/tee` | attestation request / parse, per platform (`aws`, `tdx`, `snp`; `azure`, `gcp` stubs) |
+| `internal/setup` | `build` (Nitro: image → EIF, normalized layers; TDX/SEV-SNP: the application initrd and Option 2 image) and `launch` (Nitro: enclave + vsock bridge; TDX/SEV-SNP: GRUB entry, reboot, `--check`) |
 | `internal/chain` | `register` and `lookup` against `Registry.sol` |
 | `internal/core` | `compare` (the trust decision) and `transfer` (hand-off records) |
 | `contracts/evm` | the Registry contract (`Registry.sol`); OpenZeppelin as a submodule |
 
 Role-specific code sits in a sub-package named after the role (`.../Vendor`, `.../auditor`,
 `.../user`). Keep it that way so a role's binary cannot link another role's commands.
+
+## Language
+
+Everything in the repository is written in English: code, comments, documents, commit messages and command output.
+
+## The measurement hash
+
+What goes on the chain is one hash over all of a platform's measurements:
+
+```
+measurementHash = keccak256( for each measurement, sorted by name: "<name>=<hex value>\n" )
+```
+
+It is computed in **four** places, and **all four must stay identical**, or a value registered by one binary is not
+found by another:
+
+| file | used by |
+|---|---|
+| `internal/chain/register/Vendor/register.go` | the Vendor's `register`, `self-register` |
+| `internal/chain/register/auditor/register.go` | the Auditor's `register`, `audit` |
+| `internal/core/compare/user/compare.go` | the User's comparison |
+| `internal/chain/lookup/user/ether/reader.go` | the User's lookup (the User has no register package) |
+
+Each has a `hash_golden_test.go` next to it with the same expected hashes for one real recording per format. Change all
+four implementations and all four golden tests together, in one commit.
+
+**Consequence: changing a measurement's name, or how many measurements a format has, changes the hash on the chain**,
+so registrations made before no longer match. That is why one format string always has a fixed list of values. SEV-SNP
+Option 1 registers five values and Option 2 six (PCR12 added), so they are two format strings,
+`amd-sev-snp-initrd` and `amd-sev-snp-verity`, not one format with a variable count.
+
+## Adding a platform
+
+A platform is identified by one format string, carried in `RADoc.Format`. The wire protocol sends it as a
+length-prefixed string, so a new platform needs no protocol change. `contracts/evm/Registry.sol` does not change
+either: `recordKey = keccak256(approver, platform, measurement)`, so each platform string is already its own namespace
+on the chain. The files to touch:
+
+| # | path | what |
+|---|---|---|
+| 1 | `internal/tee/parse/<plat>/` | the real parser: document, verification, nonce, measurements, embedded root certificate, `const Format` |
+| 2 | `internal/tee/parse/{Vendor,auditor,user}/<plat>.go` | thin type-converting adapters, one per role |
+| 3 | `internal/tee/request/{Vendor,auditor}/<plat>/` | getting the evidence inside the instance |
+| 4 | `cmd/ra-responder/main.go` | one more `--extractor` case |
+| 5 | `cmd/{vendor,auditor,user}/parse.go` | one more `case` in the parser switch |
+| 6 | `internal/core/transfer/{Vendor,auditor}/build_config.go` | `TEEInfoKeys["<plat>"]` |
+| 7 | `internal/core/transfer/{Vendor,auditor}/measurement_record.go` | `MeasurementNames["<plat>"]` and a `case` in `Validate` |
+| 8 | `internal/setup/build/{Vendor,auditor}/<plat>/` | producing the measured image |
+| 9 | `internal/setup/launch/{Vendor,auditor}/<plat>/` | starting it and measuring it |
+| 10 | `docs/build/<plat>.md` | what changes the measurements on this platform |
+
+Follow the two-layer shape the existing platforms use: the role-independent logic once, next to the role folders
+(`internal/tee/parse/aws` holds the real Nitro parser), and per role only a thin adapter. Record one real attestation
+document, commit it under `testdata/`, and write the parser against it, so that parse, adapters, CLI wiring and the
+trust decision can be tested with no instance running. What a parser must drop and check is in `STRUCTURE.md`,
+"What every platform's parser must do".
+
+## Secrets and certificates
+
+Never commit a secret: no private keys, no real instance addresses, no instance IDs, no account numbers. Instance
+addresses go in `e2e/env.local.sh`, which is ignored. `.gitignore` blocks every `*.pem` and `*.key`, with one exception
+line per embedded platform root certificate (`internal/tee/parse/{aws,tdx,snp}/root.pem`). **A new platform's root
+certificate needs its own exception line**, or it is silently left out of the commit.
 
 ## Commit messages
 

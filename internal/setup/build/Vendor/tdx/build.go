@@ -1,7 +1,7 @@
 // Package tdx is this role's adapter to internal/setup/build/tdx, which builds the initrd that carries an application
 // into an Intel TDX guest. The work is done once there; this file only converts the input and the result, as
 // internal/tee/parse/<role>/aws.go does for the Nitro parser. The Vendor and auditor copies are deliberately the same
-// (CLAUDE.md, "Role code is deliberately duplicated").
+// (STRUCTURE.md, "Why role code is copied per role").
 package tdx
 
 import (

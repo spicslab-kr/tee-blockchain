@@ -1,6 +1,6 @@
 // Package snp is this role's adapter to internal/setup/build/snp, which builds what carries an application into an
 // AMD SEV-SNP guest. The work is done once there; this file only converts the input and the result. The Vendor and
-// auditor copies are deliberately the same (CLAUDE.md, "Role code is deliberately duplicated").
+// auditor copies are deliberately the same (STRUCTURE.md, "Why role code is copied per role").
 package snp
 
 import (

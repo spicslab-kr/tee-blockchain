@@ -343,7 +343,7 @@ So the two possible results mean:
 
 ### Before you start
 
-- **A second SEV-SNP VM is a billable cloud resource: ask before creating it** (`CLAUDE.md`, rule 5). The first VM is
+- **A second SEV-SNP VM is a billable cloud resource: ask before creating it** (`e2e/cloud/README.md`). The first VM is
   `attestamp-snp-vendor`. The second one can be made with `bash e2e/cloud/gcp-cvm.sh snp create auditor` (same
   machine type, image and zone; it becomes `attestamp-snp-auditor`).
 - On VM A, `GRUB_FORCE_PARTUUID` must be off (`docs/build/sev-snp.md`, "The boot setting changed"), so that its vTPM
@@ -420,7 +420,7 @@ like Nitro's T8. What committing would have meant, kept for when that decision c
 
 **Identifiers.** Every `att.pb` carries the project ID inside the Google-signed AK certificate, and may carry the
 instance's identity too; check with `grep -a` before committing, as for the other SEV-SNP fixtures
-(`internal/tee/parse/snp/testdata/README.md`). An instance ID must not be committed (`CLAUDE.md`, rule 4); if the
+(`internal/tee/parse/snp/testdata/README.md`). An instance ID must not be committed (`CONTRIBUTING.md`, "Secrets and certificates"); if the
 certificate holds one, committing these fixtures waits for the same publication decision as the others.
 
 ### The 2026-11-16 recordings (kept locally, not committed)
