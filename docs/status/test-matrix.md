@@ -7,7 +7,7 @@ and the results are recorded side by side.
 Nitro is the baseline. It must be run on real instances and its results recorded in the same shape
 as the other two, not quoted from the README.
 
-## State on 2026-11-12
+## State (updated through 2026-11-17)
 
 Each cell says how far the row is proven, and by what:
 

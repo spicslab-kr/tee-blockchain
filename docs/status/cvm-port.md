@@ -1,6 +1,6 @@
 # Porting Attestamp from Nitro to confidential VMs
 
-Status (2026-11-16, evening):
+Status (2026-11-17):
 
 - **Done, and run on real guests:**
   - Phases 0 to 2: fixtures, TDX and SEV-SNP parse (D3, D4, D5 decided), request; the live request ran on both guests
@@ -26,7 +26,9 @@ Status (2026-11-16, evening):
 - **Done 2026-11-16, after the guest work:** the project's port 22 moved from `default-allow-ssh` (`0.0.0.0/0`, deleted)
   to IAP only, `attestamp-ssh-iap`: `35.235.240.0/20`, limited to the `attestamp-ra` tag. ssh and scp through IAP were
   checked after the deletion, and plain ssh timed out (`e2e/cloud/README.md`, "SSH to the guests").
-- Phase 5 (a locked guest) is designed below, not started.
+- **No guest exists now:** every TDX and SEV-SNP VM was deleted on 2026-11-16 after its values were recorded; new ones
+  are made with `e2e/cloud/gcp-cvm.sh`, which since 2026-11-17 creates only with `--yes` (`e2e/cloud/README.md`).
+- Phase 5 (a locked guest) is designed below, not started: it is the one part of this page that is still a plan.
 - The record of what ran when: the trial reports in `docs/status/` and the session results in `docs/results/`.
 
 Clouds (decided 2026-11-11): **Nitro on AWS, TDX on GCP, SEV-SNP on GCP.** Each platform runs on one cloud. AWS is
