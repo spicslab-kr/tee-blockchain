@@ -94,8 +94,9 @@ measurements. The most important:
 3. A base image pinned by digest (`FROM nginx@sha256:…`), and every package, dependency and
    `git clone` pinned to an exact version or commit.
 4. No time, host name or random value written into a file at build time.
-5. The same AMI and the same `docker` and `nitro-cli` versions. Write them down: they are not
-   recorded anywhere.
+5. On Nitro, the same AMI and the same `docker` and `nitro-cli` versions. `build` does not record
+   them for you, so write yours down; the versions our runs used are in
+   [docs/build/toolchain.md](docs/build/toolchain.md).
 6. Docker itself: `docker build` decides file order and timestamps in each layer anew on every
    run, so two builds of the same files still differ.
 7. On TDX and SEV-SNP, the VM as well as the build: the same exact image version and the same
@@ -156,15 +157,26 @@ att-vendor launch --eif out/<name>.eif           # run it; add --open-port-to <v
 att-vendor send   --repo <git url> --config build-config.json
 ```
 
-As an **Auditor**, on a Nitro instance, with the Vendor's repository:
+You write `build-config.json` yourself; its fields and an example are in the Vendor guide,
+[Hand-off with the Auditor](cmd/vendor/README.md#hand-off-with-the-auditor).
+
+As an **Auditor**, on a Nitro instance, with the Vendor's repository. A registry is deployed once, before the first
+`audit`; it prints the address that `--registry` takes:
 
 ```
+att-auditor registry-deploy --rpc <url> --deployer-key-file <key> --approver <0x… address of your signing key>
 att-auditor receive --repo <git url> --into work/src
 att-auditor build   --app-dir work/src/<path> --out-dir out
 att-auditor launch  --eif out/<name>.eif
 att-auditor audit   --config work/src/build-config.json --tee-addr <my-instance>:5000 \
                    --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>
 ```
+
+A key file is one line, a 32-byte Ethereum private key in hex (with or without `0x`); how to make one and get its
+address: [e2e/README.md, Key files](e2e/README.md#key-files). On a public network both keys need a balance: test ETH
+from a Sepolia faucet. To try it all without any ETH or key files, run the registry on a local `anvil` chain:
+[Running without a public testnet](e2e/README.md#running-without-a-public-testnet). On TDX and SEV-SNP the same
+commands run on a guest; the getting-started procedures linked above go through them step by step.
 
 ## Features
 
@@ -282,7 +294,8 @@ go test ./...
 Unit tests run anywhere. `cmd/*_e2e_test.go` build the real binaries and drive them against a local
 [anvil](https://getfoundry.sh) chain and recorded attestation evidence (Nitro, TDX and SEV-SNP). No TEE
 hardware is needed for any test. The tests look for anvil on `PATH` or in `~/.foundry/bin` and skip the
-chain tests without it; they were last run with anvil 1.8.0 (Foundry v1.8.0, commit `61ae26af`).
+chain tests without it; they were last run with anvil 1.8.0 (Foundry v1.8.0, commit `61ae26af`). To install exactly
+that version: `foundryup --install v1.8.0` (commands per system in [e2e/README.md](e2e/README.md#running-without-a-public-testnet)).
 
 ## License
 
