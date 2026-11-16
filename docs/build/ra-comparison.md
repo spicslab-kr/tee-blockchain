@@ -244,7 +244,7 @@ So four of the five values, and the nonce, come from A; the only value from B is
 shares. This is a property of SEV-SNP as GCP offers it, two documents from two signers joined by a hash, and not a
 defect of this verifier. It is recorded, not patched. The 2026-11 runs had reported the same; this is the first
 reproduction in this repository. The recordings are kept locally, not committed (they carry instance identifiers), so
-T10 is a live result, like Nitro's T8: `docs/status/app-fixture-recording.md`, "Reproducing T10", says where they are
+T10 is a live result, like Nitro's T8: `docs/build/app-fixture-recording.md`, "Reproducing T10", says where they are
 and how to make them again.
 
 What else was seen: A's and B's reports carry different `CHIP_ID`s (the VMs ran on different hosts), and neither

@@ -12,7 +12,7 @@ Evidence from one real AMD SEV-SNP guest on GCP (`attestamp-snp-vendor`), used b
 | `gcp-n2d-opt2-v1-*`, `gcp-n2d-opt2-v2-*` | Option 2, squashfs + dm-verity image on disk, verifying initrd, PCR12 extended | SHA3-512 | T5 pair (`amd-sev-snp-verity`); the first real evidence with a non-zero PCR12 |
 
 In each `v1`/`v2` pair the application differs by one byte (`attestamp app v1` → `attestamp app v2`) and nothing
-else. The procedure is `docs/status/app-fixture-recording.md`.
+else. The procedure is `docs/build/app-fixture-recording.md`.
 
 ## The two Option 1 pairs, side by side
 
@@ -157,12 +157,12 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o reco
 (The 2026-11-10 recording used a separate scratch module with the same dependency versions, because the module did
 not depend on go-tpm-tools yet.) `crypto/sha3` needs Go 1.24 or later; the pinned go1.26.1 has it.
 
-To record evidence with an application in the initrd, see `docs/status/app-fixture-recording.md`.
+To record evidence with an application in the initrd, see `docs/build/app-fixture-recording.md`.
 
 Then on an SEV-SNP guest booted with an initrd: `sudo ./record-snp -out fx -nonce-text attestamp-snp-fixture-0001`.
 
 For test-matrix row T10 the recorder also has `-relay-att <att.pb from another VM>`: it makes no vTPM attestation and
-requests this VM's report over SHA3-512 of the given file. The procedure is `docs/status/app-fixture-recording.md`,
+requests this VM's report over SHA3-512 of the given file. The procedure is `docs/build/app-fixture-recording.md`,
 "Reproducing T10" (not run yet).
 
 ## Checking a recording with `ra-parse`

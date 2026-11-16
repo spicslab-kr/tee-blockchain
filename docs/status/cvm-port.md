@@ -395,7 +395,7 @@ Designed, not started. The reasoning and what is confirmed versus reasoned are i
 | 5.2 | Boot it, with the root image's verity root hash on the kernel command line (`root=/dev/mapper/...` set up by the initrd against that hash) | the guest boots; SSH is refused; the responder answers from outside (Phase 2.3) |
 | 5.3 | Record evidence from the locked guest through the responder, not over SSH | a fixture recorded with `att-user ra-request` from the verifier's machine |
 | 5.4 | A test in which the verifier reads the root hash out of the measured command line (CMDLINE on SEV-SNP, the command-line event behind RTMR2 on TDX) and compares it with the hash of the image it was given | the hash in the evidence equals the published image's; a different image gives a different measurement |
-| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the TDX tamper boot of 2026-11-12 (v2's image under v1's root hash: `fail`, nothing mounted, the boot went on; `docs/status/app-fixture-recording.md`, "TDX Option 2 mounted at boot"). Still to do: the same on SEV-SNP, a changed data block under an unchanged root hash, and the root image. (*Record:* the 2026-11 script for this flipped one byte at offset 5000; it is no longer available) |
+| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the TDX tamper boot of 2026-11-12 (v2's image under v1's root hash: `fail`, nothing mounted, the boot went on; `docs/build/app-fixture-recording.md`, "TDX Option 2 mounted at boot"). Still to do: the same on SEV-SNP, a changed data block under an unchanged root hash, and the root image. (*Record:* the 2026-11 script for this flipped one byte at offset 5000; it is no longer available) |
 
 5.4 and 5.5 turn layer 3 from reasoning into a measured result; until they pass, `runtime-immutability.md` keeps
 calling it reasoned.
@@ -403,7 +403,7 @@ calling it reasoned.
 *Record:* the October–November SEV-SNP runs used test scripts outside this repository (`option1-initrd/`,
 `option2-dm-verity/`, `vendor/`, `auditor/`, `user/go-verifier/`, `relay-test/`). Their author has left the lab and
 they are no longer available (build-info gaps #5, #6); nothing here depends on them. What replaced them is in
-`docs/status/app-fixture-recording.md` and the recordings under `internal/tee/parse/snp/testdata/`. The one result not
+`docs/build/app-fixture-recording.md` and the recordings under `internal/tee/parse/snp/testdata/`. The one result not
 yet replaced is T10 (two machines' evidence combined); its procedure is "Reproducing T10" in the same document.
 
 ## Open decisions
@@ -417,7 +417,7 @@ reproducible — `mkinitramfs` and `dracut` write a random seed — so the Audit
 Vendor's base initrd as a binary. Options:
 
 - (a) the Vendor publishes the base initrd; the Auditor reproduces only the application part.
-  Fastest, matches what the 2026-11 test scripts did and what `docs/status/app-fixture-recording.md` does, and weakens
+  Fastest, matches what the 2026-11 test scripts did and what `docs/build/app-fixture-recording.md` does, and weakens
   the Auditor's independence.
   If chosen, say so plainly in `README.md` and `docs/build/`.
 - (b) build a reproducible base initrd ourselves. Keeps the original claim; much more work.

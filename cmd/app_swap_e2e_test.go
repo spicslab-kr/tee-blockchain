@@ -1,5 +1,5 @@
 // Test-matrix row T5 as code: an application swapped after registration is not trusted. For each platform and option,
-// two recordings from the same guest differ only in one byte of the application (docs/status/app-fixture-recording.md).
+// two recordings from the same guest differ only in one byte of the application (docs/build/app-fixture-recording.md).
 // The Auditor audits the guest serving v1 and registers it on a local anvil chain; the User is told v1 is trusted. The
 // guest is then replaced by one serving v2, and verify must exit 1 because nobody registered those measurements.
 package cmd_test

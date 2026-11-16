@@ -87,7 +87,7 @@ now live on all three.
 ⁶ Nitro and TDX return one document from one TEE; there is nothing to combine.
 
 ⁸ Moved from "needs VM" to "code" on 2026-11-11 with one VM session per platform: the evidence was recorded twice on
-the same guest, with the application changed by one byte, for each option (`docs/status/app-fixture-recording.md`).
+the same guest, with the application changed by one byte, for each option (`docs/build/app-fixture-recording.md`).
 The test registers v1 on a local anvil chain, checks the User trusts it, then serves v2 and requires exit 1 with
 "nobody has registered". From now on it is proved by `go test`, with no VM. What the test cannot show: whether the
 application in the recording actually ran. That is shown by the boot logs next to the fixtures (`*-boot.txt`); the

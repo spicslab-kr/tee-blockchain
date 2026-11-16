@@ -1,5 +1,5 @@
 #!/bin/sh
-# initramfs-tools local-bottom script for the Intel TDX Option 2 recordings (docs/status/app-fixture-recording.md).
+# initramfs-tools local-bottom script for the Intel TDX Option 2 recordings (docs/build/app-fixture-recording.md).
 # Install as /etc/initramfs-tools/scripts/local-bottom/attestamp-verity before building the base initrd.
 #
 # On TDX the application image, its dm-verity hash tree and its root hash travel inside the initrd, in the archive

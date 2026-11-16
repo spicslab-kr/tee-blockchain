@@ -11,7 +11,7 @@
 //
 // Run as root:  record -out <dir> -nonce-text attestamp-snp-fixture-0001
 //
-// For test-matrix row T10 (docs/status/app-fixture-recording.md, "Reproducing T10"), -relay-att <att.pb from another VM>
+// For test-matrix row T10 (docs/build/app-fixture-recording.md, "Reproducing T10"), -relay-att <att.pb from another VM>
 // makes no vTPM attestation here: it copies that file to att.pb and requests this VM's SNP report over SHA3-512 of it.
 // The result is the relay: another VM's vTPM evidence, bound by this VM's AMD-signed report. record.txt says so.
 package main

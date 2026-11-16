@@ -2,7 +2,7 @@
 # Create, inspect and remove the GCP Confidential VM instances for TDX or SEV-SNP.
 #
 #   bash e2e/cloud/gcp-cvm.sh tdx create [vendor] [auditor]   # one VM per role; default both (2 VMs)
-#   bash e2e/cloud/gcp-cvm.sh snp create [vendor] [auditor]   # SEV-SNP; T10 (docs/status/app-fixture-recording.md) needs a second VM
+#   bash e2e/cloud/gcp-cvm.sh snp create [vendor] [auditor]   # SEV-SNP; T10 (docs/build/app-fixture-recording.md) needs a second VM
 #   bash e2e/cloud/gcp-cvm.sh tdx status
 #   bash e2e/cloud/gcp-cvm.sh tdx stop | start | delete
 #

@@ -790,7 +790,7 @@ What else changes the registered values (from the evidence's structure; **not me
 attempting initrdless boot.` and measures no initrd). An application in an initrd is then never loaded or measured.
 `ra-parse` refuses evidence without an initrd measurement. Turning the setting off, as below, makes the stock entry
 load the initrd; `internal/setup/build/cpio/testdata/make-grub-entry.sh` makes a separate entry from it for an
-application (`docs/status/app-fixture-recording.md`). (*Record:* the 2026-11 scripts avoided it by booting their own
+application (`docs/build/app-fixture-recording.md`). (*Record:* the 2026-11 scripts avoided it by booting their own
 GRUB entry with `grub-reboot`.)
 
 ### Correction: SEV-SNP Option 1 as appended in 2026-11
@@ -802,7 +802,7 @@ ran `cat i.bin app.cpio`):
 - The base initrd, `/boot/initrd.img-7.0.0-1017-gcp`, is 50,100,283 bytes: **length mod 4 = 3**.
 - The application archive appended directly after it was discarded by the kernel:
   `Initramfs unpacking failed: invalid magic at start of compressed archive` (dmesg, both boots).
-- The marker the archive carries (`/dev/attestamp-app-marker`, see `docs/status/app-fixture-recording.md`) was
+- The marker the archive carries (`/dev/attestamp-app-marker`, see `docs/build/app-fixture-recording.md`) was
   **absent**: the application never ran.
 - The guest booted normally on the base initramfs, and GRUB measured the whole combined file, so **INITRD changed with
   the application although the application was not there**. Nothing in the evidence shows it.
@@ -894,7 +894,7 @@ On a stock GCP boot step 5 verifies both signatures and the nonce and then refus
 Turn `GRUB_FORCE_PARTUUID` off first, as in "The boot setting: turning `GRUB_FORCE_PARTUUID` off" above; the stock
 entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five values. **To run an application, use
 `build` and `launch`** ("Getting started" above). To record a **test fixture** that carries an application (Option 1),
-or the dm-verity image with its root hash on the command line (Option 2), follow `docs/status/app-fixture-recording.md`:
+or the dm-verity image with its root hash on the command line (Option 2), follow `docs/build/app-fixture-recording.md`:
 it builds the initrd with `mkappinitrd`, the image with `make-verity-image.sh`, and the boot entry with
 `make-grub-entry.sh` from the instance's own stock entry, so nothing is hard-coded.
 
@@ -1036,7 +1036,7 @@ values nobody registered. The control, B's own report next to A's attestation, w
 The binding works; the relay passes it. A and B ran on different hosts (different `CHIP_ID`s). The four documents,
 the table of where each value comes from, and a mitigation to study (pinning the AK certificate's instance, with its
 cost): `docs/build/ra-comparison.md`, "The SEV-SNP relay, measured". A live result: the recordings carry instance
-identifiers and are not committed (`docs/status/app-fixture-recording.md`, "Reproducing T10").
+identifiers and are not committed (`docs/build/app-fixture-recording.md`, "Reproducing T10").
 
 Nitro and TDX return one document from one TEE and do not have this problem. On SEV-SNP it goes away only if the boot
 files are in the SNP launch measurement itself (direct kernel boot; whether GCP allows it is not confirmed), or if
@@ -1058,7 +1058,7 @@ AWS evidence is not on this list: SEV-SNP on AWS was decided against (see "Only 
 shell scripts outside this repository (`vendor/`, `auditor/`, `user/`, `option1-initrd/`, `option2-dm-verity/`,
 `relay-test/`, `mkcpio.py`). Their author has left the lab and they are no longer available anywhere (build-info gaps
 #5, #6). This document no longer points to them. Everything they did that this repository relies on was redone here:
-the recordings, their measured values and the procedures in `docs/status/app-fixture-recording.md`. Lost and not
+the recordings, their measured values and the procedures in `docs/build/app-fixture-recording.md`. Lost and not
 replaced: "the seven 2026-11 tests" as one runnable set, and the relay test (T10, see above).
 
 ## Checking

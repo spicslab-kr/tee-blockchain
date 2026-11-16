@@ -695,7 +695,7 @@ travels in the initrd. It then opens the image with dm-verity and mounts it read
 - An image that did not match its root hash was not opened. The boot still continued, because the script only records
   `fail`.
 
-The fixtures are `gcp-c3-opt2m-*`, recorded with the procedure in `docs/status/app-fixture-recording.md`, "TDX Option 2
+The fixtures are `gcp-c3-opt2m-*`, recorded with the procedure in `docs/build/app-fixture-recording.md`, "TDX Option 2
 mounted at boot", which also has the results of the four boots, the tampered one included.
 To make the Option 2 base initrd with the hooks for a real build, follow "Getting started", step 4; the hook scripts
 are in `internal/tee/parse/tdx/testdata/record/`, and `build --option 2` makes the image itself.
