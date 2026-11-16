@@ -42,13 +42,18 @@ This page lists every folder in the repository, then explains the one idea that 
 ├── contracts/
 │   └── evm/                Registry.sol (Solidity) and the OpenZeppelin submodule under lib/
 │
-├── e2e/                    shell scripts for runs against real Nitro instances
+├── e2e/                    shell scripts for runs against real instances and guests
 │   ├── env.sh              shared settings (instance addresses come from an untracked env.local.sh)
 │   ├── 0-Setup-*.sh        install or upload the binaries to the instances, and stop them again
 │   ├── flow1-auditor-registers/       Auditor rebuilds and registers; tamper steps included
 │   ├── flow2-vendor-self-registers/   Vendor registers itself; tamper steps included
-│   └── *-check.sh, *-compare.sh       single-purpose checks (toolchain pin, build environment,
-│                                      architecture, responder)
+│   ├── *-check.sh, *-compare.sh       single-purpose Nitro checks (toolchain pin, build environment,
+│   │                                  architecture, responder, debug mode, replay)
+│   ├── cloud/              create, start, stop and delete the instances: aws-nitro.sh (Nitro), gcp-cvm.sh (TDX and
+│   │                       SEV-SNP guests), aws-snp.sh (SEV-SNP on AWS, kept for reference); README on accounts,
+│   │                       cost, images and SSH
+│   └── cvm/                scripts that run on a TDX or SEV-SNP guest: in-guest-verify.sh (the whole chain on
+│                           the guest) and build-env-check.sh (T7)
 │
 └── docs/
     ├── build/              how to use it and the procedures: one guide per platform (aws-nitro, tdx, sev-snp),
