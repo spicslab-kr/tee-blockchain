@@ -308,6 +308,35 @@ REPORT_DATA is the SHA3-512 of **VM A's** attestation. The binding then holds by
 whether anything else in the evidence ties the two halves to the same VM. Two VMs are needed for that, and the
 recorder has a mode for it (`-relay-att`, `internal/tee/parse/snp/testdata/record/main.go`).
 
+### Where each compared value comes from in a relay (written before the run, 2026-11-16)
+
+T10 is not "does it work" but "is it refused, as the row expects". Either outcome is possible, and which one says
+something different, so the sources of the values are written down first. In the relay document, **B's** SNP report is
+bound to **A's** vTPM attestation (REPORT_DATA = SHA3-512 of A's `att.pb`):
+
+| value | taken from | signed by | so in the relay it is |
+|---|---|---|---|
+| MEASUREMENT | the SNP report | AMD (B's chip's VCEK) | **B's** firmware digest. Equal to A's when both run the same firmware on the same machine type (every recording so far: `f6790085…`), so a registration cannot tell them apart |
+| PCR4, KERNEL, CMDLINE, INITRD (and PCR12 for verity) | the vTPM event log, replayed against the vTPM quotes | Google's AK (A's vTPM) | **A's** boot |
+| the nonce | the vTPM quotes' `extraData` (`snp/nonce.go`); the report has none and covers it only through the binding | Google's AK | **A's** quote over the verifier's nonce |
+| debug | the report's POLICY | AMD | **B's** policy |
+
+What the verifier checks that touches both halves (`snp/verify.go`): the AMD signature on the report, the AK chain to
+Google's root, the quotes' signatures by that AK, and REPORT_DATA = SHA3-512(vTPM attestation). The last is the only
+link between the two halves, and the attacker satisfies it by construction.
+
+**The nonce decides what a live relay needs.** Since the nonce is inside A's vTPM quotes, a relay that answers a
+verifier's **fresh** nonce needs A alive at that moment: the attacker forwards the nonce to A, takes A's attestation,
+and asks B for a report over it (a real-time man in the middle). Replaying an old attestation of A fails the nonce
+check (exit 6). The recorder below uses one fixed nonce text for A and the relay, which stands for that forwarding.
+
+So the two possible results mean:
+
+- **refused**: there is a check tying the halves to one VM that this table does not list; find which step refused
+  (the exit code and message) and write it down;
+- **accepted**: nothing in the evidence ties B's report to A's vTPM. That is a property of the platform as GCP offers
+  it, not a defect to fix here; record it as it is (`docs/build/sev-snp.md`, "Same VM").
+
 ### Before you start
 
 - **A second SEV-SNP VM is a billable cloud resource: ask before creating it** (`CLAUDE.md`, rule 5). The first VM is
