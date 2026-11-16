@@ -6,8 +6,9 @@ evidence from a running guest works (`att-ra-responder ra-serve --extractor snp-
 passed on a live guest with `snp-initrd` on 2026-11-12). Building and launching (`build` and `launch --platform
 amd-sev-snp-initrd | amd-sev-snp-verity`) **ran on real guests on 2026-11-15**: install, reboot and `launch --check`
 passed for both options, Option 2's PCR12 was the predicted value, and `audit` and `verify` passed from another
-machine (`docs/plan/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values; the
-Auditor's independent rebuild on a guest of its own is written ("The Auditor's half") and **not run**. Tools and versions: [toolchain.md](toolchain.md). A known weakness is
+machine (`docs/plan/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
+**The independent Auditor ran on 2026-11-16** ("The Auditor's half", two guests, both formats) and passed, and the
+**relay (T10) was reproduced** the same day: see "Same VM" (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Tools and versions: [toolchain.md](toolchain.md). A known weakness is
 written down below under "Same VM": SEV-SNP support is weaker here than Nitro or TDX, and that does not go away
 with more code.
 
@@ -25,8 +26,8 @@ Type the commands in order. `<guest-ip>` and `<0x…>` are values an earlier ste
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
 README describes ("an independent Auditor rebuilds it, confirms the enclave really runs those bytes"): a registration
 made that way says no more than the Vendor's own word. It shows that the chain works end to end. The Auditor's
-independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it is written but **has not
-been run** (it needs two guests at once). The procedure was followed end to
+independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it needs two guests at once
+and **ran and passed on 2026-11-16**, both formats. The procedure was followed end to
 end in a clean environment on 2026-11-15 (`docs/plan/trial-2026-11-16.md`), and again from the documents alone, both
 options, on 2026-11-16 (`docs/plan/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside
 this page have been filled in since. If a step stops with an error, that is a finding; note it. And on
@@ -291,7 +292,7 @@ made): `gcloud compute firewall-rules describe attestamp-ra` shows it.
 
 > **This step is not an audit.** It registers what the Vendor's guest measured, so the Auditor vouches for values it
 > never reproduced. It is here to show the chain working with one guest. An Auditor that means its signature does
-> "The Auditor's half" (A1 to A9, not run yet) instead of this step.
+> "The Auditor's half" (A1 to A9; run and passed on 2026-11-16) instead of this step.
 
 A local chain, in a second terminal, left running until step 12 is done:
 
@@ -383,12 +384,13 @@ The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rule
 
 ### The Auditor's half: rebuild, boot, compare, register
 
-> **Not run.** Written on 2026-11-16; it needs two guests at once and has not been followed end to end. What has
-> run: two guests of one image, each building and booting the same application, measured the same five values
-> (2026-11-15, `att-vendor` on both, Option 1; a third guest on 2026-11-16 gave them again). What has **not** run:
-> `att-auditor build` and `launch` on a guest, `audit --vendor-tee` from one guest to another, Option 2 on two guests,
-> and a User verifying the Vendor's guest against the Auditor's registration. `docs/plan/cvm-port.md`, "What waits for
-> a VM", says what run would confirm it. If you follow it, every step is a finding until then.
+> **Ran on 2026-11-16, both formats, and passed** (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Two guests
+> made in one call from `ubuntu-2404-noble-amd64-v20261105`; the Auditor's own build equalled the Vendor's, both guests
+> measured the same values, `audit --vendor-tee` registered the Auditor's own value, and the User's `verify` of the
+> Vendor's guest against it gave exit 0. With one byte changed on the Vendor's side only, `audit` said `the Vendor's
+> guest runs something else` and `verify` gave exit 1. A4's comparison also caught a wrong input (an extra file in the
+> copied `app`) before anything was registered. Not covered: another machine type or zone. And the relay of "Same VM"
+> still passes: an independent Auditor makes the registered values trustworthy, not the pairing of the two documents.
 
 This is what README's trust model asks of the Auditor: rebuild the Vendor's application independently, confirm that a
 TEE really runs those bytes, and only then register. Step 11 above does not do that. It is the same flow as Nitro's,
@@ -1008,9 +1010,16 @@ A's attestation next to a report B made over its *own* attestation is not the at
 The two findings fit together. T10 was an observation (the 2026-11 record says the relay verified); these
 measurements explain why it can work: B's report contains nothing a verifier could compare with A's vTPM evidence, so
 once the binding holds, there is no remaining check that could tell the two VMs apart. Whatever names A sits on the
-Google side (the AK certificate), and nothing on the AMD side matches it. The relay itself has still not been run in
-this repository; `docs/plan/app-fixture-recording.md`, "Reproducing T10", is the procedure, and it would confirm
-the explanation with real relayed evidence.
+Google side (the AK certificate), and nothing on the AMD side matches it.
+
+**Reproduced on 2026-11-16.** Two guests of one image: A ran the registered application, B a one-byte-changed one. B's
+report requested over SHA3-512 of A's vTPM attestation (`record-snp -relay-att`) passed `ra-parse` with exit 0,
+`signature ok` and `nonce ok`, yielded A's values, and those found the Auditor's registration for A; B's own pair had
+values nobody registered. The control, B's own report next to A's attestation, was refused at the binding (exit 5).
+The binding works; the relay passes it. A and B ran on different hosts (different `CHIP_ID`s). The four documents,
+the table of where each value comes from, and a mitigation to study (pinning the AK certificate's instance, with its
+cost): `docs/build/ra-comparison.md`, "The SEV-SNP relay, measured". A live result: the recordings carry instance
+identifiers and are not committed (`docs/plan/app-fixture-recording.md`, "Reproducing T10").
 
 Nitro and TDX return one document from one TEE and do not have this problem. On SEV-SNP it goes away only if the boot
 files are in the SNP launch measurement itself (direct kernel boot; whether GCP allows it is not confirmed), or if
@@ -1021,11 +1030,11 @@ evidence also carried.
 
 | what | why |
 |---|---|
-| "The Auditor's half" (A1 to A9): the Auditor's own `build` and `launch` on its own guest, `audit --vendor-tee` between two guests, and a User verifying the Vendor's guest against the Auditor's registration | written 2026-11-16, **not run**: it needs two guests at once. Each guest measured the same values (2026-11-15, `att-vendor` on both, Option 1), which is what it rests on; the procedure itself has not been followed, and Option 2 has never run on two guests. `docs/plan/cvm-port.md`, "What waits for a VM" |
+| the Auditor's half on another machine type or zone | it passed on 2026-11-16 with both guests `n2d-standard-2` in `us-central1-a`; whether MEASUREMENT follows the vCPU count is not measured |
 | a verity boot that fails its check | a verity boot made by `launch` passed `--check` on 2026-11-15 with PCR12 the predicted value; the tamper case (an image that does not match its root hash) was not run |
 | TCB minimums, CRLs | not applied; the platform's patch level is not judged |
 | AMD chain errors as `ErrChain` | go-sev-guest checks the chain and the signature in one call |
-| T10 measured by this repository | the only evidence is the 2026-11 record; the procedure is written (`docs/plan/app-fixture-recording.md`, "Reproducing T10") and not run |
+| T10 as a code test | reproduced live on 2026-11-16, but the recordings are not committed (each `att.pb` carries the project ID and an instance's name and ID in the signed AK certificate), so no test runs it without a VM |
 
 AWS evidence is not on this list: SEV-SNP on AWS was decided against (see "Only GCP").
 
