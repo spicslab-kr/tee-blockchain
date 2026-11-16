@@ -53,7 +53,7 @@ the arm64 instance is `ami-0ce2f8dd9b0fcfb35`, the newest Amazon Linux 2023 arm6
 | `docs/status/test-matrix.md` | the "Nitro baseline 2026-11-12" legend, the T1 cell ("not yet measured"), footnote ¹³'s `e29d028` values, and the arm64 parts of T1 and T7 ("not run") | the T1 cell gets the new two-machine values; arm64 T1 and T7 get their results; ¹³ notes that `029bbdc` moved its values |
 | `docs/status/build-info-gaps.md` row 2 | "the baseline must be retaken at `ade66e6` or later" | done, with the commit and the results file |
 | `docs/results/aws-nitro-2026-11-15.md`, `aws-nitro-2026-11-15-local-chain.md` | values from before `fc105b0` (`d5bbd4af…`, `47dbca56…`), already marked | leave as records of those days |
-| `docs/status/trial-2026-11-16-clean.md` | PCR0 `2aacdf41…`, PCR2 `e5504779…` at `e29d028` | leave as the record of that run; add one line that `029bbdc` moved them |
+| `docs/results/trial-2026-11-16-clean.md` | PCR0 `2aacdf41…`, PCR2 `e5504779…` at `e29d028` | leave as the record of that run; add one line that `029bbdc` moved them |
 | `internal/tee/parse/aws/testdata/README.md`, `internal/tee/request/testdata/README.md` | the fixtures' PCR0/PCR2, marked "before `fc105b0`" | **leave**: those are the values signed into the recorded documents, not reference values |
 | `docs/build/aws-nitro.md` (cgo table), `docs/status/build-info-gaps.md` 2.3, `internal/setup/build/responder_test.go` (and the project's rules of that day; the rule without the values is now in `CONTRIBUTING.md`, "Build") | `5573b538…` as the cgo-free responder | **leave**: they record the cgo comparison at `a5c4306`/`ade66e6`, which is still true for that code; add in `aws-nitro.md` that later commits give other bytes |
 

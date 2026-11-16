@@ -28,7 +28,7 @@ made that way says no more than the Vendor's own word. It shows that the chain w
 independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it needs two guests at once
 and **ran and passed on 2026-11-16**, both options. The procedure was followed end to end in a clean environment on 2026-11-15
 (`docs/results/trial-2026-11-16.md`), and again from the documents alone, both options, on 2026-11-16
-(`docs/status/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside this page have been
+(`docs/results/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside this page have been
 filled in since. If a step stops with an error, that is a finding; note it.
 
 **Names.** The commands use the guest name `attestamp-tdx-vendor` and the zone `us-central1-a`. If your guest has

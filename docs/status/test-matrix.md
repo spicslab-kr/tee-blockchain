@@ -142,7 +142,7 @@ T1 and T4:
   for the same application. Since 2026-11-16 `gcp-cvm.sh` pins the exact image (`IMAGE=`, `3520a56`). Not measured:
   another machine type.
 
-¹³ **The clean trial of 2026-11-16** (`docs/status/trial-2026-11-16-clean.md`, at `e29d028`): all three platforms followed
+¹³ **The clean trial of 2026-11-16** (`docs/results/trial-2026-11-16-clean.md`, at `e29d028`): all three platforms followed
 from the documents alone, by someone without the earlier sessions' knowledge, on a local anvil (`NET=local`). The
 verdicts were the same on all three, and on both options of TDX and SEV-SNP:
 - **T4**: `verify` exit 0 with `✓ matches`. On TDX and SEV-SNP the Auditor again registered the guest's own values (no
