@@ -37,6 +37,9 @@ The platform guides refer here: [AWS Nitro](aws-nitro.md), [Intel TDX](tdx.md), 
 
 ## Versions actually used
 
+These are records of what each run used, by date. **What to set so that both sides get the same values is in
+[reproduce.md](reproduce.md)**; this section is the evidence behind it.
+
 ### Your machine (the development machine of 2026-11-12, Windows 11 with Git Bash)
 
 | tool | `--version` output | used for |

@@ -3,7 +3,8 @@
 The Vendor and the Auditor each build the same source on their own instance. Whoever registers the
 value, it can only be trusted if both builds give the same measurements. On Nitro Enclaves the
 measurements are PCR0, PCR1 and PCR2. The short version is in the README under
-[Build](../../README.md#build). Tools, which step calls them, and the versions used: [toolchain.md](toolchain.md)
+[Build](../../README.md#build). What both sides must match, with a check for each: [reproduce.md](reproduce.md).
+Tools, which step calls them, and the versions used: [toolchain.md](toolchain.md)
 (the instance's AMI, kernel, docker and nitro-cli as of the 2026-11-12 baseline). The reference PCRs of the test
 application, at commit `c116845`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-16.md](../results/aws-nitro-2026-11-16.md)
 (the first baseline, at `9a5668e`: [docs/results/aws-nitro-2026-11-12.md](../results/aws-nitro-2026-11-12.md)).

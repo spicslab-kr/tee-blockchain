@@ -420,7 +420,8 @@ What this half does **not** change: SEV-SNP evidence still cannot prove that its
 
 #### The same inputs
 
-The Auditor's values equal the Vendor's only if all of these are the same on both guests. Measured on 2026-11-15
+The Auditor's values equal the Vendor's only if all of these are the same on both guests (the same rows with a check
+command for each: [reproduce.md](reproduce.md), "AMD SEV-SNP (GCP)"). Measured on 2026-11-15
 (`docs/plan/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
 `n2d-standard-2`, `us-central1-a`, built the same `app/hello.txt` into the same initrd and measured the same
 MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD; on 2026-11-16 a third guest of the same image gave the same five values

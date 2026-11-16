@@ -86,7 +86,8 @@ The Vendor and the Auditor each build the same source on their own instance. Who
 value, it can only be trusted if both builds give the same measurements.
 
 **What to watch when building.** Anything that differs between the two builds changes the
-measurements. The most important:
+measurements. **The full checklist, per platform, with the values to use, how to check each, and which measurement
+each one moves: [docs/build/reproduce.md](docs/build/reproduce.md).** The most important:
 
 1. The same CPU architecture (`amd64` or `arm64`) on both sides.
 2. The same Go toolchain (pinned, go1.26.1) with `-trimpath -buildvcs=false`, and one and the same

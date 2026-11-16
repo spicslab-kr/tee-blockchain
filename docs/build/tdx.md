@@ -445,7 +445,8 @@ Vendor's only when the inputs below are the same.
 
 #### The same inputs
 
-The Auditor's values equal the Vendor's only if all of these are the same on both guests. Measured on 2026-11-15
+The Auditor's values equal the Vendor's only if all of these are the same on both guests (the same rows with a check
+command for each: [reproduce.md](reproduce.md), "Intel TDX"). Measured on 2026-11-15
 (`docs/plan/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
 `c3-standard-4`, `us-central1-a`, built the same `app/hello.txt` into the same initrd and measured the same MRTD,
 RTMR0, RTMR1 and RTMR2; on 2026-11-16 a third guest of the same image gave the same four values again. That is the
