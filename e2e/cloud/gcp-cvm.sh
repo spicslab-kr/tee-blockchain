@@ -6,6 +6,11 @@
 #   bash e2e/cloud/gcp-cvm.sh tdx status
 #   bash e2e/cloud/gcp-cvm.sh tdx stop | start | delete
 #
+# Names: each VM is <PREFIX>-<role>, PREFIX default attestamp-<tdx|snp>. If the project already has VMs of that name
+# (made by someone else, or by you earlier), create reuses them; choose your own with PREFIX=<name>, e.g.
+#   PREFIX=alice-tdx bash e2e/cloud/gcp-cvm.sh tdx create vendor
+# and pass the same PREFIX to status, stop, start and delete: they act only on VMs whose name starts with it.
+#
 # Image: IMAGE=<exact image name> pins one image version, e.g.
 #   IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor
 # Without IMAGE the family (IMAGE_FAMILY, default ubuntu-2404-lts-amd64) is resolved once to the image it points at
@@ -29,7 +34,7 @@
 set -uo pipefail
 
 PLAT=${1:-}; ACTION=${2:-}
-[ -n "$PLAT" ] && [ -n "$ACTION" ] || { sed -n '2,28p' "$0"; exit 2; }
+[ -n "$PLAT" ] && [ -n "$ACTION" ] || { sed -n '2,33p' "$0"; exit 2; }
 shift 2
 ROLES=("$@"); [ ${#ROLES[@]} -gt 0 ] || ROLES=(vendor auditor)
 # Every role is one billable VM, so only the two roles the project uses are accepted: a stray word on the command line
@@ -104,7 +109,8 @@ create)
   for role in "${ROLES[@]}"; do
     name="$PREFIX-$role"
     if gcloud compute instances describe "$name" --zone "$ZONE" >/dev/null 2>&1; then
-      echo "$name already exists, skipping"; continue
+      echo "$name already exists, reusing it (not created). If it is not yours, run again with PREFIX=<your-name>-$PLAT."
+      continue
     fi
     gcloud compute instances create "$name" \
       --machine-type="$MACHINE" \
@@ -122,11 +128,11 @@ create)
   ;;
 
 status)
-  gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT" \
+  gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT AND name~^$PREFIX-" \
     --format='table(name,zone.basename(),machineType.basename(),status,networkInterfaces[0].accessConfigs[0].natIP:label=EXTERNAL_IP)'
   echo
   echo "Confidential setting as the API reports it:"
-  gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT" \
+  gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT AND name~^$PREFIX-" \
     --format='table(name,confidentialInstanceConfig.confidentialInstanceType,scheduling.onHostMaintenance)'
   echo
   echo "Image of each boot disk (the Vendor's and the Auditor's must be the same):"
@@ -136,14 +142,14 @@ status)
   ;;
 
 stop|start)
-  names=$(gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT" --format='value(name)')
+  names=$(gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT AND name~^$PREFIX-" --format='value(name)')
   [ -n "$names" ] || die "no $PLAT instances labelled project=attestamp"
   # shellcheck disable=SC2086
   gcloud compute instances "$ACTION" $names --zone "$ZONE" --quiet
   ;;
 
 delete)
-  names=$(gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT" --format='value(name)')
+  names=$(gcloud compute instances list --filter="labels.project=attestamp AND labels.platform=$PLAT AND name~^$PREFIX-" --format='value(name)')
   [ -n "$names" ] || { echo "nothing to delete"; exit 0; }
   echo "deleting: $names"
   # shellcheck disable=SC2086
@@ -151,5 +157,5 @@ delete)
   echo "the firewall rule $NET_TAG was left alone (the other platform may still use it)."
   ;;
 
-*) sed -n '2,28p' "$0"; exit 2 ;;
+*) sed -n '2,33p' "$0"; exit 2 ;;
 esac
