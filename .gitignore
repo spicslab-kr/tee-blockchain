@@ -16,6 +16,13 @@ dist/
 # e2e scripts: files fetched from the instances during a run
 e2e-work/
 
+# docs/build/tdx.md and sev-snp.md, run from the repository root on your computer: the guest binaries (step 2) and the
+# evidence, nonce and measurements fetched in steps 10-11
+/linux/
+/quote.bin*
+/evidence.cbor*
+/measurements.json
+
 # SSH private key — never commit
 pem2.pem
 *.pem
