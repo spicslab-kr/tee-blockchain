@@ -96,7 +96,7 @@ func usage() {
                    match two sets of measurements as they are (parsed vs built, etc.). prints PASS/FAIL with the reasons
   compare          --attested <measurements.json | NAME=hex,…> --rpc <url> --registry <0x…> --record-key <0x…> [--trusted-approvers <0x…,0x…>]
                    read the registration from the chain and check the value, expiry and approver together. exit 1 on failure
-  audit            --tee-addr <my TEE host:port> --build-measurements <my out/measurements.json> --rpc <url> --registry <0x…> --signing-key-file <file>
+  audit            --tee-addr <my TEE host:port> [--format aws-nitro|intel-tdx|amd-sev-snp-*] --build-measurements <my out/measurements.json> --rpc <url> --registry <0x…> --signing-key-file <file>
                    (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--vendor-tee <the Vendor's TEE host:port>]
                    in one go: request and verify the attestation document from my own TEE, check the attested value against --build-measurements (the value I
                    built or measured myself), register that value only if they match, then read it back and check it.

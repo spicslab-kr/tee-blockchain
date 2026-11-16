@@ -94,7 +94,7 @@ func usage() {
                    match two sets of measurements as they are (parsed vs built, etc.). prints PASS/FAIL with the reasons
   compare          --attested <measurements.json | NAME=hex,…> --rpc <url> --registry <0x…> --record-key <0x…> [--trusted-approvers <0x…,0x…>]
                    read the registration from the chain and check the value, expiry and approver together. exit 1 on failure
-  self-register    [--tee-addr <my enclave host:port>] [--build-measurements <file>] --rpc <url> --registry <0x…> --signing-key-file <file>
+  self-register    [--tee-addr <my TEE host:port>] [--format aws-nitro|intel-tdx|amd-sev-snp-*] [--build-measurements <file>] --rpc <url> --registry <0x…> --signing-key-file <file>
                    (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64])
                    no Auditor: request and verify the attestation document from my own enclave, register the value under my signing key, read it back and
                    check it. with --build-measurements too, registers only if the attested value matches it. --config takes
@@ -131,7 +131,7 @@ func usage() {
   launch      --platform amd-sev-snp-* --check [--build-value out/build-value.json] [--out-dir out]
               after that reboot: verifies fresh evidence, requires INITRD (and PCR12) to be the built values, writes measurements.json
   ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc> [--format <fmt>]  [--user-data <hex>]
-              runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
+              runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled --format (default aws-nitro)
   lo-up       brings up loopback inside the enclave. once, before starting the software
   ra-proxy    --listen <host:port>  --vsock <cid>:<port>
               runs on the Nitro parent instance. forwards incoming TCP connections to the enclave's vsock

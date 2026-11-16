@@ -43,7 +43,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `att-user checks an enclave against the registry
+	fmt.Fprintln(os.Stderr, `att-user checks a TEE (a Nitro enclave, or a TDX or SEV-SNP guest) against the registry
 
   ra-parse    --doc <file> [--nonce <hex|file>] [--root <pem>] [--format aws-nitro] [--out-file <file>] [--at <RFC3339>]
               verifies the document's signature, certificate chain and nonce, and extracts the measurements (PCR). the output file can be passed to compare --attested or lookup --measurements
@@ -56,7 +56,7 @@ func usage() {
               match the value from ra-parse against the chain registration: value, expiry and approver. exit 1 on failure
   compare     --attested <measurements.json | NAME=hex,…> --expected <same shape>
               match two sets of measurements as they are. prints PASS/FAIL with the reasons
-  verify      --tee-addr <the Vendor's enclave host:port> --rpc <url> --registry <0x…> [--registry <0x…> …] [--trusted-approvers <0x…,0x…>]
+  verify      --tee-addr <the Vendor's TEE host:port> [--format aws-nitro|intel-tdx|amd-sev-snp-initrd|amd-sev-snp-verity] --rpc <url> --registry <0x…> [--registry <0x…> …] [--trusted-approvers <0x…,0x…>]
               the trust decision in one go: request and verify the enclave's attestation document, find who registered that measurement, check each
               registration. exit 0 when every --registry given has a matching registration, 1 with the reason otherwise. no key, no ETH. --nonce pins the nonce.
               several --registry (e.g. the Vendor's and the Auditor's registry): each is shown side by side and every one must vouch`)
