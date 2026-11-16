@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"attestamp/internal/cli"
@@ -191,7 +192,10 @@ func (c Check) Run(ctx context.Context, log io.Writer) (Measured, error) {
 		return m, err
 	}
 	fmt.Fprintf(log, "%s: these values identify the boot (%s), and go on the chain\n", cli.Green("✓ measured"), m.Format)
-	for _, k := range parsesnp.MeasurementNames(m.Format) {
+	// Sorted by name: the order of the measurement hash, and the order ra-parse, audit and verify print them in.
+	names := slices.Clone(parsesnp.MeasurementNames(m.Format))
+	slices.Sort(names)
+	for _, k := range names {
 		fmt.Fprintf(log, "    %-11s %s\n", k, m.Values[k])
 	}
 	return m, nil

@@ -238,14 +238,19 @@ func fileSize(path string) int64 {
 	return st.Size()
 }
 
-// printPCRs prints the measurements in the parsed-values file, indented (PCR0, PCR1, PCR2).
+// printPCRs prints the measurements in the parsed-values file, indented, sorted by name (the order of the measurement
+// hash and of ra-parse), in one column as wide as the longest name.
 func printPCRs(path string) {
 	values, err := readMeasurements(path)
 	if err != nil {
 		return
 	}
 	sort.Slice(values, func(i, j int) bool { return values[i].Name < values[j].Name })
+	width := 5 // PCR0 and RTMR0 keep the column they always had
 	for _, m := range values {
-		fmt.Printf("    %-5s %x\n", m.Name, m.Value)
+		width = max(width, len(m.Name))
+	}
+	for _, m := range values {
+		fmt.Printf("    %-*s %x\n", width, m.Name, m.Value)
 	}
 }

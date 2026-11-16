@@ -7,7 +7,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -104,9 +106,15 @@ func raParse(args []string) error {
 		return err
 	}
 	values := map[string]string{}
+	width := 10 // the header's column
 	for _, m := range ms {
 		values[m.Name] = hex.EncodeToString(m.Value)
-		say(fmt.Sprintf("%-10s %s", m.Name, values[m.Name]))
+		width = max(width, len(m.Name))
+	}
+	// Sorted by name, the order of the measurement hash and of verify and audit, in one column however long the
+	// platform's names are (SEV-SNP's MEASUREMENT has 11 characters).
+	for _, name := range slices.Sorted(maps.Keys(values)) {
+		say(fmt.Sprintf("%-*s %s", width, name, values[name]))
 	}
 	if *outFile == "" {
 		*outFile = *docPath + ".measurements.json"
