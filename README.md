@@ -137,7 +137,7 @@ steps 1 to 13 use one guest, and their Auditor registers the Vendor's guest's va
 independent Auditor of the trust model above is each page's "The Auditor's half", which needs two guests and **passed
 on both platforms on 2026-11-16** ([TDX](docs/results/sessions-2026-11-16/intel-tdx.md),
 [SEV-SNP](docs/results/sessions-2026-11-16/amd-sev-snp.md)). What each platform's evidence gives the verifier, side
-by side: [RA comparison](docs/build/ra-comparison.md).
+by side, and which one to use: [RA comparison](docs/build/ra-comparison.md#which-one-to-use).
 
 ## Quick start
 

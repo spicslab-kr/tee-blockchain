@@ -4,6 +4,36 @@ A side-by-side view of the evidence Attestamp checks on its three platforms, at 
 verifies it. Everything here is read from the parsers in `internal/tee/parse/{aws,tdx,snp}` and from the evidence
 recorded on real instances in their `testdata/` folders. A row that is not settled says so.
 
+## Which one to use
+
+Four questions decide it. Each answer is backed by a section further down, and only measured results or the structure
+of the evidence are used.
+
+| question | Nitro | TDX | SEV-SNP |
+|---|---|---|---|
+| Must the evidence also cover the program that hands it out (`att-ra-responder`)? | **yes, it does**: the responder is inside the EIF, in PCR0 and PCR2 | no: the responder runs from the guest's disk; nothing proves which program answered (its answer is still hardware-signed) | no, as TDX |
+| Must the reference values survive changes to this repository's code? | **no**: any change to a package the responder links moves PCR0 and PCR2, even code that never runs (`029bbdc`, measured), so every value needs its commit | **yes**: the values follow the application, the image and the VM; they move with the machine type (RTMR0, measured), not with the zone | **yes**, as TDX; MEASUREMENT moves with the vCPU count (measured), not with memory or zone |
+| Must the evidence come from one VM, provably? | **yes**, one signed document | **yes**, one quote | **no**: a report from another VM, requested over this VM's vTPM attestation, verifies and finds this VM's registration (T10, measured) |
+| Who has to be trusted for the registered values? | one signer: AWS | one signer: Intel | two: AMD for MEASUREMENT (the firmware only), and Google's vTPM, run by the hypervisor, for PCR4, KERNEL, CMDLINE, INITRD (and PCR12) |
+
+In one line each:
+
+- **Nitro** when the evidence must cover everything that runs, the program that answers included. You give up stable
+  reference values: they move with this repository's code and with the CPU architecture, and need an AWS parent
+  instance and a Docker image.
+- **TDX** when you want a whole VM, one signer and one document, and reference values that move only with what you
+  build and the VM you run it on. You give up any proof of which program produced the quote, and the guest's operating
+  system outside the initrd is not measured; the Auditor's own rebuild is what catches a boot without the application
+  (the quote alone cannot show it).
+- **SEV-SNP** when you want a whole VM on AMD, and the verifier's own parser should refuse a boot without an initrd
+  (the evidence carries the event log). You give up the same-VM guarantee (T10) and a single root of trust: four of the
+  five values rest on Google's hypervisor-run vTPM, not on AMD.
+
+On every platform the same registration rule holds (`audit` requires the Auditor's own build), and freshness comes
+from the nonce; only Nitro's document also carries a timestamp.
+
+## At a glance
+
 | | AWS Nitro Enclaves | Intel TDX | AMD SEV-SNP |
 |---|---|---|---|
 | Cloud we use | AWS | GCP (`c3-standard-4`) | GCP (`n2d-standard-2`) |
