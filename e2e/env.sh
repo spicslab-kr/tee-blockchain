@@ -88,6 +88,8 @@ R() { need_host ARM64_HOST; net_retry $SSH "$SSH_USER@$ARM64_HOST" "$@"; }   # a
 #   - Retried only when ssh/scp failed (ssh: exit 255, its own error code; scp: any failure) AND its error output
 #     names a connection-setup failure. A remote command that fails, or a session that breaks after it started, is
 #     never retried, so a failure is never hidden or a command run twice.
+#   - scp's own form of the same abort is a bare "scp: Connection closed" (2026-11-16: the Auditor's measurements.json
+#     was not fetched after a good build, and nothing retried it). It counts too: a copy can be repeated harmlessly.
 #   - At most SSH_TRIES attempts (default 3), waiting 3 s, then 6 s. After the last one the original exit code is
 #     returned and the script fails as before.
 #   - stdin (the heredoc of V 'bash -s' <<REMOTE) is kept in a file and given again to every attempt; a terminal is
@@ -102,7 +104,7 @@ net_retry() {
     if [ -n "$inf" ]; then "$@" < "$inf" 2> "$errf"; rc=$?; else "$@" 2> "$errf"; rc=$?; fi
     cat "$errf" >&2
     if [ $rc -eq 0 ] || { [ "$1" = ssh ] && [ $rc -ne 255 ]; } || [ $n -ge "$SSH_TRIES" ] \
-       || ! grep -qE 'kex_exchange_identification|banner exchange|Software caused connection abort|Connection (refused|reset by peer|timed out)|Operation timed out|Network is unreachable|No route to host|Connection closed by [^ ]+ port [0-9]+$' "$errf"; then
+       || ! grep -qE 'kex_exchange_identification|banner exchange|Software caused connection abort|Connection (refused|reset by peer|timed out)|Operation timed out|Network is unreachable|No route to host|Connection closed by [^ ]+ port [0-9]+$|^scp: Connection closed$' "$errf"; then
       break
     fi
     echo "$1: the connection could not be set up (attempt $n of $SSH_TRIES); trying again in $((n * 3)) s" >&2
