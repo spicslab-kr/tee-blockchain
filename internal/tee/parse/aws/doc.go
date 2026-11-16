@@ -2,7 +2,7 @@
 // and a certificate chain. The signature is ES384 (ECDSA P-384 + SHA-384), and the leaf certificate must chain up to the AWS Nitro root.
 //
 // The logic is identical for every role (auditor, Vendor, user), so it lives here once. Each role's
-// internal/tee/parse/<role>/aws is only a thin adapter that wraps this package with that role's RADoc, Nonce and
+// internal/tee/parse/<role>/aws.go is only a thin adapter that wraps this package with that role's RADoc, Nonce and
 // Measurements types.
 //
 //	doc.go     document format: CBOR structures and decoding
