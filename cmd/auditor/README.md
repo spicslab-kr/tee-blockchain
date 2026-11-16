@@ -45,6 +45,11 @@ att-auditor audit --config work/src/build-config.json --tee-addr <my-instance>:5
     --build-measurements out/measurements.json --rpc <url> --registry <0x...> --signing-key-file <key>
 ```
 
+`--build-measurements` is required whenever `--tee-addr` is given, on every platform (since 2026-11-16): without a
+value you built yourself, `audit` would register whatever the TEE reports. To look at a TEE's report without
+registering anything, use `ra-request` and `ra-parse`. With `--vendor-tee`, a Vendor TEE that runs something else
+ends `audit` with exit 12 after your value is registered; do not run it again (see [Exit codes](../README.md#exit-codes)).
+
 `audit` ([audit.go](audit.go)) does these in order:
 
 - Requests and verifies the attestation document from your own enclave.

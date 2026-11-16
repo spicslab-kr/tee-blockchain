@@ -42,17 +42,24 @@ on-chain value.
 | Option 2 (squashfs + dm-verity application image) | n/a | the image goes inside the initrd, covered by RTMR2: the same format and the same four names (`docs/build/tdx.md`, "Option 1 and Option 2"; built and booted on guests since 2026-11-15) | the image sits on disk; a boot-time hook extends PCR12, so `amd-sev-snp-verity` has a sixth value |
 | Is `att-ra-responder` measured? | **yes**: `build` layers it into the EIF, so its bytes are in PCR0 and PCR2, and its Go version changes them (`toolchain-pin-check.sh`) | **no**: it runs from the guest's disk after the boot; the measurement covers the initrd `att` writes. Measured 2026-11-16: the Go version moves RTMR2 only when the Go program is the application inside the initrd | **no**, as on TDX: the vTPM measures the initrd `att` writes (and for verity the image's root hash), not the responder |
 | What the toolchain pin protects | the responder's bytes, so the PCRs | that the Vendor and the Auditor run the same `att`, which writes the measured initrd (and Option 2 image) | the same as TDX |
-| What the evidence carries about the boot, and so what the parser can check | the responder is inside the EIF, so PCR2 covers it: the image is all there is to boot | **the quote only**: the CC event log stays on the guest, so the parser sees RTMR2 as one hash and cannot tell that no initrd was loaded (`launch --check`, on the guest, can). `audit` therefore requires the Auditor's own build values (2026-11-16) | **a container**: the vTPM attestation carries the event log, so the parser itself refuses an initrdless boot (exit 7) |
+| What the evidence carries about the boot, and so what the parser can check | the responder is inside the EIF, so PCR2 covers it: the image is all there is to boot | **the quote only**: the CC event log stays on the guest, so the parser sees RTMR2 as one hash and cannot tell that no initrd was loaded (`launch --check`, on the guest, can). It is the Auditor's own build that catches it | **a container**: the vTPM attestation carries the event log, so the parser itself refuses an initrdless boot (exit 7) |
+| Size of each value | 48 bytes (SHA-384) | 48 bytes (SHA-384) | MEASUREMENT 48 bytes; the others 32 bytes (vTPM SHA-256 bank, GRUB's SHA-256 file digests) |
+| Signed by | AWS | Intel | MEASUREMENT by AMD; the rest by Google's vTPM |
+| Code | `aws/measure.go`, `imagePCRs` | `tdx/measure.go`, `imageRTMRs` | `snp/measure.go`, `initrdNames`, `verityNames` |
+| Asserted on recorded evidence | yes (`aws/measure_test.go`, also against the `nitrite` library) | yes (`tdx/measure_test.go`) | yes, the five initrd values (`snp/measure_test.go`), each checked against a value read outside the parser. PCR12 has no recording yet |
 
 **This is why the checks differ by platform.** What a verifier can refuse depends on what the evidence carries, not on
 what the code tries: the same initrdless boot is refused in SEV-SNP's parser, only by the Auditor's comparison (and
 `launch --check` on the guest) on TDX, and has no counterpart on Nitro. Carrying the CCEL in TDX evidence would move
 TDX's check into the parser; it changes the wire format and is planned for after publication
 (`docs/plan/build-info-gaps.md`, Q2).
-| Size of each value | 48 bytes (SHA-384) | 48 bytes (SHA-384) | MEASUREMENT 48 bytes; the others 32 bytes (vTPM SHA-256 bank, GRUB's SHA-256 file digests) |
-| Signed by | AWS | Intel | MEASUREMENT by AMD; the rest by Google's vTPM |
-| Code | `aws/measure.go`, `imagePCRs` | `tdx/measure.go`, `imageRTMRs` | `snp/measure.go`, `initrdNames`, `verityNames` |
-| Asserted on recorded evidence | yes (`aws/measure_test.go`, also against the `nitrite` library) | yes (`tdx/measure_test.go`) | yes, the five initrd values (`snp/measure_test.go`), each checked against a value read outside the parser. PCR12 has no recording yet |
+
+**The registration rule is the same on every platform, the platforms are not.** Since 2026-11-16 `audit` refuses to
+register without the Auditor's own build values on Nitro, TDX and SEV-SNP alike, because the trust model (the Auditor
+rebuilds) does not depend on the platform. What the refusal protects against does: on Nitro the enclave runs one EIF,
+all of it covered by PCR0, so a TEE's own report always names exactly what runs and there is no concrete gap like the
+next one; on TDX and SEV-SNP the guest's operating system on its disk, outside the initrd, is not measured, so a boot
+that measured no application at all can still produce a genuine report (`docs/results/sessions-2026-11-16/tdx-initrdless.md`).
 
 ### What covering the responder costs: a code change no one runs still moves Nitro's values
 
