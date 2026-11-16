@@ -76,7 +76,7 @@ on-chain value.
 | Size of each value | 48 bytes (SHA-384) | 48 bytes (SHA-384) | MEASUREMENT 48 bytes; the others 32 bytes (vTPM SHA-256 bank, GRUB's SHA-256 file digests) |
 | Signed by | AWS | Intel | MEASUREMENT by AMD; the rest by Google's vTPM |
 | Code | `aws/measure.go`, `imagePCRs` | `tdx/measure.go`, `imageRTMRs` | `snp/measure.go`, `initrdNames`, `verityNames` |
-| Asserted on recorded evidence | yes (`aws/measure_test.go`, also against the `nitrite` library) | yes (`tdx/measure_test.go`) | yes, the five initrd values (`snp/measure_test.go`), each checked against a value read outside the parser. PCR12 has no recording yet |
+| Asserted on recorded evidence | yes (`aws/measure_test.go`, also against the `nitrite` library) | yes (`tdx/measure_test.go`) | yes, the five initrd values (`snp/measure_test.go`), each checked against a value read outside the parser. PCR12 too, on the Option 2 recordings (`snp/app_fixture_test.go`, `TestAppFixtures_Option2ChangesCMDLINEAndPCR12`) |
 
 **This is why the checks differ by platform.** What a verifier can refuse depends on what the evidence carries, not on
 what the code tries: the same initrdless boot is refused in SEV-SNP's parser, only by the Auditor's comparison (and
@@ -193,7 +193,7 @@ the run. Otherwise the same image would register differently on every instance.
 | Nitro | PCR3 | the IAM role of the parent instance | `aws/measure.go` comment |
 | | PCR4 | the parent instance's ID; non-zero on a real instance | same; `aws/measure_test.go` asserts it is dropped |
 | | PCR8 | the enclave image's signing certificate | `aws/measure.go` comment |
-| TDX | MROWNER | set by whoever launches the TD; differs per GCP instance (non-zero in our fixture) | `tdx/measure.go`; `tdx/measure_test.go` asserts it is excluded and that the fixture's is non-zero |
+| TDX | MROWNER | set by whoever launches the TD; assumed to differ per GCP instance, not measured (non-zero in our fixture) | `tdx/measure.go`; `tdx/measure_test.go` asserts it is excluded and that the fixture's is non-zero |
 | | RTMR3 | extended by the guest at run time, not by the boot chain | same |
 | | MROWNERCONFIG, MRCONFIGID | set by the launcher | same |
 | | MRSEAM | the TDX module, i.e. the platform | `tdx/measure.go` comment |

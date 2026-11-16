@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cleanup - stops the enclaves and the TCP bridge processes (att-vendor, att-auditor) on both instances.
-#    The instances themselves are stopped from the AWS console.
+#    The instances themselves are stopped with bash e2e/cloud/aws-nitro.sh stop.
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/.."
 . "$here/env.sh"

@@ -7,7 +7,8 @@
 // A different architecture is expected to produce a different att-ra-responder binary, and with
 // it different PCR0/PCR2 once it's layered into an enclave image. Nitro's kernel, the compiled
 // machine code, and the base image layers all differ per architecture. That is expected. What must stay equal is the hash for one architecture built from two different checkout
-// paths, from two different commits or on two different machines, which is why every build here passes
+// paths, from two commits whose linked packages are identical, or on two different machines (a change to any package the
+// responder links moves its build ID and so its bytes, even when no code it runs changed: 029bbdc), which is why every build here passes
 // -trimpath and -buildvcs=false and sets CGO_ENABLED=0.
 //
 // Add an architecture by adding one line to ArchTargets; nothing else in this package changes.
@@ -40,8 +41,8 @@ var ArchTargets = []ArchTarget{
 // BuildResponderForArch cross-compiles cmd/ra-responder from repoRoot (a directory containing
 // go.mod) for target.GOARCH, with -trimpath, which keeps the checkout path out of the
 // binary, -buildvcs=false, which keeps the git commit out of it, and CGO_ENABLED=0, which keeps a
-// native Linux build with a C compiler from linking cgo and giving different bytes. The responder only ever runs
-// inside a Nitro enclave, so GOOS is always linux.
+// native Linux build with a C compiler from linking cgo and giving different bytes. The responder runs inside a Nitro
+// enclave or on a Linux TDX or SEV-SNP guest, so GOOS is always linux.
 func BuildResponderForArch(ctx context.Context, repoRoot string, target ArchTarget, outPath string) error {
 	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-o", outPath, "./cmd/ra-responder")
 	cmd.Dir = repoRoot

@@ -11,8 +11,8 @@
 // REPORT_DATA, so it covers the exact vTPM bytes carried next to it. (SHA-512 until 2026-11-11; see bindingSum.)
 //
 // What the binding does not prove: that both documents come from the same VM. A vTPM attestation from one VM and an
-// SNP report from another VM, asked for with the first one's hash, verify together. That was reproduced on GCP and
-// AWS (docs/status/test-matrix.md, T10) and is the reason SEV-SNP is weaker here than Nitro or TDX.
+// SNP report from another VM, asked for with the first one's hash, verify together. That was reproduced on GCP on
+// 2026-11-16, and the 2026-11 runs had reported it on AWS too (docs/status/test-matrix.md, T10) and is the reason SEV-SNP is weaker here than Nitro or TDX.
 //
 // The logic is identical for every role, so it lives here once. Each role's internal/tee/parse/<role>/snp.go is only
 // a thin adapter.

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Build-environment record check. The same source gives different PCRs on x86_64 and arm64 (measured), and a different Go
 #    toolchain changes them too, so registrations and the handoff record (measurement-record.json) name the architecture
-#    and toolchain they came from (build_env). The chain registration carries the architecture, and the record key depends
-#    on the measurement hash alone. Three groups of checks run, and no transaction is sent:
+#    and toolchain they came from (build_env). The chain registration carries the architecture, and the record key does not
+#    include it (recordKey = keccak256(approver, platform, measurement)). Three groups of checks run, and no transaction is sent:
 #      1. the uname -m -> GOARCH mapping used by the flow scripts comes out right on the real instances (x86 Vendor -> amd64, arm64 host -> arm64)
 #      2. att-auditor send refuses a record without build_env; for a record with it, send prints the build environment on
 #         one line and pushes it to a local bare repository; with --config (build-config.json) and --measurements

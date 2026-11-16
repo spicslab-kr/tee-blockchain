@@ -2,7 +2,7 @@
 # Flow 1 tamper, User - runs the same verify as 3-User-verify.sh (registry from e2e-work/registry.txt) after the Vendor
 #    swapped the enclave in 4-Vendor-tamper-swap-enclave.sh. The attested measurement now differs from the registered value.
 #    Expected: red ✗ nobody - ... approver never registered the value this enclave runs, then
-#    "nobody has registered these measurements on the chain - no basis for trust", exit 1.
+#    "nobody has registered these measurements on the chain, so there is no basis for trust", exit 1.
 #    Run from the repository root:  bash "e2e/flow1-auditor-registers/5-User-tamper-verify.sh"
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here/../.."

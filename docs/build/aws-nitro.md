@@ -181,7 +181,7 @@ checking a Vendor's self-registration later in flow 2.
 | Auditor's own `build` | the only proof that another host gets the same values. Equal builds on one host do not prove it |
 | `launch --build-measurements <file>` | measures a received image and starts it only if the values match the file |
 | `e2e/toolchain-pin-check.sh` | an `att` binary built with another Go patch version refuses to `build` |
-| `e2e/responder-check.sh` | `build --responder` refuses a responder without `-trimpath` or for the wrong architecture |
+| `e2e/responder-check.sh` | `build --responder` refuses a responder without `-trimpath`, with version control stamping, or for the wrong architecture |
 | `e2e/build-env-check.sh` | `receive` rejects a `build_env` that does not match the instance; `--ignore-env` only warns |
 | `e2e/arch-measurement-compare.sh` | the same source measures the same on two x86_64 hosts and differently on arm64 |
 

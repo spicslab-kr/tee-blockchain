@@ -47,7 +47,7 @@ type Info struct {
 // 2 together.
 //
 // Left out because they do not describe the image: RTMR3 (extended at run time by the guest, zero on a fresh boot),
-// MROWNER, MROWNERCONFIG and MRCONFIGID (set by whoever launches the TD; MROWNER differs per GCP instance), and the
+// MROWNER, MROWNERCONFIG and MRCONFIGID (set by whoever launches the TD; MROWNER is assumed to differ per GCP instance, not measured), and the
 // TDX module's MRSEAM (the platform, not the guest). Nitro leaves out PCR3, PCR4 and PCR8 for the same reason.
 var imageRTMRs = []int{0, 1, 2}
 

@@ -105,7 +105,7 @@ day of the last password change), because it carried the build day into PCR0 and
 | TDX quote signature | ECDSA P-256 (the QE's attestation key) | Intel | the platform |
 | SEV-SNP MEASUREMENT | a SHA-384 chain over the launch pages | AMD | the platform |
 | SEV-SNP report signature | ECDSA P-384 (the chip's VCEK) | AMD | the platform |
-| SEV-SNP PCR4, PCR12, KERNEL, INITRD, CMDLINE | SHA-256 | the vTPM bank we read | the parser takes the SHA-256 quote among those the attestation carries (`snp/measure.go`); GRUB's file digests in that bank are SHA-256. Why not another bank: **not recorded** |
+| SEV-SNP PCR4, PCR12, KERNEL, INITRD, CMDLINE | SHA-256 | the vTPM bank we read | the parser takes the SHA-256 quote among those the attestation carries (`snp/measure.go`); GRUB's file digests in that bank are SHA-256. Why this bank: the verity hook extends only the SHA-256 bank, and the 2026-11 Auditor scripts computed their expected values with SHA-256 (`snp/measure.go`) |
 | SEV-SNP binding: REPORT_DATA = hash of the vTPM attestation | **SHA3-512** | **us** (project decision, 2026-11-11; SHA-512 before) | it must be 64 bytes, the size of REPORT_DATA. Why SHA3-512 rather than SHA-512: **not recorded**. Evidence bound with SHA-512 is refused (`TestVerifySig_SHA512BindingIsRefused`) |
 | SEV-SNP PCR12 extension | SHA-256 of `attestamp-verity-<ok\|fail>:<root hash>` | us (the hook) | the PCR12 bank is SHA-256 |
 | dm-verity hash tree and root hash | SHA-256 (`--hash=sha256`), fixed salt | us, made explicit | `veritysetup`'s own default is the same; the salt is fixed for reproducibility |

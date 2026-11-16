@@ -106,7 +106,7 @@ distribution's on both guests.
 the reason SEV-SNP is weaker than the other two, and it has to appear in the table rather than in a footnote. By the
 structure of the evidence it should hold with the SHA3-512 binding too (the relaying VM writes the hash of the
 other's attestation into its own report), but the only observation is the 2026-11 record, made with the SHA-512
-binding and scripts that are gone. Until "Reproducing T10" is run, this repository cannot show it.
+binding and scripts that are gone. Until "Reproducing T10" is run, this repository cannot show it. *(Run on 2026-11-16: the relay reproduced, row T10 and ¹⁵.)*
 
 ¹⁰ The 2026-11 observations these SEV-SNP cells used to show, kept as a record (scripts no longer available, results
 not reproducible; `docs/build/sev-snp.md`, "Variables"):
@@ -117,7 +117,7 @@ not reproducible; `docs/build/sev-snp.md`, "Variables"):
 | T2 | Go 1.22.2 and 1.23.4 gave different application binaries | our responder bytes under two Go patch versions (2026-11-12); the SEV-SNP measurement itself is "needs VM" |
 | T3 | without `-trimpath`, two folders gave two binaries | our code test of the responder across checkout paths; the whole initrd is "needs VM" |
 | T9 | replayed evidence was refused | our live replay refusal on the guest (2026-11-12) |
-| T10 | a vTPM attestation from one VM with an SNP report from another verified | nothing yet: the cell says so, and "Reproducing T10" is the plan |
+| T10 | a vTPM attestation from one VM with an SNP report from another verified | *(until 2026-11-16)* nothing yet: the cell says so, and "Reproducing T10" is the plan |
 
 ¹¹ **Local chain, not Sepolia.** The T4, T5 and T6 Nitro runs of 2026-11-15 used real enclaves on the two Nitro
 instances and a registry on a local anvil 1.8.0 on the machine running the scripts (`NET=local`, anvil's development accounts as
