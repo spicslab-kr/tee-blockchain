@@ -139,12 +139,14 @@ verdicts were the same on all three, and on both options of TDX and SEV-SNP:
 
 The 20 script-written result lines are in `docs/results/trial-2026-11-16-clean/`.
 
-¹⁴ **Session 2 of 2026-11-16, TDX on two guests** (`docs/results/sessions-2026-11-16/intel-tdx.md` and `.jsonl`, 17
+¹⁴ **Session 2 of 2026-11-16, TDX on two guests** (`docs/results/sessions-2026-11-16/intel-tdx.md` and `.jsonl`, 18
 lines, all as expected): two guests made in one call from `ubuntu-2404-noble-amd64-v20261105`. The Auditor's half of
 `docs/build/tdx.md` (A1–A9) was followed for the first time, both options, and **D3 passed**: the Auditor's own build
 equalled the Vendor's, both guests measured the same four values, `audit --vendor-tee` registered the Auditor's own
 value, and the User's `verify` of the Vendor's guest against it gave exit 0; with one byte changed on the Vendor's side
-only, `audit --vendor-tee` said `runs something else` and `verify` gave exit 1. T2 and T3 used a Go program as the
+only, `audit --vendor-tee` said `runs something else` and `verify` gave exit 1. One more negative control came
+unplanned: a failed copy left the Auditor an empty application, and its build (initrd `7c738a30…`, not the Vendor's
+`bc024887…`) was stopped by A4's comparison before anything was launched or registered. T2 and T3 used a Go program as the
 application, since on TDX the measured thing is the initrd's content and `att-ra-responder` is not in it. T6 is flow 2
 done by hand.
 
