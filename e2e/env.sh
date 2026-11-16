@@ -11,7 +11,9 @@
 # An instance without a fixed address gets a new public IP every time it is started (bash e2e/cloud/aws-nitro.sh status
 # prints them), and this is how to run with the new ones before env.local.sh is edited.
 here_env="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-env_given=$(declare -p VENDOR_HOST AUDITOR_HOST ARM64_HOST AUDITOR_ADDR VENDOR_ADDR 2>/dev/null | grep -E '="[^"]+"$')
+# declare -p fails for any name that is not set, and grep fails when nothing matches; under a caller's
+# set -euo pipefail either ends the script here with no message, so the pipeline must not fail.
+env_given=$(declare -p VENDOR_HOST AUDITOR_HOST ARM64_HOST AUDITOR_ADDR VENDOR_ADDR 2>/dev/null | grep -E '="[^"]+"$' || true)
 [ -f "$here_env/env.local.sh" ] && . "$here_env/env.local.sh"
 [ -n "$env_given" ] && eval "$env_given"
 VENDOR_HOST=${VENDOR_HOST:-}
