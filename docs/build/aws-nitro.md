@@ -196,6 +196,8 @@ checking a Vendor's self-registration later in flow 2.
 
 ## Settings that matter
 
+(The settings of every platform, and the hashes used, in one place: [settings-and-hashes.md](settings-and-hashes.md).)
+
 | setting | what it does | can you leave it out |
 |---|---|---|
 | `-trimpath` (go build) | keeps the build folder path out of the binary | no for `att-ra-responder`: `build` refuses it |

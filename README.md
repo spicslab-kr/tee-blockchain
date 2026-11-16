@@ -128,7 +128,8 @@ att-vendor build --app-dir <dir with Dockerfile> --out-dir out --verify
 ```
 
 All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md), [Intel TDX](docs/build/tdx.md),
-[AMD SEV-SNP](docs/build/sev-snp.md).
+[AMD SEV-SNP](docs/build/sev-snp.md). Every setting this project changes on a machine, why, and what breaks if it
+differs, with the hashes used and who chose each: [docs/build/settings-and-hashes.md](docs/build/settings-and-hashes.md).
 
 **Step by step, from nothing:** Nitro, the two flows in [e2e/README.md](e2e/README.md) (instances:
 [e2e/cloud/README.md](e2e/cloud/README.md)); Intel TDX, [Getting started](docs/build/tdx.md#getting-started-from-nothing-to-a-verified-tdx-guest); AMD SEV-SNP,

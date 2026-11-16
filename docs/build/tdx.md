@@ -767,6 +767,9 @@ Two things to know:
 
 ## `GRUB_FORCE_PARTUUID`
 
+(Every setting this project changes, with what breaks if it differs, is collected in
+[settings-and-hashes.md](settings-and-hashes.md); this section is the detail for this one.)
+
 Researched 2026-11-11. What is **confirmed** has a source; the rest is marked.
 
 **What it is (confirmed).**

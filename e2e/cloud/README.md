@@ -39,6 +39,9 @@ For the Nitro e2e suite you also need, in the repository root (all gitignored):
 
 ### SSH to the guests: do not leave port 22 open to everyone
 
+(This and the other settings this project changes are collected, with what breaks if each differs, in
+`docs/build/settings-and-hashes.md`, "Network access".)
+
 A new GCP project's default network has `default-allow-ssh`, tcp:22 from `0.0.0.0/0`, for **every** VM in it. The
 guests here need SSH only from you. Two ways to narrow it:
 

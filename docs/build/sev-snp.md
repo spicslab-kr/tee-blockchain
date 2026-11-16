@@ -822,6 +822,8 @@ Option 2 does not have this problem. The image is on disk, and a failed check sh
 
 ### The boot setting: turning `GRUB_FORCE_PARTUUID` off
 
+(All the settings this project changes, and the hashes it uses: [settings-and-hashes.md](settings-and-hashes.md).)
+
 **Every new guest of this image has the setting on**, so do this on each guest that has to boot an initrd; "Getting
 started" step 4 does it for you. It was first done on `attestamp-snp-vendor` on 2026-11-11 to record `gcp-n2d-*`, the
 evidence with an initrd, and every step below was checked there:
