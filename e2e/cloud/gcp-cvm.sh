@@ -118,7 +118,7 @@ create)
       --tags="$NET_TAG" \
       --labels="project=attestamp,platform=$PLAT,role=$role" || die "instances create ($role)"
   done
-  exec "$0" "$PLAT" status
+  exec bash "$0" "$PLAT" status
   ;;
 
 status)

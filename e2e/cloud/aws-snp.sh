@@ -74,7 +74,14 @@ launch() { # launch <role> <ami>
 
 case "${1:-}" in
 base)
-  [ -f "$PEM_OUT" ] || { aws ec2 create-key-pair --key-name "$KEY_NAME" --query KeyMaterial --output text > "$PEM_OUT" && chmod 400 "$PEM_OUT" && echo "wrote $PEM_OUT"; }
+  # Through a temporary .pem (covered by .gitignore): a redirect straight into $PEM_OUT leaves an empty file when aws
+  # fails, and the next run would skip creating the key.
+  if [ ! -f "$PEM_OUT" ]; then
+    tmp_pem="${PEM_OUT%.pem}.partial.pem"
+    aws ec2 create-key-pair --key-name "$KEY_NAME" --query KeyMaterial --output text > "$tmp_pem" \
+      || { rm -f "$tmp_pem"; die "could not create key pair $KEY_NAME (if it exists in $REGION without its .pem here, set KEY_NAME, SG_NAME and TAG)"; }
+    mv "$tmp_pem" "$PEM_OUT" && chmod 400 "$PEM_OUT" && echo "wrote $PEM_OUT"
+  fi
   AMI=$(ubuntu_ami); [ "$AMI" != "None" ] || die "no Ubuntu 24.04 AMI found in $REGION"
   echo "base AMI $AMI   type $TYPE   region $REGION"
   id=$(launch base "$AMI") || die "run-instances"
@@ -113,7 +120,7 @@ vm)
   [ "$AMI" != "None" ] && [ -n "$AMI" ] || die "no TPM-supported AMI; run 'mkami' first"
   id=$(launch vm "$AMI") || die "run-instances"
   echo "instance $id from $AMI"; aws ec2 wait instance-running --instance-ids "$id"
-  exec "$0" status
+  exec bash "$0" status
   ;;
 
 status)

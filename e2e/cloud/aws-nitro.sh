@@ -61,8 +61,16 @@ address_of() {
 # Sets SG.
 ensure_key_and_group() {
   if [ ! -f "$PEM_OUT" ]; then
-    aws ec2 create-key-pair --key-name "$KEY_NAME" --query KeyMaterial --output text > "$PEM_OUT" \
-      || die "could not create key pair $KEY_NAME (does it already exist? delete it or set KEY_NAME)"
+    # Written to a temporary file first: a redirect straight into $PEM_OUT leaves an empty file behind when aws fails,
+    # and the next run would then say "already exists, reusing it" and never create the key. The temporary name ends
+    # in .pem so that .gitignore covers it even if the run is interrupted.
+    tmp_pem="${PEM_OUT%.pem}.partial.pem"
+    aws ec2 create-key-pair --key-name "$KEY_NAME" --query KeyMaterial --output text > "$tmp_pem" \
+      || { rm -f "$tmp_pem"; die "could not create key pair $KEY_NAME. If it already exists in $REGION (made on
+  another machine, so its private key is not here), choose new names for this machine:
+    KEY_NAME=<name> SG_NAME=<name> TAG=<name> bash e2e/cloud/aws-nitro.sh create
+  and pass the same TAG to status, stop, start and delete."; }
+    mv "$tmp_pem" "$PEM_OUT"
     chmod 400 "$PEM_OUT"
     echo "wrote $PEM_OUT  (gitignored - never commit it)"
   else
@@ -110,7 +118,7 @@ create)
   for role in vendor auditor; do launch_role "$role" "$TYPE" "$AMI"; done
   echo; echo "waiting for them to be running..."
   aws ec2 wait instance-running --filters "Name=tag:Project,Values=$TAG" 2>/dev/null
-  exec "$0" status
+  exec bash "$0" status
   ;;
 
 create-arm64)
@@ -122,7 +130,7 @@ create-arm64)
   launch_role arm64 "$TYPE_ARM64" "$AMI"
   echo; echo "waiting for it to be running..."
   aws ec2 wait instance-running --filters "Name=tag:Project,Values=$TAG" "Name=tag:Role,Values=arm64" 2>/dev/null
-  exec "$0" status
+  exec bash "$0" status
   ;;
 
 status)
