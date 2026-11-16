@@ -18,7 +18,7 @@ Each cell says how far the row is proven, and by what:
 | **Nitro baseline 2026-11-12** | run on two real Nitro instances at commit `9a5668e`, no chain; results in `docs/results/aws-nitro-2026-11-12.md` and its `.jsonl`. Its PCR0/PCR2 values are from before `fc105b0` and `029bbdc`, which changed them; **taken again on 2026-11-16 at `c116845`**, with arm64: `docs/results/aws-nitro-2026-11-16.md` ¹⁶ |
 | **Nitro, live …, local chain** | run on the two real Nitro instances with the registry on a local anvil, not a public network (footnote ¹¹) |
 | **script, never run** | a Nitro e2e script exists for the row but has never been run against real instances |
-| **needs VM** | nothing has run; it needs instances (the TDX and SEV-SNP request, build and launch code exists and ran on guests on 2026-11-15 ¹²) |
+| **needs VM** | nothing has run; it needs instances (since 2026-11-16 only SEV-SNP T3's whole-initrd part is left in this state; see "Cells still open" below the table) |
 | **missing** | no script and no test |
 
 | id | test | expected | Nitro | TDX | SEV-SNP (GCP) |
@@ -33,6 +33,18 @@ Each cell says how far the row is proven, and by what:
 | T8 | TEE in debug mode | measurements refused | **Nitro, live 2026-11-15** (`debug-mode-check.sh`): the same EIF started with `--debug-mode` gave a genuinely signed document with the right nonce and all-zero PCRs; `ra-parse` refused it with exit 7 ("every PCR is zero"). The normal launch of the same EIF, the control, verified ⁴ | **code**: `TestParse_DebugTDIsRefused` (debug bit set in a copy of the recorded quote) | **code**: `TestParse_DebugGuestIsRefused` (debug bit set in a copy of the recorded report) |
 | T9 | replay of an earlier attestation | refused (nonce) | **code**: `TestCmd_E2E_ParseRejectsTamperedNonce` and the nonce unit tests. **Nitro, live 2026-11-15** (`replay-check.sh`): two fresh documents from the running enclave each verified against their own nonce and differed; document 1 presented against request 2's nonce was refused with exit 6 ("document nonce is not the one sent") ⁵ | **code**: `tdx` nonce tests (a different REPORTDATA is refused); **live 2026-11-12**: a fresh quote presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`); **live 2026-11-16 from another machine** (`replay-check.sh`), exit 6 ¹³ | **code**: `snp` nonce tests; **live 2026-11-16 from another machine** (`replay-check.sh`, on our boot), exit 6 ¹³; **live 2026-11-12**: a fresh document from the guest, presented against the next request's nonce, refused with exit 6 (`e2e/cvm/in-guest-verify.sh`) ¹⁰ |
 | T10 | two attestations from different machines, combined | refused | **not applicable** ⁶ | **not applicable** ⁶ | **Fails: reproduced live 2026-11-16** ¹⁵. B's AMD-signed report requested over SHA3-512 of A's vTPM attestation (`record-snp -relay-att`) verifies, **exit 0**, with A's values, and `lookup` finds the Auditor's registration for A, while B runs an unregistered application. Controls: A's and B's own pairs exit 0; B's own report next to A's attestation is refused at the binding, exit 5. So the binding works and the relay passes it (`docs/build/ra-comparison.md`, "The SEV-SNP relay, measured"). A **live result**, like Nitro's T8: the recordings carry instance identifiers and are not committed. `TestVerifySig_MixedRecordingsFailTheBinding` is the naive mix, not this row |
+
+### Cells still open (2026-11-16), and why
+
+| cell | state | why it is open |
+|---|---|---|
+| T1, Nitro, across days | the same commit on two machines agrees; values differ across commits and days | by design: the code changed (`fc105b0`, `029bbdc`), and the test application's Dockerfile pins neither its base image nor its packages (`docs/results/aws-nitro-2026-11-16.md`) |
+| T1, TDX and SEV-SNP, machine type and zone | not measured | every guest so far was `c3-standard-4` / `n2d-standard-2` in `us-central1-a`; RTMR0 and MEASUREMENT are expected to follow the VM's shape |
+| T3, SEV-SNP, the whole initrd from two paths | **needs VM** | session 3 ran T2 and T6 on SEV-SNP, not T3; TDX's T3 (`att` writes the initrd the same way for both) passed. The SEV-SNP guests are stopped, not deleted |
+| T7, TDX and SEV-SNP | **code** in part | `e2e/build-env-check.sh` is a Nitro script; no CVM version exists, so `receive` refusing another architecture has not run on a guest |
+| T8, TDX and SEV-SNP | **code** only | no debug TD or debug SEV-SNP guest has been launched; `gcp-cvm.sh` has no option for one, and whether GCP offers it has not been checked. The refusal is tested on a recorded document with the debug bit set |
+| T10, Nitro and TDX | not applicable | one signed document, nothing to combine (⁶) |
+| T10, SEV-SNP, as a code test | live only | the relay recordings carry instance identifiers and are not committed |
 
 ¹ `docs/build/sev-snp.md`, "Variables", keeps the 2026-11 observations as a record. The 2026-11 numbering of "the seven
 SEV-SNP tests" was the scripts' own and is not the same as T1–T10 here.
