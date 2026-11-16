@@ -117,8 +117,10 @@ All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md), [Intel
 
 **Step by step, from nothing:** Nitro, the two flows in [e2e/README.md](e2e/README.md) (instances:
 [e2e/cloud/README.md](e2e/cloud/README.md)); Intel TDX, [Getting started](docs/build/tdx.md#getting-started-from-nothing-to-a-verified-tdx-guest); AMD SEV-SNP,
-[Getting started](docs/build/sev-snp.md#getting-started-from-nothing-to-a-verified-sev-snp-guest). What each platform's evidence
-gives the verifier, side by side: [RA comparison](docs/build/ra-comparison.md).
+[Getting started](docs/build/sev-snp.md#getting-started-from-nothing-to-a-verified-sev-snp-guest). On TDX and SEV-SNP
+the tested path uses one guest, and its Auditor registers the Vendor's guest's values without rebuilding them; the
+independent Auditor of the trust model above is each page's "The Auditor's half", written and **not yet run**. What
+each platform's evidence gives the verifier, side by side: [RA comparison](docs/build/ra-comparison.md).
 
 ## Quick start
 
@@ -231,8 +233,11 @@ hash, and register its own signed hash. The User can then require both registrie
   live TDX and SEV-SNP guests with the whole chain on the guest (`e2e/cvm/in-guest-verify.sh`). For TDX,
   `build` and `launch --platform intel-tdx` build the application initrd (both options, with `--verify`) and
   install and check it under GRUB; for SEV-SNP the same with `--platform amd-sev-snp-initrd` or
-  `amd-sev-snp-verity`. Tested without a guest (the SEV-SNP check also on recorded evidence), not yet run on one.
-  SEV-SNP evidence is two documents
+  `amd-sev-snp-verity`. Run on real guests, both options, on 2026-11-15 and 2026-11-16, with `audit` and `verify`
+  from another machine. **Not yet run on the CVMs: the independent Auditor.** In every CVM run so far the Auditor
+  registered the values the Vendor's guest measured, which is weaker than the trust model above; the Auditor's own
+  rebuild on a guest of its own is written ("The Auditor's half" in each platform's Getting started) and needs two
+  guests to run. SEV-SNP evidence is two documents
   from two signers, and nothing proves they come from the same VM; see [AMD SEV-SNP](docs/build/sev-snp.md#same-vm).
   What a measurement says about a running guest: [runtime immutability](docs/build/runtime-immutability.md).
 - **GCP Confidential Space and Azure** have request-side scaffolding only.
