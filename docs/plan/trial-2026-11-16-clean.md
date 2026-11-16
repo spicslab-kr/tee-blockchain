@@ -297,11 +297,11 @@ Not changed, and why:
 
 | finding | why |
 |---|---|
-| D3 (no independent rebuild on the CVMs) | needs a second guest; "The Auditor's own guest" in each doc is still unrun |
+| D3 (no independent rebuild on the CVMs) | **written, not run.** Both procedures now say that step 11 is not an audit, and "The Auditor's half" (A1 to A9) moves Nitro's flow 1 to the CVMs, with what "the same inputs" means (`docs/build/tdx.md`, `sev-snp.md`). Running it needs two guests at once; `docs/plan/cvm-port.md` Phase 3 item 6 and Phase 4b item 5 say what run confirms it |
 | D1, D2, D4–D9, D11 | differences of the platforms themselves, not defects; the User's side is the same command |
 | D13 | TDX and SEV-SNP evidence has no module ID and no time to show |
 | D14 | the getting-started steps are typed by hand and write no JSONL; `in-guest-verify.sh` and `replay-check.sh` do |
-| D17 | "enclave" in the CLI wording on VMs: cosmetic, left for a pass over all CLI text |
+| D17 | partly: `audit` and `verify`, which the Auditor's half runs against guests, now say "guest" on TDX and SEV-SNP and "enclave" only on Nitro (`cli.TEENoun`); the TDX e2e test requires it. Other commands' wording (`ra-request`, `self-register`, `lookup`, usage text) is left for a pass over all CLI text |
 | F9 | the Nitro AMI and the `dnf` packages are unpinned; this run's versions are recorded above and equal the baseline's except git |
 | `net_retry` not retrying `Connection closed by …` | not reproduced |
 | `sudo` working although `sudo -n true` asked for a password | not investigated; outside the repository |

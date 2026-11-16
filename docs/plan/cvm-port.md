@@ -13,6 +13,9 @@ Status (2026-11-11, evening):
   mounted the dm-verity image (3.4). On 2026-11-15 the TDX build (both options, `--verify`) and launch went into the
   tool and **ran on real guests** (install, reboot, `--check`, both options; `audit` and `verify` from another
   machine; two guests of one image gave the same values). What is left is listed under "Phase 3: what waits for a VM".
+  **The biggest open item:** in every CVM run so far the Auditor registered the Vendor's guest's own values. The
+  Auditor's independent rebuild on a guest of its own is written as a procedure (2026-11-16, both platform docs, "The
+  Auditor's half") and **has not been run**: Phase 3 item 6 and Phase 4b item 5.
 - Phase 5 (a locked guest) is designed below, not started.
 - See `docs/plan/night-log.md`.
 
@@ -262,6 +265,29 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
    independent rebuild can ever match on TDX, and it is the first thing to measure.
 5. **Done 2026-11-15**: from a WSL on another machine, `ra-request`, `audit` (registered on a local anvil) and `verify` (exit 0, `✓ matches`). What was asked: **The verifier from another machine.** `att-user verify` against the guest's responder (Phase 2.2), with
    `measurements.json` registered by the Vendor or audited by the Auditor.
+6. **Not run: the Auditor's half as a procedure.** Written 2026-11-16 (`docs/build/tdx.md`, "The Auditor's half",
+   A1 to A9). Item 4 measured that two guests of one image give the same values; nobody has yet followed the procedure
+   in which the Auditor rebuilds, boots, compares and registers its **own** values and a User then verifies the
+   **Vendor's** guest against them. Until this runs, every TDX registration made so far is the Vendor's values
+   registered by the Auditor (the getting-started step 11), not an audit. What to run, for each option:
+   1. **Two guests from one exact image**, the same machine type and zone, in one call so they cannot differ:
+      `IMAGE=<exact name> bash e2e/cloud/gcp-cvm.sh tdx create vendor auditor` (with approval; two billable VMs).
+      Pass: `gcp-cvm.sh tdx status` shows the same image on both disks.
+   2. **Each builds and launches.** The Vendor: getting-started steps 4 to 9 with `att-vendor`. The Auditor: A3 to A7
+      with `att-auditor`, the Vendor's `app` folder and, for Option 2, the Vendor's `base-initrd-v.img`. Pass: both
+      `launch --check` print `✓ the boot measured the built initrd`, and `initrd_sha384` (Option 2: also `root_hash`)
+      is equal in the two `out/build-value.json`.
+   3. **The two guests' values are equal.** Fetch both `out/measurements.json`; `att-auditor compare --attested
+      vendor-measurements.json --expected auditor-measurements.json` exits 0. Pass: MRTD, RTMR0, RTMR1 and RTMR2 equal.
+   4. **The Auditor registers its own values** (A8): `audit --tee-addr <auditor-guest>:5000 --build-measurements
+      <its own> --vendor-tee <vendor-guest>:5000`. Pass: `identical: the guest runs exactly what I built`, `same: the
+      Vendor's guest runs exactly what I built`, `PASS: audited and registered`, exit 0.
+   5. **The User verifies the Vendor's guest** against that registry (A9). Pass: exit 0, `✓ matches`.
+   6. **Negative control**: one byte changed in the Vendor's `app`, rebuilt and relaunched on the Vendor's guest only.
+      Pass: `audit --vendor-tee` prints `the Vendor's guest runs something else`, and the User's `verify` against the
+      Auditor's registry exits 1.
+
+   Record the verdicts as JSONL lines (T4 for 4 and 5, T5 for 6) so they land in `docs/plan/test-matrix.md`.
 
 ## Phase 4 — AMD SEV-SNP
 
@@ -323,6 +349,27 @@ so a check fed the recorded evidence and those build values must pass, and fail 
    between two guests' disks; and the Auditor uses the Vendor's base initrd (D1 (a)). Measure first whether CMDLINE
    can be made equal.
 4. **T10** stays as it is: the build and launch do not change what the evidence can say about the same VM.
+5. **Not run: the Auditor's half as a procedure.** Written 2026-11-16 (`docs/build/sev-snp.md`, "The Auditor's
+   half", A1 to A9). Item 3 measured that two guests of one image give the same values (Option 1); nobody has yet
+   followed the procedure in which the Auditor rebuilds, boots, compares and registers its **own** values and a User
+   then verifies the **Vendor's** guest against them, and Option 2 has never run on two guests. What to run, for each
+   format (`amd-sev-snp-initrd`, `amd-sev-snp-verity`):
+   1. **Two guests from one exact image**, the same machine type and zone, in one call:
+      `IMAGE=<exact name> bash e2e/cloud/gcp-cvm.sh snp create vendor auditor` (with approval; two billable VMs).
+      Pass: `gcp-cvm.sh snp status` shows the same image on both disks.
+   2. **Each builds and launches.** The Vendor: getting-started steps 4 to 9 with `att-vendor`. The Auditor: A3 to A7
+      with `att-auditor`, the Vendor's `app` folder and, for Option 2, the Vendor's `base-initrd-v.img`. Pass: both
+      `launch --check` print `✓ the boot measured the build`, and `initrd_sha256` (Option 2: also `root_hash` and
+      `pcr12`) is equal in the two `out/build-value.json`.
+   3. **The two guests' values are equal.** `att-auditor compare --attested vendor-measurements.json --expected
+      auditor-measurements.json` exits 0. Pass: MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD (and PCR12) equal.
+   4. **The Auditor registers its own values** (A8), with `--vendor-tee`. Pass: `identical: the guest runs exactly what
+      I built`, `same: the Vendor's guest runs exactly what I built`, `PASS: audited and registered`, exit 0.
+   5. **The User verifies the Vendor's guest** against that registry (A9). Pass: exit 0, `✓ matches`.
+   6. **Negative control**: one byte changed in the Vendor's `app`, rebuilt and relaunched on the Vendor's guest only.
+      Pass: `audit --vendor-tee` prints `the Vendor's guest runs something else`, and `verify` exits 1.
+
+   Record the verdicts as JSONL lines (T4 for 4 and 5, T5 for 6).
 
 4b (needs instances): request, build and launch, mirroring phases 2 and 3, **on GCP only**. SEV-SNP on AWS (VLEK
 signing, NitroTPM as the vTPM, an AMI re-registered with TPM support) was **decided against on 2026-11-11** and is not
