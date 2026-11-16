@@ -5,8 +5,10 @@
 tdx`; the whole chain passed on a live guest on 2026-11-12). Building the initrd and launching it are in the tool since
 2026-11-15 (`build` and `launch --platform intel-tdx`, both options, `--verify`), and **ran on real guests on
 2026-11-15**: install, reboot and `launch --check` passed for both options, and `audit` and `verify` passed from
-another machine (`docs/plan/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values;
-the Auditor's independent rebuild on a guest of its own is written ("The Auditor's half") and **not run**.
+another machine (`docs/plan/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
+**The independent Auditor ran on 2026-11-16** ("The Auditor's half", two guests, both options): it rebuilt on its own
+guest, got the Vendor's values, registered them, and a User's `verify` of the Vendor's guest passed; a one-byte change
+on the Vendor's side was refused (`docs/results/sessions-2026-11-16/intel-tdx.md`).
 The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) passes against a local anvil chain (first run
 2026-11-11, anvil 1.8.0). Tools and versions: [toolchain.md](toolchain.md).
 
@@ -23,8 +25,8 @@ the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step pri
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
 README describes ("an independent Auditor rebuilds it, confirms the enclave really runs those bytes"): a registration
 made that way says no more than the Vendor's own word. It shows that the chain works end to end. The Auditor's
-independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it is written but **has not
-been run** (it needs two guests at once). The procedure was followed end to end in a clean environment on 2026-11-15
+independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it needs two guests at once
+and **ran and passed on 2026-11-16**, both options. The procedure was followed end to end in a clean environment on 2026-11-15
 (`docs/plan/trial-2026-11-16.md`), and again from the documents alone, both options, on 2026-11-16
 (`docs/plan/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside this page have been
 filled in since. If a step stops with an error, that is a finding; note it.
@@ -317,7 +319,7 @@ first made): `gcloud compute firewall-rules describe attestamp-ra` shows it.
 
 > **This step is not an audit.** It registers what the Vendor's guest measured, so the Auditor vouches for values it
 > never reproduced. It is here to show the chain working with one guest. An Auditor that means its signature does
-> "The Auditor's half" (A1 to A9, not run yet) instead of this step.
+> "The Auditor's half" (A1 to A9; run and passed on 2026-11-16) instead of this step.
 
 A local chain, in a second terminal, left running until step 12 is done:
 
@@ -410,12 +412,12 @@ The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rule
 
 ### The Auditor's half: rebuild, boot, compare, register
 
-> **Not run.** Written on 2026-11-16; it needs two guests at once and has not been followed end to end. What has
-> run: two guests of one image, each building and booting the same application, measured the same four values
-> (2026-11-15, `att-vendor` on both; a third guest on 2026-11-16 gave them again). What has **not** run:
-> `att-auditor build` and `launch` on a guest, `audit --vendor-tee` from one guest to another, and a User verifying the
-> Vendor's guest against the Auditor's registration. `docs/plan/cvm-port.md`, "What waits for a VM", says what run
-> would confirm it. If you follow it, every step is a finding until then.
+> **Ran on 2026-11-16, both options, and passed** (`docs/results/sessions-2026-11-16/intel-tdx.md`). Two guests
+> made in one call from `ubuntu-2404-noble-amd64-v20261105`; the Auditor's own build equalled the Vendor's, both guests
+> measured the same four values, `audit --vendor-tee` registered the Auditor's own value, and the User's `verify` of
+> the Vendor's guest against it gave exit 0. With one byte changed on the Vendor's side only, `audit` said `the
+> Vendor's guest runs something else` and `verify` gave exit 1. One step was wrong and is fixed (A2's copy of `app`).
+> Not covered by that run: another machine type or zone (see "The same inputs").
 
 This is what README's trust model asks of the Auditor: rebuild the Vendor's application independently, confirm that a
 TEE really runs those bytes, and only then register. Step 11 above does not do that. It is the same flow as Nitro's,
@@ -897,7 +899,7 @@ instead. This section only records a quote from a stock guest, as the first fixt
 | what | why |
 |---|---|
 | a failed dm-verity check at boot stopping the boot | Option 2 builds and boots with the real tools (2026-11-15), but a root hash that does not match still lets the boot go on; `launch --check` refuses it (`/run/attestamp-status`) |
-| "The Auditor's half" (A1 to A9): the Auditor's own `build` and `launch` on its own guest, `audit --vendor-tee` between two guests, and a User verifying the Vendor's guest against the Auditor's registration | written 2026-11-16, **not run**: it needs two guests at once. Each guest measured the same values (2026-11-15, `att-vendor` on both), which is what it rests on; the procedure itself has not been followed. `docs/plan/cvm-port.md`, "What waits for a VM" |
+| the Auditor's half on another machine type or zone | it passed on 2026-11-16 with both guests `c3-standard-4` in `us-central1-a`; whether RTMR0 or MRTD follow the machine type or zone is not measured |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |
