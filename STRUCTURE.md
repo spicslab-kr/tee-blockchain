@@ -36,7 +36,8 @@ This page lists every folder in the repository, then explains the one idea that 
 │   ├── core/               logic that is about measurements, not about a platform or a chain
 │   │   ├── compare/        compare values and judge a registration (match, expiry, approver)
 │   │   └── transfer/       the build-config and measurement-record files that travel between Vendor and Auditor
-│   └── cli/                the few things every command line shares (colour, progress lines)
+│   ├── cli/                the few things every command line shares (colour, progress lines)
+│   └── doccheck/           no code: a test that every document reference (links, anchors, file paths) resolves
 │
 ├── contracts/
 │   └── evm/                Registry.sol (Solidity) and the OpenZeppelin submodule under lib/
