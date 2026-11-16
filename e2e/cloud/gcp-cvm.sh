@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 # Create, inspect and remove the GCP Confidential VM instances for TDX or SEV-SNP.
 #
-#   bash e2e/cloud/gcp-cvm.sh tdx create [vendor] [auditor]   # one VM per role; default both (2 VMs)
-#   bash e2e/cloud/gcp-cvm.sh snp create [vendor] [auditor]   # SEV-SNP; T10 (docs/build/app-fixture-recording.md) needs a second VM
+#   bash e2e/cloud/gcp-cvm.sh tdx create [vendor] [auditor] --yes   # one VM per role; default both (2 VMs)
+#   bash e2e/cloud/gcp-cvm.sh snp create [vendor] [auditor] --yes   # SEV-SNP; T10 (docs/build/app-fixture-recording.md) needs a second VM
 #   bash e2e/cloud/gcp-cvm.sh tdx status
 #   bash e2e/cloud/gcp-cvm.sh tdx stop | start | delete
 #
+# create makes VMs only with --yes. Without it, it prints how many VMs it would make, with their names, and stops;
+# --dry-run prints the same without calling gcloud at all. The roles are vendor and auditor, each at most once; any
+# other word stops the script before anything runs.
+#
 # Names: each VM is <PREFIX>-<role>, PREFIX default attestamp-<tdx|snp>. If the project already has VMs of that name
 # (made by someone else, or by you earlier), create reuses them; choose your own with PREFIX=<name>, e.g.
-#   PREFIX=alice-tdx bash e2e/cloud/gcp-cvm.sh tdx create vendor
+#   PREFIX=alice-tdx bash e2e/cloud/gcp-cvm.sh tdx create vendor --yes
 # and pass the same PREFIX to status, stop, start and delete: they act only on VMs whose name starts with it.
 #
 # Image: IMAGE=<exact image name> pins one image version, e.g.
-#   IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor
+#   IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor --yes
 # Without IMAGE the family (IMAGE_FAMILY, default ubuntu-2404-lts-amd64) is resolved once to the image it points at
 # now, that exact name is printed, and every VM of this call is made from it. The Vendor's and the Auditor's guests
 # must be made from the same exact image: the root file system UUID, the partition UUID and the stock initrd come with
@@ -34,14 +38,28 @@
 set -uo pipefail
 
 PLAT=${1:-}; ACTION=${2:-}
-[ -n "$PLAT" ] && [ -n "$ACTION" ] || { sed -n '2,33p' "$0"; exit 2; }
+[ -n "$PLAT" ] && [ -n "$ACTION" ] || { sed -n '2,37p' "$0"; exit 2; }
 shift 2
-ROLES=("$@"); [ ${#ROLES[@]} -gt 0 ] || ROLES=(vendor auditor)
-# Every role is one billable VM, so only the two roles the project uses are accepted: a stray word on the command line
-# (it happened in e2e/cloud/README.md: "create vendor auditor user y" would have made four VMs) stops the script.
+# --yes: really create. --dry-run: print the plan and call nothing, not even gcloud. Anything else is a role.
+YES=0; DRY=0; ROLES=()
+for arg in "$@"; do
+  case "$arg" in
+    --yes) YES=1 ;;
+    --dry-run) DRY=1 ;;
+    -*) echo "unknown option '$arg': the options are --yes and --dry-run" >&2; exit 2 ;;
+    *) ROLES+=("$arg") ;;
+  esac
+done
+[ ${#ROLES[@]} -gt 0 ] || ROLES=(vendor auditor)
+# Every role is one billable VM, so only the two roles the project uses are accepted, each once. A stray word on the
+# command line stops the script before anything else runs: e2e/cloud/README.md once had "create vendor auditor user y",
+# which would have made four VMs (build-info gap #20).
 if [ "$ACTION" = create ]; then
+  seen=" "
   for role in "${ROLES[@]}"; do
-    case "$role" in vendor|auditor) ;; *) echo "unknown role '$role': each role is one VM; use vendor and/or auditor" >&2; exit 2 ;; esac
+    case "$role" in vendor|auditor) ;; *) echo "unknown role '$role': each role is one VM; the roles are vendor and auditor" >&2; exit 2 ;; esac
+    case "$seen" in *" $role "*) echo "role '$role' given twice: each role is one VM" >&2; exit 2 ;; esac
+    seen="$seen$role "
   done
 fi
 
@@ -57,6 +75,22 @@ IMAGE=${IMAGE:-}   # an exact image name in IMAGE_PROJECT; empty: resolve IMAGE_
 PREFIX=${PREFIX:-attestamp-$PLAT}
 NET_TAG=attestamp-ra
 RA_PORT=${RA_PORT:-5000}
+
+# create: say what would be made, before any gcloud call, and make it only with --yes. On 2026-11-16 a run meant as a
+# test, with no terminal to press Ctrl-C in, went through the old 4-second pause and created two VMs (gap #20).
+if [ "$ACTION" = create ]; then
+  names=""; for role in "${ROLES[@]}"; do names="$names $PREFIX-$role"; done
+  echo "create: ${#ROLES[@]} billable VM(s):$names"
+  echo "        $PLAT, $MACHINE, zone $ZONE, image ${IMAGE:-the one family $IMAGE_FAMILY points at now}"
+  if [ "$DRY" = 1 ]; then
+    echo "dry run: nothing was created and gcloud was not called."
+    exit 0
+  fi
+  if [ "$YES" != 1 ]; then
+    echo "Nothing created. To create these ${#ROLES[@]} VM(s), run the same command with --yes." >&2
+    exit 3
+  fi
+fi
 
 die() { echo "error: $*" >&2; exit 1; }
 command -v gcloud >/dev/null 2>&1 || die "gcloud not found. Install it and run 'gcloud auth login'."
@@ -82,8 +116,8 @@ create)
   echo "image    $IMAGE_PROJECT/$IMAGE   ($from)"
   echo "roles: ${ROLES[*]}"
   echo "Record the image name: the other side's guest must be made from the same one, with"
-  echo "    IMAGE=$IMAGE bash e2e/cloud/gcp-cvm.sh $PLAT create <role>"
-  echo "This creates ${#ROLES[@]} billable instances. Ctrl-C now to stop."; sleep 4
+  echo "    IMAGE=$IMAGE bash e2e/cloud/gcp-cvm.sh $PLAT create <role> --yes"
+  echo "Creating ${#ROLES[@]} billable instance(s) (--yes given)."
 
   # Confirm the chosen image really carries the guest OS feature this platform needs.
   if ! gcloud compute images describe "$IMAGE" --project "$IMAGE_PROJECT" \

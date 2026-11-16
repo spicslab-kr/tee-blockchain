@@ -375,7 +375,7 @@ So the two possible results mean:
 ### Before you start
 
 - **A second SEV-SNP VM is a billable cloud resource: ask before creating it** (`e2e/cloud/README.md`). The first VM is
-  `attestamp-snp-vendor`. The second one can be made with `bash e2e/cloud/gcp-cvm.sh snp create auditor` (same
+  `attestamp-snp-vendor`. The second one can be made with `bash e2e/cloud/gcp-cvm.sh snp create auditor --yes` (same
   machine type, image and zone; it becomes `attestamp-snp-auditor`).
 - On VM A, `GRUB_FORCE_PARTUUID` must be off (`docs/build/sev-snp.md`, "The boot setting: turning `GRUB_FORCE_PARTUUID` off"), so that its vTPM
   event log measures an initrd and `ra-parse` gets as far as the binding. `attestamp-snp-vendor` already has it off.

@@ -281,7 +281,7 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
    control refused. The procedure needed one fix (A2's copy of `app`). What was asked: **the Auditor's half as a
    procedure** (`docs/build/tdx.md`, "The Auditor's half", A1 to A9), for each option:
    1. **Two guests from one exact image**, the same machine type and zone, in one call so they cannot differ:
-      `IMAGE=<exact name> bash e2e/cloud/gcp-cvm.sh tdx create vendor auditor` (with approval; two billable VMs).
+      `IMAGE=<exact name> bash e2e/cloud/gcp-cvm.sh tdx create vendor auditor --yes` (with approval; two billable VMs).
       Pass: `gcp-cvm.sh tdx status` shows the same image on both disks.
    2. **Each builds and launches.** The Vendor: getting-started steps 4 to 9 with `att-vendor`. The Auditor: A3 to A7
       with `att-auditor`, the Vendor's `app` folder and, for Option 2, the Vendor's `base-initrd-v.img`. Pass: both
@@ -364,7 +364,7 @@ so a check fed the recorded evidence and those build values must pass, and fail 
    **the Auditor's half as a procedure** (`docs/build/sev-snp.md`, "The Auditor's half", A1 to A9), for each format
    (`amd-sev-snp-initrd`, `amd-sev-snp-verity`):
    1. **Two guests from one exact image**, the same machine type and zone, in one call:
-      `IMAGE=<exact name> bash e2e/cloud/gcp-cvm.sh snp create vendor auditor` (with approval; two billable VMs).
+      `IMAGE=<exact name> bash e2e/cloud/gcp-cvm.sh snp create vendor auditor --yes` (with approval; two billable VMs).
       Pass: `gcp-cvm.sh snp status` shows the same image on both disks.
    2. **Each builds and launches.** The Vendor: getting-started steps 4 to 9 with `att-vendor`. The Auditor: A3 to A7
       with `att-auditor`, the Vendor's `app` folder and, for Option 2, the Vendor's `base-initrd-v.img`. Pass: both

@@ -137,7 +137,7 @@ The first two run on your computer; the `linux/` two go to the guest.
 ### 3. On your computer: the guest
 
 ```
-bash e2e/cloud/gcp-cvm.sh tdx create vendor
+bash e2e/cloud/gcp-cvm.sh tdx create vendor --yes
 ```
 
 This makes **one** VM, `attestamp-tdx-vendor` (`c3-standard-4`, Ubuntu 24.04, TDX, zone `us-central1-a`), and a
@@ -491,7 +491,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linu
 **A2. On the Auditor's computer: its own guest, from the Vendor's exact image.**
 
 ```
-IMAGE=ubuntu-2404-noble-amd64-v20261105 MACHINE=c3-standard-4 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh tdx create auditor
+IMAGE=ubuntu-2404-noble-amd64-v20261105 MACHINE=c3-standard-4 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh tdx create auditor --yes
 bash e2e/cloud/gcp-cvm.sh tdx status
 ```
 
@@ -879,7 +879,7 @@ the boot stopped.
 
 ## The instance
 
-`e2e/cloud/gcp-cvm.sh tdx create <roles…>` creates it.
+`e2e/cloud/gcp-cvm.sh tdx create <roles…> --yes` creates it.
 
 | setting | value | why |
 |---|---|---|
@@ -907,7 +907,7 @@ describe` on 2026-11-11):
 To build and run an application, follow [Getting started](#getting-started-from-nothing-to-a-verified-tdx-guest)
 instead. This section only records a quote from a stock guest, as the first fixture was made.
 
-1. `bash e2e/cloud/gcp-cvm.sh tdx create vendor`, then on the instance `sudo shutdown -h +240` as a safety stop.
+1. `bash e2e/cloud/gcp-cvm.sh tdx create vendor --yes`, then on the instance `sudo shutdown -h +240` as a safety stop.
 2. Record a quote with ConfigFS TSM, as in `internal/tee/parse/tdx/testdata/README.md`.
 3. Copy `quote.bin` back (`gcloud compute scp`, one file per call) and stop the instance.
 4. `att-user ra-parse --doc quote.bin --format intel-tdx --nonce <128 hex chars>` prints MRTD and RTMR0–2.

@@ -92,7 +92,7 @@ The first two run on your computer; the `linux/` two go to the guest.
 ### 3. On your computer: the guest
 
 ```
-bash e2e/cloud/gcp-cvm.sh snp create vendor
+bash e2e/cloud/gcp-cvm.sh snp create vendor --yes
 ```
 
 This makes **one** VM, `attestamp-snp-vendor` (`n2d-standard-2`, AMD Milan, Ubuntu 24.04, SEV-SNP, zone
@@ -467,7 +467,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linu
 **A2. On the Auditor's computer: its own guest, from the Vendor's exact image.**
 
 ```
-IMAGE=ubuntu-2404-noble-amd64-v20261105 MACHINE=n2d-standard-2 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh snp create auditor
+IMAGE=ubuntu-2404-noble-amd64-v20261105 MACHINE=n2d-standard-2 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh snp create auditor --yes
 bash e2e/cloud/gcp-cvm.sh snp status
 ```
 
@@ -851,7 +851,7 @@ the kernel command line lost `panic=-1`, which only the initrdless entry adds (o
 
 ## The instance
 
-`e2e/cloud/gcp-cvm.sh snp create <roles…>` creates it. The settings and why:
+`e2e/cloud/gcp-cvm.sh snp create <roles…> --yes` creates it. The settings and why:
 
 | setting | value | why |
 |---|---|---|
@@ -879,7 +879,7 @@ describe` on 2026-11-11):
 
 ## From scratch: record and check one evidence pair
 
-1. Create the instance: `bash e2e/cloud/gcp-cvm.sh snp create vendor`. On the instance, set a safety stop:
+1. Create the instance: `bash e2e/cloud/gcp-cvm.sh snp create vendor --yes`. On the instance, set a safety stop:
    `sudo shutdown -h +240`.
 2. Build the recorder (`internal/tee/parse/snp/testdata/README.md`, "Recording another one") and copy it over with
    `gcloud compute scp`.

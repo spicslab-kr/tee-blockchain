@@ -96,17 +96,22 @@ behind them. Nitro comes first because it is the baseline the other two are comp
 ```
 1. Nitro baseline        bash e2e/cloud/aws-nitro.sh create      # 2 instances, eu-north-1
    (architecture rows)   bash e2e/cloud/aws-nitro.sh create-arm64  # 1 more, c7g.xlarge (Graviton), for ARM64_HOST
-2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create    # 2 instances (vendor, auditor), us-central1-a
-3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create    # 2 instances (vendor, auditor), us-central1-a
+2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create --yes  # 2 instances (vendor, auditor), us-central1-a
+3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create --yes  # 2 instances (vendor, auditor), us-central1-a
 ```
 
 Every word after `create` is a role, and every role is **one billable VM**. Without roles you get `vendor` and
-`auditor`; `create vendor` makes only the Vendor's. The script accepts no other role names, so a typo stops it
-instead of creating a VM.
+`auditor`; `create vendor` makes only the Vendor's. The script accepts no other role names and no role twice, so a
+typo stops it before anything runs.
+
+**`create` makes VMs only with `--yes`.** Without it, it prints how many VMs it would make and their names, and stops
+(exit 3); `--dry-run` prints the same without calling `gcloud` at all. Run it once without `--yes` to see the plan,
+then again with it. This is because a run without a terminal to press Ctrl-C in once created two VMs nobody meant to
+make (2026-11-16; `docs/status/build-info-gaps.md`, #20).
 
 **One exact image for both guests.** `gcp-cvm.sh` resolves the image family once, prints the exact image it picked
 (for example `ubuntu-2404-noble-amd64-v20261105`) and makes every VM of that call from it. When the second guest is
-made later, pass that name: `IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor`.
+made later, pass that name: `IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor --yes`.
 The family moves to a new version every few weeks, and the disk UUIDs and the stock initrd that end up in TDX RTMR2
 and the SEV-SNP CMDLINE come with the image (`docs/build/tdx.md`, "Use the same image as the other side").
 `gcp-cvm.sh <plat> status` shows each boot disk's image.
@@ -114,7 +119,7 @@ and the SEV-SNP CMDLINE come with the image (`docs/build/tdx.md`, "Use the same 
 **Names already taken.** The default names (`attestamp-e2e` on AWS, `attestamp-<tdx|snp>-<role>` on GCP) are shared by
 everyone using the same account or project. `gcp-cvm.sh` reuses a VM of that name without creating one, and
 `aws-nitro.sh` cannot use a key pair whose `.pem` was made on another machine. Give your own names:
-`PREFIX=<you>-tdx bash e2e/cloud/gcp-cvm.sh tdx create vendor`, or
+`PREFIX=<you>-tdx bash e2e/cloud/gcp-cvm.sh tdx create vendor --yes`, or
 `KEY_NAME=<you> SG_NAME=<you> TAG=<you> bash e2e/cloud/aws-nitro.sh create`, and pass the same `PREFIX=` or `TAG=` to
 `status`, `stop`, `start` and `delete`: each of them acts only on the VMs or instances with that prefix or tag.
 
