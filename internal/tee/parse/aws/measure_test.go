@@ -42,13 +42,19 @@ func TestParse_RealDocumentPCRs(t *testing.T) {
 	}
 }
 
+// fixtureInstanceID is the EC2 instance ID at the start of the module_id in testdata/fixture-my-web.cbor. This value
+// comes from the signed fixture and cannot be changed: AWS signed the document over its module_id, so editing the
+// fixture breaks the signature and every test that verifies it. It is an instance ID, not an account number, and
+// names an instance that no longer exists (the operator's statement, 2026-11-16; docs/plan/build-info-gaps.md, #15).
+const fixtureInstanceID = "i-05acc9d339a979636"
+
 func TestInfo(t *testing.T) {
 	raw, nonce := realDoc(t)
 	info, err := (Parser{}).Info(Format, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Format != Format || info.Debug || string(info.Nonce) != string(nonce) || !strings.HasPrefix(info.Module, "i-05acc9d339a979636-enc") {
+	if info.Format != Format || info.Debug || string(info.Nonce) != string(nonce) || !strings.HasPrefix(info.Module, fixtureInstanceID+"-enc") {
 		t.Fatalf("info: %+v", info)
 	}
 	if info.Timestamp.Before(time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)) || info.Timestamp.After(time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC)) {
