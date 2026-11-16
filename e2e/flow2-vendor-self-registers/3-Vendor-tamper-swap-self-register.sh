@@ -23,6 +23,9 @@ FROM alpine:3.20
 RUN echo "not the audited image" > /etc/att-tampered
 CMD ["sleep", "1000000"]
 DOCKER
+# Step 1's build enabled docker on this instance; start it here too, as flow 1 step 4 must, so this step does not
+# depend on that.
+step "STARTING DOCKER" sudo systemctl enable --now docker
 step "BUILDING TAMPERED IMAGE" sudo docker build -q -t tampered:latest tampered
 
 # att-vendor pack - turns this docker image into an enclave image (EIF) and measures it.

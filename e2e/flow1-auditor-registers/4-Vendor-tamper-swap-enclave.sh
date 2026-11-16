@@ -22,6 +22,9 @@ FROM alpine:3.20
 RUN echo "not the audited image" > /etc/att-tampered
 CMD ["sleep", "1000000"]
 DOCKER
+# In flow 1 the Vendor never runs att-vendor build, which is what starts docker (systemctl enable --now docker), so
+# docker is installed but not running on a fresh Vendor instance. Start it the same way build does.
+step "STARTING DOCKER" sudo systemctl enable --now docker
 step "BUILDING TAMPERED IMAGE" sudo docker build -q -t tampered:latest tampered
 
 # att-vendor pack - turns this docker image into an enclave image (EIF) and measures it.
