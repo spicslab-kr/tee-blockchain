@@ -44,9 +44,11 @@ Unit tests run anywhere. `cmd/*_e2e_test.go` build the binaries and run them aga
 is not on `PATH`. No Nitro hardware is needed for any test.
 Files the `e2e/` scripts fetch from instances land in `e2e-work/`, which is ignored.
 
-`internal/doccheck` checks every document reference in the tracked files: Markdown links and their anchors, and file
-paths written in Markdown, Go comments and scripts. When you move or rename a file, it lists every reference left
-pointing at the old place. Fix the reference; its few exceptions are not a place to silence a failure (the test file
+`internal/doccheck` checks every document reference in the tracked files: Markdown links and their anchors, file
+paths written in Markdown, Go comments and scripts, and every commit named in backticks (`029bbdc`), which must be a
+commit of this repository and unambiguous (it skips in a shallow clone). When you move or rename a file, it lists
+every reference left pointing at the old place; if the history is ever rewritten, it lists every commit the documents
+still name. Fix the reference; its few exceptions are not a place to silence a failure (the test file
 says why).
 
 ## Layout
