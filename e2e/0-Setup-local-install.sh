@@ -29,6 +29,15 @@ case "$(uname -s)" in
 esac
 echo "== detected environment: $(uname -s) -> $OS_KIND"
 
+# The Go tarball for this CPU. go.dev names x86_64 amd64 and aarch64 arm64.
+linux_go_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo amd64 ;;
+    aarch64|arm64) echo arm64 ;;
+    *) echo "unsupported CPU $(uname -m): install Go $GO_VERSION from https://go.dev/dl yourself" >&2; return 1 ;;
+  esac
+}
+
 go_version_ok() {
   # Exact match: the reproducible-build comparison needs the identical compiler version.
   command -v go >/dev/null 2>&1 || return 1
@@ -63,7 +72,8 @@ case "$OS_KIND" in
     if go_version_ok; then
       echo "== Go is already at the right version - skipping"
     else
-      install_go_tarball linux amd64
+      go_arch=$(linux_go_arch)
+      install_go_tarball linux "$go_arch"
     fi
     ;;
   dnf|yum)
@@ -72,7 +82,8 @@ case "$OS_KIND" in
     if go_version_ok; then
       echo "== Go is already at the right version - skipping"
     else
-      install_go_tarball linux amd64
+      go_arch=$(linux_go_arch)
+      install_go_tarball linux "$go_arch"
     fi
     ;;
   mac)
