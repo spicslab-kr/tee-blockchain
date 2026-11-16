@@ -21,12 +21,16 @@ the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step pri
 What it shows and what it does not: everything runs against **one** guest. The Auditor registers the values the
 Vendor's guest measured, as in `e2e/cvm/in-guest-verify.sh`. An Auditor that rebuilds on a guest of its own is the
 last section, "The Auditor's own guest". The procedure was followed end to end in a clean environment on 2026-11-15
-(`docs/plan/trial-2026-11-16.md`); the places where it needed knowledge from outside this page have been filled in
-since. If a step stops with an error, that is a finding; note it.
+(`docs/plan/trial-2026-11-16.md`), and again from the documents alone, both options, on 2026-11-16
+(`docs/plan/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside this page have been
+filled in since. If a step stops with an error, that is a finding; note it.
 
 **Names.** The commands use the guest name `attestamp-tdx-vendor` and the zone `us-central1-a`. If your guest has
 another name (you made `create auditor`, or gave `PREFIX=…` to `gcp-cvm.sh`), replace the name in every `gcloud`
-command; `bash e2e/cloud/gcp-cvm.sh tdx status` lists the names.
+command; `bash e2e/cloud/gcp-cvm.sh tdx status` lists the names. If somebody else in the same project already has an
+`attestamp-tdx-vendor`, `create` says `already exists, reusing it (not created)` and makes nothing: choose your own
+names with `PREFIX=<you>-tdx` (the guest is then `<you>-tdx-vendor`), and pass the same `PREFIX=` to `status` and
+`stop`, which act only on VMs whose name starts with it.
 
 **Cost.** The guest is a `c3-standard-4` and is billed by the hour while it runs. Step 13 stops it.
 
@@ -73,8 +77,9 @@ otherwise links cgo and gives another `att-ra-responder`).
 | macOS | the archive and `./google-cloud-sdk/install.sh` from https://cloud.google.com/sdk/docs/install |
 
 Under WSL, Windows' own `PATH` is appended, so a `gcloud` installed on the Windows side is found too
-(`command -v gcloud` prints a `/mnt/c/…` path); install the Linux one and check that `command -v gcloud` prints
-`/usr/bin/gcloud`. Then sign in, with a project that has billing and C3 quota in `us-central1-a`:
+(`command -v gcloud` prints a `/mnt/c/…` path). That one works from WSL too (2026-11-16), but slowly: `gcp-cvm.sh
+status` took over two minutes. Install the Linux one and check that `command -v gcloud` prints `/usr/bin/gcloud`.
+Then sign in, with a project that has billing and C3 quota in `us-central1-a`:
 
 ```
 gcloud auth login
@@ -89,6 +94,22 @@ source ~/.bashrc
 foundryup --install v1.8.0
 anvil --version
 ```
+
+Or, without running an installer script, the release archive itself (Linux x86_64; the release page has the other
+systems under the same pattern), checked against the release's checksum file:
+
+```
+curl -fsSLO https://github.com/foundry-rs/foundry/releases/download/v1.8.0/foundry_v1.8.0_linux_amd64.tar.gz
+curl -fsSLO https://github.com/foundry-rs/foundry/releases/download/v1.8.0/foundry_v1.8.0_linux_amd64.sha256
+cat foundry_v1.8.0_linux_amd64.sha256
+sha256sum foundry_v1.8.0_linux_amd64.tar.gz
+mkdir -p ~/.foundry/bin
+tar -xzf foundry_v1.8.0_linux_amd64.tar.gz -C ~/.foundry/bin
+export PATH=$PATH:$HOME/.foundry/bin
+```
+
+The two hashes must be equal, and equal to the one in [toolchain.md](toolchain.md) (`8c8560de…ac57`). The checksum
+file is `…_linux_amd64.sha256`, not `….tar.gz.sha256`.
 
 On Windows without WSL, download `foundry_v1.8.0_win32_amd64.zip` from
 https://github.com/foundry-rs/foundry/releases/tag/v1.8.0 and put `anvil.exe` on `PATH`. The `curl` line needs
@@ -124,6 +145,14 @@ same image as the other side" below).
 The VM takes a minute to boot after `create` returns; if the first `gcloud compute ssh` or `scp` fails to connect, try
 again after half a minute. On Windows `gcloud` uses PuTTY, which asks once per new guest whether to store its host key:
 answer `y`.
+
+The first `gcloud compute ssh` or `scp` on a computer that has no `~/.ssh/google_compute_engine` yet makes that key
+and prints `Updating project ssh metadata`: it adds the public key to the **project**, so every VM in the project,
+other people's included, accepts it from then on. That is how `gcloud` works unless the project uses OS Login; if that
+is not acceptable in a shared project, ask its owner before this step.
+
+A stopped VM can get a **new** external address when it is started again (seen on 2026-11-15 and 16 on both
+platforms). After every `start`, take `<guest-ip>` again from `status`.
 
 Copy the binaries to it, one file per command:
 
@@ -219,6 +248,7 @@ out/build-value.json`. `build-value.json` holds the initrd's SHA-384, the digest
 ### 7. On the guest: install and boot
 
 ```
+cat /proc/sys/kernel/random/boot_id     # note it: it is new on every boot, and tells the new boot from the old below
 sudo ./att-vendor launch --platform intel-tdx --initrd out/initrd-app.img --reboot
 ```
 
@@ -227,19 +257,18 @@ title and initrd changed) to `/etc/grub.d/41_attestamp`, makes it the default in
 `/etc/default/grub.d/99-attestamp.cfg`, runs `update-grub` and reboots. The connection drops.
 
 The reboot can take a few minutes, and logging in too early reaches the **old** boot, which is still shutting down
-(seen on 2026-11-15: a minute was not enough). To know the new boot is up, either watch the serial console from your
-computer until a `login:` line appears after the `reboot` lines:
+(seen on 2026-11-15: a minute was not enough; on 2026-11-16 the new boot answered 55 to 166 seconds after the reboot
+command). The surest test is the boot ID noted above. Log in (the `gcloud compute ssh` command of step 3) and check:
 
 ```
-gcloud compute instances get-serial-port-output attestamp-tdx-vendor --zone us-central1-a | tail -5
+cat /proc/sys/kernel/random/boot_id   # must differ from the one noted; the same one is the old boot: log out and wait
+uptime                                # "up 1 min" or so
+cat /proc/cmdline                     # our entry: root=UUID=… ; the stock boot: root=PARTUUID=…
 ```
 
-or log in (the `gcloud compute ssh` command of step 3) and check:
-
-```
-uptime                    # "up 1 min" or so; a longer time is the old boot: log out and wait
-cat /proc/cmdline         # our entry: root=UUID=… ; the stock boot: root=PARTUUID=…
-```
+Do not rely on the serial console (`gcloud compute instances get-serial-port-output`) for this: it returns only the
+newest part of the log, and the old boot's `login:` line looks the same as the new one's (2026-11-16: one wait ended too
+early, another never ended).
 
 Then `sudo shutdown -h +240` again.
 
@@ -262,10 +291,12 @@ ls /opt/app-verity/opt/app         # hello.txt
 ### 9. On the guest: answer attestation requests
 
 ```
-sudo nohup ./att-ra-responder ra-serve --extractor tdx --listen tcp:0.0.0.0:5000 > ra.log 2>&1 &
+sudo nohup ./att-ra-responder ra-serve --extractor tdx --listen tcp:0.0.0.0:5000 > ra.log 2>&1 < /dev/null &
 ```
 
-It is not a service: after every reboot, start it again. Log out (`exit`).
+It is not a service: after every reboot, start it again. Log out (`exit`). The `< /dev/null` matters only when the
+line is sent through `gcloud compute ssh --command '…'` instead of typed: without it the background process holds the
+session's input and the command does not return.
 
 ### 10. On your computer: get the evidence
 
@@ -343,6 +374,7 @@ Then:
 sudo rm -f /etc/grub.d/41_attestamp /etc/default/grub.d/99-attestamp.cfg /boot/initrd-attestamp.img
 sudo cp -p /root/40-force-partuuid.cfg.orig /etc/default/grub.d/40-force-partuuid.cfg
 sudo update-grub
+cat /proc/sys/kernel/random/boot_id     # note it, as in step 7
 sudo systemctl reboot
 ```
 
@@ -361,6 +393,10 @@ finds nothing.
 ```
 bash e2e/cloud/gcp-cvm.sh tdx stop        # the disk still costs a little; "delete" removes the VM and its disk
 ```
+
+With `PREFIX=…` in step 3, give it here too (`PREFIX=<you>-tdx bash e2e/cloud/gcp-cvm.sh tdx stop`): `stop` acts only
+on the VMs whose name starts with the prefix, default `attestamp-tdx`. To stop one VM by name:
+`gcloud compute instances stop <name> --zone us-central1-a`.
 
 The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rules delete attestamp-ra` removes it.
 
