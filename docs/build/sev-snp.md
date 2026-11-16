@@ -113,6 +113,10 @@ and prints `Updating project ssh metadata`: it adds the public key to the **proj
 other people's included, accepts it from then on. That is how `gcloud` works unless the project uses OS Login; if that
 is not acceptable in a shared project, ask its owner before this step.
 
+Port 22: a new project opens it to everyone (`default-allow-ssh`). To close that, see `e2e/cloud/README.md`, "SSH to
+the guests"; with IAP, add `--tunnel-through-iap` to every `gcloud compute ssh` and `scp` below (checked on
+2026-11-16 from Git Bash, both ways).
+
 A stopped VM can get a **new** external address when it is started again (seen twice on SEV-SNP on 2026-11-16). After
 every `start`, take `<guest-ip>` again from `status`.
 

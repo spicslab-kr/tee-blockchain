@@ -37,6 +37,45 @@ For the Nitro e2e suite you also need, in the repository root (all gitignored):
 | `xxd` on the guest (the manual quote recording in `internal/tee/parse/tdx/testdata/README.md`) | present in the stock image `ubuntu-2404-noble-amd64-v20261105` (package `xxd` 2:9.1.0016-1ubuntu7.20); not installed by hand (`/var/log/apt/history.log` shows only `tpm2-tools`) | `command -v xxd` on the guest |
 | `tpm2-tools` on the SEV-SNP guest | **not** in the stock image; installed by hand (`apt-get install -y tpm2-tools`, 5.6-1build4) for the Option 2 hook | `dpkg-query -W tpm2-tools` |
 
+### SSH to the guests: do not leave port 22 open to everyone
+
+A new GCP project's default network has `default-allow-ssh`, tcp:22 from `0.0.0.0/0`, for **every** VM in it. The
+guests here need SSH only from you. Two ways to narrow it:
+
+**IAP (recommended).** Google's Identity-Aware Proxy carries the SSH connection, so port 22 needs to be open only to
+Google's IAP range, `35.235.240.0/20`, and your own address does not matter.
+
+What was checked on 2026-11-16 (Windows, Git Bash, gcloud with PuTTY's plink and pscp, an SEV-SNP guest with an
+external address, while `default-allow-ssh` was still open):
+
+| what | result |
+|---|---|
+| `gcloud compute ssh <vm> --zone … --tunnel-through-iap --command '…'` | works |
+| `gcloud compute scp <file> <vm>:<file> --tunnel-through-iap`, both directions | works; a 1 MiB file came back with the same SHA-256 |
+| `gcloud compute scp --recurse <folder> <vm>: --tunnel-through-iap` | works |
+| where the connection comes from, seen on the guest (`$SSH_CONNECTION`) | `35.235.242.218`, inside `35.235.240.0/20` |
+| host key | plink asks to store it again, under `compute.<instance id>` instead of the address: answer `y` |
+| the IAP API (`iap.googleapis.com`) | was **not** listed as enabled, and the tunnel worked anyway |
+| the first attempt right after the VM started | failed (`Remote side unexpectedly closed network connection`); the second worked. Probably the guest still booting; not proven |
+
+**Not checked:** that SSH still works after `0.0.0.0/0` is removed and only `35.235.240.0/20` is allowed (the project's
+rule was left as it was); which IAM role is the least that suffices (the account tested holds `roles/owner`; Google
+documents `roles/iap.tunnelResourceAccessor` for this, not tried alone); a guest without an external address; macOS
+and Linux clients. With IAP every `gcloud compute ssh` and `scp` in the procedures needs `--tunnel-through-iap`.
+
+The rule it needs, limited to this project's guests by their network tag (not yet applied):
+
+```
+gcloud compute firewall-rules create attestamp-ssh-iap --allow=tcp:22 \
+  --source-ranges=35.235.240.0/20 --target-tags=attestamp-ra
+```
+
+and then `default-allow-ssh` removed or narrowed, which affects every VM in the project, not only these.
+
+**Your own address (`/32`).** The same rule with `--source-ranges=<your address>/32`. It works without IAP, but it
+breaks as soon as your public address changes, and it changes with the network you are on: twice on 2026-11-16 alone
+(`aws-nitro.sh status` now tells you on AWS; on GCP check `attestamp-ra` and the SSH rule by hand).
+
 ## Order
 
 The procedures: Nitro, the flows in `e2e/README.md`; TDX and SEV-SNP, "Getting started" in `docs/build/tdx.md` and
