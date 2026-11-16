@@ -533,7 +533,10 @@ gcloud compute scp attestamp-snp-auditor:out/measurements.json auditor-measureme
 ```
 
 `audit` asks the Auditor's own guest for fresh evidence and registers only if it equals `auditor-measurements.json`
-(`identical: the guest runs exactly what I built`); otherwise it stops with `not registering anything`. With
+(`identical: the guest runs exactly what I built`); otherwise it stops with `not registering anything`. Without
+`--build-measurements` it refuses to start at all (since 2026-11-16): it would register whatever the guest reports,
+an initrdless boot included (`docs/results/sessions-2026-11-16/tdx-initrdless.md`). That refusal does not stop an
+Auditor who registers such values by hand with `register`; the trust model has to assume the Auditor does not. With
 `--vendor-tee` it also asks the Vendor's guest and prints `same: the Vendor's guest runs exactly what I built` or
 `the Vendor's guest runs something else`. In the second case it **still registers the Auditor's own value and exits
 12**, saying that the registration succeeded and only the Vendor comparison failed; do not run it again (that ends

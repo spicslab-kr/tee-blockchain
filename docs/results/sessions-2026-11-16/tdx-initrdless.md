@@ -28,5 +28,28 @@ binaries built at `1b981df`/`57b4350` (no change to the TDX parser since). Local
   build values registers whatever the guest attests, with no check of what that boot loaded; the registration then
   vouches for a boot that carries no application.
 
-What to do about it is an open question (`docs/plan/build-info-gaps.md`, "Design questions to review", Q2). The guest
-was deleted afterwards (with its disk).
+The guest was deleted afterwards (with its disk).
+
+## Measured again after the fix, at `fa871e1`
+
+The fix (`fix(cmd/auditor): refuse to audit a TDX or SEV-SNP guest without --build-measurements`): `audit` on a CVM
+format needs a value the Auditor built. The parser was not changed, because TDX evidence is the quote alone and the
+event log that shows whether an initrd was loaded stays on the guest (`docs/plan/build-info-gaps.md`, Q2: the real fix
+puts that log into the evidence, in a later session). Measured on `trial1116-tdx-vendor`, another guest of the same
+image on the same stock boot (`root=PARTUUID=… panic=-1`, no initrd); its quote gave the same RTMR2 `8d9317e9…`.
+Binaries at `fa871e1`, local anvil 1.8.0.
+
+| step | before (at `1b981df`/`57b4350`) | after (at `fa871e1`) |
+|---|---|---|
+| 1 `ra-parse` | exit 0 | **exit 0**, unchanged (the parser cannot see the missing initrd) |
+| 2 `verify` against the application's registration | exit 1, `nobody` | **exit 1**, `nobody`, unchanged |
+| 3 `audit` with the application's build values | exit 1, `RTMR2: values differ` | **exit 1**, unchanged |
+| 4 `audit` with `--tee-addr` only | exit 0, **registered** | **exit 1, refused before any request**: `refusing to audit a intel-tdx guest without --build-measurements: without a value I rebuilt myself, this would register whatever the guest reports, and a boot that never measured the application (one without an initrd, for example) would be registered and then trusted. Rebuild and launch on your own guest, and pass its out/measurements.json (docs/build/tdx.md, "The Auditor's half")` |
+| 5 `verify` against that registry | exit 0, **trusted** | **exit 1**, `nobody`: nothing was registered in step 4 |
+| 6 `launch --check` on the guest | exit 1, `no initrd was loaded` | **exit 1**, the same (given the Option 1 build value) |
+
+Row 4 is the change, and row 5 follows from it: the path by which an initrdless boot became `trusted` is closed in
+`audit`. **What it does not close:** an Auditor that calls `register` by hand with the initrdless values, or passes
+them as its "build" values, still registers them. That is not a bypassed check but an Auditor vouching for something
+it did not build, which the trust model already has to assume does not happen; it is written down so that nobody
+reads the `audit` refusal as a guarantee.

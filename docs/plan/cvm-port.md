@@ -13,9 +13,10 @@ Status (2026-11-16, evening):
     refused (2026-11-16, `docs/results/sessions-2026-11-16/`). T2, T3 (TDX) and T6 live too.
   - **T10 reproduced** on SEV-SNP (2026-11-16): the relay verifies; a property of the platform, recorded in
     `docs/build/ra-comparison.md`, not fixed.
-- **Open, measured but not decided:** TDX has no initrdless check (an initrdless guest's quote verifies; it is refused
-  against an application's registration, but its own values can be registered and then verify); `audit --vendor-tee`
-  exits 0 when the Vendor's guest differs. Both are in `docs/plan/build-info-gaps.md`, "Design questions to review".
+- **Decided and done 2026-11-16:** `audit` refuses a CVM format without the Auditor's own build values (an initrdless
+  TDX guest had been registered that way and then trusted); `audit --vendor-tee` exits 12 when the Vendor's guest
+  differs. **Planned after publication:** the TDX parser's own initrdless check, which needs the CCEL in TDX evidence
+  (a wire-format change). All three in `docs/plan/build-info-gaps.md`, "Design questions to review", Q2 and Q3.
 - **Open, not measured:** whether the values follow the machine type or the zone; the dm-verity tamper case at boot
   (an image that does not match its root hash); TDX `AppLast`; a mitigation for T10.
 - Phase 5 (a locked guest) is designed below, not started.
