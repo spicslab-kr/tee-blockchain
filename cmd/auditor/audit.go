@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -76,6 +77,9 @@ func auditCmd(args []string) error {
 	}
 	if *teeAddr == "" && *buildMeasurements == "" {
 		return errors.New("--tee-addr or --build-measurements is required")
+	}
+	if err := requireBuildOnCVM(*format, *buildMeasurements); err != nil {
+		return err
 	}
 	if err := checkArch(*arch); err != nil {
 		return err
@@ -271,6 +275,26 @@ func auditCmd(args []string) error {
 		cli.Errorln("but note: the Vendor's ", tee, " at ", *vendorTee, " does NOT run this value. a User verifying that ", tee, " against this registry will be told not to trust it")
 	}
 	return nil
+}
+
+// requireBuildOnCVM refuses an audit of a TDX or SEV-SNP guest that has no value the Auditor built itself. Without
+// one, audit registers whatever the guest reports. Measured on 2026-11-16 (docs/results/sessions-2026-11-16/
+// tdx-initrdless.md): a TDX guest booted without an initrd, so with no application measured at all, was registered
+// that way and then verified as trusted. TDX evidence is the quote alone, so the parser cannot see that no initrd was
+// loaded (SEV-SNP's can: its evidence carries the event log); the Auditor's own build is what catches it. This does
+// not stop a register call made by hand with such values: that is an Auditor vouching for what it did not build.
+func requireBuildOnCVM(format, buildMeasurements string) error {
+	if buildMeasurements != "" || format == "aws-nitro" {
+		return nil
+	}
+	doc := "docs/build/tdx.md"
+	if strings.HasPrefix(format, "amd-sev-snp") {
+		doc = "docs/build/sev-snp.md"
+	}
+	return fmt.Errorf("refusing to audit a %s guest without --build-measurements: without a value I rebuilt myself, "+
+		"this would register whatever the guest reports, and a boot that never measured the application (one without "+
+		"an initrd, for example) would be registered and then trusted. Rebuild and launch on your own guest, and pass "+
+		"its out/measurements.json (%s, \"The Auditor's half\")", format, doc)
 }
 
 // fileSize returns the size of the file at path, or 0 if it cannot be read.

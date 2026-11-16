@@ -96,15 +96,16 @@ func usage() {
                    match two sets of measurements as they are (parsed vs built, etc.). prints PASS/FAIL with the reasons
   compare          --attested <measurements.json | NAME=hex,…> --rpc <url> --registry <0x…> --record-key <0x…> [--trusted-approvers <0x…,0x…>]
                    read the registration from the chain and check the value, expiry and approver together. exit 1 on failure
-  audit            --tee-addr <my enclave host:port> --build-measurements <my out/measurements.json> --rpc <url> --registry <0x…> --signing-key-file <file>
-                   (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--vendor-tee <the Vendor's enclave host:port>]
-                   in one go: request and verify the attestation document from my own enclave, check the attested value against --build-measurements (the value I
+  audit            --tee-addr <my TEE host:port> --build-measurements <my out/measurements.json> --rpc <url> --registry <0x…> --signing-key-file <file>
+                   (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--vendor-tee <the Vendor's TEE host:port>]
+                   in one go: request and verify the attestation document from my own TEE, check the attested value against --build-measurements (the value I
                    built or measured myself), register that value only if they match, then read it back and check it.
                    --config takes service, version and the build env from the Vendor's build-config.json (receive put it in the
                    clone root); the flags override it, with a warning. --nonce pins the nonce. with --service/--version empty and no
                    --config, takes them from an existing registration of the same measurements on this registry. without --tee-addr
-                   registers --build-measurements as is (no audit).
-                   --vendor-tee also asks the Vendor's running enclave and says whether it runs the same value; what is
+                   registers --build-measurements as is (no audit). on intel-tdx and amd-sev-snp-* --build-measurements is required:
+                   without it the guest's report would be registered as it is, whatever it booted.
+                   --vendor-tee also asks the Vendor's running TEE and says whether it runs the same value; what is
                    registered is still my value
   receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
                    clone the source repository and read the build config. build from that directory
