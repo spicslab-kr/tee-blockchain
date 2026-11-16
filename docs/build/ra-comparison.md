@@ -133,18 +133,68 @@ the run. Otherwise the same image would register differently on every instance.
 
 | | Nitro | TDX | SEV-SNP |
 |---|---|---|---|
-| Same-VM guarantee | **yes, by construction**: one document, one signer, produced inside the enclave's own platform | **yes, by construction**: one quote over one TD report | **no**. A vTPM attestation from approved VM X, hashed into an SNP report requested on VM Y, verifies. *Record:* seen on GCP (and on AWS) in the 2026-11 runs, with scripts that are no longer available; not yet reproduced in this repository (test-matrix row T10). Why it can pass is measured: nothing in the report names the VM (below) |
-| What would fix it | n/a | n/a | boot files in the SNP launch measurement itself, or a vTPM inside the guest's trust boundary; neither is available to us on GCP today (`docs/build/sev-snp.md`, "Same VM") |
+| Same-VM guarantee | **yes, by construction**: one document, one signer, produced inside the enclave's own platform | **yes, by construction**: one quote over one TD report | **no. Reproduced on 2026-11-16 (T10):** VM B's AMD-signed report, requested over SHA3-512 of VM A's vTPM attestation, verifies, yields A's values and finds the registration made for A (below) |
+| What would close it | n/a | n/a | boot files in the SNP launch measurement itself, or a vTPM inside the guest's trust boundary; neither is available to us on GCP today (`docs/build/sev-snp.md`, "Same VM"). A narrower idea is below, as a thing to study, not a fix |
 
-"By construction" is a statement about the document format: there is only one signed object, so there is nothing to
-mix. It has not been tested by a relay experiment (nor has SEV-SNP in this repository yet; see T10).
+"By construction" is a statement about the document format: Nitro and TDX each return **one** signed object, so there
+are no two halves to mix and no binding to satisfy. It has not been tested by a relay experiment on those two; there
+is nothing to relay.
 
-**Why the SEV-SNP relay goes unnoticed, from our own measurements.** The relaying VM B asks its own firmware for a
-report over SHA3-512 of VM A's vTPM attestation, so the binding holds by construction, and each half is genuinely
-signed. What is left for a verifier is to find something in B's AMD-signed report that ties it to A, and there is
-nothing: the finding under "Roots of trust" above, measured on 2026-11-11 (MEASUREMENT identifies only the firmware,
-equal across boots with and without an initrd; HOST_DATA, FAMILY_ID, IMAGE_ID, ID_KEY_DIGEST all zero), is exactly
-that absence. REPORT_ID changes on every boot and CHIP_ID names the host, and neither appears in the vTPM evidence. So the
-two findings fit together: T10 was an observation from the 2026-11 runs, and the measurement now explains why it can
-pass. Pinned by `TestReports_IdentifyFirmwareNotVM` on our eight reports; `docs/build/sev-snp.md`, "Same VM". The
-relay itself still waits for `docs/plan/app-fixture-recording.md`, "Reproducing T10".
+### The SEV-SNP relay, measured (T10, 2026-11-16)
+
+Two guests of one image, session 3 of 2026-11-16 (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). VM A ran the
+approved application, which the Auditor had registered; VM B ran a one-byte-changed one, which nobody registered. All
+four documents were checked with `att-user ra-parse --format amd-sev-snp-initrd` against the same nonce:
+
+| document | made how | result |
+|---|---|---|
+| A's own pair | A's report over A's vTPM attestation | **exit 0**, A's values (INITRD `11cd710e…`) |
+| B's own pair | B's report over B's vTPM attestation | **exit 0**, B's values (INITRD `db9c9779…`); **not registered** |
+| naive mix | B's **own** report, put next to A's vTPM attestation | **exit 5**, refused at the binding: `REPORT_DATA is not SHA3-512 of the vTPM attestation` |
+| relay (`record-snp -relay-att`) | B's report **requested over** SHA3-512 of A's vTPM attestation | **exit 0**, `signature ok`, `nonce ok`, **A's** values; `lookup` finds the Auditor's registration for A |
+
+**The binding works, and the relay passes it.** The naive mix shows the binding check doing its job: a report that was
+not requested over these exact vTPM bytes is refused. The relay passes because B **did** request its report over those
+bytes. REPORT_DATA = SHA3-512(vTPM attestation) proves only that whoever asked for the report held that vTPM blob at
+the time; it does not prove that the blob came from the same VM's vTPM. Each half is genuine, each signature checks,
+and the binding holds. Nothing in the evidence connects B's chip to A's vTPM.
+
+Where the five compared values come from in the relay:
+
+| value | from | signed by | in the relay |
+|---|---|---|---|
+| MEASUREMENT | the SNP report | AMD | **B's**. Equal to A's (`f6790085…`), as on every guest of the same machine type and firmware, so it cannot tell them apart |
+| PCR4, KERNEL, CMDLINE, INITRD | the vTPM event log, replayed against the vTPM quotes | Google's AK | **A's** |
+| (the nonce) | the vTPM quotes' `extraData` | Google's AK | A's quote; so a live relay needs A alive to sign the verifier's fresh nonce, in real time |
+
+So four of the five values, and the nonce, come from A; the only value from B is one that every VM of that shape
+shares. This is a property of SEV-SNP as GCP offers it, two documents from two signers joined by a hash, and not a
+defect of this verifier. It is recorded, not patched. The 2026-11 runs had reported the same; this is the first
+reproduction in this repository. The recordings are kept locally, not committed (they carry instance identifiers), so
+T10 is a live result, like Nitro's T8: `docs/plan/app-fixture-recording.md`, "Reproducing T10", says where they are
+and how to make them again.
+
+What else was seen: A's and B's reports carry different `CHIP_ID`s (the VMs ran on different hosts), and neither
+`CHIP_ID` appears in the vTPM evidence. The structural absence was already measured on 2026-11-11 (MEASUREMENT
+identifies only the firmware; HOST_DATA, FAMILY_ID, IMAGE_ID, ID_KEY_DIGEST all zero; pinned by
+`TestReports_IdentifyFirmwareNotVM`); the relay now shows its consequence.
+
+### A mitigation to study, not adopted
+
+A's vTPM evidence does name A: the AK certificate Google signs carries A's instance (the numeric instance ID in its
+subject, and the GCE instance-information extension, OID 1.3.6.1.4.1.11129.2.1.21, with the project and instance). B's
+report has nothing to compare that with, but a verifier could **pin the instance**: register, next to the values, the
+AK certificate's instance ID, and accept evidence only from that instance.
+
+Not adopted, and not tested:
+
+- **It would change what a registration means.** Today a registration says "these measurements are trusted", and any
+  TEE that attests them is trusted: the Vendor can replace its VM and keep its registration. Pinning the instance makes
+  *which VM* part of the registry key, so every new VM needs a new registration, which conflicts with the goal that
+  changing the TEE needs nothing but the TEE.
+- **It is not known that it would stop the relay.** It ties the vTPM half to one instance, not B's AMD report. By
+  reasoning only (not tried): in the relay above the vTPM half *is* A's own, so a pin on A's instance would accept it
+  as well, as long as A is alive to answer; what pinning would rule out is evidence from some other VM's vTPM. Whether
+  that narrows the attack to anything useful has not been worked out, and no pinned verifier has been run against the
+  recordings.
+- It would also put instance identifiers into the registry, which is public.
