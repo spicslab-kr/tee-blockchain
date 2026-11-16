@@ -11,7 +11,8 @@ same PCR0, PCR1 and PCR2 when the Auditor rebuilds it. See [Build](../../README.
 
 If you built the software image yourself, `pack` turns it into an enclave image (`Build` with
 `DockerImage` set). It layers the attestation responder on top (`ResponderPath`, `att-ra-responder` next
-to the binary by default) and writes `out/app.eif` and `out/measurements.json` (`OutDir`).
+to the binary by default) and writes `out/<name>.eif` and `out/measurements.json` (`OutDir`); the name is the docker
+image's without its tag, so `app.eif` below.
 `--image-name` sets the name and `--port` the port (default 5000).
 
 ```
@@ -25,7 +26,7 @@ if the measurements differ.
 
 ```
 att-vendor build --app-dir <dir with Dockerfile> --out-dir out
-att-vendor launch --eif out/app.eif
+att-vendor launch --eif out/<name of the --app-dir directory>.eif
 ```
 
 `launch` (`Launch`, `EIF`) starts the enclave, bridges TCP port 5000 to its vsock (`ProxyBinary`), asks the enclave for
