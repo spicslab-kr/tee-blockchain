@@ -469,11 +469,14 @@ address is `<auditor-guest-ip>` below. Then copy what the build needs, one item 
 ```
 gcloud compute scp linux/att-auditor       attestamp-snp-auditor:att-auditor       --zone us-central1-a
 gcloud compute scp linux/att-ra-responder  attestamp-snp-auditor:att-ra-responder  --zone us-central1-a
-gcloud compute scp --recurse vendor-app    attestamp-snp-auditor:app               --zone us-central1-a
+gcloud compute scp --recurse vendor-app    attestamp-snp-auditor:              --zone us-central1-a
 gcloud compute scp vendor-base-initrd-v.img attestamp-snp-auditor:base-initrd-v.img --zone us-central1-a   # Option 2
 ```
 
-and log in: `gcloud compute ssh attestamp-snp-auditor --zone us-central1-a`.
+and log in: `gcloud compute ssh attestamp-snp-auditor --zone us-central1-a`. The folder arrives as `vendor-app` in
+the home folder; on the guest, `rm -rf app && mv vendor-app app`. (Copying straight to `…:app` fails with Windows'
+`pscp` when `app` does not exist yet, and leaves an **empty** `app` behind; A4's comparison catches the build of it.
+Seen on TDX, 2026-11-16.)
 
 **A3. On the Auditor's guest: prepare it.** Step 4 as written, with `chmod +x att-auditor att-ra-responder`, and with
 two differences. Option 1: `base-initrd.img` is copied from `/boot` as written; its SHA-256 must equal

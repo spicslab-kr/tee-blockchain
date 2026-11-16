@@ -493,11 +493,14 @@ copy what the build needs, one item per command:
 ```
 gcloud compute scp linux/att-auditor       attestamp-tdx-auditor:att-auditor       --zone us-central1-a
 gcloud compute scp linux/att-ra-responder  attestamp-tdx-auditor:att-ra-responder  --zone us-central1-a
-gcloud compute scp --recurse vendor-app    attestamp-tdx-auditor:app               --zone us-central1-a
+gcloud compute scp --recurse vendor-app    attestamp-tdx-auditor:              --zone us-central1-a
 gcloud compute scp vendor-base-initrd-v.img attestamp-tdx-auditor:base-initrd-v.img --zone us-central1-a   # Option 2
 ```
 
-and log in: `gcloud compute ssh attestamp-tdx-auditor --zone us-central1-a`.
+and log in: `gcloud compute ssh attestamp-tdx-auditor --zone us-central1-a`. The folder arrives as `vendor-app` in
+the home folder; on the guest, `rm -rf app && mv vendor-app app`. (Copying straight to `…:app` fails with Windows'
+`pscp` when `app` does not exist yet, `unable to open app`, and leaves an **empty** `app` behind; a build of it gives
+another initrd, which A4's comparison catches. Seen 2026-11-16.)
 
 **A3. On the Auditor's guest: prepare it.** Step 4 as written, with `chmod +x att-auditor att-ra-responder`, and with
 two differences. Option 1: `base-initrd.img` is copied from `/boot` as written; its SHA-256 must equal
