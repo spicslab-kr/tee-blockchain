@@ -40,6 +40,11 @@ echo "responder sha256: $(sha256 att-ra-responder | cut -c1-64)"  # compared wit
 step "INSTALLING GIT"
 V 'command -v git >/dev/null || sudo dnf install -y -q git; git --version'
 A 'command -v git >/dev/null || sudo dnf install -y -q git; git --version'
+# The arm64 host gets no binaries from this script (the arch scripts upload their own per architecture), but
+# arch-measurement-compare.sh clones the test application there, so it needs git too.
+if [ -n "$ARM64_HOST" ]; then
+  R 'command -v git >/dev/null || sudo dnf install -y -q git; git --version'
+fi
 
 # A running att-vendor or att-auditor process (the ra-proxy bridge) locks its binary, so stop it and the enclave before uploading.
 step "STOPPING OLD ENCLAVES"
