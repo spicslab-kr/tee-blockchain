@@ -5,7 +5,8 @@ value, it can only be trusted if both builds give the same measurements. On Nitr
 measurements are PCR0, PCR1 and PCR2. The short version is in the README under
 [Build](../../README.md#build). Tools, which step calls them, and the versions used: [toolchain.md](toolchain.md)
 (the instance's AMI, kernel, docker and nitro-cli as of the 2026-11-12 baseline). The reference PCRs of the test
-application: [docs/results/aws-nitro-2026-11-12.md](../results/aws-nitro-2026-11-12.md).
+application, at commit `c116845`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-16.md](../results/aws-nitro-2026-11-16.md)
+(the first baseline, at `9a5668e`: [docs/results/aws-nitro-2026-11-12.md](../results/aws-nitro-2026-11-12.md)).
 
 ## The three values
 
@@ -54,7 +55,9 @@ commit `a5c4306`, the same `-trimpath -buildvcs=false` command:
 
 Rebuilt at `ade66e6` on 2026-11-16 the three gave the same hashes again. So before `ade66e6` the PCR0 and PCR2 of an
 image depended on whether the machine that built the responder was Linux with gcc. Since `ade66e6` every build
-command sets `CGO_ENABLED=0` and `build` refuses a responder that records anything else.
+command sets `CGO_ENABLED=0` and `build` refuses a responder that records anything else. These hashes are for the code
+at `a5c4306` and `ade66e6`; later code gives other bytes (from `029bbdc` on the `CGO_ENABLED=0` responder is
+`c61c988e…`, below), and the cgo comparison itself still holds.
 
 `receive` stops when OS, architecture or Go version differ from the Vendor's `build_env`.
 `--ignore-env` turns that into a warning. Use it only to look around, since the values will not match.
@@ -98,15 +101,22 @@ The software's own files and logs are not touched.
 
 **This changes the measurements.** Every image with an account `adduser` made, the test application included, has
 a different PCR0 and PCR2 from `fc105b0` on (PCR1, the kernel and init, does not change). PCR values recorded before
-that commit are marked "before `fc105b0`" where they appear; they were not re-measured.
+that commit are marked "before `fc105b0`" where they appear.
 
-**The Nitro reference values have to be taken again at `ade66e6` or later.** Two commits changed what `build`
-produces: `fc105b0` (the `/etc/shadow` build day, above) changes PCR0 and PCR2 of the test application, and
-`ade66e6` (`CGO_ENABLED=0`, see "cgo, measured") fixes which responder file goes in. Every recorded Nitro PCR0 and PCR2
-was built with the cross-built responder `5573b538…`, which is exactly the `CGO_ENABLED=0` file, so `ade66e6` by
-itself does not move them; `fc105b0` does. The recorded values are therefore marked "before `fc105b0`" only, and the
-baseline (`docs/results/aws-nitro-2026-11-12.md`) has not been run again: the next run, at `ade66e6` or later, gives
-the reference PCR0 and PCR2.
+**The Nitro reference values were taken again on 2026-11-16, at `c116845`** (`docs/results/aws-nitro-2026-11-16.md`).
+Three commits had made the earlier ones stale:
+
+| commit | what it changes | effect on the test application's PCR0/PCR2 |
+|---|---|---|
+| `fc105b0` | `build` empties the build day in `/etc/shadow` (above) | moved |
+| `ade66e6` | every build is `CGO_ENABLED=0` ("cgo, measured") | none on the recorded values: they were already built with the cgo-free responder `5573b538…` |
+| `029bbdc` | adds a function to `internal/cli`, which the responder links but does not call | moved: the responder became `c61c988e…` (`docs/build/ra-comparison.md`, "What covering the responder costs") |
+
+The values at `c116845`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder `c61c988e…`,
+x86_64, two machines identical: PCR0 `0c905480…`, PCR1 `4b4d5b36…`, PCR2 `6347a146…`. On arm64 (`c7g.xlarge`) all
+three differ: PCR0 `f1d4d679…`, PCR1 `3b4a7e1b…`, PCR2 `6e865138…`. **Every Nitro value is written next to the commit
+it was measured at**: the responder's bytes, and so PCR0 and PCR2, change with any change to a package the responder
+links, so a value without its commit cannot be compared.
 
 ### Two builds compared (2026-11-15)
 

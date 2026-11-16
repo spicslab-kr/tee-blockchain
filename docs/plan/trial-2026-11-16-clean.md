@@ -216,7 +216,7 @@ guests, the home folder still holds `base-initrd*.img`, `app`, `out`, the binari
 | PCR0 | `2aacdf410ab98ea95138b9c99e48eb2436a0d2e6d9e7fc0f4b8d7084d92325174179c65b4292f5809f052b1d450c7520` |
 | PCR1 | `4b4d5b3661b3efc12920900c80e126e4ce783c522de6c02a2a5bf7af3a2b9327b86776f188e4be1c1c404a129dbda493` (= 2026-11-12) |
 | PCR2 | `e550477971775beb0f24a9afc2457e239404b5da83121b14c84478da7ed424bf730ce6e7d286dc6a3aec3f371b5dfc72` |
-| note | PCR0/PCR2 differ from 2026-11-12 (`d5bbd4af…`/`6b64250f…`) and 2026-11-15 (`47dbca56…`), as `test-matrix.md` T1 predicts after `fc105b0` and `ade66e6`. The first values at `e29d028`. Only the Auditor built, so this is **not** a two-machine T1 |
+| note | PCR0/PCR2 differ from 2026-11-12 (`d5bbd4af…`/`6b64250f…`) and 2026-11-15 (`47dbca56…`), as `test-matrix.md` T1 predicts after `fc105b0` and `ade66e6`. The first values at `e29d028`. Only the Auditor built, so this is **not** a two-machine T1. *Later the same day:* `029bbdc` changed the responder (`5573b538…` → `c61c988e…`), so these values are superseded too; the baseline was retaken at `c116845` (`docs/results/aws-nitro-2026-11-16.md`) |
 | reproducibility scan | 9 warnings in the nginx Dockerfile (unpinned base tag, `apk add` without versions, …) |
 | swapped image (flow 1 step 4) | PCR0 `9f1ebbec9da57cb0d95bc32bc2e7592ee8624ffdd85bde62178aea957295a6f638ef173875d35f444136e0a7ae1d81e2`, PCR2 `c7cd2011…cfcc` |
 | one byte changed | PCR0 `c0263871dbded159e22795f8f3bd4b07773aa37ba3e190953cf921f1f6b75f9e5bb0ebe8a079bbb4e57c9b323a1abb5a`, PCR1 unchanged, PCR2 `8aeabedf9dea0903a4a95a08362afe70e37105905f5dbd784516b47e6f2a1e67d68fce5d06e2e041f60471621733a094` |
