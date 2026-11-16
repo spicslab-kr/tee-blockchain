@@ -60,8 +60,9 @@ This page lists every folder in the repository, then explains the one idea that 
     │                       what both sides must match (reproduce), the settings and hashes, the toolchain, the
     │                       platform comparison, runtime immutability, recording test fixtures
     ├── results/            dated records: every run's report and its JSONL result lines, the trials, the Nitro
-    │                       baseline retake and the 2026-11-12 audit. Their facts stay as recorded; what is
-    │                       learned later is added with its date
+    │                       baseline retake and the 2026-11-12 audit. Measured values are never changed;
+    │                       labels, interpretation and status are updated as more is learned, each update
+    │                       marked where it is made with when and what changed
     ├── status/             where things stand: the test matrix (what is proven, and by what), the build-info gaps
     │                       (what a reader still lacks, and the publication decisions), the CVM port's status and
     │                       its one remaining plan (Phase 5)
@@ -268,6 +269,6 @@ Two details the table hides:
 | `contracts/evm/` | `Registry.sol`; `lib/openzeppelin-contracts` is a git submodule |
 | `e2e/` | Shell scripts, not run by `go test`; the Go end-to-end tests are in `cmd/` |
 | `docs/build/` | Guides and procedures a reader follows; the other docs folders point here for "how" |
-| `docs/results/` | Dated records, cited as evidence by `docs/status/` and the guides; their facts stay as recorded, and a later run adds a file or a dated note rather than changing them |
+| `docs/results/` | Dated records, cited as evidence by `docs/status/` and the guides. **Measured values (hashes, PCRs, initrds, exit codes, the JSONL lines) are never changed.** Labels, interpretation and status are updated as more is learned, and each update is marked where it is made, in italics, with its date, its commit and, for replaced text, what it said before. A later run adds a new file. Paths to other documents follow when a file moves (those are the only unmarked edits; `git log --follow` shows them) |
 | `docs/status/` | `test-matrix.md`, `build-info-gaps.md`, `cvm-port.md`: the current state, updated as runs and fixes land |
 | `docs/img/` | `logo.svg`, `flow-auditor.svg`, `flow-vendor.svg` and `verify.svg` |
