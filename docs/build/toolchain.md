@@ -31,6 +31,7 @@ The platform guides refer here: [AWS Nitro](aws-nitro.md), [Intel TDX](tdx.md), 
 | `e2e/cloud/gcp-cvm.sh` | your machine | gcloud |
 | app fixtures on the CVM guests | guest | mksquashfs, veritysetup, mkinitramfs, update-grub; `tpm2_pcrextend` in the SEV-SNP Option 2 hook |
 | `e2e/cvm/in-guest-verify.sh` | guest | anvil, the three att binaries, sudo |
+| `e2e/cvm/build-env-check.sh` | guest | `att-vendor`, `att-auditor`, git (the image has it); no sudo, no network |
 | checks quoted in the docs | anywhere | openssl (certificate fingerprints, SHA3-512 cross-check), `cast` (keccak cross-check) |
 
 ## Versions actually used
