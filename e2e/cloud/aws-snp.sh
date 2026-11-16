@@ -6,9 +6,10 @@
 # AWS SEV-SNP with a vTPM. This takes three steps, because SEV-SNP is an instance option but the
 # vTPM (NitroTPM) is an AMI attribute, so the stock AMI has to be re-registered with TPM support.
 #
-#   bash e2e/cloud/aws-snp.sh base     # 1. launch a plain SEV-SNP instance from the stock AMI
-#   bash e2e/cloud/aws-snp.sh mkami    # 2. stop it, snapshot it, re-register with TPM support
-#   bash e2e/cloud/aws-snp.sh vm       # 3. launch the real instance from that AMI, SEV-SNP on
+#   bash e2e/cloud/aws-snp.sh base --yes    # 1. launch a plain SEV-SNP instance from the stock AMI
+#   bash e2e/cloud/aws-snp.sh mkami --yes   # 2. stop it, snapshot it, re-register with TPM support
+#   bash e2e/cloud/aws-snp.sh vm --yes      # 3. launch the real instance from that AMI, SEV-SNP on
+#   (without --yes each prints what it would make and stops; --dry-run prints it without calling aws)
 #   bash e2e/cloud/aws-snp.sh status | stop | start | delete
 #
 # Verified against the AWS docs (2026-11):
@@ -33,6 +34,36 @@ RA_PORT=${RA_PORT:-5000}
 
 here="$(cd "$(dirname "$0")" && pwd)"; cd "$here/../.."
 die() { echo "error: $*" >&2; exit 1; }
+
+# Arguments, checked before any aws call, by the same rules as gcp-cvm.sh and aws-nitro.sh: base, mkami and vm create
+# billable resources only with --yes; without it they print what they would make and stop, and --dry-run prints the
+# same without calling aws at all. Every other action takes no argument: an option given to it is refused, not
+# ignored. Until 2026-11-16 these three ran with no warning and no pause (docs/status/build-info-gaps.md, #20).
+ACTION=${1:-}; [ $# -gt 0 ] && shift
+YES=0; DRY=0
+for arg in "$@"; do
+  case "$arg" in
+    --yes) YES=1 ;;
+    --dry-run) DRY=1 ;;
+    *) echo "unknown argument '$arg': the only options are --yes and --dry-run, for base, mkami and vm" >&2; exit 2 ;;
+  esac
+done
+case "$ACTION" in
+  base) plan="1 billable EC2 instance (Role=base, $TYPE, SEV-SNP) in $REGION from the stock Ubuntu 24.04 AMI, and, if not there yet, the key pair $KEY_NAME (written to $PEM_OUT) and the security group $SG_NAME (ports 22 and $RA_PORT from this machine's address /32 only)" ;;
+  mkami) plan="stops the base instance, then 1 EBS snapshot of its root volume and 1 AMI ($AMI_NAME-<time>, TPM support) in $REGION, both billed for storage until removed by hand" ;;
+  vm) plan="1 billable EC2 instance (Role=vm, $TYPE, SEV-SNP) in $REGION from the newest TPM AMI that mkami made" ;;
+  status|stop|start|delete)
+    if [ "$YES" = 1 ] || [ "$DRY" = 1 ]; then echo "$ACTION takes no options; --yes and --dry-run are for base, mkami and vm" >&2; exit 2; fi ;;
+  *) sed -n '2,23p' "$0"; exit 2 ;;
+esac
+case "$ACTION" in
+  base|mkami|vm)
+    echo "$ACTION: $plan"
+    if [ "$DRY" = 1 ]; then echo "dry run: nothing was created and aws was not called."; exit 0; fi
+    if [ "$YES" != 1 ]; then echo "Nothing created. To create, run the same command with --yes." >&2; exit 3; fi
+    ;;
+esac
+
 command -v aws >/dev/null 2>&1 || die "aws CLI not found."
 # On Windows (Git Bash) the aws CLI ends every output line with a carriage return, so a value captured with $(...)
 #   keeps a trailing CR and the next command rejects it (the same as gcloud's in gcp-cvm.sh `stop`, 2026-11-15). Strip it here, once,
@@ -72,7 +103,7 @@ launch() { # launch <role> <ami>
     --query 'Instances[0].InstanceId' --output text
 }
 
-case "${1:-}" in
+case "$ACTION" in
 base)
   # Through a temporary .pem (covered by .gitignore): a redirect straight into $PEM_OUT leaves an empty file when aws
   # fails, and the next run would skip creating the key.
@@ -89,7 +120,7 @@ base)
   aws ec2 wait instance-running --instance-ids "$id"
   echo "SEV-SNP as the API reports it:"
   aws ec2 describe-instances --instance-ids "$id" --query 'Reservations[].Instances[].CpuOptions' --output json
-  echo "Next: bash e2e/cloud/aws-snp.sh mkami"
+  echo "Next: bash e2e/cloud/aws-snp.sh mkami --yes"
   ;;
 
 mkami)
@@ -111,7 +142,7 @@ mkami)
   echo "TPM-supported AMI: $NEW"
   aws ec2 create-tags --resources "$NEW" --tags "Key=Project,Value=$TAG" >/dev/null
   aws ec2 describe-images --image-ids "$NEW" --query 'Images[].[ImageId,Name,TpmSupport,BootMode]' --output text
-  echo "Next: bash e2e/cloud/aws-snp.sh vm"
+  echo "Next: bash e2e/cloud/aws-snp.sh vm --yes"
   ;;
 
 vm)
@@ -150,5 +181,5 @@ delete)
   echo "AMIs, snapshots and the security group were left alone. List them with 'status' and remove by hand when done — they keep costing storage."
   ;;
 
-*) sed -n '2,20p' "$0"; exit 2 ;;
+*) sed -n '2,23p' "$0"; exit 2 ;;
 esac

@@ -50,6 +50,13 @@ for arg in "$@"; do
     *) ROLES+=("$arg") ;;
   esac
 done
+case "$ACTION" in create|status|stop|start|delete) ;; *) echo "unknown action '$ACTION'" >&2; sed -n '2,37p' "$0"; exit 2 ;; esac
+# Only create takes roles and the two options. Elsewhere they are refused rather than ignored: "delete vendor" would
+# otherwise delete every VM of the prefix, and "delete --dry-run" would really delete.
+if [ "$ACTION" != create ] && { [ ${#ROLES[@]} -gt 0 ] || [ "$YES" = 1 ] || [ "$DRY" = 1 ]; }; then
+  echo "$ACTION takes no roles and no options (it acts on every VM whose name starts with ${PREFIX:-attestamp-$PLAT}-; choose them with PREFIX=)" >&2
+  exit 2
+fi
 [ ${#ROLES[@]} -gt 0 ] || ROLES=(vendor auditor)
 # Every role is one billable VM, so only the two roles the project uses are accepted, each once. A stray word on the
 # command line stops the script before anything else runs: e2e/cloud/README.md once had "create vendor auditor user y",
@@ -191,5 +198,5 @@ delete)
   echo "the firewall rule $NET_TAG was left alone (the other platform may still use it)."
   ;;
 
-*) sed -n '2,33p' "$0"; exit 2 ;;
+*) sed -n '2,37p' "$0"; exit 2 ;;
 esac

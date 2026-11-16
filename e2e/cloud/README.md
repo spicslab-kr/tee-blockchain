@@ -6,7 +6,9 @@ documentation (see the comments for which page).
 
 **These scripts create billable resources.** Every `create`, `run-instances`, `delete` and
 `terminate-instances` they run costs money or destroys state. Run them only when you mean to, and if an automated
-agent runs commands for you, have it ask before each of these.
+agent runs commands for you, have it ask before it runs any of these scripts' creating or deleting actions: a rule
+that asks before `gcloud … create` or `aws ec2 run-instances` does not see the calls a script makes inside. Nothing is
+created without `--yes` ("Nothing is created without `--yes`", below).
 
 ## What you have to do yourself, once
 
@@ -94,8 +96,8 @@ The procedures: Nitro, the flows in `e2e/README.md`; TDX and SEV-SNP, "Getting s
 behind them. Nitro comes first because it is the baseline the other two are compared against.
 
 ```
-1. Nitro baseline        bash e2e/cloud/aws-nitro.sh create      # 2 instances, eu-north-1
-   (architecture rows)   bash e2e/cloud/aws-nitro.sh create-arm64  # 1 more, c7g.xlarge (Graviton), for ARM64_HOST
+1. Nitro baseline        bash e2e/cloud/aws-nitro.sh create --yes        # 2 instances, eu-north-1
+   (architecture rows)   bash e2e/cloud/aws-nitro.sh create-arm64 --yes  # 1 more, c7g.xlarge (Graviton), for ARM64_HOST
 2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create --yes  # 2 instances (vendor, auditor), us-central1-a
 3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create --yes  # 2 instances (vendor, auditor), us-central1-a
 ```
@@ -104,10 +106,34 @@ Every word after `create` is a role, and every role is **one billable VM**. With
 `auditor`; `create vendor` makes only the Vendor's. The script accepts no other role names and no role twice, so a
 typo stops it before anything runs.
 
-**`create` makes VMs only with `--yes`.** Without it, it prints how many VMs it would make and their names, and stops
-(exit 3); `--dry-run` prints the same without calling `gcloud` at all. Run it once without `--yes` to see the plan,
-then again with it. This is because a run without a terminal to press Ctrl-C in once created two VMs nobody meant to
-make (2026-11-16; `docs/status/build-info-gaps.md`, #20).
+### Nothing is created without `--yes`: the same rules in all three scripts
+
+`gcp-cvm.sh create`, `aws-nitro.sh create` and `create-arm64`, and `aws-snp.sh base`, `mkami` and `vm` behave alike:
+
+- **Without `--yes` they create nothing.** They print how many billable resources they would make and their names (or
+  tags), and stop with exit 3. Run once without `--yes` to read the plan, then again with it.
+- **`--dry-run`** prints the same plan and calls neither `gcloud` nor `aws`, not even to sign in.
+- **Every check runs before the first CLI call**: an unknown role or option, a role given twice, and `--yes` or
+  `--dry-run` given to `status`, `stop`, `start` or `delete` all stop the script with exit 2. The last is refused
+  rather than ignored, so `delete --dry-run` cannot really delete; and `gcp-cvm.sh delete vendor` is refused because
+  `delete` acts on every VM of the prefix, not on one role.
+- **There is no pause to press Ctrl-C in.** The scripts used to warn and wait 4 seconds (`aws-snp.sh` did not even do
+  that). On 2026-11-16 a command run without a terminal went through the pause unseen and created two VMs nobody meant
+  to make (`docs/status/build-info-gaps.md`, #20).
+
+**Why a flag and not a pause, or an approval prompt.** An approval rule in an agent's or a tool's settings, such as
+"ask before `gcloud compute instances create`", sees only the command a person or an agent typed, for example
+`bash e2e/cloud/gcp-cvm.sh snp create`. It does not see the `gcloud` or `aws` calls the script makes inside, so it
+never asks. A pause protects only someone watching a terminal. A flag in the typed command is the one thing both a
+person and an approval rule can see.
+
+**Testing these scripts without creating anything.** Use `--dry-run` first. To go further, put stand-in `gcloud` and
+`aws` scripts (that only print or log their arguments) first on `PATH`, and check with `which gcloud aws` that they are
+the ones found **before** running anything. In Git Bash write the folder as `/c/Users/...`, never `C:/Users/...`:
+`PATH` is split at every colon, so `C:/Users/.../fakebin:$PATH` becomes `C` and `/Users/.../fakebin`, neither of which
+exists, and the real CLI runs. That is what happened on 2026-11-16. Safer still, set `PATH` to the stand-in folder and
+`/usr/bin` only, so the real CLIs (under `C:/Program Files`) cannot be found at all, and point `PEM_OUT` outside the
+repository so a key file is not written into it.
 
 **One exact image for both guests.** `gcp-cvm.sh` resolves the image family once, prints the exact image it picked
 (for example `ubuntu-2404-noble-amd64-v20261105`) and makes every VM of that call from it. When the second guest is
@@ -120,7 +146,7 @@ and the SEV-SNP CMDLINE come with the image (`docs/build/tdx.md`, "Use the same 
 everyone using the same account or project. `gcp-cvm.sh` reuses a VM of that name without creating one, and
 `aws-nitro.sh` cannot use a key pair whose `.pem` was made on another machine. Give your own names:
 `PREFIX=<you>-tdx bash e2e/cloud/gcp-cvm.sh tdx create vendor --yes`, or
-`KEY_NAME=<you> SG_NAME=<you> TAG=<you> bash e2e/cloud/aws-nitro.sh create`, and pass the same `PREFIX=` or `TAG=` to
+`KEY_NAME=<you> SG_NAME=<you> TAG=<you> bash e2e/cloud/aws-nitro.sh create --yes`, and pass the same `PREFIX=` or `TAG=` to
 `status`, `stop`, `start` and `delete`: each of them acts only on the VMs or instances with that prefix or tag.
 
 Each platform runs on one cloud: Nitro on AWS, TDX and SEV-SNP on GCP. SEV-SNP on AWS was decided against on

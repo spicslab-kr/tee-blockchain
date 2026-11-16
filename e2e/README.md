@@ -11,11 +11,11 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
 ## Prerequisites
 
 - Two Nitro-enabled EC2 instances (Linux), one for the Vendor and one for the Auditor. An optional
-  third, arm64 (Graviton), is used only by the architecture comparison. `bash e2e/cloud/aws-nitro.sh create` makes
+  third, arm64 (Graviton), is used only by the architecture comparison. `bash e2e/cloud/aws-nitro.sh create --yes` makes
   the two x86_64 instances; see [`cloud/README.md`](cloud/README.md) for the settings and cost. If the account
   already has the key pair `attestamp-e2e` (made from another machine, so its `.pem` is not on yours), `create` stops
   with `could not create key pair`: give this machine names of its own,
-  `KEY_NAME=<name> SG_NAME=<name> TAG=<name> bash e2e/cloud/aws-nitro.sh create`, and the same `TAG=` to `status`,
+  `KEY_NAME=<name> SG_NAME=<name> TAG=<name> bash e2e/cloud/aws-nitro.sh create --yes`, and the same `TAG=` to `status`,
   `stop`, `start` and `delete`. The instances have no automatic stop; `sudo shutdown -h +360` on each, right after
   `create`, is a safety net if a run is abandoned.
 - `git`, an `ssh` client and the pinned Go version on your machine. `0-Setup-local-install.sh`

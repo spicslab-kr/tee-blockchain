@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Create, inspect and remove the AWS Nitro Enclaves instances the e2e suite needs.
 #
-#   bash e2e/cloud/aws-nitro.sh create         # key pair, security group, two x86_64 instances (vendor, auditor)
-#   bash e2e/cloud/aws-nitro.sh create-arm64   # one more, arm64 (Graviton), for the architecture checks (ARM64_HOST)
+#   bash e2e/cloud/aws-nitro.sh create --yes         # key pair, security group, two x86_64 instances (vendor, auditor)
+#   bash e2e/cloud/aws-nitro.sh create-arm64 --yes   # one more, arm64 (Graviton), for the architecture checks (ARM64_HOST)
+#   (without --yes they print what they would make and stop; --dry-run prints it without calling aws)
 #   bash e2e/cloud/aws-nitro.sh status         # addresses, to paste into e2e/env.local.sh, and whether this
 #                                              # machine's public address is allowed in (only prints the command)
 #   bash e2e/cloud/aws-nitro.sh stop           # stop all of them (keeps the disks, stops the hourly charge)
@@ -29,6 +30,36 @@ RA_PORT=${RA_PORT:-5000}
 
 here="$(cd "$(dirname "$0")" && pwd)"; cd "$here/../.."
 die() { echo "error: $*" >&2; exit 1; }
+
+# Arguments, checked before any aws call. create and create-arm64 make instances only with --yes; without it they print
+# what they would make and stop, and --dry-run prints the same without calling aws at all. Every other action takes no
+# argument: an option given to it is refused, not ignored ("delete --dry-run" would otherwise really delete). The same
+# rules hold in gcp-cvm.sh and aws-snp.sh; on 2026-11-16 a 4-second pause, the guard before, let a run with no
+# terminal create two VMs (docs/status/build-info-gaps.md, #20).
+ACTION=${1:-}; [ $# -gt 0 ] && shift
+YES=0; DRY=0
+for arg in "$@"; do
+  case "$arg" in
+    --yes) YES=1 ;;
+    --dry-run) DRY=1 ;;
+    *) echo "unknown argument '$arg': the only options are --yes and --dry-run, for create and create-arm64" >&2; exit 2 ;;
+  esac
+done
+case "$ACTION" in
+  create|create-arm64) ;;
+  status|stop|start|delete)
+    if [ "$YES" = 1 ] || [ "$DRY" = 1 ]; then echo "$ACTION takes no options; --yes and --dry-run are for create and create-arm64" >&2; exit 2; fi ;;
+  *) sed -n '2,19p' "$0"; exit 2 ;;
+esac
+if [ "$ACTION" = create ] || [ "$ACTION" = create-arm64 ]; then
+  if [ "$ACTION" = create ]; then n=2; what="Role=vendor and Role=auditor, $TYPE (x86_64)"
+  else n=1; what="Role=arm64, $TYPE_ARM64 (arm64)"; fi
+  echo "$ACTION: $n billable EC2 instance(s) in $REGION, tagged Project=$TAG: $what, each skipped if one with that tag"
+  echo "        exists; and, if not there yet, the key pair $KEY_NAME (written to $PEM_OUT) and the security group"
+  echo "        $SG_NAME (ports 22 and $RA_PORT from this machine's address /32 only)"
+  if [ "$DRY" = 1 ]; then echo "dry run: nothing was created and aws was not called."; exit 0; fi
+  if [ "$YES" != 1 ]; then echo "Nothing created. To create, run the same command with --yes." >&2; exit 3; fi
+fi
 
 command -v /usr/bin/env >/dev/null
 command -v aws >/dev/null 2>&1 || die "aws CLI not found. Install it and run 'aws configure' first."
@@ -69,7 +100,7 @@ ensure_key_and_group() {
     aws ec2 create-key-pair --key-name "$KEY_NAME" --query KeyMaterial --output text > "$tmp_pem" \
       || { rm -f "$tmp_pem"; die "could not create key pair $KEY_NAME. If it already exists in $REGION (made on
   another machine, so its private key is not here), choose new names for this machine:
-    KEY_NAME=<name> SG_NAME=<name> TAG=<name> bash e2e/cloud/aws-nitro.sh create
+    KEY_NAME=<name> SG_NAME=<name> TAG=<name> bash e2e/cloud/aws-nitro.sh create --yes
   and pass the same TAG to status, stop, start and delete."; }
     mv "$tmp_pem" "$PEM_OUT"
     chmod 400 "$PEM_OUT"
@@ -139,10 +170,10 @@ launch_role() {
   echo "$1: $id ($2)"
 }
 
-case "${1:-}" in
+case "$ACTION" in
 create)
   echo "region $REGION   type $TYPE"
-  echo "This creates two billable EC2 instances. Ctrl-C now to stop."; sleep 4
+  echo "creating (--yes given)"
   ensure_key_and_group
   AMI=$(latest_al2023 x86_64); [ "$AMI" != "None" ] || die "no Amazon Linux 2023 x86_64 AMI found in $REGION"
   echo "AMI $AMI (latest Amazon Linux 2023, x86_64)"
@@ -154,7 +185,7 @@ create)
 
 create-arm64)
   echo "region $REGION   type $TYPE_ARM64 (arm64)"
-  echo "This creates one billable EC2 instance. Ctrl-C now to stop."; sleep 4
+  echo "creating (--yes given)"
   ensure_key_and_group
   AMI=$(latest_al2023 arm64); [ "$AMI" != "None" ] || die "no Amazon Linux 2023 arm64 AMI found in $REGION"
   echo "AMI $AMI (latest Amazon Linux 2023, arm64)"
@@ -205,5 +236,5 @@ delete)
   echo "key pair $KEY_NAME and $PEM_OUT were left alone; delete them by hand if you are done."
   ;;
 
-*) sed -n '2,16p' "$0"; exit 2 ;;
+*) sed -n '2,19p' "$0"; exit 2 ;;
 esac

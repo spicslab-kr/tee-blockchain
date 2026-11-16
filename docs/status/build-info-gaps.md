@@ -132,7 +132,12 @@ calls; the same with `--dry-run`, exit 2, 0 calls; with `--yes`, exit 2, 0 calls
 calls; `create --verbose` exit 2, 0 calls; `create --dry-run` the plan (2 VMs and their names), exit 0, 0 calls;
 `create` the plan, exit 3, 0 calls; `create --yes` the two `instances create` calls, to the stand-in only. Every
 `create` example in the guides, `e2e/cloud/README.md` and `cvm-port.md` now carries `--yes`; the dated records keep the
-commands as they ran |
+commands as they ran. *Added 2026-11-17:* the same rules now hold in `aws-nitro.sh` (`create`, `create-arm64`; their
+4-second pauses removed) and `aws-snp.sh` (`base`, `mkami`, `vm`, which had no warning at all), and in all three scripts
+`--yes`/`--dry-run` given to `status`, `stop`, `start` or `delete` is refused, as are extra words (`gcp-cvm.sh delete
+vendor` used to delete every VM of the prefix). Checked in 28 cases against stand-in `aws` and `gcloud` with the real
+CLIs off `PATH` (confirmed with `which` before the run): every refusal, every run without `--yes` and every dry run made
+0 CLI calls; only the `--yes` runs reached a creating call, on the stand-ins |
 | 21 | [slows] **README Quick start.** The Auditor's `audit --registry …` has no `registry-deploy` before it; nothing says how to write a key file (one private key in hex) or where to get Sepolia ETH (`NET=local` avoids both, but Quick start does not mention it); `build-config.json` has to be written by hand, which only `cmd/vendor/README.md` implies **Closed 2026-11-16:** Quick start now has `registry-deploy` before `audit` (it prints the address `--registry` takes), says a key file is one 32-byte hex private key and links "Key files" for making one, names a Sepolia faucet for test ETH and links "Running without a public testnet" for `NET=local`, and says `build-config.json` is written by hand, linking the Vendor guide's example |
 | 22 | [slows] **Verifying a CVM.** `att-user verify` defaults to `--format aws-nitro`; no document tells a TDX or SEV-SNP verifier to pass `--format intel-tdx` or `amd-sev-snp-*` *Partly, 2026-11-15:* the getting-started procedures pass `--format`. **Closed 2026-11-16 (status audit):** the User guide (`cmd/user/README.md`), which said "Only `aws-nitro` can be verified", now lists the four formats and says to give `--format` for a guest |
 | 23 | [slows] **The CVM `build-config.json`.** Its `tee_info` keys for GCP (`instance_name`, `project_id`, `zone`, `image`; `internal/core/transfer/*/build_config.go`) are not documented; `cmd/vendor/README.md` shows the `aws-nitro` keys only. **Closed 2026-11-16 (status audit):** `cmd/vendor/README.md` lists the CVM keys from `TEEInfoKeys` |

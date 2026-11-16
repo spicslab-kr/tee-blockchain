@@ -9,7 +9,7 @@
 #        architecture. Without ARM64_HOST this part is skipped and reported as skipped.
 #    The script ends with a verdict and writes one results line per verdict (env.sh, result()).
 #
-#    arm64 host: bash e2e/cloud/aws-nitro.sh create-arm64 (c7g.xlarge, Graviton, Amazon Linux 2023 arm64, Nitro
+#    arm64 host: bash e2e/cloud/aws-nitro.sh create-arm64 --yes (c7g.xlarge, Graviton, Amazon Linux 2023 arm64, Nitro
 #    Enclaves on), then put its address in ARM64_HOST in e2e/env.local.sh.
 #    Run from the repository root:  bash "e2e/arch-measurement-compare.sh"
 set -uo pipefail
