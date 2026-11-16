@@ -1,6 +1,6 @@
 # AMD SEV-SNP, session 3 of 2026-11-16: the Auditor's own rebuild (D3), T2, T6, and the relay (T10)
 
-Run by Claude with the operator present, at commit `57b4350`. 21 result lines, written by hand in the results contract
+Run on 2026-11-16 at commit `57b4350`, with an AI coding agent under operator supervision. 21 result lines, written by hand in the results contract
 (`"script":"manual: …"`): 16 in `amd-sev-snp-initrd.jsonl`, 5 in `amd-sev-snp-verity.jsonl`. **20 have `result` equal
 to `expected`; the one that does not is T10's relay, accepted where the row expected refused, which is the finding.**
 Local anvil 1.8.0 (`NET=local`), verifier on the operator's Windows machine.
