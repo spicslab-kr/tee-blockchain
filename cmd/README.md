@@ -1,13 +1,13 @@
 # Command-line tools
 
-Four binaries: one per role, plus the responder that runs inside the enclave.
+Four binaries: one per role, plus the responder that runs inside the TEE.
 
 | binary | role | runs on |
 |---|---|---|
-| `att-vendor` | Vendor: build or pack the enclave image, launch it, send the build config, self-register | a Nitro-enabled EC2 instance (Linux) for `build`, `pack`, `launch`; anywhere for the rest |
-| `att-auditor` | Auditor: receive the source, rebuild, launch, deploy a registry, audit, send the result back | a Nitro-enabled EC2 instance (Linux) for `build`, `pack`, `launch`; anywhere for the rest |
-| `att-user` | User: `verify`, plus the single steps it wraps (`ra-request`, `ra-parse`, `lookup`, `compare`) | anywhere with network access. No Nitro, no Docker, no keys |
-| `att-ra-responder` | answers attestation requests inside the enclave | inside the enclave only. `build` and `pack` layer it into the image |
+| `att-vendor` | Vendor: build (or pack) the measured image, launch it, send the build config, self-register | for `build`, `pack`, `launch`: a Nitro-enabled EC2 instance (Linux), or the TDX or SEV-SNP guest itself (`--platform intel-tdx \| amd-sev-snp-*`); anywhere for the rest |
+| `att-auditor` | Auditor: receive the source, rebuild, launch, deploy a registry, audit, send the result back | the same as `att-vendor` |
+| `att-user` | User: `verify`, plus the single steps it wraps (`ra-request`, `ra-parse`, `lookup`, `compare`) | anywhere with network access. No TEE, no Docker, no keys |
+| `att-ra-responder` | answers attestation requests from inside the TEE | Nitro: inside the enclave only, layered into the image by `build` and `pack`, so it is measured. TDX and SEV-SNP: started on the guest (`ra-serve --extractor tdx \| snp-initrd \| snp-verity`), not measured (`docs/build/ra-comparison.md`) |
 
 Each role binary contains only its own role's commands. `att-user` has no `register` at all.
 
@@ -50,8 +50,8 @@ from two different commits, or from a tree with uncommitted changes, then gives 
 
 ### One shared `att-ra-responder`
 
-`att-ra-responder` answers attestation requests inside the enclave. `build` layers it onto the
-software image, so it must sit next to the role binary (or be named with `--responder <file>`).
+`att-ra-responder` answers attestation requests inside the enclave. On Nitro `build` layers it onto the
+software image (on TDX and SEV-SNP it runs from the guest's disk and this section does not apply), so it must sit next to the role binary (or be named with `--responder <file>`).
 It is one binary for every role, and the Vendor and the Auditor must use the same file: if they
 embed different responders their measurements can never match.
 

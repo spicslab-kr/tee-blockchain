@@ -876,10 +876,11 @@ describe` on 2026-11-11):
 
 On a stock GCP boot step 5 verifies both signatures and the nonce and then refuses, because the boot was initrdless.
 Turn `GRUB_FORCE_PARTUUID` off first, as in "The boot setting changed on `attestamp-snp-vendor`" above; the stock
-entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five values. To boot an initrd that carries
-an application (Option 1), or the dm-verity image with its root hash on the command line (Option 2), follow
-`docs/plan/app-fixture-recording.md`: it builds the initrd with `mkappinitrd`, the image with `make-verity-image.sh`,
-and the boot entry with `make-grub-entry.sh` from the instance's own stock entry, so nothing is hard-coded.
+entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five values. **To run an application, use
+`build` and `launch`** ("Getting started" above). To record a **test fixture** that carries an application (Option 1),
+or the dm-verity image with its root hash on the command line (Option 2), follow `docs/plan/app-fixture-recording.md`:
+it builds the initrd with `mkappinitrd`, the image with `make-verity-image.sh`, and the boot entry with
+`make-grub-entry.sh` from the instance's own stock entry, so nothing is hard-coded.
 
 The two roots of trust in one SEV-SNP measurement set (AMD for MEASUREMENT, Google's vTPM for the rest), and the
 check that MEASUREMENT is identical across our initrd and initrdless recordings, are written up in
@@ -1047,5 +1048,7 @@ replaced: "the seven 2026-11 tests" as one runnable set, and the relay test (T10
 
 ## Checking
 
-There is no `--verify` for SEV-SNP yet. Until there is, build twice and on two machines, and compare the hashes of the
-application, the cpio archive and the disk image before registering anything.
+`build --verify` builds twice on the same machine and fails if the two differ (both formats; used in step 6). Across
+machines, the Auditor's half compares the Auditor's own build with the Vendor's (`initrd_sha256`, and for
+`amd-sev-snp-verity` `root_hash` and `pcr12`) before anything is registered; on 2026-11-16 that comparison caught two
+wrong inputs (`docs/results/sessions-2026-11-16/`).

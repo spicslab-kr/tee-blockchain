@@ -13,7 +13,7 @@
   <a href="#contributors">Contributors</a>
 </p>
 
-Software runs in a TEE (AWS Nitro Enclaves today). An independent Auditor rebuilds it, confirms the
+Software runs in a TEE (AWS Nitro Enclaves, or an Intel TDX or AMD SEV-SNP confidential VM on GCP). An independent Auditor rebuilds it, confirms the
 enclave really runs those bytes, and registers the measurement on an Ethereum-compatible chain.
 Anyone can then ask the enclave to attest itself and compare the answer with what is on-chain,
 without a key from anyone.
@@ -118,9 +118,11 @@ All the cautions, per TEE: [AWS Nitro Enclaves](docs/build/aws-nitro.md), [Intel
 **Step by step, from nothing:** Nitro, the two flows in [e2e/README.md](e2e/README.md) (instances:
 [e2e/cloud/README.md](e2e/cloud/README.md)); Intel TDX, [Getting started](docs/build/tdx.md#getting-started-from-nothing-to-a-verified-tdx-guest); AMD SEV-SNP,
 [Getting started](docs/build/sev-snp.md#getting-started-from-nothing-to-a-verified-sev-snp-guest). On TDX and SEV-SNP
-the tested path uses one guest, and its Auditor registers the Vendor's guest's values without rebuilding them; the
-independent Auditor of the trust model above is each page's "The Auditor's half", written and **not yet run**. What
-each platform's evidence gives the verifier, side by side: [RA comparison](docs/build/ra-comparison.md).
+steps 1 to 13 use one guest, and their Auditor registers the Vendor's guest's values without rebuilding them; the
+independent Auditor of the trust model above is each page's "The Auditor's half", which needs two guests and **passed
+on both platforms on 2026-11-16** ([TDX](docs/results/sessions-2026-11-16/intel-tdx.md),
+[SEV-SNP](docs/results/sessions-2026-11-16/amd-sev-snp.md)). What each platform's evidence gives the verifier, side
+by side: [RA comparison](docs/build/ra-comparison.md).
 
 ## Quick start
 
@@ -225,7 +227,7 @@ hash, and register its own signed hash. The User can then require both registrie
 
 - **AWS Nitro Enclaves end to end.** Request, document verification against the AWS Nitro root,
   measurement extraction, image build and launch.
-- **Intel TDX and AMD SEV-SNP on GCP: verification, and requesting evidence in the guest.** `ra-parse`,
+- **Intel TDX and AMD SEV-SNP on GCP end to end.** `ra-parse`,
   `audit` and `verify` check a TDX quote (`intel-tdx`: MRTD, RTMR0–2) or SEV-SNP evidence
   (`amd-sev-snp-initrd`, `amd-sev-snp-verity`), tested against evidence recorded on GCP, including
   recordings with an application in both options. `att-ra-responder ra-serve --extractor tdx | snp-initrd |
@@ -234,15 +236,17 @@ hash, and register its own signed hash. The User can then require both registrie
   `build` and `launch --platform intel-tdx` build the application initrd (both options, with `--verify`) and
   install and check it under GRUB; for SEV-SNP the same with `--platform amd-sev-snp-initrd` or
   `amd-sev-snp-verity`. Run on real guests, both options, on 2026-11-15 and 2026-11-16, with `audit` and `verify`
-  from another machine. **Not yet run on the CVMs: the independent Auditor.** In every CVM run so far the Auditor
-  registered the values the Vendor's guest measured, which is weaker than the trust model above; the Auditor's own
-  rebuild on a guest of its own is written ("The Auditor's half" in each platform's Getting started) and needs two
-  guests to run. SEV-SNP evidence is two documents
-  from two signers, and nothing proves they come from the same VM; see [AMD SEV-SNP](docs/build/sev-snp.md#same-vm).
+  from another machine. **The independent Auditor ran on both CVMs on 2026-11-16**: on two guests of one image, the
+  Auditor rebuilt the Vendor's application on its own guest, got the same values, registered them, and a User's
+  `verify` of the Vendor's guest passed; one byte changed on the Vendor's side was refused
+  ([TDX](docs/results/sessions-2026-11-16/intel-tdx.md), [SEV-SNP](docs/results/sessions-2026-11-16/amd-sev-snp.md)).
+  SEV-SNP evidence is two documents from two signers, and nothing binds them to one VM: a relay that hashes one VM's
+  vTPM evidence into another VM's report verifies (reproduced 2026-11-16; see
+  [RA comparison](docs/build/ra-comparison.md) and [AMD SEV-SNP](docs/build/sev-snp.md#same-vm)).
   What a measurement says about a running guest: [runtime immutability](docs/build/runtime-immutability.md).
 - **GCP Confidential Space and Azure** have request-side scaffolding only.
-- **The measurement is the identity.** The image hash (PCR0·1·2 on Nitro, MRTD and RTMR0–2 on TDX)
-  is what gets registered and looked up, so no name, version or key has to be known in advance.
+- **The measurement is the identity.** The image hash (PCR0·1·2 on Nitro, MRTD and RTMR0–2 on TDX, MEASUREMENT,
+  PCR4, KERNEL, CMDLINE, INITRD and for verity PCR12 on SEV-SNP) is what gets registered and looked up, so no name, version or key has to be known in advance.
 - **One architecture, one registration.** x86_64 and arm64 builds measure differently, so each
   registration says which architecture it is for.
 - **A deliberately simple contract.** `Registry.sol` never overwrites and never revokes. Expiry is

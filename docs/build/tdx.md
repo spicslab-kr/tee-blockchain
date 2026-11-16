@@ -683,8 +683,9 @@ travels in the initrd. It then opens the image with dm-verity and mounts it read
 - An image that did not match its root hash was not opened. The boot still continued, because the script only records
   `fail`.
 
-The fixtures are `gcp-c3-opt2m-*`, and the procedure is `docs/plan/night-log.md`, "Overnight 2026-11-12". It is still
-a test setup: the scripts are not part of `setup/build`.
+The fixtures are `gcp-c3-opt2m-*`, recorded with the procedure in `docs/plan/night-log.md`, "Overnight 2026-11-12".
+To make the Option 2 base initrd with the hooks for a real build, follow "Getting started", step 4; the hook scripts
+are in `internal/tee/parse/tdx/testdata/record/`, and `build --option 2` makes the image itself.
 
 Left out, because they describe the machine or whoever launched it, not the image:
 

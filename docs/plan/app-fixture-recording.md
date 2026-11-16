@@ -1,7 +1,9 @@
 # Recording fixtures that carry an application
 
-**Status: run on 2026-11-11; see "Results" at the end.** This procedure covers the four cells of the 2026-10-23 slides
-7 and 16:
+**Status: run on 2026-11-11; see "Results" at the end.** This is how the **test fixtures** were recorded, with its own
+tools (`mkappinitrd`, `make-grub-entry.sh`, `make-verity-image.sh`). To run an application on a guest, use `build` and
+`launch --platform …` instead: "Getting started" in `docs/build/tdx.md` and `docs/build/sev-snp.md`. This procedure
+covers the four cells of the 2026-10-23 slides 7 and 16:
 
 | | Option 1: application cpio in the initrd | Option 2: squashfs + dm-verity image |
 |---|---|---|

@@ -101,9 +101,9 @@ from the running binary.
 |---|---|
 | `schema` | Must be `attestamp.build-config/1`. |
 | `service`, `version` | Required. They name the registration. |
-| `platform` | `aws-nitro`. It decides which `tee_info` keys are required. |
+| `platform` | `aws-nitro`, `intel-tdx`, `amd-sev-snp-initrd` or `amd-sev-snp-verity`. It decides which `tee_info` keys are required. |
 | `source` | `repo` and `commit` are required. `path` is the optional app folder. |
-| `tee_info` | For `aws-nitro`: `instance_id`, `region`, `ami_id`. |
+| `tee_info` | For `aws-nitro`: `instance_id`, `region`, `ami_id`. For `intel-tdx` and both `amd-sev-snp-*` (guests on GCP): `instance_name`, `project_id`, `zone`, `image` (`TEEInfoKeys` in `internal/core/transfer/*/build_config.go`). For the CVMs, `image` is the exact image version both sides must boot (`docs/build/tdx.md`, "The same inputs"). |
 | `build_env` | `os`, `arch` (`amd64` or `arm64`) and `go` are required. `trimpath` may be false, and the Auditor warns about it. |
 
 The Auditor needs read access to the repository. Exit codes 8 to 11 report git failures from `send` and

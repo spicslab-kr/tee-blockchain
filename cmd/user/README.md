@@ -26,11 +26,13 @@ as the default and applies to every registry. Addresses compare without regard t
 
 Flags:
 
-- `--tee-addr` is the enclave's `host:port`.
+- `--tee-addr` is the TEE's `host:port`: a Nitro enclave's, or a TDX or SEV-SNP guest's.
 - `--rpc` is the Ethereum RPC URL.
 - `--registry` is the registry contract address. You can repeat it.
 - `--trusted-approvers <0x...,0x...>` names the approvers you trust.
-- `--format` is the expected document format. Only `aws-nitro` can be verified. This is the default.
+- `--format` is the expected document format: `aws-nitro` (the default), `intel-tdx`, `amd-sev-snp-initrd` or
+  `amd-sev-snp-verity`. **Give it for a TDX or SEV-SNP guest**; with the default, a CVM's evidence is refused as the
+  wrong format. The registration is looked up under the same name.
 - `--timeout` is the request timeout. The default is 30s.
 - `--nonce` pins the nonce, for tests.
 - `--out-dir` keeps the document and the measurements. Without it, `verify` uses a temporary directory.

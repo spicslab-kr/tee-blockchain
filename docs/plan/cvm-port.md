@@ -1,23 +1,25 @@
 # Porting Attestamp from Nitro to confidential VMs
 
-Status (2026-11-11, evening):
+Status (2026-11-16, evening):
 
-- Done:
-  - Phase 0.3 and 0.4: the first fixtures.
-  - Phase 1 (TDX parse) and phase 4a (SEV-SNP parse), with D3, D4 and D5 decided.
-  - The anvil chain tests, which run.
-  - Application fixtures for all four platform/option cells, which make T5 a code test (`docs/plan/app-fixture-recording.md`).
-  - Phase 2 code (TDX and SEV-SNP request), tested on the recorded evidence. Its live run (2.3) passed on both guests on
-    2026-11-12, with everything on one guest.
-- Phase 3 is partly done: 3.2–3.4 were measured in the recording sessions; on 2026-11-12 the TDX boot also opened and
-  mounted the dm-verity image (3.4). On 2026-11-15 the TDX build (both options, `--verify`) and launch went into the
-  tool and **ran on real guests** (install, reboot, `--check`, both options; `audit` and `verify` from another
-  machine; two guests of one image gave the same values). What is left is listed under "Phase 3: what waits for a VM".
-  **The biggest open item:** in every CVM run so far the Auditor registered the Vendor's guest's own values. The
-  Auditor's independent rebuild on a guest of its own is written as a procedure (2026-11-16, both platform docs, "The
-  Auditor's half") and **has not been run**: Phase 3 item 6 and Phase 4b item 5.
+- **Done, and run on real guests:**
+  - Phases 0 to 2: fixtures, TDX and SEV-SNP parse (D3, D4, D5 decided), request; the live request ran on both guests
+    (2026-11-12, then from another machine 2026-11-15).
+  - Phase 3 (TDX) and Phase 4b (SEV-SNP) build and launch, both options/formats: install, reboot and `launch --check` on
+    real guests (2026-11-15), and followed from the documents alone (the clean trial, 2026-11-16).
+  - **The independent Auditor, both platforms** (Phase 3 item 6, Phase 4b item 5): on two guests made in one call from
+    one image, the Auditor rebuilt on its own guest, got the Vendor's values, registered them with `audit
+    --vendor-tee`, and a User's `verify` of the Vendor's guest passed; a one-byte change on the Vendor's side was
+    refused (2026-11-16, `docs/results/sessions-2026-11-16/`). T2, T3 (TDX) and T6 live too.
+  - **T10 reproduced** on SEV-SNP (2026-11-16): the relay verifies; a property of the platform, recorded in
+    `docs/build/ra-comparison.md`, not fixed.
+- **Open, measured but not decided:** TDX has no initrdless check (an initrdless guest's quote verifies; it is refused
+  against an application's registration, but its own values can be registered and then verify); `audit --vendor-tee`
+  exits 0 when the Vendor's guest differs. Both are in `docs/plan/build-info-gaps.md`, "Design questions to review".
+- **Open, not measured:** whether the values follow the machine type or the zone; the dm-verity tamper case at boot
+  (an image that does not match its root hash); TDX `AppLast`; a mitigation for T10.
 - Phase 5 (a locked guest) is designed below, not started.
-- See `docs/plan/night-log.md`.
+- The day-by-day record: `docs/plan/night-log.md` and the trial and session reports.
 
 Clouds (decided 2026-11-11): **Nitro on AWS, TDX on GCP, SEV-SNP on GCP.** Each platform runs on one cloud. AWS is
 used for Nitro Enclaves only; SEV-SNP on AWS is not pursued. The AWS SEV-SNP runs of 2026-11 stay in the record as
@@ -223,7 +225,7 @@ check on the recorded quotes, and the event-log replay on a constructed log. **W
 | # | state | proved by |
 |---|---|---|
 | 3.5 build | **done without hardware**, both options: `internal/setup/build/tdx` and adapters (`63d138f`), `att-vendor`/`att-auditor build --platform intel-tdx` (`fc0f460`) | `internal/setup/build/tdx` tests (also run on Linux under WSL); `TestCmd_E2E_TDXBuild_VendorAndAuditorAgree` (on Linux the two roles' builds are byte-identical) |
-| 3.5 launch | **code done, not run on a guest**: install and the post-boot check (`400d2cd`, CLI `fc0f460`) | GRUB entry and install against a temporary root; a recorded quote verifies and a foreign event log is refused; the replay, the initrd comparison and the marker checks on constructed input |
+| 3.5 launch | **done, and run on real guests** (2026-11-15, again 2026-11-16 on two guests): install and the post-boot check (`400d2cd`, CLI `fc0f460`) | GRUB entry and install against a temporary root; a recorded quote verifies and a foreign event log is refused; the replay, the initrd comparison and the marker checks on constructed input |
 | 3.6 `--verify` | **done**: a one-byte change between the two builds fails the build and names `/opt/app/app` (Option 1) or the root hash (Option 2); a replaced base initrd is named too | `TestVerify_OneByteChangedFailsTheBuild`, `TestVerify_ChangedBaseInitrdIsNamed` |
 
 ### Phase 3: what waits for a VM
@@ -265,11 +267,11 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
    independent rebuild can ever match on TDX, and it is the first thing to measure.
 5. **Done 2026-11-15**: from a WSL on another machine, `ra-request`, `audit` (registered on a local anvil) and `verify` (exit 0, `✓ matches`). What was asked: **The verifier from another machine.** `att-user verify` against the guest's responder (Phase 2.2), with
    `measurements.json` registered by the Vendor or audited by the Auditor.
-6. **Not run: the Auditor's half as a procedure.** Written 2026-11-16 (`docs/build/tdx.md`, "The Auditor's half",
-   A1 to A9). Item 4 measured that two guests of one image give the same values; nobody has yet followed the procedure
-   in which the Auditor rebuilds, boots, compares and registers its **own** values and a User then verifies the
-   **Vendor's** guest against them. Until this runs, every TDX registration made so far is the Vendor's values
-   registered by the Auditor (the getting-started step 11), not an audit. What to run, for each option:
+6. **Done 2026-11-16, both options, every pass below met** (`docs/results/sessions-2026-11-16/intel-tdx.md`, at
+   `1b981df`): two guests from `ubuntu-2404-noble-amd64-v20261105` in one call; equal builds and equal values; `audit
+   --vendor-tee` registered the Auditor's own value; the User's `verify` of the Vendor's guest exit 0; the negative
+   control refused. The procedure needed one fix (A2's copy of `app`). What was asked: **the Auditor's half as a
+   procedure** (`docs/build/tdx.md`, "The Auditor's half", A1 to A9), for each option:
    1. **Two guests from one exact image**, the same machine type and zone, in one call so they cannot differ:
       `IMAGE=<exact name> bash e2e/cloud/gcp-cvm.sh tdx create vendor auditor` (with approval; two billable VMs).
       Pass: `gcp-cvm.sh tdx status` shows the same image on both disks.
@@ -332,7 +334,7 @@ so a check fed the recorded evidence and those build values must pass, and fail 
 | shared code | the verity image (`setup/build/verity`) and the GRUB install (`setup/launch/grub`) moved out of TDX (`66e28d9`) | the TDX tests unchanged, and `verity`/`grub` tests |
 | build | **done without hardware**, both formats, `--verify` (`ce08d93`, CLI `cac5d28`) | Option 1's archive from the recordings' one-file application is **byte-identical** to the archive the `opt1p-v1` and `opt1p-v2` guests booted (`TestBuild_Option1_TheArchiveTheGuestBooted`); a one-byte change fails `--verify`; run on Linux too |
 | launch check | **done on recorded evidence** (`b5d7086`) | `opt1p-v1` passes with its INITRD `a4504052…`; `opt2-v1` passes with INITRD `b0fd172d…` and the PCR12 predicted from root hash `e29ec085…`; v2's values are refused; a replayed nonce is refused |
-| launch install | code done, run against a temporary root only | `TestInstall_Option2PutsImageAndRootHash` |
+| launch install | **done, and run on real guests** (2026-11-15, again 2026-11-16 on two guests, both formats); in code against a temporary root | `TestInstall_Option2PutsImageAndRootHash` |
 
 ### Phase 4b: what waits for a VM
 
@@ -348,12 +350,11 @@ so a check fed the recorded evidence and those build values must pass, and fail 
 3. **Measured 2026-11-15: CMDLINE is the same.** The root UUID comes with the image, so two guests of `ubuntu-2404-noble-amd64-v20261105` gave the same MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD for the same application. Pin the exact image on both sides: `gcp-cvm.sh` `IMAGE=` since 2026-11-16 (`3520a56`). Not measured: whether MEASUREMENT follows the machine type. What was asked: **The Auditor's half**: as on TDX, the command line names the root disk (`root=UUID=`), so CMDLINE will differ
    between two guests' disks; and the Auditor uses the Vendor's base initrd (D1 (a)). Measure first whether CMDLINE
    can be made equal.
-4. **T10** stays as it is: the build and launch do not change what the evidence can say about the same VM.
-5. **Not run: the Auditor's half as a procedure.** Written 2026-11-16 (`docs/build/sev-snp.md`, "The Auditor's
-   half", A1 to A9). Item 3 measured that two guests of one image give the same values (Option 1); nobody has yet
-   followed the procedure in which the Auditor rebuilds, boots, compares and registers its **own** values and a User
-   then verifies the **Vendor's** guest against them, and Option 2 has never run on two guests. What to run, for each
-   format (`amd-sev-snp-initrd`, `amd-sev-snp-verity`):
+4. **T10** stays as it is: the build and launch do not change what the evidence can say about the same VM. **Reproduced 2026-11-16** on the two guests of item 5: the relay verifies (`docs/build/ra-comparison.md`, "The SEV-SNP relay, measured").
+5. **Done 2026-11-16, both formats, every pass below met** (`docs/results/sessions-2026-11-16/amd-sev-snp.md`, at
+   `57b4350`), Option 2 on two guests included; and T10 reproduced on the same two guests (item 4). What was asked:
+   **the Auditor's half as a procedure** (`docs/build/sev-snp.md`, "The Auditor's half", A1 to A9), for each format
+   (`amd-sev-snp-initrd`, `amd-sev-snp-verity`):
    1. **Two guests from one exact image**, the same machine type and zone, in one call:
       `IMAGE=<exact name> bash e2e/cloud/gcp-cvm.sh snp create vendor auditor` (with approval; two billable VMs).
       Pass: `gcp-cvm.sh snp status` shows the same image on both disks.

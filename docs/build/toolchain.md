@@ -110,9 +110,21 @@ identical in every line:
 | git | `git version 2.50.1` (`git-2.50.1-1.amzn2023.0.1`); **not in the AMI**: `0-Setup-local-upload.sh` installed it |
 | enclave allocator | `memory_mib: 512`, `cpu_count: 2` after the builds (raised by `launch` when needed) |
 
+The same two instances on 2026-11-16 (the baseline taken again, `docs/results/aws-nitro-2026-11-16.md`): every line
+the same. The **arm64** instance of that day, a `c7g.xlarge` made with `aws-nitro.sh create-arm64`:
+
+| what | value, as printed |
+|---|---|
+| AMI | `ami-0ce2f8dd9b0fcfb35`, the newest Amazon Linux 2023 arm64 on 2026-11-16 |
+| kernel | `6.1.190-237.442.amzn2023.aarch64`; `uname -m`: `aarch64` (Amazon's arm64 image ships kernel 6.1, the x86_64 one 6.12) |
+| aws-nitro-enclaves-cli | `aws-nitro-enclaves-cli-1.5.0-0.amzn2023.aarch64`; `Nitro CLI 1.5.0` |
+| docker | `docker-25.0.18-1.amzn2023.0.3.aarch64`; `Docker version 25.0.14, build 0bab007` |
+| git | `git-2.50.1-1.amzn2023.0.2.aarch64`, installed by `0-Setup-local-upload.sh` |
+
 `build` and `launch` install docker and `aws-nitro-enclaves-cli` with `dnf` without a version, so another day's image
 may bring others. PCR1 depends on nitro-cli's kernel files: with 1.5.0 the test application's PCR1 was
-`4b4d5b36…a493`. To record a later instance the same way:
+`4b4d5b36…a493` on x86_64 (2026-11-12 at `9a5668e` and 2026-11-16 at `c116845`) and `3b4a7e1b…` on arm64
+(2026-11-16 at `c116845`). To record a later instance the same way:
 
 ```
 rpm -q docker aws-nitro-enclaves-cli git
