@@ -16,6 +16,11 @@ dist/
 # e2e scripts: files fetched from the instances during a run
 e2e-work/
 
+# `go generate` in internal/chain/register/*/ether runs `forge build` in contracts/evm: its compiler output
+# (Registry.abi and Registry.bin, read by abigen) and forge's cache. Build products; the binding registry.go is committed.
+/contracts/evm/out/
+/contracts/evm/cache/
+
 # docs/build/tdx.md and sev-snp.md, run from the repository root on your computer: the guest binaries (step 2) and the
 # evidence, nonce and measurements fetched in steps 10-11
 /linux/
