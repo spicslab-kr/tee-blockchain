@@ -30,6 +30,8 @@ binaries built at `1b981df`/`57b4350` (no change to the TDX parser since). Local
 
 The guest was deleted afterwards (with its disk).
 
+*(Revised later on 2026-11-16, `868eeda`: the paragraph above first ended "What to do about it is an open question (`build-info-gaps.md`, "Design questions to review", Q2)". The question was decided, the sentence removed, and the section below added.)*
+
 ## Measured again after the fix, at `fa871e1`
 
 The fix (`fix(cmd/auditor): refuse to audit a TDX or SEV-SNP guest without --build-measurements`): `audit` on a CVM

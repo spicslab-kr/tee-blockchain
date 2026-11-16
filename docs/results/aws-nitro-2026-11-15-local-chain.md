@@ -26,7 +26,7 @@ Sepolia**. Every verdict is in [`aws-nitro-2026-11-15-local-chain.jsonl`](aws-ni
 | T6 | User `verify` with both registries required | **not trusted, exit 1**: "only 1 of 2 registries vouch" |
 
 PCR0 of the test application: `d5bbd4af…` in flow 1 (the Auditor's docker cache from 2026-11-12), `47dbca56…` in flow 2
-(the Vendor built it again today). Why they differ is the finding below. Both are values from **before `fc105b0`**,
+(the Vendor built it again today). Why they differ is the finding below. *(Added the same day, `00df4dc`:)* Both are values from **before `fc105b0`**,
 which empties the field that differed; the current `build` gives neither.
 
 ## Finding: the build day is in the image
@@ -45,7 +45,7 @@ cached image's `/etc/shadow` has `nginx:!:20769:0:99999:7:::`; day 20769 is 2026
 same source on different days give different PCR0 and PCR2**, and an Auditor rebuilding a day later than the Vendor
 would not match. The 2026-11-12 baseline (T1) compared two builds made on the same day and could not show this.
 
-*Update, the same day:* by the user's decision `build` now empties this field (`fc105b0`; `docs/build/aws-nitro.md`,
+*Update, the same day (`00df4dc`), replacing what was first recorded here, "`build` does not normalise this field yet … Fixing it changes the measurement of every image that has users, so it is left for a decision rather than made here":* by the user's decision `build` now empties this field (`fc105b0`; `docs/build/aws-nitro.md`,
 "What `build` changes in the image"). That changes PCR0 and PCR2 of every image with such an account.
 
 To go on, the Vendor's cached `alpine-slim:app` was rebuilt with `--no-cache` on the same day, and `--verify` then

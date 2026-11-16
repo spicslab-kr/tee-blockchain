@@ -1,7 +1,7 @@
 # Intel TDX, session 2 of 2026-11-16: the Auditor's own rebuild (D3), T2, T3, T6
 
 Run on 2026-11-16 at commit `1b981df`, with an AI coding agent under operator supervision (binaries built there; the `self-register` wording change
-`fix(cmd/vendor)` came during the run and only changes its text). 18 result lines in `intel-tdx.jsonl`, written by hand
+`fix(cmd/vendor)` came during the run and only changes its text). *(This sentence was reworded on 2026-11-16 in `9702f42`: it first named who ran the session; it now states the conditions. The facts are unchanged.)* 18 result lines in `intel-tdx.jsonl`, written by hand
 in the results contract (`"script":"manual: …"`), every one with `result` equal to `expected`. Local anvil 1.8.0
 (`NET=local`), verifier on the operator's Windows machine.
 
@@ -32,7 +32,7 @@ in the results contract (`"script":"manual: …"`), every one with `result` equa
 MRTD and RTMR0-2 for Option 1 equal those of the two earlier trials (2026-11-15 and the clean trial of 2026-11-16):
 four guests of one image, made over six days, measured the same.
 
-**An unplanned negative control: the wrong input was caught before registering.** A2's `gcloud compute scp
+**An unplanned negative control: the wrong input was caught before registering.** *(Rewritten later on 2026-11-16, `ac125aa`: this paragraph was first headed "What the procedure got wrong, and what was changed", with the same facts. The 18th JSONL line was added then, and the count in the first paragraph went from 17 to 18.)* A2's `gcloud compute scp
 --recurse vendor-app <guest>:app` failed with Windows' `pscp` (`unable to open app`) and left an empty `app` folder,
 so the Auditor's first build was of an **empty** application: initrd `7c738a30…` instead of the Vendor's
 `bc024887…`. A4's comparison of `initrd_sha384` with the Vendor's stopped the procedure there; nothing was launched or

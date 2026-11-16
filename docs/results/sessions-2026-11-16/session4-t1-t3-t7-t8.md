@@ -1,10 +1,10 @@
 # Session 4 of 2026-11-16: T1, T3, T7 and T8 on the confidential VMs
 
-Run on 2026-11-16 with an AI coding agent under operator supervision. Binaries built at commit `e319431` (`att-auditor` `3d4b6635…`, `att-vendor`
+Run on 2026-11-16 with an AI coding agent under operator supervision. *(This sentence was reworded on 2026-11-16 in `9702f42`: it first named who ran the session; it now states the conditions. The facts are unchanged.)* Binaries built at commit `e319431` (`att-auditor` `3d4b6635…`, `att-vendor`
 `3a30019c…`, go1.26.1, `CGO_ENABLED=0 -trimpath -buildvcs=false`); the T7 script was committed as `e9af1c9` during
 the session, byte-identical to the copy that ran (`95e915e5…`). 16 result lines, every one with `result` equal to
 `expected`: 8 in `session4-amd-sev-snp-initrd.jsonl`, 1 in `session4-amd-sev-snp-verity.jsonl`, 7 in
-`session4-intel-tdx.jsonl`. The T7 lines were written by `e2e/cvm/build-env-check.sh`, the others by hand
+`session4-intel-tdx.jsonl`. *(First recorded as 15 lines, 6 of them in the TDX file; updated 2026-11-16 in `3e89fd9` when the TDX zone line was added.)* The T7 lines were written by `e2e/cvm/build-env-check.sh`, the others by hand
 (`"script":"manual: …"`). T8 has no lines: it was closed as not applicable, not run.
 
 ## Setup

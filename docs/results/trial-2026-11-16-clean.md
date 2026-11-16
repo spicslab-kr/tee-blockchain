@@ -15,7 +15,7 @@
 
 Run on 2026-11-15/16 (UTC 18:40–21:10) at commit `e29d028`, with an AI coding agent working from the documents alone,
 without the earlier sessions' knowledge, in a WSL Ubuntu 24.04.5 on the development machine, with the
-repository as it was. **No tracked file was changed**; this file is the only one written into the repository. The
+repository as it was. **No tracked file was changed**; this file is the only one written into the repository. *(These two sentences were reworded on 2026-11-16 in `9702f42`: they first named who ran the trial and spoke in the first person. The facts are unchanged.)* The
 documented steps themselves wrote gitignored files (`e2e-work/`, `pem2.pem`, `auditor.key`, `deployer.key`, `att-*`)
 and some files that are **not** gitignored: `linux/`, `quote.bin*`, `evidence.cbor*`, `measurements.json` (F14). They
 are still there.
@@ -298,11 +298,11 @@ Not changed, and why:
 
 | finding | why |
 |---|---|
-| D3 (no independent rebuild on the CVMs) | **written, not run.** Both procedures now say that step 11 is not an audit, and "The Auditor's half" (A1 to A9) moves Nitro's flow 1 to the CVMs, with what "the same inputs" means (`docs/build/tdx.md`, `sev-snp.md`). Running it needs two guests at once; `docs/status/cvm-port.md` Phase 3 item 6 and Phase 4b item 5 say what run confirms it |
+| D3 (no independent rebuild on the CVMs) | *(Rewritten later on 2026-11-16, `91d0dc6`; first: "needs a second guest; 'The Auditor's own guest' in each doc is still unrun". Later still the same day it ran and passed, on both platforms: `docs/results/sessions-2026-11-16/`.)* **written, not run.** Both procedures now say that step 11 is not an audit, and "The Auditor's half" (A1 to A9) moves Nitro's flow 1 to the CVMs, with what "the same inputs" means (`docs/build/tdx.md`, `sev-snp.md`). Running it needs two guests at once; `docs/status/cvm-port.md` Phase 3 item 6 and Phase 4b item 5 say what run confirms it |
 | D1, D2, D4–D9, D11 | differences of the platforms themselves, not defects; the User's side is the same command |
 | D13 | TDX and SEV-SNP evidence has no module ID and no time to show |
 | D14 | the getting-started steps are typed by hand and write no JSONL; `in-guest-verify.sh` and `replay-check.sh` do |
-| D17 | partly: `audit` and `verify`, which the Auditor's half runs against guests, now say "guest" on TDX and SEV-SNP and "enclave" only on Nitro (`cli.TEENoun`); the TDX e2e test requires it. Other commands' wording (`ra-request`, `self-register`, `lookup`, usage text) is left for a pass over all CLI text |
+| D17 | *(Rewritten later on 2026-11-16, `91d0dc6`; first: "'enclave' in the CLI wording on VMs: cosmetic, left for a pass over all CLI text".)* partly: `audit` and `verify`, which the Auditor's half runs against guests, now say "guest" on TDX and SEV-SNP and "enclave" only on Nitro (`cli.TEENoun`); the TDX e2e test requires it. Other commands' wording (`ra-request`, `self-register`, `lookup`, usage text) is left for a pass over all CLI text |
 | F9 | the Nitro AMI and the `dnf` packages are unpinned; this run's versions are recorded above and equal the baseline's except git |
 | `net_retry` not retrying `Connection closed by …` | not reproduced |
 | `sudo` working although `sudo -n true` asked for a password | not investigated; outside the repository |
