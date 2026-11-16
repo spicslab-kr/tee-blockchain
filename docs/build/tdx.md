@@ -421,7 +421,8 @@ The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rule
 > measured the same four values, `audit --vendor-tee` registered the Auditor's own value, and the User's `verify` of
 > the Vendor's guest against it gave exit 0. With one byte changed on the Vendor's side only, `audit` said `the
 > Vendor's guest runs something else` and `verify` gave exit 1. One step was wrong and is fixed (A2's copy of `app`).
-> Not covered by that run: another machine type or zone (see "The same inputs").
+> Measured afterwards (T1, same day): another machine type changes RTMR0; the zone is not measured on TDX (see "The
+> same inputs").
 
 This is what README's trust model asks of the Auditor: rebuild the Vendor's application independently, confirm that a
 TEE really runs those bytes, and only then register. Step 11 above does not do that. It is the same flow as Nitro's,
@@ -453,8 +454,8 @@ condition the whole half rests on.
 |---|---|---|
 | the image, **exact version** (`ubuntu-2404-noble-amd64-v20261105`), not the family `ubuntu-2404-lts-amd64` | the Vendor records the name step 3 printed; the Auditor creates with `IMAGE=<that name>` (A2). A family moves every few weeks | the kernel (RTMR1), the root file system UUID on the command line (RTMR2), the stock initrd |
 | the kernel | do not `apt upgrade` either guest; `uname -r` must print the same on both | RTMR1, and the Option 1 base initrd |
-| the machine type (`c3-standard-4`) | `MACHINE=` the Vendor's | RTMR0 is expected to follow the VM's CPU and memory; **not measured** |
-| the zone (`us-central1-a`) | `ZONE=` the Vendor's | firmware could differ between zones; **not measured** |
+| the machine type (`c3-standard-4`) | `MACHINE=` the Vendor's. **Required**: the Auditor's and the Vendor's guest must have the same machine type | **RTMR0** (measured 2026-11-16, T1). One guest, one boot entry, only the type changed: `c3-standard-4` RTMR0 `8847ec5d…`, `c3-standard-8` **`eba48352…`**; MRTD, RTMR1 and RTMR2 did not change. Whether the vCPU count or the memory moves it could not be separated: GCP refused `c3-highmem-4` and `c3-highcpu-8` for TDX, and in `c3-standard` both grow together. RTMR0 is where the firmware measures the VM's configuration (its ACPI tables and memory layout) |
+| the zone (`us-central1-a`) | `ZONE=` the Vendor's | not measured on TDX. On SEV-SNP a guest in another zone gave the same values (`docs/build/sev-snp.md`), which says nothing certain about TDX's firmware, so keep the Vendor's zone |
 | the base initrd | Option 1: the image's own `/boot/initrd.img-<kernel>`, the same file on every guest of one image (`4703ec07…` on all three). Option 2: **the Vendor's** `base-initrd-v.img`; `mkinitramfs` never makes the same file twice, so the Auditor must not make its own | the initrd hash, so RTMR2 |
 | the application folder | the same files byte for byte (and the same modes; `build` normalises them) | the initrd hash, so RTMR2 |
 | the option (1 or 2) | the Vendor says which | the initrd, and for Option 2 the image |
@@ -601,7 +602,7 @@ If the two images differ, expect:
 |---|---|
 | another version of the same family | a new root file system UUID, so the command line and **RTMR2**; a new stock initrd, so the Option 1 base and the initrd hash; often a new kernel, so **RTMR1** too |
 | another kernel on the same image (an `apt upgrade` on one side) | **RTMR1** (the kernel), the base initrd (`/boot/initrd.img-<version>`), so **RTMR2** |
-| another machine type (`c3-standard-4` vs another shape) | not measured; **RTMR0**, the firmware's configuration, is expected to follow the VM's memory and CPU count |
+| another machine type (`c3-standard-4` vs `c3-standard-8`) | **RTMR0**, measured 2026-11-16 (`8847ec5d…` vs `eba48352…`); MRTD, RTMR1 and RTMR2 unchanged |
 | another firmware (GCP updates TDVF) | **MRTD** and RTMR0 |
 
 The values then differ and `audit` refuses, correctly: it is another boot. Both sides move to a new image together
@@ -714,14 +715,15 @@ three hours of a Nitro leaf. Freshness comes from the nonce.
 
 ## Variables
 
-Nothing below has been measured by changing it on TDX; the rows are what the structure above implies, or what the
-SEV-SNP runs measured for the same files. What was measured is the opposite case: two guests of one image, made five
-days apart, gave the same four values (see "Use the same image as the other side").
+Two rows below were measured on TDX by changing only that variable, both on 2026-11-16: the VM shape (T1) and the
+application archive's Go version (T2, `docs/results/sessions-2026-11-16/intel-tdx.md`). The other rows are what the
+structure above implies, or what the SEV-SNP runs measured for the same files. Also measured is the opposite case: two
+guests of one image, made five days apart, gave the same four values (see "Use the same image as the other side").
 
 | variable | which value | note |
 |---|---|---|
 | GCP's TDVF version | MRTD | GCP may update it; every registration would change |
-| VM shape (vCPUs, memory) | RTMR0 probably | the firmware's configuration includes the ACPI tables. **Not confirmed** |
+| VM shape (vCPUs, memory) | RTMR0 | **measured 2026-11-16**: `c3-standard-4` `8847ec5d…`, `c3-standard-8` `eba48352…`, nothing else moved. Which of vCPUs and memory does it was not separable (GCP allows TDX on `c3-standard` shapes only, where both grow together) |
 | shim, GRUB, kernel | RTMR1 | OS image updates |
 | kernel command line | RTMR2 | it carries the root file system's UUID (`root=UUID=…` with our entry). That UUID comes with the image version, not the disk: two guests of one image had the same (measured 2026-11-15), so it changes only with another image |
 | base initrd | RTMR2 | `mkinitramfs` writes a random seed, so the Vendor's base initrd is used as published (as on SEV-SNP) |
@@ -908,7 +910,7 @@ instead. This section only records a quote from a stock guest, as the first fixt
 | what | why |
 |---|---|
 | a failed dm-verity check at boot stopping the boot | Option 2 builds and boots with the real tools (2026-11-15), but a root hash that does not match still lets the boot go on; `launch --check` refuses it (`/run/attestamp-status`) |
-| the Auditor's half on another machine type or zone | it passed on 2026-11-16 with both guests `c3-standard-4` in `us-central1-a`; whether RTMR0 or MRTD follow the machine type or zone is not measured |
+| the values in another zone | the machine type was measured on 2026-11-16 (RTMR0 changes); a TDX guest in another zone was not made. On SEV-SNP the zone changed nothing |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |

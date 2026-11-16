@@ -393,7 +393,8 @@ The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rule
 > measured the same values, `audit --vendor-tee` registered the Auditor's own value, and the User's `verify` of the
 > Vendor's guest against it gave exit 0. With one byte changed on the Vendor's side only, `audit` said `the Vendor's
 > guest runs something else` and `verify` gave exit 1. A4's comparison also caught a wrong input (an extra file in the
-> copied `app`) before anything was registered. Not covered: another machine type or zone. And the relay of "Same VM"
+> copied `app`) before anything was registered. Measured afterwards (T1, same day): another machine type changes
+> MEASUREMENT, another zone did not ("The same inputs"). And the relay of "Same VM"
 > still passes: an independent Auditor makes the registered values trustworthy, not the pairing of the two documents.
 
 This is what README's trust model asks of the Auditor: rebuild the Vendor's application independently, confirm that a
@@ -428,8 +429,8 @@ again. That is the condition the whole half rests on.
 |---|---|---|
 | the image, **exact version** (`ubuntu-2404-noble-amd64-v20261105`), not the family `ubuntu-2404-lts-amd64` | the Vendor records the name step 3 printed; the Auditor creates with `IMAGE=<that name>` (A2). A family moves every few weeks | the root file system UUID in CMDLINE, the stock initrd, often KERNEL and PCR4 |
 | the kernel | do not `apt upgrade` either guest; `uname -r` must print the same on both | KERNEL, and the Option 1 base initrd |
-| the machine type (`n2d-standard-2`) | `MACHINE=` the Vendor's | MEASUREMENT is expected to follow the vCPU count; **not measured** |
-| the zone (`us-central1-a`) | `ZONE=` the Vendor's | firmware could differ between zones; **not measured** |
+| the machine type (`n2d-standard-2`) | `MACHINE=` the Vendor's. **Required**: the Auditor's and the Vendor's guest must have the same machine type, or at least the same number of vCPUs | **MEASUREMENT** (measured 2026-11-16, T1). One guest, one boot entry, only the type changed: `n2d-standard-2` (2 vCPUs, 8 GB) `f6790085…`, `n2d-standard-4` (4 vCPUs, 16 GB) **`2279d213…`**, `n2d-highmem-2` (2 vCPUs, 16 GB) `f6790085…` again. So it is the vCPU count, not the memory: the SNP launch digest covers each vCPU's initial register state (VMSA). PCR4, KERNEL, CMDLINE and INITRD did not change |
+| the zone (`us-central1-a`) | `ZONE=` the Vendor's | nothing, where measured: a guest made in `us-central1-b` from the same image gave the same five values as `us-central1-a` (2026-11-16, T1). That is one other zone on one day, not every zone for good, so keep the Vendor's zone; it costs nothing |
 | the base initrd | Option 1: the image's own `/boot/initrd.img-<kernel>`, the same file on every guest of one image (`4703ec07…` on all three). Option 2: **the Vendor's** `base-initrd-v.img`; `mkinitramfs` never makes the same file twice, so the Auditor must not make its own | INITRD |
 | the application folder | the same files byte for byte (and the same modes; `build` normalises them) | INITRD (Option 1); the root hash, so CMDLINE and PCR12 (Option 2) |
 | the format: `amd-sev-snp-initrd` or `amd-sev-snp-verity` | the Vendor says which | everything after the firmware |
@@ -577,7 +578,8 @@ If the two images differ, expect:
 |---|---|
 | another version of the same family | a new root file system UUID, so **CMDLINE**; a new stock initrd, so the Option 1 base and **INITRD**; often a new kernel, so **KERNEL**, and a new shim or GRUB, so **PCR4** |
 | another kernel on the same image (an `apt upgrade` on one side) | **KERNEL** and the base initrd (`/boot/initrd.img-<version>`), so **INITRD** |
-| another machine type (`n2d-standard-2` vs another shape) | not measured; **MEASUREMENT** is expected to follow the vCPU count, since the SNP launch digest covers each vCPU's initial state |
+| another machine type with another vCPU count (`n2d-standard-2` vs `n2d-standard-4`) | **MEASUREMENT**, measured 2026-11-16 (`f6790085…` vs `2279d213…`); the same vCPU count with more memory (`n2d-highmem-2`) did not change it |
+| another zone (`us-central1-a` vs `us-central1-b`) | nothing, measured 2026-11-16 with one guest in each |
 | another firmware (GCP updates its OVMF) | **MEASUREMENT** |
 
 The values then differ and `audit` refuses, correctly: it is another boot. Both sides move to a new image together
@@ -758,8 +760,8 @@ the row says so.
 
 | variable | what changed | how we kept it fixed |
 |---|---|---|
-| Go version | Go 1.22.2 and 1.23.4 gave different application binaries (record) | the same Go version on both sides. **Ours:** the responder built with go1.26.1 and go1.26.2 differs (Nitro baseline 2026-11-12, `toolchain-pin-check.sh`), and `build` refuses another version |
-| build path | without `-trimpath`, two folders gave two different binaries (record) | `-trimpath`. **Ours:** `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`, and two checkout paths gave the same Nitro PCRs (2026-11-12) |
+| Go version | Go 1.22.2 and 1.23.4 gave different application binaries (record) | the same Go version on both sides. **Ours:** the responder built with go1.26.1 and go1.26.2 differs (Nitro baseline 2026-11-12, `toolchain-pin-check.sh`), and `build` refuses another version. **On a SEV-SNP guest (2026-11-16, T2):** the same application under the two versions booted to INITRD `48e09d59…` vs `bca95760…` |
+| build path | without `-trimpath`, two folders gave two different binaries (record) | `-trimpath`. **Ours:** `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`, and two checkout paths gave the same Nitro PCRs (2026-11-12). **On a SEV-SNP guest (2026-11-16, T3):** one Go application from two checkout paths, built into an initrd from two folders of different depth, gave the same INITRD `48e09d59…` (booted and measured) and, for Option 2, the same image and root hash `4a517772…` |
 | cpio tool | GNU cpio 2.13 (Amazon Linux 2023) and 2.15 (Ubuntu) packed the same files into different bytes (directory link counts) (record) | our own cpio writer: `internal/setup/build/cpio` (sorted names, time 0, owner 0, fixed inode numbers). It was byte-identical to the 2026-11 scripts' `mkcpio.py`, which is no longer available; the golden files in `internal/setup/build/cpio/testdata` pin that output |
 | distribution base initrd | `mkinitramfs` and `dracut` build a different file every time (it contains a random seed) | none possible. The Auditor uses the base initrd the Vendor publishes and rebuilds only the application part |
 | folder permissions (umask) | the same files in a squashfs image gave a different image and root hash under umask 022 (folders 755) and umask 002 (folders 775) | **fixed (2026-11-11):** `internal/setup/build/cpio/testdata/make-verity-image.sh` sets **`umask 022`** and sets every folder and file to mode **755** explicitly. With it, the image built on `attestamp-snp-vendor` and on `attestamp-tdx-vendor` was byte-identical (`app.img` sha256 `28bdfcff…ec1c`, root hash `e29ec085…af0c9`). A build that sets neither still depends on the caller's umask |
@@ -775,7 +777,7 @@ What else changes the registered values (from the evidence's structure; **not me
 
 | value | changes with |
 |---|---|
-| MEASUREMENT | the virtual firmware GCP launches the guest with; GCP may update it |
+| MEASUREMENT | the virtual firmware GCP launches the guest with; GCP may update it. And the **vCPU count** (**measured** 2026-11-16: `n2d-standard-2` `f6790085…`, `n2d-standard-4` `2279d213…`, `n2d-highmem-2` `f6790085…`; see "The same inputs"); not the zone (`us-central1-b` gave `f6790085…` too) |
 | PCR4 | shim and GRUB, i.e. the OS image and its updates |
 | KERNEL | the kernel package |
 | CMDLINE | the boot entry. It names the root by the file system's UUID (stock entry with an initrd) or the partition's PARTUUID (the initrdless one). Both come with the image version, not the disk: two guests of one image had the same CMDLINE (**measured** 2026-11-15), so the Auditor's guest must be made from the Vendor's exact image ("Use the same image as the other side") |
@@ -1039,7 +1041,6 @@ evidence also carried.
 
 | what | why |
 |---|---|
-| the Auditor's half on another machine type or zone | it passed on 2026-11-16 with both guests `n2d-standard-2` in `us-central1-a`; whether MEASUREMENT follows the vCPU count is not measured |
 | a verity boot that fails its check | a verity boot made by `launch` passed `--check` on 2026-11-15 with PCR12 the predicted value; the tamper case (an image that does not match its root hash) was not run |
 | TCB minimums, CRLs | not applied; the platform's patch level is not judged |
 | AMD chain errors as `ErrChain` | go-sev-guest checks the chain and the signature in one call |
