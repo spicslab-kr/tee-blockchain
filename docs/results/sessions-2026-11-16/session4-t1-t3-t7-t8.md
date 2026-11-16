@@ -18,9 +18,16 @@ the session, byte-identical to the copy that ran (`95e915e5…`). 15 result line
 The application in T1 and T3 was the one session 2 and 3 used for T2 and T3: `cmd/ra-responder` built with go1.26.1
 (`c61c988e…`), alone in `app/`, Option 1 on the image's own base initrd (`4703ec07…` on every guest).
 
-State now: all four GCP guests **stopped** (`d3-snp-vendor` was not started). The three that booted an Attestamp
-entry still have it as the GRUB default and `GRUB_FORCE_PARTUUID` commented out; nothing was undone (step 13), since
-what happens to the guests next is the operator's decision.
+State at the end of the session: all four GCP guests **stopped** (`d3-snp-vendor` was not started). The three that
+booted an Attestamp entry still had it as the GRUB default and `GRUB_FORCE_PARTUUID` commented out.
+
+**Afterwards, the same day: all four deleted, without the undo.** On the operator's decision, `d3-snp-vendor`,
+`d3-snp-auditor`, `t1zone-snp-vendor` and `t1type-tdx-vendor` were deleted with `gcloud compute instances delete`,
+after `d3-snp-auditor` had been used once more for the IAP check (`e2e/cloud/README.md`, "SSH to the guests"). Step 13
+(the undo of the boot entry and of `/var/lib/attestamp`) was **not** run on any of them: the guests were being
+deleted, so there was nothing to restore. Each boot disk was set to auto-delete, and afterwards the project listed no
+instances, no disks, no snapshots and no custom images. Every value measured on them is in this file and the
+`session4-*.jsonl` lines; new guests are made with `e2e/cloud/gcp-cvm.sh`.
 
 ## T7: the build environment on a guest
 
