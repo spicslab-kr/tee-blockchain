@@ -2,8 +2,8 @@
 
 Run by Claude with the operator present. Binaries built at commit `e319431` (`att-auditor` `3d4b6635…`, `att-vendor`
 `3a30019c…`, go1.26.1, `CGO_ENABLED=0 -trimpath -buildvcs=false`); the T7 script was committed as `e9af1c9` during
-the session, byte-identical to the copy that ran (`95e915e5…`). 15 result lines, every one with `result` equal to
-`expected`: 8 in `session4-amd-sev-snp-initrd.jsonl`, 1 in `session4-amd-sev-snp-verity.jsonl`, 6 in
+the session, byte-identical to the copy that ran (`95e915e5…`). 16 result lines, every one with `result` equal to
+`expected`: 8 in `session4-amd-sev-snp-initrd.jsonl`, 1 in `session4-amd-sev-snp-verity.jsonl`, 7 in
 `session4-intel-tdx.jsonl`. The T7 lines were written by `e2e/cvm/build-env-check.sh`, the others by hand
 (`"script":"manual: …"`). T8 has no lines: it was closed as not applicable, not run.
 
@@ -82,11 +82,16 @@ digest covers one initial register state (VMSA) per vCPU.
 |---|---|---|---|---|
 | new guest, `c3-standard-4`, 4 vCPUs, 16 GB | `f21e6b48…` | `8847ec5d…` | `6e1a3f88…` | `4ea92ca9…` |
 | the same guest at `c3-standard-8`, 8 vCPUs, 32 GB | the same | **`eba48352…`** | the same | the same |
+| another new guest, `c3-standard-4`, **`us-central1-b`** (made after the others were deleted) | the same | `8847ec5d…` | the same | the same |
 
 The `c3-standard-4` values equal session 2's guests' for the same application, so a third TDX guest of this image
 agreed again. `c3-highmem-4` and `c3-highcpu-8`, tried to separate vCPUs from memory, were refused by GCP for a TDX
-VM ("Confidential Instance Config can only be set on supported and compatible Confidential VM machine types"). Zone on
-TDX: not measured.
+VM ("Confidential Instance Config can only be set on supported and compatible Confidential VM machine types").
+
+**Zone on TDX, measured separately, the same day:** a TDX guest made in `us-central1-b` (`gcp-cvm.sh`, same image and
+type, tag `attestamp-ra` checked before use, reached through IAP only) gave the same four values as `us-central1-a`.
+The zone changed nothing on TDX, as on SEV-SNP; each platform was measured on its own. The guest was deleted
+afterwards (its boot disk with it; the project then listed no instances and no disks).
 
 **Consequence, written into both guides ("The same inputs"):** the Auditor's guest must have the Vendor's machine
 type. On SEV-SNP the vCPU count is what matters; on TDX it could not be narrowed beyond the type.

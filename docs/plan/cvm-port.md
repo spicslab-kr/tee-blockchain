@@ -20,8 +20,8 @@ Status (2026-11-16, evening):
 - **Measured in session 4 (2026-11-16):** T1, T3 (SEV-SNP), T7 on guests; T8 closed as not applicable on GCP
   (`docs/results/sessions-2026-11-16/session4-t1-t3-t7-t8.md`). The machine type changes the values (SEV-SNP
   MEASUREMENT with the vCPU count, TDX RTMR0), so both guides now require the Vendor's machine type; the zone changed
-  nothing on SEV-SNP. No test-matrix cell needs a guest any more.
-- **Open, not measured:** the zone on TDX; the dm-verity tamper case at boot (an image that does not match its root
+  nothing, measured on each platform. No test-matrix cell needs a guest any more.
+- **Open, not measured:** the dm-verity tamper case at boot (an image that does not match its root
   hash); TDX `AppLast`; a mitigation for T10.
 - **Done 2026-11-16, after the guest work:** the project's port 22 moved from `default-allow-ssh` (`0.0.0.0/0`, deleted)
   to IAP only, `attestamp-ssh-iap`: `35.235.240.0/20`, limited to the `attestamp-ra` tag. ssh and scp through IAP were

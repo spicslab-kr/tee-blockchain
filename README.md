@@ -106,7 +106,8 @@ measurements. The most important:
      memory with the same vCPUs (`n2d-highmem-2`) and another zone (`us-central1-b`) did not.
    - TDX: the machine type changes RTMR0 (`c3-standard-8` against `c3-standard-4`). Whether it is the
      vCPUs or the memory could not be told apart: GCP refused the shapes that would separate them
-     (`c3-highmem-4`, `c3-highcpu-8`) for a TDX VM.
+     (`c3-highmem-4`, `c3-highcpu-8`) for a TDX VM. Another zone (`us-central1-b`) did not change
+     anything, measured on a TDX guest of its own.
 
    So the Auditor makes its guest with the Vendor's machine type, as the guides' "The same inputs"
    asks.
