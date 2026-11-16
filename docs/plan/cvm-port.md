@@ -23,9 +23,9 @@ Status (2026-11-16, evening):
   nothing on SEV-SNP. No test-matrix cell needs a guest any more.
 - **Open, not measured:** the zone on TDX; the dm-verity tamper case at boot (an image that does not match its root
   hash); TDX `AppLast`; a mitigation for T10.
-- **Next, now that the guest work is done:** the project's port 22 moves from `default-allow-ssh` (`0.0.0.0/0`) to IAP
-  only, `35.235.240.0/20`, limited to the `attestamp-ra` tag. IAP was checked from Git Bash on 2026-11-16
-  (`e2e/cloud/README.md`, "SSH to the guests"); the setting itself has not been changed yet.
+- **Done 2026-11-16, after the guest work:** the project's port 22 moved from `default-allow-ssh` (`0.0.0.0/0`, deleted)
+  to IAP only, `attestamp-ssh-iap`: `35.235.240.0/20`, limited to the `attestamp-ra` tag. ssh and scp through IAP were
+  checked after the deletion, and plain ssh timed out (`e2e/cloud/README.md`, "SSH to the guests").
 - Phase 5 (a locked guest) is designed below, not started.
 - The day-by-day record: `docs/plan/night-log.md` and the trial and session reports.
 

@@ -32,7 +32,7 @@ For the Nitro e2e suite you also need, in the repository root (all gitignored):
 | what | state found | check it with |
 |---|---|---|
 | Compute Engine API | enabled | `gcloud services list --enabled --filter=config.name=compute.googleapis.com` |
-| SSH to the guests | the default network's `default-allow-ssh` rule (tcp:22 from `0.0.0.0/0`), created with the project; `gcloud compute ssh` relies on it | `gcloud compute firewall-rules list` |
+| SSH to the guests | a new project's default network has `default-allow-ssh` (tcp:22 from `0.0.0.0/0`), and plain `gcloud compute ssh` relies on it. **Changed on 2026-11-16 in the project the recordings were made in:** that rule is deleted and `attestamp-ssh-iap` (tcp:22 from `35.235.240.0/20`, tag `attestamp-ra`) replaces it, so every `gcloud compute ssh` and `scp` there needs `--tunnel-through-iap` (next section) | `gcloud compute firewall-rules list` |
 | RA port for a verifier outside the guest | `attestamp-ra`, tcp:5000 from one `/32`, created by `gcp-cvm.sh … create` for the address of the machine that runs it (later addresses are added or removed by hand); not needed when the whole chain runs on the guest (`e2e/cvm/in-guest-verify.sh`) | same |
 | `xxd` on the guest (the manual quote recording in `internal/tee/parse/tdx/testdata/README.md`) | present in the stock image `ubuntu-2404-noble-amd64-v20261105` (package `xxd` 2:9.1.0016-1ubuntu7.20); not installed by hand (`/var/log/apt/history.log` shows only `tpm2-tools`) | `command -v xxd` on the guest |
 | `tpm2-tools` on the SEV-SNP guest | **not** in the stock image; installed by hand (`apt-get install -y tpm2-tools`, 5.6-1build4) for the Option 2 hook | `dpkg-query -W tpm2-tools` |
@@ -45,32 +45,40 @@ guests here need SSH only from you. Two ways to narrow it:
 **IAP (recommended).** Google's Identity-Aware Proxy carries the SSH connection, so port 22 needs to be open only to
 Google's IAP range, `35.235.240.0/20`, and your own address does not matter.
 
-What was checked on 2026-11-16 (Windows, Git Bash, gcloud with PuTTY's plink and pscp, an SEV-SNP guest with an
-external address, while `default-allow-ssh` was still open):
-
-| what | result |
-|---|---|
-| `gcloud compute ssh <vm> --zone … --tunnel-through-iap --command '…'` | works |
-| `gcloud compute scp <file> <vm>:<file> --tunnel-through-iap`, both directions | works; a 1 MiB file came back with the same SHA-256 |
-| `gcloud compute scp --recurse <folder> <vm>: --tunnel-through-iap` | works |
-| where the connection comes from, seen on the guest (`$SSH_CONNECTION`) | `35.235.242.218`, inside `35.235.240.0/20` |
-| host key | plink asks to store it again, under `compute.<instance id>` instead of the address: answer `y` |
-| the IAP API (`iap.googleapis.com`) | was **not** listed as enabled, and the tunnel worked anyway |
-| the first attempt right after the VM started | failed (`Remote side unexpectedly closed network connection`); the second worked. Probably the guest still booting; not proven |
-
-**Not checked:** that SSH still works after `0.0.0.0/0` is removed and only `35.235.240.0/20` is allowed (the project's
-rule was left as it was); which IAM role is the least that suffices (the account tested holds `roles/owner`; Google
-documents `roles/iap.tunnelResourceAccessor` for this, not tried alone); a guest without an external address; macOS
-and Linux clients. With IAP every `gcloud compute ssh` and `scp` in the procedures needs `--tunnel-through-iap`.
-
-The rule it needs, limited to this project's guests by their network tag (not yet applied):
+The two rules, as applied on 2026-11-16 to the project the recordings were made in:
 
 ```
-gcloud compute firewall-rules create attestamp-ssh-iap --allow=tcp:22 \
+gcloud compute firewall-rules create attestamp-ssh-iap --network=default --direction=INGRESS --allow=tcp:22 \
   --source-ranges=35.235.240.0/20 --target-tags=attestamp-ra
+gcloud compute firewall-rules delete default-allow-ssh
 ```
 
-and then `default-allow-ssh` removed or narrowed, which affects every VM in the project, not only these.
+The first allows SSH only from Google's IAP range and only to VMs tagged `attestamp-ra` (`gcp-cvm.sh` tags every guest
+it makes). The second removes SSH from everywhere for **every** VM in the project's default network, not only these:
+check that nothing else in the project needs it first.
+
+What was checked on 2026-11-16 (Windows, Git Bash, gcloud with PuTTY's plink and pscp, a SEV-SNP guest with an
+external address). First while `default-allow-ssh` was still there, then again **after it was deleted**, with
+`attestamp-ssh-iap` the only rule for port 22:
+
+| what | with `0.0.0.0/0` still open | after it was deleted |
+|---|---|---|
+| `gcloud compute ssh <vm> --zone … --tunnel-through-iap --command '…'` | works | **works** |
+| `gcloud compute scp <file> <vm>:<file> --tunnel-through-iap`, both directions | works; a 1 MiB file came back with the same SHA-256 | **works**; the same check |
+| `gcloud compute scp --recurse <vm>:<folder> . --tunnel-through-iap` | works (to the guest) | **works** (from the guest; a folder with a subfolder, the same SHA-256) |
+| plain `gcloud compute ssh` without `--tunnel-through-iap` | works | **fails**, `Network error: Connection timed out`: port 22 is closed to the internet |
+| where the connection comes from, seen on the guest (`$SSH_CONNECTION`) | `35.235.242.218` | `35.235.242.217`; both inside `35.235.240.0/20` |
+| host key | plink asks to store it again, under `compute.<instance id>` instead of the address: answer `y` | the same |
+| the IAP API (`iap.googleapis.com`) | was **not** listed as enabled, and the tunnel worked anyway | the same |
+| right after the VM starts | the first attempt failed (`Remote side unexpectedly closed network connection`), the second worked | attempts failed for a few minutes after the start, then worked; the guest was still booting |
+
+**Not checked:** which IAM role is the least that suffices (the account tested holds `roles/owner`; Google documents
+`roles/iap.tunnelResourceAccessor` for this, not tried alone); a guest without an external address; macOS and Linux
+clients. With IAP every `gcloud compute ssh` and `scp` in the procedures needs `--tunnel-through-iap`; the RA port
+(`attestamp-ra`, tcp:5000) is a separate rule and does not go through IAP.
+
+To undo it: `gcloud compute firewall-rules create default-allow-ssh --network=default --allow=tcp:22
+--source-ranges=0.0.0.0/0 --priority=65534`, the rule as GCP made it.
 
 **Your own address (`/32`).** The same rule with `--source-ranges=<your address>/32`. It works without IAP, but it
 breaks as soon as your public address changes, and it changes with the network you are on: twice on 2026-11-16 alone
