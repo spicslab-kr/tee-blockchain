@@ -31,7 +31,7 @@ For the Nitro e2e suite you also need, in the repository root (all gitignored):
 
 | what | state found | check it with |
 |---|---|---|
-| Compute Engine API | enabled | `gcloud services list --enabled --filter=config.name=compute.googleapis.com` |
+| Compute Engine API | enabled. In a new project it is off: enable it once with `gcloud services enable compute.googleapis.com` (the first `gcloud compute` command also offers to) | `gcloud services list --enabled --filter=config.name=compute.googleapis.com` |
 | SSH to the guests | a new project's default network has `default-allow-ssh` (tcp:22 from `0.0.0.0/0`), and plain `gcloud compute ssh` relies on it. **Changed on 2026-11-16 in the project the recordings were made in:** that rule is deleted and `attestamp-ssh-iap` (tcp:22 from `35.235.240.0/20`, tag `attestamp-ra`) replaces it, so every `gcloud compute ssh` and `scp` there needs `--tunnel-through-iap` (next section) | `gcloud compute firewall-rules list` |
 | RA port for a verifier outside the guest | `attestamp-ra`, tcp:5000 from one `/32`, created by `gcp-cvm.sh … create` for the address of the machine that runs it (later addresses are added or removed by hand); not needed when the whole chain runs on the guest (`e2e/cvm/in-guest-verify.sh`) | same |
 | `xxd` on the guest (the manual quote recording in `internal/tee/parse/tdx/testdata/README.md`) | present in the stock image `ubuntu-2404-noble-amd64-v20261105` (package `xxd` 2:9.1.0016-1ubuntu7.20); not installed by hand (`/var/log/apt/history.log` shows only `tpm2-tools`) | `command -v xxd` on the guest |
