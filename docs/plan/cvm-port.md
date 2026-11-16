@@ -17,12 +17,15 @@ Status (2026-11-16, evening):
   TDX guest had been registered that way and then trusted); `audit --vendor-tee` exits 12 when the Vendor's guest
   differs. **Planned after publication:** the TDX parser's own initrdless check, which needs the CCEL in TDX evidence
   (a wire-format change). All three in `docs/plan/build-info-gaps.md`, "Design questions to review", Q2 and Q3.
-- **Open, not measured:** whether the values follow the machine type or the zone; the dm-verity tamper case at boot
-  (an image that does not match its root hash); TDX `AppLast`; a mitigation for T10.
-- **Planned after SEV-SNP T3** (the last cell that needs a guest): the project's port 22 moves from `default-allow-ssh`
-  (`0.0.0.0/0`) to IAP only, `35.235.240.0/20`, limited to the `attestamp-ra` tag. IAP was checked from Git Bash on
-  2026-11-16 (`e2e/cloud/README.md`, "SSH to the guests"); the setting itself is left as it is until then, so the last
-  run is not cut off.
+- **Measured in session 4 (2026-11-16):** T1, T3 (SEV-SNP), T7 on guests; T8 closed as not applicable on GCP
+  (`docs/results/sessions-2026-11-16/session4-t1-t3-t7-t8.md`). The machine type changes the values (SEV-SNP
+  MEASUREMENT with the vCPU count, TDX RTMR0), so both guides now require the Vendor's machine type; the zone changed
+  nothing on SEV-SNP. No test-matrix cell needs a guest any more.
+- **Open, not measured:** the zone on TDX; the dm-verity tamper case at boot (an image that does not match its root
+  hash); TDX `AppLast`; a mitigation for T10.
+- **Next, now that the guest work is done:** the project's port 22 moves from `default-allow-ssh` (`0.0.0.0/0`) to IAP
+  only, `35.235.240.0/20`, limited to the `attestamp-ra` tag. IAP was checked from Git Bash on 2026-11-16
+  (`e2e/cloud/README.md`, "SSH to the guests"); the setting itself has not been changed yet.
 - Phase 5 (a locked guest) is designed below, not started.
 - The day-by-day record: `docs/plan/night-log.md` and the trial and session reports.
 
