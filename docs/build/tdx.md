@@ -5,7 +5,8 @@
 tdx`; the whole chain passed on a live guest on 2026-11-12). Building the initrd and launching it are in the tool since
 2026-11-15 (`build` and `launch --platform intel-tdx`, both options, `--verify`), and **ran on real guests on
 2026-11-15**: install, reboot and `launch --check` passed for both options, and `audit` and `verify` passed from
-another machine (`docs/plan/trial-2026-11-16.md`).
+another machine (`docs/plan/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values;
+the Auditor's independent rebuild on a guest of its own is written ("The Auditor's half") and **not run**.
 The audit-and-verify chain test (`TestRun_E2E_TDX_AuditorUser`) passes against a local anvil chain (first run
 2026-11-11, anvil 1.8.0). Tools and versions: [toolchain.md](toolchain.md).
 
@@ -18,9 +19,12 @@ This takes one TDX guest on Google Cloud and your own computer, and goes all the
 initrd on the guest, boot it, read the measurements, register them on a chain, and have a User verify the guest. Type
 the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; nothing else needs filling in.
 
-What it shows and what it does not: everything runs against **one** guest. The Auditor registers the values the
-Vendor's guest measured, as in `e2e/cvm/in-guest-verify.sh`. An Auditor that rebuilds on a guest of its own is the
-last section, "The Auditor's own guest". The procedure was followed end to end in a clean environment on 2026-11-15
+**What steps 1 to 13 show, and what they do not.** They run against **one** guest, and in step 11 the Auditor
+registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
+README describes ("an independent Auditor rebuilds it, confirms the enclave really runs those bytes"): a registration
+made that way says no more than the Vendor's own word. It shows that the chain works end to end. The Auditor's
+independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it is written but **has not
+been run** (it needs two guests at once). The procedure was followed end to end in a clean environment on 2026-11-15
 (`docs/plan/trial-2026-11-16.md`), and again from the documents alone, both options, on 2026-11-16
 (`docs/plan/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside this page have been
 filled in since. If a step stops with an error, that is a finding; note it.
@@ -311,6 +315,10 @@ first made): `gcloud compute firewall-rules describe attestamp-ra` shows it.
 
 ### 11. On your computer: register with audit
 
+> **This step is not an audit.** It registers what the Vendor's guest measured, so the Auditor vouches for values it
+> never reproduced. It is here to show the chain working with one guest. An Auditor that means its signature does
+> "The Auditor's half" (A1 to A9, not run yet) instead of this step.
+
 A local chain, in a second terminal, left running until step 12 is done:
 
 ```
@@ -400,26 +408,164 @@ on the VMs whose name starts with the prefix, default `attestamp-tdx`. To stop o
 
 The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rules delete attestamp-ra` removes it.
 
-### The Auditor's own guest
+### The Auditor's half: rebuild, boot, compare, register
 
-The real Auditor rebuilds on a guest of its own instead of taking the Vendor's values (step 11). Steps 1 to 4 below
-ran on 2026-11-15 with two guests of one image, Option 1; step 5 has not been run yet:
+> **Not run.** Written on 2026-11-16; it needs two guests at once and has not been followed end to end. What has
+> run: two guests of one image, each building and booting the same application, measured the same four values
+> (2026-11-15, `att-vendor` on both; a third guest on 2026-11-16 gave them again). What has **not** run:
+> `att-auditor build` and `launch` on a guest, `audit --vendor-tee` from one guest to another, and a User verifying the
+> Vendor's guest against the Auditor's registration. `docs/plan/cvm-port.md`, "What waits for a VM", says what run
+> would confirm it. If you follow it, every step is a finding until then.
 
-1. Make the guest **from the Vendor's exact image** (step 3 printed its name):
-   `IMAGE=ubuntu-2404-noble-amd64-v20261105 bash e2e/cloud/gcp-cvm.sh tdx create auditor` makes
-   `attestamp-tdx-auditor`. `bash e2e/cloud/gcp-cvm.sh tdx status` shows both disks' images; they must be the same.
-2. Give it the same inputs as the Vendor's build: the `app` folder and the Vendor's base initrd (copy them from the
-   Vendor's guest to your computer with `gcloud compute scp`, then to the Auditor's guest), and an `att-auditor` built
-   for Linux like `att-vendor` in step 2, with `att-ra-responder`. For Option 1 the base initrd is the image's own
-   `/boot/initrd.img-…`, the same file on every guest of one image (measured: `4703ec07…` on both); for Option 2 it
-   must be the Vendor's `base-initrd-v.img`, since `mkinitramfs` never makes the same file twice.
-3. Steps 4 (without making a new Option 2 base initrd), 6 to 9 with `att-auditor` in place of `att-vendor`.
-   `initrd_sha384` in its `out/build-value.json` must equal the Vendor's: the same files give the same initrd.
-4. Compare its `out/measurements.json` with the Vendor's. **All four values must be equal.** Measured on 2026-11-15:
-   two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105` gave the same MRTD, RTMR0, RTMR1 and
-   RTMR2 for the same application. If one differs, see the next section.
-5. `att-auditor audit --tee-addr <auditor-guest-ip>:5000 … --build-measurements <its own measurements.json>
-   --vendor-tee <guest-ip>:5000` registers its own value and says whether the Vendor's guest runs the same.
+This is what README's trust model asks of the Auditor: rebuild the Vendor's application independently, confirm that a
+TEE really runs those bytes, and only then register. Step 11 above does not do that. It is the same flow as Nitro's,
+moved to a confidential VM:
+
+| | Nitro (`e2e/flow1-auditor-registers`) | TDX, below |
+|---|---|---|
+| rebuild | the Auditor builds the EIF on its own instance; the build gives all three PCRs | the Auditor builds the initrd on its own guest (A4); the build gives the initrd's hash, which GRUB measures into RTMR2 |
+| boot it | the Auditor launches the EIF in its own enclave | the Auditor installs the initrd and reboots its own guest (A5) |
+| compare | the attested PCRs must equal the built ones | the boot's event log must show GRUB loading exactly the built initrd (A6, `launch --check`), and its four values are recorded |
+| register | `audit`: a fresh attestation of its own enclave equals its build, then register | `audit`: a fresh quote from its own guest equals A6's values, then register; `--vendor-tee` also asks the Vendor's guest (A8) |
+| the Vendor | launches the Auditor's EIF | builds from the same inputs and boots (steps 4 to 9), or boots the Auditor's `out/initrd-app.img`, the same bytes |
+| the User | verifies the Vendor's enclave against the Auditor's registry | the same, step 12 against the Auditor's registry (A9) |
+
+**Why the Auditor needs a guest of its own.** The build predicts only the initrd. MRTD (the firmware), RTMR0 (its
+configuration) and RTMR1 (the kernel) come from the machine, and RTMR2 also holds the kernel command line, which comes
+from the image. The Auditor learns those by booting the same inputs on a guest it controls, and they equal the
+Vendor's only when the inputs below are the same.
+
+#### The same inputs
+
+The Auditor's values equal the Vendor's only if all of these are the same on both guests. Measured on 2026-11-15
+(`docs/plan/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
+`c3-standard-4`, `us-central1-a`, built the same `app/hello.txt` into the same initrd and measured the same MRTD,
+RTMR0, RTMR1 and RTMR2; on 2026-11-16 a third guest of the same image gave the same four values again. That is the
+condition the whole half rests on.
+
+| input | how to make it the same | what changes if it differs |
+|---|---|---|
+| the image, **exact version** (`ubuntu-2404-noble-amd64-v20261105`), not the family `ubuntu-2404-lts-amd64` | the Vendor records the name step 3 printed; the Auditor creates with `IMAGE=<that name>` (A2). A family moves every few weeks | the kernel (RTMR1), the root file system UUID on the command line (RTMR2), the stock initrd |
+| the kernel | do not `apt upgrade` either guest; `uname -r` must print the same on both | RTMR1, and the Option 1 base initrd |
+| the machine type (`c3-standard-4`) | `MACHINE=` the Vendor's | RTMR0 is expected to follow the VM's CPU and memory; **not measured** |
+| the zone (`us-central1-a`) | `ZONE=` the Vendor's | firmware could differ between zones; **not measured** |
+| the base initrd | Option 1: the image's own `/boot/initrd.img-<kernel>`, the same file on every guest of one image (`4703ec07…` on all three). Option 2: **the Vendor's** `base-initrd-v.img`; `mkinitramfs` never makes the same file twice, so the Auditor must not make its own | the initrd hash, so RTMR2 |
+| the application folder | the same files byte for byte (and the same modes; `build` normalises them) | the initrd hash, so RTMR2 |
+| the option (1 or 2) | the Vendor says which | the initrd, and for Option 2 the image |
+| this repository's commit | the same commit, built as in step 2 | the archive `build` writes (the cpio format is pinned by tests, but only the same code is sure to give the same bytes) |
+
+What the Vendor hands the Auditor, by any channel: the image name, the machine type and zone, the option, the `app`
+folder (or the commit of the source it comes from), its `out/build-value.json`, and for Option 2 its
+`base-initrd-v.img`. From the Vendor's guest to the Vendor's computer:
+
+```
+gcloud compute scp --recurse attestamp-tdx-vendor:app      vendor-app        --zone us-central1-a
+gcloud compute scp attestamp-tdx-vendor:out/build-value.json vendor-build-value.json --zone us-central1-a
+gcloud compute scp attestamp-tdx-vendor:base-initrd-v.img vendor-base-initrd-v.img --zone us-central1-a   # Option 2
+```
+
+#### The steps
+
+The order with both halves: the Vendor's steps 1 to 10, then A1 to A9 instead of step 11, then step 12, then step 13 on
+both guests. A1 to A9 are the Auditor's, on the Auditor's computer and its own guest.
+
+**A1. On the Auditor's computer: tools and binaries.** Step 1 as written, at the Vendor's commit. Step 2, with
+`att-auditor` for the guest instead of `att-vendor`:
+
+```
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user    ./cmd/user
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-auditor      ./cmd/auditor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+```
+
+**A2. On the Auditor's computer: its own guest, from the Vendor's exact image.**
+
+```
+IMAGE=ubuntu-2404-noble-amd64-v20261105 MACHINE=c3-standard-4 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh tdx create auditor
+bash e2e/cloud/gcp-cvm.sh tdx status
+```
+
+`IMAGE`, `MACHINE` and `ZONE` are the Vendor's ("The same inputs"); the guest is `attestamp-tdx-auditor` (with `PREFIX=` as in "Names", its own prefix).
+`status` lists each disk's image: both must name the same version. Its address is `<auditor-guest-ip>` below. Then
+copy what the build needs, one item per command:
+
+```
+gcloud compute scp linux/att-auditor       attestamp-tdx-auditor:att-auditor       --zone us-central1-a
+gcloud compute scp linux/att-ra-responder  attestamp-tdx-auditor:att-ra-responder  --zone us-central1-a
+gcloud compute scp --recurse vendor-app    attestamp-tdx-auditor:app               --zone us-central1-a
+gcloud compute scp vendor-base-initrd-v.img attestamp-tdx-auditor:base-initrd-v.img --zone us-central1-a   # Option 2
+```
+
+and log in: `gcloud compute ssh attestamp-tdx-auditor --zone us-central1-a`.
+
+**A3. On the Auditor's guest: prepare it.** Step 4 as written, with `chmod +x att-auditor att-ra-responder`, and with
+two differences. Option 1: `base-initrd.img` is copied from `/boot` as written; its SHA-256 must equal
+`base_initrd_sha256` in the Vendor's `build-value.json` (`sha256sum base-initrd.img`). Option 2: install the packages
+(`squashfs-tools cryptsetup-bin`) and make `/opt/app-verity`, but **do not** run the hook and `mkinitramfs` lines: use
+the Vendor's `base-initrd-v.img`, copied in A2. Check `uname -r` against the Vendor's.
+
+**A4. On the Auditor's guest: build.** The Auditor's own build of the Vendor's application:
+
+```
+./att-auditor build --platform intel-tdx --app-dir app --base-initrd base-initrd.img --option 1 --verify
+```
+
+(Option 2: `sudo ./att-auditor build --platform intel-tdx --app-dir app --base-initrd base-initrd-v.img --option 2
+--verify`.) Its `out/build-value.json` is the Auditor's expected value. `initrd_sha384` must equal the Vendor's (and
+for Option 2 `root_hash` too): the same files on the same base give the same initrd. If they differ, the inputs differ;
+stop and find which.
+
+**A5. On the Auditor's guest: install and boot.** Step 7 with `att-auditor`:
+
+```
+cat /proc/sys/kernel/random/boot_id
+sudo ./att-auditor launch --platform intel-tdx --initrd out/initrd-app.img --reboot
+```
+
+Wait for the new boot as step 7 says, log in again, and `sudo shutdown -h +240`.
+
+**A6. On the Auditor's guest: compare the boot with the build.**
+
+```
+sudo ./att-auditor launch --platform intel-tdx --check
+```
+
+This is the comparison: it verifies a fresh quote, replays the event log against it and requires GRUB to have loaded
+exactly the initrd A4 built. It ends with `✓ the boot measured the built initrd` and writes the four values to
+`out/measurements.json`. If it refuses, the Auditor registers nothing. Those four values should equal the Vendor's
+step 8 values; whether they do is checked against the Vendor's running guest in A8, not by trusting a file the Vendor
+sent.
+
+**A7. On the Auditor's guest: answer requests.** Step 9 as written. Log out.
+
+**A8. On the Auditor's computer: register only if they match.** anvil, the keys and `registry-deploy` as in step 11.
+Then, with the Auditor's own values:
+
+```
+gcloud compute scp attestamp-tdx-auditor:out/measurements.json auditor-measurements.json --zone us-central1-a
+./att-auditor audit --tee-addr <auditor-guest-ip>:5000 --format intel-tdx --build-measurements auditor-measurements.json \
+  --vendor-tee <guest-ip>:5000 \
+  --rpc http://127.0.0.1:8545 --registry <0x…> --signing-key-file auditor.key \
+  --service hello --version 1.0.0 --arch amd64
+```
+
+`audit` asks the Auditor's own guest for a fresh quote and registers only if it equals `auditor-measurements.json`
+(`identical: the guest runs exactly what I built`); otherwise it stops with `not registering anything`. With
+`--vendor-tee` it also asks the Vendor's guest and prints `same: the Vendor's guest runs exactly what I built` or
+`the Vendor's guest runs something else`. In the second case it **still registers the Auditor's own value and exits
+0**: read the output, not only the exit code. A User verifying the Vendor's guest will then be refused (A9), which is
+correct.
+
+**A9. On any computer: the User verifies the Vendor's guest.** Step 12 against the registry of A8:
+
+```
+./att-user verify --tee-addr <guest-ip>:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry <0x…>
+```
+
+Exit 0 and `✓ matches  hello 1.0.0 (amd64) by 0x7099…` now mean what README promises: the Vendor's guest runs what an
+Auditor rebuilt and booted itself. Then step 13 on both guests (`attestamp-tdx-auditor` too) and
+`bash e2e/cloud/gcp-cvm.sh tdx stop`, which stops both.
 
 ### Use the same image as the other side
 
@@ -748,7 +894,7 @@ instead. This section only records a quote from a stock guest, as the first fixt
 | what | why |
 |---|---|
 | a failed dm-verity check at boot stopping the boot | Option 2 builds and boots with the real tools (2026-11-15), but a root hash that does not match still lets the boot go on; `launch --check` refuses it (`/run/attestamp-status`) |
-| the Auditor's `audit --vendor-tee` between two guests | each guest measured the same values (2026-11-15), but `audit` with `--vendor-tee` across two guests has not been run |
+| "The Auditor's half" (A1 to A9): the Auditor's own `build` and `launch` on its own guest, `audit --vendor-tee` between two guests, and a User verifying the Vendor's guest against the Auditor's registration | written 2026-11-16, **not run**: it needs two guests at once. Each guest measured the same values (2026-11-15, `att-vendor` on both), which is what it rests on; the procedure itself has not been followed. `docs/plan/cvm-port.md`, "What waits for a VM" |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |
