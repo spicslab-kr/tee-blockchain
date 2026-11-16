@@ -55,7 +55,7 @@ the arm64 instance is `ami-0ce2f8dd9b0fcfb35`, the newest Amazon Linux 2023 arm6
 | `docs/results/aws-nitro-2026-11-15.md`, `aws-nitro-2026-11-15-local-chain.md` | values from before `fc105b0` (`d5bbd4af…`, `47dbca56…`), already marked | leave as records of those days |
 | `docs/plan/trial-2026-11-16-clean.md` | PCR0 `2aacdf41…`, PCR2 `e5504779…` at `e29d028` | leave as the record of that run; add one line that `029bbdc` moved them |
 | `internal/tee/parse/aws/testdata/README.md`, `internal/tee/request/testdata/README.md` | the fixtures' PCR0/PCR2, marked "before `fc105b0`" | **leave**: those are the values signed into the recorded documents, not reference values |
-| `docs/build/aws-nitro.md` (cgo table), `CLAUDE.md`, `docs/plan/build-info-gaps.md` 2.3, `internal/setup/build/responder_test.go` | `5573b538…` as the cgo-free responder | **leave**: they record the cgo comparison at `a5c4306`/`ade66e6`, which is still true for that code; add in `aws-nitro.md` that later commits give other bytes |
+| `docs/build/aws-nitro.md` (cgo table), `docs/plan/build-info-gaps.md` 2.3, `internal/setup/build/responder_test.go` (and the project's rules of that day; the rule without the values is now in `CONTRIBUTING.md`, "Build") | `5573b538…` as the cgo-free responder | **leave**: they record the cgo comparison at `a5c4306`/`ade66e6`, which is still true for that code; add in `aws-nitro.md` that later commits give other bytes |
 
 ## Before running (once SSH works)
 

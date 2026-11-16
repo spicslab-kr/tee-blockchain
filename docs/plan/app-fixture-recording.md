@@ -226,7 +226,37 @@ sudo ./record-tdx -out opt2-v2 -nonce-text attestamp-tdx-opt2-v2
 
 This records what TDX Option 2 measures: the image and hash tree carried inside the initrd. Opening and mounting the
 image before the switch to the real root is Phase 3.4 and is not part of this recording; it was recorded separately on
-2026-11-12 (`gcp-c3-opt2m-*`, procedure in `docs/plan/night-log.md`, "Overnight 2026-11-12").
+2026-11-12, next section.
+
+### TDX Option 2 mounted at boot (`gcp-c3-opt2m-*`, 2026-11-12)
+
+On `attestamp-tdx-vendor`, stock image `ubuntu-2404-noble-amd64-v20261105`, kernel `7.0.0-1017-gcp`. The scripts are
+`internal/tee/parse/tdx/testdata/record/initramfs-{hook,local-bottom}.sh` (SEV-SNP's, without PCR12).
+
+1. The hook and the local-bottom script installed into `/etc/initramfs-tools`, `mkinitramfs -o
+   initrd-verity-base.img`, and both removed again at once. The base carries `veritysetup`, `dm-verity.ko` and the
+   script; squashfs, loop and dm-mod are built into this kernel. (For a real build, "Getting started" step 4 in
+   `docs/build/tdx.md` makes this base.)
+2. The images `verity-v1` and `verity-v2` of the Option 2 recordings above (sha256 checked) put before the base with
+   `mkappinitrd -placement first`, and the boot entry made with `make-grub-entry.sh attestamp-verity
+   initrd-attestamp-verity.img`.
+3. One boot each:
+
+| boot | `/run/attestamp-status` | mounted | content | RTMR2 |
+|---|---|---|---|---|
+| stock | — | — | — | `9960b923…` |
+| v1 | `ok e29ec085…` | `/opt/app-verity`, squashfs ro on `/dev/mapper/attestamp-app`, `dmsetup status` `V` | `attestamp app v1` | `fc0d75eb…` |
+| v2 | `ok a2f4df92…` | same | `attestamp app v2` | `71cd0493…` |
+| tamper: v2's image with v1's root hash | `fail e29ec085…`, log "Verification of root hash failed." | nothing; no dm device | — | `01964c57…` |
+
+MRTD, RTMR0 and RTMR1 were the same on every boot. On the v2 boot `e2e/cvm/in-guest-verify.sh tdx intel-tdx` passed
+(11 of 11), and the live quote's RTMR2 equalled the recording's. **The tampered boot carried on to a normal login**: the
+script records `fail` and exits 0. That is enough for a verifier (RTMR2 differs from every registered value), but a
+locked guest (Phase 5 in `docs/plan/cvm-port.md`) must stop the boot instead.
+
+Committed as `gcp-c3-opt2m-v1-*` and `gcp-c3-opt2m-v2-*` with their boot logs; `TestMountedFixtures_OnlyRTMR2Changes`
+checks them. The tamper quote was not committed; its RTMR2 is above. Undone afterwards as in the next section, with
+`41_attestamp-verity` and `initrd-attestamp-verity.img` in place of the `-app` files.
 
 ## Undo, fetch, stop (each instance)
 

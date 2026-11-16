@@ -27,7 +27,7 @@ Status (2026-11-16, evening):
   to IAP only, `attestamp-ssh-iap`: `35.235.240.0/20`, limited to the `attestamp-ra` tag. ssh and scp through IAP were
   checked after the deletion, and plain ssh timed out (`e2e/cloud/README.md`, "SSH to the guests").
 - Phase 5 (a locked guest) is designed below, not started.
-- The day-by-day record: `docs/plan/night-log.md` and the trial and session reports.
+- The record of what ran when: the trial reports in `docs/plan/` and the session results in `docs/results/`.
 
 Clouds (decided 2026-11-11): **Nitro on AWS, TDX on GCP, SEV-SNP on GCP.** Each platform runs on one cloud. AWS is
 used for Nitro Enclaves only; SEV-SNP on AWS is not pursued. The AWS SEV-SNP runs of 2026-11 stay in the record as
@@ -395,7 +395,7 @@ Designed, not started. The reasoning and what is confirmed versus reasoned are i
 | 5.2 | Boot it, with the root image's verity root hash on the kernel command line (`root=/dev/mapper/...` set up by the initrd against that hash) | the guest boots; SSH is refused; the responder answers from outside (Phase 2.3) |
 | 5.3 | Record evidence from the locked guest through the responder, not over SSH | a fixture recorded with `att-user ra-request` from the verifier's machine |
 | 5.4 | A test in which the verifier reads the root hash out of the measured command line (CMDLINE on SEV-SNP, the command-line event behind RTMR2 on TDX) and compares it with the hash of the image it was given | the hash in the evidence equals the published image's; a different image gives a different measurement |
-| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the TDX tamper boot of 2026-11-12 (v2's image under v1's root hash: `fail`, nothing mounted, the boot went on; `docs/plan/night-log.md`). Still to do: the same on SEV-SNP, a changed data block under an unchanged root hash, and the root image. (*Record:* the 2026-11 script for this flipped one byte at offset 5000; it is no longer available) |
+| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the TDX tamper boot of 2026-11-12 (v2's image under v1's root hash: `fail`, nothing mounted, the boot went on; `docs/plan/app-fixture-recording.md`, "TDX Option 2 mounted at boot"). Still to do: the same on SEV-SNP, a changed data block under an unchanged root hash, and the root image. (*Record:* the 2026-11 script for this flipped one byte at offset 5000; it is no longer available) |
 
 5.4 and 5.5 turn layer 3 from reasoning into a measured result; until they pass, `runtime-immutability.md` keeps
 calling it reasoned.
@@ -522,7 +522,7 @@ not quoted from the README. Phase 0 gains one step:
 | # | Task | Pass criterion |
 |---|---|---|
 | 0.0 | Run the existing Nitro e2e suite end to end and record its results | every row of the matrix that applies to Nitro is filled from a real run |
-| 0.0b | Add the JSONL result line to each e2e script, and the two missing tests (T8 debug mode, T9 replay) | `e2e-work/results/aws-nitro.jsonl` has one line per test. **JSONL done 2026-11-12** (`result()` in `e2e/env.sh`; the CVM script writes the same fields); T8 and T9: see the night log |
+| 0.0b | Add the JSONL result line to each e2e script, and the two missing tests (T8 debug mode, T9 replay) | `e2e-work/results/aws-nitro.jsonl` has one line per test. **JSONL done 2026-11-12** (`result()` in `e2e/env.sh`; the CVM script writes the same fields); T8 and T9: live on Nitro 2026-11-15, `docs/plan/test-matrix.md` footnotes 4 and 5 |
 
 0.0b comes before any TDX or SEV-SNP script is written, so all three are written against the same
 output contract.
