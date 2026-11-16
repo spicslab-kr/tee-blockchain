@@ -107,30 +107,43 @@ The binding changed from SHA-512 to SHA3-512 on 2026-11-11. SHA-512 was what the
 
 ## Identifying information in these files
 
-**These fixtures contain the GCP project ID.** Every `*-att.pb` here (eight files: `gcp-n2d-att.pb`,
-`gcp-n2d-initrdless-att.pb` and the six `gcp-n2d-opt*-att.pb`) carries it as plain text inside the Google-signed AK
-certificate, together with the project number, the zone, the instance name and the numeric instance ID (checked with
-`grep -a` on 2026-11-12). Publishing this repository publishes them. Decide before making it public.
+**What is in them.** Checked on 2026-11-16 by decoding the AK certificate of all eight `*-att.pb` files
+(`gcp-n2d-att.pb`, `gcp-n2d-initrdless-att.pb` and the six `gcp-n2d-opt*-att.pb`), not only by a text search: a
+text search finds the subject's strings but not the extension's integers. **All eight carry the same identity**, one
+GCP project and one instance:
 
-They are committed anyway, for the same reason `internal/tee/parse/aws/testdata/fixture-my-web.cbor` carries an EC2
-instance ID: without a committed fixture the parser tests cannot run in CI or for anyone else, and testing without
-hardware is what this project relies on. The values cannot be removed: they are inside the AK certificate, which
-Google signed, so changing one byte breaks the certificate chain and every test that verifies it. The alternatives are
-to keep the repository private, to re-record from a project whose identifiers may be public, or to drop these fixtures
-and the tests that use them. All recordings come from the same instance, so each discloses nothing the first did not,
-except the root file system's UUID and boot IDs.
+| where in the Google-signed AK certificate | field | stored as |
+|---|---|---|
+| subject CN | the numeric **instance ID** (19 digits) | text |
+| subject OU | the **GCP project ID** (30 characters, the auto-generated `project-<hex>-<hex>-…` form) | text |
+| subject O, L | `Google Compute Engine`, the zone `us-central1-a` | text |
+| GCE instance-information extension (OID 1.3.6.1.4.1.11129.2.1.21, go-tpm-tools' `gceInstanceInfo`) | the zone, the **project number** (12 digits), the project ID, the **instance ID**, the **instance name** `attestamp-snp-vendor` | the project number and the instance ID as ASN.1 INTEGERs (binary, invisible to `grep`); the others as text |
 
-The other text files in this folder (`*-record.txt`, `*-boot.txt`, this README) and `docs/` do not contain the project
-ID, the project number or the instance ID; they were searched for on 2026-11-12, and the one place the project ID was
-written in prose (`docs/plan/night-log.md`) now says `<project-id>`.
+The vTPM event log in the same files describes that instance's boots: the boot disk's file-system UUID and, on the
+kernel command line, the root partition's PARTUUID (initrdless) or the file system's UUID. These come with the image
+version, not with the instance (`docs/build/tdx.md`, "Use the same image as the other side").
 
-| File | Contains |
+| other file | contains |
 |---|---|
-| `*-att.pb` | In the Google-signed AK certificate: the GCP **project ID**, the **zone**, the **instance name** (`attestamp-snp-vendor`) and the numeric **instance ID**, found as text in the subject. The certificate's GCE instance-information extension (OID 1.3.6.1.4.1.11129.2.1.21) also carries the **project number** and the **instance ID** as integers; go-tpm-tools reads them as `gceInstanceInfo` (`server/verify.go`). The event log describes the boot of that instance, including the boot disk's file-system UUID and, on the kernel command line, the root partition's PARTUUID (initrdless) or the root file system's UUID (`gcp-n2d-*`). |
-| `*-report.bin` | `CHIP_ID`, which identifies the physical AMD processor of the Google host, and that host's TCB versions. No project or instance identifiers (searched for in the initrdless recording). |
-| `*-auxblob.bin` | The VCEK certificate, which carries the same chip ID and TCB. No project or instance identifiers (searched for). |
+| `*-report.bin` | `CHIP_ID`, which names the physical AMD processor of the Google host (it changed between recordings as the VM moved hosts), the host's TCB versions, and a REPORT_ID that changes every boot. No project or instance identifier |
+| `*-auxblob.bin` | the VCEK certificate, with the same chip ID and TCB. No project or instance identifier |
+| `*-boot.txt` | the instance **name** `attestamp-snp-vendor`, as where the evidence was copied from; no ID, no address |
+| `*-record.txt`, `record/`, `pack/` | nonces, hashes and sizes; no identifier |
 
 None of them contains a private key, a credential or an IP address.
+
+**Why they cannot be cleaned.** The identifiers sit inside the AK certificate Google signed; changing one byte breaks
+the certificate chain, and with it every test that verifies these files. Anonymising them is not possible.
+
+**What they point at.** The project ID is GCP's auto-generated form and names no person or organisation by itself;
+the instance name is this repository's default `PREFIX` for the Vendor's SEV-SNP guest (`e2e/cloud/gcp-cvm.sh`). The
+project number and instance ID are numbers Google assigned. Together they identify one VM in one project.
+
+**Why they are committed anyway**, as `internal/tee/parse/aws/testdata/fixture-my-web.cbor` carries an EC2 instance
+ID: without committed evidence the parser tests cannot run in CI or for anyone else, and testing without hardware is
+what this project relies on. The choices before publishing (keep and document, delete the GCP project after the work so
+that the strings point at nothing, or re-record in a separate project) are listed in `docs/plan/build-info-gaps.md`,
+#15. The T10 relay recordings of 2026-11-16 carry two more instances and were deliberately **not** committed.
 
 ## Recording another one
 
