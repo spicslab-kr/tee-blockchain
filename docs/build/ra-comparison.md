@@ -110,7 +110,7 @@ The asymmetry is a trade-off, and this is one case of each side:
 |---|---|---|
 | what the measurement covers | wide: the whole image, the program that produces the evidence included | narrow: the initrd (the application), not the program that produces the evidence |
 | cost | reference values go stale easily: any change to the responder or anything it links moves them | the responder is not covered: which program answered the request is not in the evidence. Its answer is signed by the hardware, so it cannot forge values, but nothing proves which responder ran |
-| consequence for records | every value needs the commit it was measured at (`docs/status/nitro-baseline-2026-11-16.md`) | values follow the application and the image, not the repository's code |
+| consequence for records | every value needs the commit it was measured at (`docs/results/nitro-baseline-2026-11-16.md`) | values follow the application and the image, not the repository's code |
 
 Whether the responder should link `internal/cli` at all is an open design question (`docs/status/build-info-gaps.md`),
 not decided here.
