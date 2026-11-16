@@ -18,21 +18,21 @@ import (
 	cmp "attestamp/internal/core/compare/user"
 )
 
-// verifyCmd runs the User's part in one command: request an attestation document from the enclave and verify it, use its values to find the registration in the registry,
+// verifyCmd runs the User's part in one command: request an attestation document from the TEE and verify it, use its values to find the registration in the registry,
 // then compare value, expiry and approver for each one found. The screen shows one sentence per step.
 //
 // --registry may be given several times (for example the Vendor's registry and the Auditor's side by side). One registry = one approver, so
-// for each registry it separately shows whether that approver registered what this enclave runs, and trust requires a matching registration in **every registry given**.
+// for each registry it separately shows whether that approver registered what this TEE runs, and trust requires a matching registration in **every registry given**.
 // With one registry, one matching registration in it gives trust.
 func verifyCmd(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
-	teeAddr := fs.String("tee-addr", "", "the enclave's host:port")
+	teeAddr := fs.String("tee-addr", "", "the TEE's host:port (a Nitro enclave, or a TDX or SEV-SNP guest)")
 	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
 	rpc := fs.String("rpc", "", "Ethereum RPC URL")
 	var registries []string
-	fs.Func("registry", "Registry contract address. repeat it to check several registries (e.g. the Vendor's and the Auditor's); then every one of them must vouch for this enclave", func(s string) error {
+	fs.Func("registry", "Registry contract address. repeat it to check several registries (e.g. the Vendor's and the Auditor's); then every one of them must vouch for this TEE", func(s string) error {
 		for _, c := range strings.Split(s, ",") {
 			if c = strings.TrimSpace(c); c != "" {
 				registries = append(registries, c)
@@ -45,8 +45,9 @@ func verifyCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	tee := cli.TEENoun(*format) // "enclave" on Nitro, "guest" on TDX and SEV-SNP
 	// Values not given as options are asked for in turn, as lookup does.
-	ask(teeAddr, "enclave host:port", "")
+	ask(teeAddr, tee+" host:port", "")
 	ask(rpc, "RPC URL", "https://ethereum-rpc.publicnode.com")
 	if len(registries) == 0 {
 		var c string
@@ -79,13 +80,13 @@ func verifyCmd(args []string) error {
 	docPath := filepath.Join(dir, "doc.cbor")
 	measPath := filepath.Join(dir, "measurements.json")
 
-	t := cli.Start(fmt.Sprintf("Asking the enclave at %s for an attestation", *teeAddr))
+	t := cli.Start(fmt.Sprintf("Asking the %s at %s for an attestation", tee, *teeAddr))
 	if err := raRequest([]string{"--tee-addr", *teeAddr, "--out-file", docPath, "--format", *format, "--timeout", timeout.String()}); err != nil {
 		t.Fail("no answer")
 		return err
 	}
 	t.Done(fmt.Sprintf("%s document, %d bytes", *format, fileSize(docPath)))
-	cli.Why("an attestation is a document the enclave hardware signs on the spot, stating which image is running; the fresh nonce inside proves it was made just now")
+	cli.Why("an attestation is a document the TEE hardware signs on the spot, stating what is running; the fresh nonce inside proves it was made just now")
 
 	t = cli.Start("Checking the attestation (signature chain to the platform root, nonce)")
 	parseArgs := []string{"--doc", docPath, "--format", *format, "--out-file", measPath}
@@ -97,7 +98,7 @@ func verifyCmd(args []string) error {
 		return err
 	}
 	t.Done("genuine")
-	cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from an enclave; the values below are the image it runs")
+	cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from a TEE; the values below are what it runs")
 	printPCRs(measPath)
 	values, err := readMeasurements(measPath)
 	if err != nil {
@@ -119,14 +120,14 @@ func verifyCmd(args []string) error {
 		if several {
 			label = fmt.Sprintf("registry %s (approver %s)", c, strings.Join(approvers, ","))
 		}
-		t = cli.Start("Looking up who registered what this enclave runs, in " + label)
+		t = cli.Start("Looking up who registered what this " + tee + " runs, in " + label)
 		recordKeys, err := lookup([]string{"--rpc", *rpc, "--registry", c, "--measurements", measPath, "--platform", *format})
 		if err != nil {
 			t.Fail("chain error")
 			return err
 		}
 		if len(recordKeys) == 0 {
-			t.Fail("nobody: this registry's approver never registered the value this enclave runs")
+			t.Fail("nobody: this registry's approver never registered the value this " + tee + " runs")
 			continue
 		}
 		t.Done(fmt.Sprintf("%d registration(s)", len(recordKeys)))
@@ -158,21 +159,21 @@ func verifyCmd(args []string) error {
 		}
 	}
 	if several {
-		cli.Why("with several registries, every one of them has to vouch for what this enclave runs. If the Vendor's registry says yes but the Auditor's says no, the Auditor never approved what is running")
+		cli.Why("with several registries, every one of them has to vouch for what this " + tee + " runs. If the Vendor's registry says yes but the Auditor's says no, the Auditor never approved what is running")
 	} else {
-		cli.Why("a registration counts only if its value equals what the enclave attested, it has not expired, and it was signed by the approver this registry trusts")
+		cli.Why("a registration counts only if its value equals what the " + tee + " attested, it has not expired, and it was signed by the approver this registry trusts")
 	}
 	if vouched == 0 {
 		return errors.New("nobody has registered these measurements on the chain, so there is no basis for trust")
 	}
 	if vouched < len(registries) {
-		cli.Errorln(fmt.Sprintf("not trusted: only %d of %d registries vouch for what this enclave runs; the others never approved it", vouched, len(registries)))
+		cli.Errorln(fmt.Sprintf("not trusted: only %d of %d registries vouch for what this %s runs; the others never approved it", vouched, len(registries), tee))
 		os.Exit(1)
 	}
 	if several {
-		cli.Okln("trusted: every registry given vouches for what this enclave runs (", strings.Join(uniq(approversSeen), ", "), ")")
+		cli.Okln("trusted: every registry given vouches for what this ", tee, " runs (", strings.Join(uniq(approversSeen), ", "), ")")
 	} else {
-		cli.Okln("trusted: this enclave runs exactly what ", strings.Join(uniq(approversSeen), ", "), " registered")
+		cli.Okln("trusted: this ", tee, " runs exactly what ", strings.Join(uniq(approversSeen), ", "), " registered")
 	}
 	return nil
 }

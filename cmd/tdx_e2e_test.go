@@ -154,6 +154,10 @@ func TestRun_E2E_TDX_AuditorUser(t *testing.T) {
 	if !strings.Contains(string(aOut), "identical") || !strings.Contains(string(aOut), "PASS") {
 		t.Fatalf("audit must print both the check PASS and the self-check PASS:\n%s", aOut)
 	}
+	// A TDX TEE is a whole VM: the output calls it a guest, never an enclave (that word is Nitro's).
+	if !strings.Contains(string(aOut), "the guest runs exactly what I built") || strings.Contains(string(aOut), "enclave") {
+		t.Fatalf("audit on intel-tdx must speak of the guest, not an enclave:\n%s", aOut)
+	}
 
 	uOut, err = exec.Command(userBin, "verify", "--tee-addr", teeAddr, "--format", "intel-tdx", "--rpc", rpc, "--registry", registryAddr,
 		"--nonce", nonce, "--out-dir", t.TempDir()).CombinedOutput()
@@ -162,6 +166,9 @@ func TestRun_E2E_TDX_AuditorUser(t *testing.T) {
 	}
 	if !strings.Contains(string(uOut), "trusted:") || !strings.Contains(string(uOut), "tdx-e2e 1.0.0") {
 		t.Fatalf("verify must say the TDX guest is trusted:\n%s", uOut)
+	}
+	if !strings.Contains(string(uOut), "trusted: this guest runs exactly what") || strings.Contains(string(uOut), "enclave") {
+		t.Fatalf("verify on intel-tdx must speak of the guest, not an enclave:\n%s", uOut)
 	}
 
 	// The registration is under intel-tdx: looking it up as aws-nitro finds nothing.

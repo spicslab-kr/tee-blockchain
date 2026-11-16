@@ -23,8 +23,8 @@ import (
 // With only --tee-addr, the attested values are registered as they are (no check). With only --build-measurements, that file is registered as it is.
 func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
-	teeAddr := fs.String("tee-addr", "", "my enclave's host:port, from which an attestation is requested first")
-	vendorTee := fs.String("vendor-tee", "", "the Vendor's enclave host:port. also ask it, and say whether it runs the same value I built. the value registered is always the one I built")
+	teeAddr := fs.String("tee-addr", "", "my TEE's host:port (a Nitro enclave, or a TDX or SEV-SNP guest), from which an attestation is requested first")
+	vendorTee := fs.String("vendor-tee", "", "the Vendor's TEE host:port. also ask it, and say whether it runs the same value I built. the value registered is always the one I built")
 	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
@@ -43,6 +43,7 @@ func auditCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	tee := cli.TEENoun(*format) // "enclave" on Nitro, "guest" on TDX and SEV-SNP
 	// The record key includes the platform, so registering under one name and looking up under another finds nothing.
 	if *platform == "" {
 		*platform = *format
@@ -65,7 +66,7 @@ func auditCmd(args []string) error {
 	ask(registry, "Registry address (0x…)", "")
 	ask(signingKeyFile, "my signing key file", "")
 	if *teeAddr == "" && *buildMeasurements == "" {
-		ask(teeAddr, "my enclave host:port (empty uses a measurements file)", "")
+		ask(teeAddr, "my "+tee+" host:port (empty uses a measurements file)", "")
 	}
 	if *teeAddr == "" && *buildMeasurements == "" {
 		ask(buildMeasurements, "build measurements file", "out/measurements.json")
@@ -98,13 +99,13 @@ func auditCmd(args []string) error {
 		docPath := filepath.Join(dir, "doc.cbor")
 		parsedPath = filepath.Join(dir, "parsed.json")
 
-		t := cli.Start(fmt.Sprintf("Asking my enclave at %s for an attestation", *teeAddr))
+		t := cli.Start(fmt.Sprintf("Asking my %s at %s for an attestation", tee, *teeAddr))
 		if err := raRequest([]string{"--tee-addr", *teeAddr, "--out-file", docPath, "--format", *format, "--timeout", timeout.String()}); err != nil {
 			t.Fail("no answer")
 			return err
 		}
 		t.Done(fmt.Sprintf("%s document, %d bytes", *format, fileSize(docPath)))
-		cli.Why("an attestation is a document the enclave hardware signs on the spot, stating which image is running; the fresh nonce inside proves it was made just now")
+		cli.Why("an attestation is a document the TEE hardware signs on the spot, stating what is running; the fresh nonce inside proves it was made just now")
 
 		t = cli.Start("Checking the attestation (signature chain to the platform root, nonce)")
 		parseArgs := []string{"--doc", docPath, "--format", *format, "--out-file", parsedPath}
@@ -116,13 +117,13 @@ func auditCmd(args []string) error {
 			return err
 		}
 		t.Done("genuine")
-		cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from an enclave; the values below are the image it runs")
+		cli.Why("the signature chains up to the platform vendor's root certificate, so this really came from a TEE; the values below are what it runs")
 		printPCRs(parsedPath)
 		if measPath == "" {
 			measPath = parsedPath
 		}
 	} else {
-		fmt.Printf("No enclave given: registering %s as it is, without checking it against a running enclave\n", measPath)
+		fmt.Printf("No %s given: registering %s as it is, without checking it against a running %s\n", tee, measPath, tee)
 	}
 
 	values, err := readMeasurements(measPath)
@@ -130,7 +131,7 @@ func auditCmd(args []string) error {
 		return err
 	}
 	if parsedPath != "" && parsedPath != measPath {
-		t := cli.Start(fmt.Sprintf("Comparing what the enclave attested with my own value (%s)", measPath))
+		t := cli.Start(fmt.Sprintf("Comparing what the %s attested with my own value (%s)", tee, measPath))
 		parsed, err := readMeasurements(parsedPath)
 		if err != nil {
 			t.Fail("cannot read")
@@ -142,10 +143,10 @@ func auditCmd(args []string) error {
 			for _, r := range v.Reason {
 				cli.Errorln("    ", r)
 			}
-			return errors.New("the enclave is not running what I built, so this audit is not registering anything")
+			return fmt.Errorf("the %s is not running what I built, so this audit is not registering anything", tee)
 		}
-		t.Done("identical: the enclave runs exactly what I built")
-		cli.Why("this is the audit: the value I obtained myself and the value the running enclave attests to are the same, so the enclave runs the image I built")
+		t.Done(fmt.Sprintf("identical: the %s runs exactly what I built", tee))
+		cli.Why(fmt.Sprintf("this is the audit: the value I obtained myself and the value the running %s attests to are the same, so the %s runs what I built", tee, tee))
 	}
 
 	// Also ask what the Vendor is running right now. If it differs, say so; the value registered is the one I verified.
@@ -157,7 +158,7 @@ func auditCmd(args []string) error {
 		}
 		defer os.RemoveAll(dir)
 		vDoc, vParsed := filepath.Join(dir, "doc.cbor"), filepath.Join(dir, "parsed.json")
-		t := cli.Start(fmt.Sprintf("Asking the Vendor's enclave at %s what it is running", *vendorTee))
+		t := cli.Start(fmt.Sprintf("Asking the Vendor's %s at %s what it is running", tee, *vendorTee))
 		if err := raRequest([]string{"--tee-addr", *vendorTee, "--out-file", vDoc, "--format", *format, "--timeout", timeout.String()}); err != nil {
 			t.Fail("no answer")
 			return err
@@ -172,16 +173,16 @@ func auditCmd(args []string) error {
 		}
 		v := (cmp.Impl{}).Compare(vendorValues, values)
 		if v.Pass {
-			t.Done("same: the Vendor's enclave runs exactly what I built")
+			t.Done(fmt.Sprintf("same: the Vendor's %s runs exactly what I built", tee))
 		} else {
 			vendorRunsSomethingElse = true
-			t.Fail("the Vendor's enclave runs something else")
+			t.Fail(fmt.Sprintf("the Vendor's %s runs something else", tee))
 			for _, r := range v.Reason {
 				cli.Errorln("    ", r)
 			}
 			printPCRs(vParsed)
 		}
-		cli.Why("the Vendor claims to run this source; the only way to know is to ask its enclave and compare with what the source really builds to")
+		cli.Why(fmt.Sprintf("the Vendor claims to run this source; the only way to know is to ask its %s and compare with what the source really builds to", tee))
 	}
 	reader := lether.Reader{RPC: *rpc, RegistryAddr: common.HexToAddress(*registry), Platform: *platform}
 
@@ -267,7 +268,7 @@ func auditCmd(args []string) error {
 	cli.Okln("PASS: audited and registered. Users can now verify against registry ", *registry)
 	fmt.Printf("this registration is for %s only. Put \"arch\": \"%s\" in measurement-record.json; a build for the other architecture measures differently and is registered on its own\n", *arch, *arch)
 	if vendorRunsSomethingElse {
-		cli.Errorln("but note: the Vendor's enclave at ", *vendorTee, " does NOT run this value. a User verifying that enclave against this registry will be told not to trust it")
+		cli.Errorln("but note: the Vendor's ", tee, " at ", *vendorTee, " does NOT run this value. a User verifying that ", tee, " against this registry will be told not to trust it")
 	}
 	return nil
 }
