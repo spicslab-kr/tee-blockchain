@@ -190,7 +190,7 @@ stop|start)
   aws ec2 "$1-instances" --instance-ids $ids >/dev/null || die "$1-instances"
   echo "$1: $ids"
   # A started instance gets a new address, and this machine's may have changed too: say whether it can get in.
-  [ "$1" = start ] && check_my_address
+  if [ "$1" = start ]; then check_my_address; fi   # not "[ … ] && …": on stop that would end the script with exit 1
   ;;
 
 delete)
