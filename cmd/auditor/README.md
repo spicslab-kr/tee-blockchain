@@ -4,6 +4,10 @@ att-auditor rebuilds the Vendor's source in the same environment, checks the res
 enclave, and registers the hash on the chain. `att-ra-responder` must sit in the same directory as
 `att-auditor` on your Nitro instance.
 
+This page shows the Nitro commands. On a TDX or SEV-SNP guest `build` and `launch` take `--platform` and `audit` takes
+`--format`; follow "The Auditor's half" in [docs/build/tdx.md](../../docs/build/tdx.md) or
+[docs/build/sev-snp.md](../../docs/build/sev-snp.md).
+
 **What you build:** `att-auditor`, `att-ra-responder` and the Vendor's enclave image, rebuilt from its
 source. See [Build](../../README.md#build).
 
@@ -28,7 +32,9 @@ att-auditor build --app-dir work/src/<path> --out-dir out
 att-auditor launch --eif out/<name>.eif
 ```
 
-If your PCR0, PCR1 and PCR2 differ from the Vendor's, that is the finding, and you do not register.
+Your own enclave's values are what you register. To check the Vendor's running enclave against them, give `audit`
+`--vendor-tee <vendor-instance>:5000` (below): it registers your value and then says whether the Vendor's enclave runs
+the same; if it does not, that is the finding, and `audit` exits 12.
 
 ## Deploy the registry
 ```
@@ -100,7 +106,7 @@ One service and version has one record and one registration per CPU architecture
 | Command | What it does |
 |---|---|
 | `ra-request` | Fetches an attestation document from `--tee-addr`. |
-| `ra-parse` | Verifies a document and extracts PCR0, PCR1 and PCR2. |
+| `ra-parse` | Verifies a document and extracts its measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP the five or six values); `--format` for a guest. |
 | `register` | Signs and registers measurements. `audit` calls it. |
 | `lookup` | Finds registrations by `--measurements` or `--record-key`. |
 | `compare` | Compares two sets of measurements, or a document with a registration. |

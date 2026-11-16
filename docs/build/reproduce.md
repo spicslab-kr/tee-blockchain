@@ -43,7 +43,7 @@ The values are MRTD (the firmware), RTMR0 (its view of the VM's configuration), 
 
 | what | set it to | check with | moves | how we know |
 |---|---|---|---|---|
-| guest image | **exactly** the Vendor's image version, never the family. Ours: `ubuntu-os-cloud/ubuntu-2404-noble-amd64-v20261105` (`IMAGE=` for `e2e/cloud/gcp-cvm.sh`) | `gcloud compute disks describe <vm> --zone <z> --format='value(sourceImage)'` | RTMR1 (kernel), RTMR2 (the root file system UUID on the command line, the stock initrd) | measured: guests of one image made days apart gave the same four values; the UUID comes with the image version |
+| guest image | **exactly** the Vendor's image version, never the family. Ours: `ubuntu-2404-noble-amd64-v20261105` in the project `ubuntu-os-cloud` (`IMAGE=ubuntu-2404-noble-amd64-v20261105` for `e2e/cloud/gcp-cvm.sh`; the project is its default `IMAGE_PROJECT`) | `gcloud compute disks describe <vm> --zone <z> --format='value(sourceImage)'` | RTMR1 (kernel), RTMR2 (the root file system UUID on the command line, the stock initrd) | measured: guests of one image made days apart gave the same four values; the UUID comes with the image version |
 | kernel | the image's own, not upgraded. Ours: `7.0.0-1017-gcp` | `uname -r` | RTMR1, and the Option 1 base initrd, so RTMR2 | structure: the kernel is in RTMR1; not measured by changing only the kernel |
 | machine type | **the Vendor's**. Ours: `c3-standard-4` (`MACHINE=`) | `gcloud compute instances describe <vm> --zone <z> --format='value(machineType.basename())'` | RTMR0 | measured: `c3-standard-8` gave RTMR0 `eba48352…` instead of `8847ec5d…`, nothing else moved. vCPUs and memory could not be told apart (GCP allows TDX on `c3-standard` only) |
 | zone | the Vendor's. Ours: `us-central1-a` | the same `describe` | nothing, where measured | measured: `us-central1-b` gave the same four values (one other zone, one day) |
@@ -61,7 +61,7 @@ The values are MEASUREMENT (the firmware, from the SNP report), PCR4 (shim and G
 
 | what | set it to | check with | moves | how we know |
 |---|---|---|---|---|
-| guest image | **exactly** the Vendor's image version. Ours: `ubuntu-os-cloud/ubuntu-2404-noble-amd64-v20261105` | as for TDX | CMDLINE (root UUID), the stock initrd, often KERNEL and PCR4 | measured: guests of one image gave the same five values |
+| guest image | **exactly** the Vendor's image version. Ours: `ubuntu-2404-noble-amd64-v20261105` (`IMAGE=`, as for TDX) | as for TDX | CMDLINE (root UUID), the stock initrd, often KERNEL and PCR4 | measured: guests of one image gave the same five values |
 | kernel | the image's own, not upgraded. Ours: `7.0.0-1017-gcp` | `uname -r` | KERNEL, and the Option 1 base initrd, so INITRD | structure; not measured by changing only the kernel |
 | machine type | **the Vendor's**, at least the same vCPU count. Ours: `n2d-standard-2` | as for TDX | MEASUREMENT, by the vCPU count | measured: `n2d-standard-4` gave `2279d213…` instead of `f6790085…`; `n2d-highmem-2` (2 vCPUs, more memory) did not change it |
 | CPU platform | `--min-cpu-platform="AMD Milan"` (what `gcp-cvm.sh` sets) | `grep 'model name' /proc/cpuinfo` (ours: `AMD EPYC 7B13`) | MEASUREMENT, by structure | **not measured** on another CPU platform |

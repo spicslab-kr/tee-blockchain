@@ -18,6 +18,18 @@ enclave really runs those bytes, and registers the measurement on an Ethereum-co
 Anyone can then ask the enclave to attest itself and compare the answer with what is on-chain,
 without a key from anyone.
 
+**Words used below.**
+- **TEE**: trusted execution environment. Here, a Nitro enclave or a confidential VM, called a **guest** (TDX,
+  SEV-SNP).
+- **Measurement**: the hashes the TEE's hardware or firmware reports for what it loaded, signed by the platform.
+  - Nitro: PCR0–PCR2.
+  - TDX: MRTD and RTMR0–RTMR2.
+  - SEV-SNP: MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD, and PCR12 for Option 2.
+- **EIF**: the enclave image file Nitro boots.
+- **Option 1 / Option 2** (TDX and SEV-SNP): the application's files inside the initrd, or a read-only dm-verity disk
+  image of them checked at boot ([docs/build/tdx.md](docs/build/tdx.md), "Option 1 and Option 2").
+- **Registry**: the contract that holds the measurements an Auditor vouches for.
+
 <p align="center">
   <img src="https://img.shields.io/badge/go-1.26.1%20pinned-00ADD8?logo=go&logoColor=white" alt="Go 1.26.1 pinned">
   <img src="https://img.shields.io/badge/TEE-AWS%20Nitro%20Enclaves-FF9900?logo=amazonaws&logoColor=white" alt="TEE AWS Nitro Enclaves">
@@ -178,8 +190,10 @@ att-auditor audit   --config work/src/build-config.json --tee-addr <my-instance>
 A key file is one line, a 32-byte Ethereum private key in hex (with or without `0x`); how to make one and get its
 address: [e2e/README.md, Key files](e2e/README.md#key-files). On a public network both keys need a balance: test ETH
 from a Sepolia faucet. To try it all without any ETH or key files, run the registry on a local `anvil` chain:
-[Running without a public testnet](e2e/README.md#running-without-a-public-testnet). On TDX and SEV-SNP the same
-commands run on a guest; the getting-started procedures linked above go through them step by step.
+[Running without a public testnet](e2e/README.md#running-without-a-public-testnet). On TDX and SEV-SNP the roles are
+the same but the commands differ: `build` and `launch` run on the guest with `--platform` (and take a folder of files
+and a base initrd, not a Dockerfile), and `audit`, `self-register` and `verify` need `--format`. The getting-started
+procedures linked above go through them step by step.
 
 ## Features
 
@@ -258,7 +272,7 @@ hash, and register its own signed hash. The User can then require both registrie
   `audit` and `verify` check a TDX quote (`intel-tdx`: MRTD, RTMR0–2) or SEV-SNP evidence
   (`amd-sev-snp-initrd`, `amd-sev-snp-verity`), tested against evidence recorded on GCP, including
   recordings with an application in both options. `att-ra-responder ra-serve --extractor tdx | snp-initrd |
-  snp-verity` produces the evidence inside the guest; tested against the recordings, and on 2026-11-12 run on
+  snp-verity --listen tcp:0.0.0.0:5000` produces the evidence inside the guest; tested against the recordings, and on 2026-11-12 run on
   live TDX and SEV-SNP guests with the whole chain on the guest (`e2e/cvm/in-guest-verify.sh`). For TDX,
   `build` and `launch --platform intel-tdx` build the application initrd (both options, with `--verify`) and
   install and check it under GRUB; for SEV-SNP the same with `--platform amd-sev-snp-initrd` or

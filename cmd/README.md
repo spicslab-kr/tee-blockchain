@@ -23,8 +23,8 @@ CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user         ./cmd/user
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
 ```
 
-Cross-compile for the Nitro instances (Linux) with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or `arm64` for a
-Graviton instance). Keep `CGO_ENABLED=0` on every build: on Linux with a C compiler installed Go otherwise links
+Cross-compile for a Nitro instance or a TDX or SEV-SNP guest (Linux) with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or
+`arm64` for a Graviton Nitro instance; the GCP guests are x86_64). Keep `CGO_ENABLED=0` on every build: on Linux with a C compiler installed Go otherwise links
 cgo into `att-ra-responder`, the file differs from a cross-build, and `build` refuses it.
 
 **Pinned toolchain.** The required Go toolchain is exactly the version in
@@ -44,8 +44,8 @@ from two different commits, or from a tree with uncommitted changes, then gives 
 
 ### Where each binary runs
 
-- **Vendor's Nitro instance:** `att-vendor` and `att-ra-responder`, in the same directory.
-- **Auditor's Nitro instance:** `att-auditor` and `att-ra-responder`, in the same directory.
+- **Vendor's Nitro instance or TDX/SEV-SNP guest:** `att-vendor` and `att-ra-responder`, in the same directory.
+- **Auditor's Nitro instance or TDX/SEV-SNP guest:** `att-auditor` and `att-ra-responder`, in the same directory.
 - **User:** `att-user`, anywhere.
 
 ### One shared `att-ra-responder`
@@ -61,8 +61,8 @@ binary and refuse a responder that was built with a different Go than the pin, w
 architecture than the instance they run on. The build log prints
 the responder's sha256 so both sides can compare it by eye.
 
-`build`, `pack`, `launch` and the responder only work on a Nitro-enabled EC2 instance (Linux).
-Everything else runs anywhere.
+`build`, `launch` and the responder work only on a Nitro-enabled EC2 instance (Linux) or on the TDX or SEV-SNP guest
+itself (`--platform intel-tdx | amd-sev-snp-*`); `pack` is Nitro only. Everything else runs anywhere.
 
 ## Exit codes
 

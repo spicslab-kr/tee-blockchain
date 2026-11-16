@@ -4,6 +4,11 @@
 on a Nitro instance, and registers its measurements, either through an Auditor or yourself.
 `att-ra-responder` must sit in the same directory as `att-vendor`.
 
+This page shows the Nitro commands. On a TDX or SEV-SNP guest the same commands take `--platform intel-tdx` or
+`amd-sev-snp-initrd | amd-sev-snp-verity` (`build`, `launch`) and `--format` (`self-register`, `ra-parse`); follow
+[docs/build/tdx.md](../../docs/build/tdx.md#getting-started-from-nothing-to-a-verified-tdx-guest) or
+[docs/build/sev-snp.md](../../docs/build/sev-snp.md#getting-started-from-nothing-to-a-verified-sev-snp-guest).
+
 **What you build:** `att-vendor`, `att-ra-responder` and your enclave image. The image must give the
 same PCR0, PCR1 and PCR2 when the Auditor rebuilds it. See [Build](../../README.md#build).
 
@@ -40,9 +45,11 @@ and starts it only if the result matches the file.
 
 ## Self-register (flow 2)
 
-In flow 2 you register your own enclave, with no Auditor.
+In flow 2 you register your own enclave, with no Auditor, in a registry whose approver is your own key. Deploy it once;
+it prints the address `--registry` takes:
 
 ```
+att-vendor registry-deploy --rpc <url> --deployer-key-file <key> --approver <0x… address of your signing key>
 att-vendor self-register --config build-config.json --tee-addr 127.0.0.1:5000 \
     --rpc <url> --registry <0x...> --signing-key-file <key>
 ```
@@ -115,7 +122,7 @@ The Auditor needs read access to the repository. Exit codes 8 to 11 report git f
 | command | what it does |
 |---|---|
 | `ra-request` | Sends a fresh nonce to an enclave and saves its attestation document. |
-| `ra-parse` | Verifies a document and extracts PCR0, PCR1 and PCR2. |
+| `ra-parse` | Verifies a document and extracts its measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP the five or six values); `--format` for a guest. |
 | `register` | Signs measurements with your key and registers them. |
 | `lookup` | Reads a registration by record key or by measurements. |
 | `compare` | Checks two measurement sets, or a set against a registration on the chain. |

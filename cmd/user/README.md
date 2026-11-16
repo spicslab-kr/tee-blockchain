@@ -10,7 +10,8 @@ att-user verify --tee-addr <enclave-ip>:5000 --rpc <url> --registry <0x...>
 ```
 
 `verify` (`verifyCmd` in [verify.go](verify.go)) asks the enclave for an attestation
-(`TCPRequester.RequestFresh`), checks the document (`AWSParser`), finds who registered the measurement it
+(`TCPRequester.RequestFresh`), checks the document with the parser for `--format` (`AWSParser`, `TDXParser` or
+`SNPParser`), finds who registered the measurement it
 contains (`Reader.FindRecordKeys`) and checks each registration it finds (`Reader.Lookup`).
 
 [`Check`](../../internal/core/compare/check.go) passes a registration when all three hold:
@@ -37,7 +38,9 @@ Flags:
 - `--nonce` pins the nonce, for tests.
 - `--out-dir` keeps the document and the measurements. Without it, `verify` uses a temporary directory.
 
-If you leave out `--tee-addr` or `--registry`, `verify` asks for them.
+If you leave out `--tee-addr`, `--registry` or `--rpc`, `verify` asks for them. The suggested RPC, taken when you just
+press Enter, is a public **Ethereum mainnet** endpoint (`https://ethereum-rpc.publicnode.com`); for Sepolia or a local
+chain give `--rpc` yourself.
 
 ## What it prints
 
@@ -62,7 +65,7 @@ Each step of `verify` is a command of its own.
 | Command | What it does |
 |---|---|
 | `ra-request --tee-addr <host:port> --out-file doc.cbor` | Fetches an attestation document and saves the nonce next to it. |
-| `ra-parse --doc doc.cbor --out-file parsed.json` | Verifies the document and extracts PCR0, PCR1 and PCR2. |
+| `ra-parse --doc doc.cbor --out-file parsed.json` | Verifies the document and extracts its measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP the five or six values); `--format` for a guest. |
 | `lookup --rpc <url> --registry <0x...> --measurements parsed.json` | Finds the record keys registered for those measurements. |
 | `compare --attested parsed.json --expected other.json` | Compares two sets of measurements. |
 | `compare --attested parsed.json --registry <0x...> --rpc <url> --record-key <0x...>` | Checks one registration. `--trusted-approvers` is optional. |
@@ -75,14 +78,14 @@ Each step of `verify` is a command of its own.
 - `registration expired`: ask the approver to register the measurement again with a later expiry.
 - `approver 0x... is not in the trusted approvers`: if you trust that address, add it with `--trusted-approvers`.
 - `document nonce is not the one sent`: run `verify` again and drop `--nonce` if you set it.
-- `attestation document has a different format than expected`: the enclave answers in a format other than `aws-nitro`, which `att-user` cannot verify.
+- `attestation document has a different format than expected`: the TEE answers in another format than `--format` (default `aws-nitro`). Pass the one it uses: `intel-tdx`, `amd-sev-snp-initrd` or `amd-sev-snp-verity` for a guest.
 - `dial tcp <host>:5000: i/o timeout`: check `--tee-addr` and the Vendor's firewall, or raise `--timeout`.
 
 ## Reading the code
 
 - [main.go](main.go) switches on the first argument and calls one function per command. `exitCode` maps an error to an exit code.
 - [verifyCmd](verify.go) runs the whole sequence.
-- [AWSParser](../../internal/tee/parse/user/aws.go) verifies the signature chain and the nonce.
+- [AWSParser](../../internal/tee/parse/user/aws.go), [TDXParser](../../internal/tee/parse/user/tdx.go) and [SNPParser](../../internal/tee/parse/user/snp.go) verify the signature chain and the nonce, one per format.
 - [Reader](../../internal/chain/lookup/user/ether/reader.go) has `FindRecordKeys` and `Lookup`.
 - [Check](../../internal/core/compare/check.go) fails a registration with `registration expired`, `approver <address> is not in the trusted approvers` or `measurement hash differs from the chain registration`.
 

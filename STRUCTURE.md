@@ -8,7 +8,7 @@ This page lists every folder in the repository, then explains the one idea that 
 
 ```
 .
-├── go.mod, go.sum          Go module "attestamp"; the toolchain is pinned to go1.26.1
+├── go.mod, go.sum          Go module "attestamp" (`go 1.26.1`); the toolchain pin itself is internal/setup/build/GO_TOOLCHAIN
 ├── README.md               overview, install, quick start
 ├── CONTRIBUTING.md         build, test, layout and commit conventions
 ├── STRUCTURE.md            this file
@@ -44,7 +44,8 @@ This page lists every folder in the repository, then explains the one idea that 
 │
 ├── e2e/                    shell scripts for runs against real instances and guests
 │   ├── env.sh              shared settings (instance addresses come from an untracked env.local.sh)
-│   ├── 0-Setup-*.sh        install or upload the binaries to the instances, and stop them again
+│   ├── 0-Setup-*.sh        install the local tools, or upload the binaries to the instances; 99-Setup-local-stop.sh
+│   │                       stops what they started (the instances themselves: e2e/cloud/aws-nitro.sh stop)
 │   ├── flow1-auditor-registers/       Auditor rebuilds and registers; tamper steps included
 │   ├── flow2-vendor-self-registers/   Vendor registers itself; tamper steps included
 │   ├── *-check.sh, *-compare.sh       single-purpose Nitro checks (toolchain pin, build environment,
@@ -100,10 +101,13 @@ sub-package.
 internal/tee/request/
 ├── Vendor/          role package  (package vendor)
 │   ├── aws/         platform module: AWS Nitro, implemented
+│   ├── tdx/         platform module: Intel TDX, implemented (role adapter over internal/tee/request/tdx)
+│   ├── snp/         platform module: AMD SEV-SNP, implemented (role adapter over internal/tee/request/snp)
 │   ├── gcp/         platform module: GCP Confidential Space, partial
 │   └── azure/       platform module: Azure, empty
 ├── auditor/         role package  (package auditor), same shape
-│   └── aws/ gcp/ azure/
+│   └── aws/ tdx/ snp/ gcp/ azure/
+├── tdx/, snp/       the role-independent request code for TDX and SEV-SNP
 └── user/            role package  (package user), no platform sub-folders
 ```
 
@@ -129,7 +133,8 @@ import paths in `cmd/vendor`, in the other role packages and in the tests.
 A platform module is the code that is specific to one TEE platform. It lives one level below a role
 package (`internal/tee/request/Vendor/aws`) or, for logic that does not depend on the role, next to
 the role packages (`internal/tee/parse/aws`). A role package picks the module by the attestation
-document's format name (`aws-nitro`, `gcp-cs-jwt`, `azure-maa-jwt`).
+document's format name (`aws-nitro`, `intel-tdx`, `amd-sev-snp-initrd`, `amd-sev-snp-verity`, `gcp-cs-jwt`,
+`azure-maa-jwt`).
 
 What is implemented, checked against the code:
 
@@ -234,7 +239,7 @@ The table is read from the imports of each `cmd/*` package (`go list -deps ./cmd
 
 | Module | Job | att-vendor | att-auditor | att-user | att-ra-responder |
 | --- | --- | :-: | :-: | :-: | :-: |
-| `tee/request/<role>` and `<role>/aws` | Request an attestation document; the responder side runs inside the enclave | yes | yes | yes (role only) | yes (Vendor copy, with aws) |
+| `tee/request/<role>` and `<role>/aws` | Request an attestation document; the responder side runs inside the enclave | yes | yes | yes (role only) | yes (Vendor copy, with aws, tdx and snp) |
 | `tee/parse/aws` (shared) | Verify a Nitro document and extract measurements | yes | yes | yes | no |
 | `tee/parse/<role>` | Role-typed adapter over the shared parser | yes | yes | yes | no |
 | `setup/build` (root) | Architecture, toolchain pin, responder build check | yes | yes | no | no |
@@ -261,7 +266,7 @@ Two details the table hides:
 
 | Path | What lives there |
 | --- | --- |
-| `cmd/<role>/` | `main.go` (flags and dispatch), plus `arch.go`, `chain.go`, `compare.go`, `parse.go`, `quiet.go` wiring for that role; vendor adds `self_register.go`, user adds `verify.go`, auditor adds `audit.go` |
+| `cmd/<role>/` | `main.go` (flags and dispatch), plus `chain.go`, `compare.go`, `parse.go`, `quiet.go` wiring for that role; vendor and auditor add `arch.go`, `tdx.go` and `snp.go` (the CVM build and launch), vendor adds `self_register.go`, user adds `verify.go`, auditor adds `audit.go` |
 | `internal/setup/build/GO_TOOLCHAIN` | The pinned Go version, read by `build` and by CONTRIBUTING |
 | `internal/tee/parse/aws/` | Shared Nitro parser, `root.pem`, and a recorded document under `testdata/` |
 | `internal/tee/request/testdata/` | A recorded Nitro attestation document used by tests |

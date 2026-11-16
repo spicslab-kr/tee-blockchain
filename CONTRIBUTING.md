@@ -41,7 +41,7 @@ go test ./...
 
 Unit tests run anywhere. `cmd/*_e2e_test.go` build the binaries and run them against a local
 `anvil` and a recorded attestation document; the chain-backed ones skip themselves when `anvil`
-is not on `PATH`. No Nitro hardware is needed for any test.
+is neither on `PATH` nor in `~/.foundry/bin`. No Nitro hardware is needed for any test.
 Files the `e2e/` scripts fetch from instances land in `e2e-work/`, which is ignored.
 
 `internal/doccheck` checks every document reference in the tracked files: Markdown links and their anchors, file

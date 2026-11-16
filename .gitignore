@@ -7,6 +7,8 @@ dist/
 /vendor.exe
 /user
 /user.exe
+/ra-responder
+/ra-responder.exe
 # e2e/0-Setup-local-upload.sh cross-builds the Linux binaries for the instances into the repo root.
 /att-vendor
 /att-auditor

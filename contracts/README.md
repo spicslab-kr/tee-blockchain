@@ -12,8 +12,9 @@ OpenZeppelin Contracts is pinned by the submodule gitlink at
 that version; OZ v4 implements EIP712 differently and would produce different bytecode.
 
 `.gitmodules` only names the path (`evm/lib/openzeppelin-contracts`) and the URL; the gitlink is what fixes the
-version. Clone with `git clone --recursive`, or run `git submodule update --init --recursive` after cloning, before
-running `go generate` in `internal/chain/register/*/ether`.
+version. Fetch it after cloning with `git submodule update --init contracts/evm/lib/openzeppelin-contracts` (from the
+repository root, as in the README), before running `go generate` in `internal/chain/register/*/ether`. `--recursive`
+also fetches OpenZeppelin's own test submodules, which are not needed and can fail on Windows with long paths.
 
 ## What it stores
 
@@ -39,7 +40,7 @@ The approver signs a typed `Registration`, under the EIP-712 domain `Registry`, 
 | `arch` | the CPU architecture the image was built for, `amd64` or `arm64`. Display only; it is signed but is not part of the record key |
 | `service` | service name, for example `nginx` |
 | `version` | service version, for example `1.31.6` |
-| `measurement` | one 32-byte value: the measurements (PCR0, PCR1, PCR2), ordered by name and hashed with keccak256 |
+| `measurement` | one 32-byte value: the measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD and PCR12), ordered by name and hashed with keccak256 |
 | `expires` | unix seconds, required and in the future |
 
 The type string is
@@ -90,8 +91,9 @@ registration look valid or a live one look expired.
 emitted once per registration.
 
 Errors: `NotAnApprover(approver)`, `AlreadyRegistered(recordKey, expires)`, `MissingField(field)`
-and `ExpiryAlreadyPassed(expires, nowTime)`. The commands map the first three to exit codes 4, 5 and
-6 (see [Exit codes](../cmd/README.md#exit-codes)).
+and `ExpiryAlreadyPassed(expires, nowTime)`. The commands map `NotAnApprover`, `AlreadyRegistered` and
+`ExpiryAlreadyPassed` to exit codes 4, 5 and 6; `MissingField` ends with exit 1 (see
+[Exit codes](../cmd/README.md#exit-codes)).
 
 ## Key types, fields and functions
 
