@@ -217,7 +217,7 @@ The Vendor's registry address is saved in `e2e-work/registry-flow2.txt`.
 | `arch-measurement-compare.sh` | the same source measures the same on two x86_64 hosts checked out under two different paths (T1, T3), and differently on arm64 (only with `ARM64_HOST`) |
 
 Intermediate files go in `e2e-work/`. Every verdict is also appended to `e2e-work/results/aws-nitro.jsonl`, one JSON line
-each (`result()` in `env.sh`; fields in `docs/plan/test-matrix.md`, "Making the results machine-readable").
+each (`result()` in `env.sh`; fields in `docs/status/test-matrix.md`, "Making the results machine-readable").
 `arch-measurement-compare.sh` runs the x86_64 pair without `ARM64_HOST` and records the arm64 side as skipped.
 
 ## Settings and variables

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds a reproducible read-only application image with a dm-verity hash tree, for the Option 2 app fixtures
-# (docs/plan/app-fixture-recording.md). The settings are the ones docs/build/sev-snp.md, "Variables", found to give
+# (docs/status/app-fixture-recording.md). The settings are the ones docs/build/sev-snp.md, "Variables", found to give
 # the same image and root hash on two machines:
 #   - squashfs, not ext4 (ext4 differs between two builds even with a fixed UUID and hash_seed)
 #   - mksquashfs -mkfs-time 0 -all-time 0, every file and directory time set to 0, owners root

@@ -127,7 +127,7 @@ What is implemented, checked against the code:
 
 **aws**, **tdx** and **snp** work end to end (Nitro on AWS; TDX and SEV-SNP on GCP); what each one's evidence can and
 cannot prove is compared in `docs/build/ra-comparison.md`, and what has been measured on each is in
-`docs/plan/test-matrix.md`. gcp and azure exist so the format names, the Parser interface and the folder layout are
+`docs/status/test-matrix.md`. gcp and azure exist so the format names, the Parser interface and the folder layout are
 already in place.
 
 `internal/setup/build/cpio` is shared: the deterministic cpio writer for confidential-VM initrds.

@@ -123,7 +123,7 @@ step() { printf '\033[1;32m==================== %s (in progress) ===============
 nitroBanner() { echo; step "CONNECTING TO NITRO ($1)"; sleep 2; }
 localBanner() { echo; step "RETURNING TO LOCAL"; sleep 2; }
 
-# Results contract (docs/plan/test-matrix.md, "Making the results machine-readable"). Every verdict a script reaches is
+# Results contract (docs/status/test-matrix.md, "Making the results machine-readable"). Every verdict a script reaches is
 # also appended as one JSON line to $WORK/results/<platform>.jsonl, so the test matrix can be filled from the files
 # instead of by hand. e2e/cvm/in-guest-verify.sh writes the same fields for the confidential VMs.
 #

@@ -25,7 +25,7 @@ Option 2 mounts the application as a read-only squashfs image on a dm-verity tar
   application was mounted read-only on `/opt/app-verity`, and PCR12 matched the expected digest for the root hash on
   the kernel command line (`internal/tee/parse/snp/testdata/gcp-n2d-opt2-v*-boot.txt`).
 - **Not measured:** a change made to the image while the guest runs. That is the tamper case in
-  `docs/plan/cvm-port.md`, Phase 5.
+  `docs/status/cvm-port.md`, Phase 5.
 
 ## Layer 2: the rest of the guest is immutable. NOT BUILT.
 
@@ -37,7 +37,7 @@ Locking the application does not stop someone who can log in from running a diff
 - no outbound network.
 
 None of this exists yet. Today we log in to both guests over SSH to record evidence, which is exactly what layer 2
-removes. That is why Phase 2 (the responder serving evidence over TCP) had to come first (`docs/plan/cvm-port.md`).
+removes. That is why Phase 2 (the responder serving evidence over TCP) had to come first (`docs/status/cvm-port.md`).
 
 ## Layer 3: proving layer 2 from the measurement. REASONED, NOT TESTED.
 

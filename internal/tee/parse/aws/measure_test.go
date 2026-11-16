@@ -45,7 +45,7 @@ func TestParse_RealDocumentPCRs(t *testing.T) {
 // fixtureInstanceID is the EC2 instance ID at the start of the module_id in testdata/fixture-my-web.cbor. This value
 // comes from the signed fixture and cannot be changed: AWS signed the document over its module_id, so editing the
 // fixture breaks the signature and every test that verifies it. It is an instance ID, not an account number, and
-// names an instance that no longer exists (the operator's statement, 2026-11-16; docs/plan/build-info-gaps.md, #15).
+// names an instance that no longer exists (the operator's statement, 2026-11-16; docs/status/build-info-gaps.md, #15).
 const fixtureInstanceID = "i-05acc9d339a979636"
 
 func TestInfo(t *testing.T) {

@@ -31,7 +31,7 @@ fixture-my-web.nonce`): the signature chains to the AWS Nitro root, the nonce ma
 
 The document's signed `module_id` carries the **EC2 instance ID** of the parent instance it was made on, and
 `measure_test.go` asserts its prefix. It cannot be removed without re-recording. Whether to publish this file is a
-decision for a person (`docs/plan/build-info-gaps.md`, #15). The document carries no secret: it is signed by the
+decision for a person (`docs/status/build-info-gaps.md`, #15). The document carries no secret: it is signed by the
 platform, and anyone may verify it.
 
 ## Recording another one

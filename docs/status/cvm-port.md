@@ -16,7 +16,7 @@ Status (2026-11-16, evening):
 - **Decided and done 2026-11-16:** `audit` refuses to register without the Auditor's own build values, on every platform (an initrdless
   TDX guest had been registered that way and then trusted); `audit --vendor-tee` exits 12 when the Vendor's guest
   differs. **Planned after publication:** the TDX parser's own initrdless check, which needs the CCEL in TDX evidence
-  (a wire-format change). All three in `docs/plan/build-info-gaps.md`, "Design questions to review", Q2 and Q3.
+  (a wire-format change). All three in `docs/status/build-info-gaps.md`, "Design questions to review", Q2 and Q3.
 - **Measured in session 4 (2026-11-16):** T1, T3 (SEV-SNP), T7 on guests; T8 closed as not applicable on GCP
   (`docs/results/sessions-2026-11-16/session4-t1-t3-t7-t8.md`). The machine type changes the values (SEV-SNP
   MEASUREMENT with the vCPU count, TDX RTMR0), so both guides now require the Vendor's machine type; the zone changed
@@ -27,7 +27,7 @@ Status (2026-11-16, evening):
   to IAP only, `attestamp-ssh-iap`: `35.235.240.0/20`, limited to the `attestamp-ra` tag. ssh and scp through IAP were
   checked after the deletion, and plain ssh timed out (`e2e/cloud/README.md`, "SSH to the guests").
 - Phase 5 (a locked guest) is designed below, not started.
-- The record of what ran when: the trial reports in `docs/plan/` and the session results in `docs/results/`.
+- The record of what ran when: the trial reports in `docs/status/` and the session results in `docs/results/`.
 
 Clouds (decided 2026-11-11): **Nitro on AWS, TDX on GCP, SEV-SNP on GCP.** Each platform runs on one cloud. AWS is
 used for Nitro Enclaves only; SEV-SNP on AWS is not pursued. The AWS SEV-SNP runs of 2026-11 stay in the record as
@@ -112,7 +112,7 @@ adapters in `internal/tee/request/{Vendor,auditor}/{tdx,snp}`, and `request/{Ven
 | # | Task | Pass criterion | State |
 |---|---|---|---|
 | 2.1 | `internal/tee/request/tdx` (ConfigFS TSM, REPORTDATA = nonce then zeros) and `internal/tee/request/snp` (GCE vTPM attestation, SHA3-512 into REPORT_DATA, SNP report and certificate table, the parse/snp container), with role adapters | the returned evidence parses with the Phase 1 and 4a parsers | **done, without hardware**: a fake TSM (go-configfs-tsm `faketsm`) answers only for the REPORTDATA each recording was made for, and the quote and evidence produced verify with the parsers |
-| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **Answered on the guest over 127.0.0.1, 2026-11-12** (`tdx`, `snp-initrd`); **from another machine on 2026-11-15** (TDX: `docs/plan/trial-2026-11-16.md`) |
+| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **Answered on the guest over 127.0.0.1, 2026-11-12** (`tdx`, `snp-initrd`); **from another machine on 2026-11-15** (TDX: `docs/status/trial-2026-11-16.md`) |
 | 2.3 | End to end: `att-user verify` against a running TDX and SEV-SNP instance | exit 0 and a `✓ matches` line | **Passed 2026-11-12, all on one guest** (`e2e/cvm/in-guest-verify.sh`, 11 of 11 checks each): `amd-sev-snp-initrd` on a stock boot; `intel-tdx` on a stock boot and again on a boot with the dm-verity application mounted (3.4) |
 
 **How 2.3 was run.** Without a firewall rule, everything runs on the guest and talks over `127.0.0.1`: the responder
@@ -240,14 +240,14 @@ check on the recorded quotes, and the event-log replay on a constructed log. **W
 
 Each item says what to run and what must come out. The pass criterion of 3.5 is the last line of the second step.
 
-1. **Done 2026-11-15, no VM** (`docs/plan/trial-2026-11-16.md`): in a clean Ubuntu 24.04 WSL with squashfs-tools 4.6.1 and cryptsetup 2.7.0, `--option 2` on the recordings' v1 application gave root hash `e29ec085…af0c9` and `app.img` `28bdfcff…ec1c`, the measured values. What was asked: **The build with the real tools** (any Ubuntu 24.04 machine with squashfs-tools 4.6.1 and cryptsetup 2.7.0; not a
+1. **Done 2026-11-15, no VM** (`docs/status/trial-2026-11-16.md`): in a clean Ubuntu 24.04 WSL with squashfs-tools 4.6.1 and cryptsetup 2.7.0, `--option 2` on the recordings' v1 application gave root hash `e29ec085…af0c9` and `app.img` `28bdfcff…ec1c`, the measured values. What was asked: **The build with the real tools** (any Ubuntu 24.04 machine with squashfs-tools 4.6.1 and cryptsetup 2.7.0; not a
    TDX VM). `att-vendor build --platform intel-tdx --option 2 --app-dir <a folder holding one file app containing
    "attestamp app v1">` must give root hash `e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9`, the
    value `make-verity-image.sh` gave on both guests on 2026-11-11 (`tdx/testdata/gcp-c3-opt2-v1-boot.txt`). The Go port
    lays the image out the same way (application under `opt/app`, every mode 755, every time 0, the same flags, padding,
    salt and UUID), and a test keeps the flags equal to the script's, but only the real tools can show the bytes are the
    same. WSL on the development machine had squashfs-tools 4.7.5 and no veritysetup, so this was not run.
-2. **Done 2026-11-15** (`docs/plan/trial-2026-11-16.md`): on a new guest, install, reboot and `--check` passed; the CC event log replayed, GRUB's initrd event carried the path of its `initrd` command and the SHA-384 of the file, the marker was there. What was asked: **Launch on a TDX guest** (`gcp-cvm.sh tdx create vendor`, with approval). On the guest, `GRUB_FORCE_PARTUUID`
+2. **Done 2026-11-15** (`docs/status/trial-2026-11-16.md`): on a new guest, install, reboot and `--check` passed; the CC event log replayed, GRUB's initrd event carried the path of its `initrd` command and the SHA-384 of the file, the marker was there. What was asked: **Launch on a TDX guest** (`gcp-cvm.sh tdx create vendor`, with approval). On the guest, `GRUB_FORCE_PARTUUID`
    commented out (the install refuses otherwise):
    ```
    sudo ./att-vendor build --platform intel-tdx --app-dir app --base-initrd /boot/initrd.img-$(uname -r) --option 1 --verify
@@ -297,7 +297,7 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
       Pass: `audit --vendor-tee` prints `the Vendor's guest runs something else`, and the User's `verify` against the
       Auditor's registry exits 1.
 
-   Record the verdicts as JSONL lines (T4 for 4 and 5, T5 for 6) so they land in `docs/plan/test-matrix.md`.
+   Record the verdicts as JSONL lines (T4 for 4 and 5, T5 for 6) so they land in `docs/status/test-matrix.md`.
 
 ## Phase 4 — AMD SEV-SNP
 
@@ -346,10 +346,10 @@ so a check fed the recorded evidence and those build values must pass, and fail 
 
 ### Phase 4b: what waits for a VM
 
-1. **Done 2026-11-15, no VM**: root hash `e29ec085…` (v1) and `a2f4df92…` (v2), and the predicted PCR12 `470379c7…` equals the recorded `opt2-v1` PCR12 (`docs/plan/trial-2026-11-16.md`). What was asked: **The real tools for Option 2** (any Ubuntu 24.04, as for TDX): `build --platform amd-sev-snp-verity` with the
+1. **Done 2026-11-15, no VM**: root hash `e29ec085…` (v1) and `a2f4df92…` (v2), and the predicted PCR12 `470379c7…` equals the recorded `opt2-v1` PCR12 (`docs/status/trial-2026-11-16.md`). What was asked: **The real tools for Option 2** (any Ubuntu 24.04, as for TDX): `build --platform amd-sev-snp-verity` with the
    one-file v1 application must give root hash `e29ec085…af0c9`; the check above already showed that this root hash
    gives the recorded PCR12.
-2. **Done 2026-11-15** (`docs/plan/trial-2026-11-16.md`): on a new guest, both options: install, reboot and `--check` passed; Option 2's PCR12 in the verified evidence was the predicted value; `audit` and `verify` passed from another machine; the undo returned the stock boot. What was asked: **Install and reboot on a SEV-SNP guest** (`gcp-cvm.sh snp create vendor`, with approval), `GRUB_FORCE_PARTUUID`
+2. **Done 2026-11-15** (`docs/status/trial-2026-11-16.md`): on a new guest, both options: install, reboot and `--check` passed; Option 2's PCR12 in the verified evidence was the predicted value; `audit` and `verify` passed from another machine; the undo returned the stock boot. What was asked: **Install and reboot on a SEV-SNP guest** (`gcp-cvm.sh snp create vendor`, with approval), `GRUB_FORCE_PARTUUID`
    commented out. Option 1: `build --platform amd-sev-snp-initrd --app-dir app --base-initrd /boot/initrd.img-$(uname
    -r) --verify`, `launch --platform amd-sev-snp-initrd --reboot`, then `launch … --check`. **Pass: "✓ the same".**
    Option 2: a base initrd built with `snp/testdata/record/initramfs-hook.sh` and `initramfs-local-bottom.sh`
@@ -395,7 +395,7 @@ Designed, not started. The reasoning and what is confirmed versus reasoned are i
 | 5.2 | Boot it, with the root image's verity root hash on the kernel command line (`root=/dev/mapper/...` set up by the initrd against that hash) | the guest boots; SSH is refused; the responder answers from outside (Phase 2.3) |
 | 5.3 | Record evidence from the locked guest through the responder, not over SSH | a fixture recorded with `att-user ra-request` from the verifier's machine |
 | 5.4 | A test in which the verifier reads the root hash out of the measured command line (CMDLINE on SEV-SNP, the command-line event behind RTMR2 on TDX) and compares it with the hash of the image it was given | the hash in the evidence equals the published image's; a different image gives a different measurement |
-| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the TDX tamper boot of 2026-11-12 (v2's image under v1's root hash: `fail`, nothing mounted, the boot went on; `docs/plan/app-fixture-recording.md`, "TDX Option 2 mounted at boot"). Still to do: the same on SEV-SNP, a changed data block under an unchanged root hash, and the root image. (*Record:* the 2026-11 script for this flipped one byte at offset 5000; it is no longer available) |
+| 5.5 | **Tamper case:** break the verity image on purpose (change one data block of the application image, and separately of the root image) and boot or read it | the change shows: PCR12 records `fail` (SEV-SNP Option 2), or the read fails with an I/O error, or the boot stops. This is the evidence for "if it is not there, it shows". Starting point: the TDX tamper boot of 2026-11-12 (v2's image under v1's root hash: `fail`, nothing mounted, the boot went on; `docs/status/app-fixture-recording.md`, "TDX Option 2 mounted at boot"). Still to do: the same on SEV-SNP, a changed data block under an unchanged root hash, and the root image. (*Record:* the 2026-11 script for this flipped one byte at offset 5000; it is no longer available) |
 
 5.4 and 5.5 turn layer 3 from reasoning into a measured result; until they pass, `runtime-immutability.md` keeps
 calling it reasoned.
@@ -403,7 +403,7 @@ calling it reasoned.
 *Record:* the October–November SEV-SNP runs used test scripts outside this repository (`option1-initrd/`,
 `option2-dm-verity/`, `vendor/`, `auditor/`, `user/go-verifier/`, `relay-test/`). Their author has left the lab and
 they are no longer available (build-info gaps #5, #6); nothing here depends on them. What replaced them is in
-`docs/plan/app-fixture-recording.md` and the recordings under `internal/tee/parse/snp/testdata/`. The one result not
+`docs/status/app-fixture-recording.md` and the recordings under `internal/tee/parse/snp/testdata/`. The one result not
 yet replaced is T10 (two machines' evidence combined); its procedure is "Reproducing T10" in the same document.
 
 ## Open decisions
@@ -417,7 +417,7 @@ reproducible — `mkinitramfs` and `dracut` write a random seed — so the Audit
 Vendor's base initrd as a binary. Options:
 
 - (a) the Vendor publishes the base initrd; the Auditor reproduces only the application part.
-  Fastest, matches what the 2026-11 test scripts did and what `docs/plan/app-fixture-recording.md` does, and weakens
+  Fastest, matches what the 2026-11 test scripts did and what `docs/status/app-fixture-recording.md` does, and weakens
   the Auditor's independence.
   If chosen, say so plainly in `README.md` and `docs/build/`.
 - (b) build a reproducible base initrd ourselves. Keeps the original claim; much more work.
@@ -522,7 +522,7 @@ not quoted from the README. Phase 0 gains one step:
 | # | Task | Pass criterion |
 |---|---|---|
 | 0.0 | Run the existing Nitro e2e suite end to end and record its results | every row of the matrix that applies to Nitro is filled from a real run |
-| 0.0b | Add the JSONL result line to each e2e script, and the two missing tests (T8 debug mode, T9 replay) | `e2e-work/results/aws-nitro.jsonl` has one line per test. **JSONL done 2026-11-12** (`result()` in `e2e/env.sh`; the CVM script writes the same fields); T8 and T9: live on Nitro 2026-11-15, `docs/plan/test-matrix.md` footnotes 4 and 5 |
+| 0.0b | Add the JSONL result line to each e2e script, and the two missing tests (T8 debug mode, T9 replay) | `e2e-work/results/aws-nitro.jsonl` has one line per test. **JSONL done 2026-11-12** (`result()` in `e2e/env.sh`; the CVM script writes the same fields); T8 and T9: live on Nitro 2026-11-15, `docs/status/test-matrix.md` footnotes 4 and 5 |
 
 0.0b comes before any TDX or SEV-SNP script is written, so all three are written against the same
 output contract.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# initramfs-tools local-bottom script for the amd-sev-snp-verity app fixtures (docs/plan/app-fixture-recording.md).
+# initramfs-tools local-bottom script for the amd-sev-snp-verity app fixtures (docs/status/app-fixture-recording.md).
 # Install as /etc/initramfs-tools/scripts/local-bottom/attestamp-verity.
 #
 # It runs after the real root is mounted at ${rootmnt}. It reads the expected root hash from the kernel command line

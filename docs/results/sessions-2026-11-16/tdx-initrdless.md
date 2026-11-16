@@ -34,7 +34,7 @@ The guest was deleted afterwards (with its disk).
 
 The fix (`fix(cmd/auditor): refuse to audit a TDX or SEV-SNP guest without --build-measurements`): `audit` on a CVM
 format needs a value the Auditor built. The parser was not changed, because TDX evidence is the quote alone and the
-event log that shows whether an initrd was loaded stays on the guest (`docs/plan/build-info-gaps.md`, Q2: the real fix
+event log that shows whether an initrd was loaded stays on the guest (`docs/status/build-info-gaps.md`, Q2: the real fix
 puts that log into the evidence, in a later session). Measured on `trial1116-tdx-vendor`, another guest of the same
 image on the same stock boot (`root=PARTUUID=… panic=-1`, no initrd); its quote gave the same RTMR2 `8d9317e9…`.
 Binaries at `fa871e1`, local anvil 1.8.0.

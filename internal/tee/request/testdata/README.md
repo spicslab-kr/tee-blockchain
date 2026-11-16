@@ -33,5 +33,5 @@ signature chains to the AWS Nitro root.
 ## Identifying information
 
 The signed `module_id` carries an **EC2 instance ID**, a different one from `fixture-my-web`'s. It cannot be removed
-without re-recording; publication is a decision for a person (`docs/plan/build-info-gaps.md`, #15;
-`docs/plan/audit-2026-11-12.md`).
+without re-recording; publication is a decision for a person (`docs/status/build-info-gaps.md`, #15;
+`docs/status/audit-2026-11-12.md`).

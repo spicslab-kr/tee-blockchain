@@ -11,7 +11,7 @@ import (
 )
 
 // The stock entry is the first one GRUB's 10_linux writes on Ubuntu, titled 'Ubuntu'. The recordings used it as the
-// template (docs/plan/app-fixture-recording.md); internal/setup/build/cpio/testdata/make-grub-entry.sh did this with sed.
+// template (docs/status/app-fixture-recording.md); internal/setup/build/cpio/testdata/make-grub-entry.sh did this with sed.
 var (
 	stockStart  = regexp.MustCompile(`^menuentry 'Ubuntu'.*\{\s*$`)
 	initrdName  = regexp.MustCompile(`initrd\.img-[^\s]*`)

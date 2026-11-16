@@ -5,7 +5,7 @@
 tdx`; the whole chain passed on a live guest on 2026-11-12). Building the initrd and launching it are in the tool since
 2026-11-15 (`build` and `launch --platform intel-tdx`, both options, `--verify`), and **ran on real guests on
 2026-11-15**: install, reboot and `launch --check` passed for both options, and `audit` and `verify` passed from
-another machine (`docs/plan/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
+another machine (`docs/status/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
 **The independent Auditor ran on 2026-11-16** ("The Auditor's half", two guests, both options): it rebuilt on its own
 guest, got the Vendor's values, registered them, and a User's `verify` of the Vendor's guest passed; a one-byte change
 on the Vendor's side was refused (`docs/results/sessions-2026-11-16/intel-tdx.md`).
@@ -27,8 +27,8 @@ README describes ("an independent Auditor rebuilds it, confirms the enclave real
 made that way says no more than the Vendor's own word. It shows that the chain works end to end. The Auditor's
 independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it needs two guests at once
 and **ran and passed on 2026-11-16**, both options. The procedure was followed end to end in a clean environment on 2026-11-15
-(`docs/plan/trial-2026-11-16.md`), and again from the documents alone, both options, on 2026-11-16
-(`docs/plan/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside this page have been
+(`docs/status/trial-2026-11-16.md`), and again from the documents alone, both options, on 2026-11-16
+(`docs/status/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside this page have been
 filled in since. If a step stops with an error, that is a finding; note it.
 
 **Names.** The commands use the guest name `attestamp-tdx-vendor` and the zone `us-central1-a`. If your guest has
@@ -447,7 +447,7 @@ Vendor's only when the inputs below are the same.
 
 The Auditor's values equal the Vendor's only if all of these are the same on both guests (the same rows with a check
 command for each: [reproduce.md](reproduce.md), "Intel TDX"). Measured on 2026-11-15
-(`docs/plan/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
+(`docs/status/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
 `c3-standard-4`, `us-central1-a`, built the same `app/hello.txt` into the same initrd and measured the same MRTD,
 RTMR0, RTMR1 and RTMR2; on 2026-11-16 a third guest of the same image gave the same four values again. That is the
 condition the whole half rests on.
@@ -590,7 +590,7 @@ The Vendor's and the Auditor's guests must be made from the **same exact image v
 GRUB measures into RTMR2 names the root file system by its UUID (`root=UUID=9d4d258d-…`), and the Option 1 base initrd
 is the image's own file. Both come **with the image**, not with the disk: every disk made from one image version
 carries the same file system UUID, the same partition UUID and the same `/boot` files. Measured on 2026-11-15
-(`docs/plan/trial-2026-11-16.md`): `attestamp-tdx-vendor`, made 2026-11-10, and `attestamp-tdx-auditor`, made
+(`docs/status/trial-2026-11-16.md`): `attestamp-tdx-vendor`, made 2026-11-10, and `attestamp-tdx-auditor`, made
 2026-11-15, both from `v20261105`, had the same UUIDs, the same base initrd `4703ec07…`, built the same initrd
 `bc024887…` from `app/hello.txt` and measured the same MRTD, RTMR0, RTMR1 and RTMR2; MRTD, RTMR0 and RTMR1 also equal the
 2026-11-11 recordings.
@@ -670,7 +670,7 @@ and RTMR2, and the name list does not change.
 
 ### Option 1 and Option 2
 
-TDX, like SEV-SNP, has two ways to carry the application (`docs/plan/cvm-port.md`, Phase 3.4, and the 2026-10-23
+TDX, like SEV-SNP, has two ways to carry the application (`docs/status/cvm-port.md`, Phase 3.4, and the 2026-10-23
 slides, slide 16):
 
 - **Option 1:** the application is a cpio archive in the initrd (`internal/setup/build/cpio`).
@@ -695,7 +695,7 @@ travels in the initrd. It then opens the image with dm-verity and mounts it read
 - An image that did not match its root hash was not opened. The boot still continued, because the script only records
   `fail`.
 
-The fixtures are `gcp-c3-opt2m-*`, recorded with the procedure in `docs/plan/app-fixture-recording.md`, "TDX Option 2
+The fixtures are `gcp-c3-opt2m-*`, recorded with the procedure in `docs/status/app-fixture-recording.md`, "TDX Option 2
 mounted at boot", which also has the results of the four boots, the tampered one included.
 To make the Option 2 base initrd with the hooks for a real build, follow "Getting started", step 4; the hook scripts
 are in `internal/tee/parse/tdx/testdata/record/`, and `build --option 2` makes the image itself.
@@ -872,7 +872,7 @@ the application ran**: only the marker, or the boot log, does. The boot logs are
 (`*-boot.txt`).
 
 **TDX with `AppLast` was not tested on 2026-11-11.** The statement that an append failed to decompress on TDX comes
-from the Phase 3.2 record of 2026-10 (`docs/plan/cvm-port.md`), not from this session. That base initrd and its serial
+from the Phase 3.2 record of 2026-10 (`docs/status/cvm-port.md`), not from this session. That base initrd and its serial
 log were not kept. If its length was not a multiple of 4, the measurement above explains it; and an unpadded append
 lets the guest boot without the application, so "failed" there may mean the application was missing rather than that
 the boot stopped.

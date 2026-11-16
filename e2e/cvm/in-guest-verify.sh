@@ -1,5 +1,5 @@
 #!/bin/sh
-# Phase 2.3 inside one confidential VM (docs/plan/cvm-port.md): att-ra-responder makes fresh evidence on the guest,
+# Phase 2.3 inside one confidential VM (docs/status/cvm-port.md): att-ra-responder makes fresh evidence on the guest,
 # and the whole chain runs against it on 127.0.0.1 - request, nonce check, replay refusal, registry deploy on a local
 # anvil, audit (which registers), and verify. No firewall rule is needed; the only part it leaves out is a verifier on
 # another machine.
@@ -10,7 +10,7 @@
 #   sh in-guest-verify.sh snp-verity amd-sev-snp-verity
 # The responder runs as root (ConfigFS TSM and /dev/tpmrm0 need it). Prints PASS/FAIL per check and exits non-zero
 # if any check failed. Everything it writes goes to a temporary folder it prints, including results.jsonl: one line per
-# check in the results contract of e2e/env.sh (docs/plan/test-matrix.md), with the format string as the platform. Copy
+# check in the results contract of e2e/env.sh (docs/status/test-matrix.md), with the format string as the platform. Copy
 # it back and append it to e2e-work/results/<format>.jsonl.
 set -u
 EX=$1

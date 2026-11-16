@@ -170,7 +170,7 @@ func checkSetup(t *testing.T, log []byte) (Check, string) {
 }
 
 // The check verifies the quote first, and then refuses an event log that is not this quote's. Without a guest no log
-// replays to a real quote's RTMRs, so the passing path waits for a VM (docs/plan/cvm-port.md).
+// replays to a real quote's RTMRs, so the passing path waits for a VM (docs/status/cvm-port.md).
 func TestCheck_RecordedQuoteVerifiesThenForeignLogIsRefused(t *testing.T) {
 	q, rd := recordedQuote(t)
 	raw, _ := ccel(bootEvents(builtInitrd))

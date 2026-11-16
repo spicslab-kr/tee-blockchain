@@ -82,7 +82,7 @@ on-chain value.
 what the code tries: the same initrdless boot is refused in SEV-SNP's parser, only by the Auditor's comparison (and
 `launch --check` on the guest) on TDX, and has no counterpart on Nitro. Carrying the CCEL in TDX evidence would move
 TDX's check into the parser; it changes the wire format and is planned for after publication
-(`docs/plan/build-info-gaps.md`, Q2).
+(`docs/status/build-info-gaps.md`, Q2).
 
 **The registration rule is the same on every platform, the platforms are not.** Since 2026-11-16 `audit` refuses to
 register without the Auditor's own build values on Nitro, TDX and SEV-SNP alike, because the trust model (the Auditor
@@ -110,9 +110,9 @@ The asymmetry is a trade-off, and this is one case of each side:
 |---|---|---|
 | what the measurement covers | wide: the whole image, the program that produces the evidence included | narrow: the initrd (the application), not the program that produces the evidence |
 | cost | reference values go stale easily: any change to the responder or anything it links moves them | the responder is not covered: which program answered the request is not in the evidence. Its answer is signed by the hardware, so it cannot forge values, but nothing proves which responder ran |
-| consequence for records | every value needs the commit it was measured at (`docs/plan/nitro-baseline-2026-11-16.md`) | values follow the application and the image, not the repository's code |
+| consequence for records | every value needs the commit it was measured at (`docs/status/nitro-baseline-2026-11-16.md`) | values follow the application and the image, not the repository's code |
 
-Whether the responder should link `internal/cli` at all is an open design question (`docs/plan/build-info-gaps.md`),
+Whether the responder should link `internal/cli` at all is an open design question (`docs/status/build-info-gaps.md`),
 not decided here.
 
 ## Roots of trust
@@ -244,7 +244,7 @@ So four of the five values, and the nonce, come from A; the only value from B is
 shares. This is a property of SEV-SNP as GCP offers it, two documents from two signers joined by a hash, and not a
 defect of this verifier. It is recorded, not patched. The 2026-11 runs had reported the same; this is the first
 reproduction in this repository. The recordings are kept locally, not committed (they carry instance identifiers), so
-T10 is a live result, like Nitro's T8: `docs/plan/app-fixture-recording.md`, "Reproducing T10", says where they are
+T10 is a live result, like Nitro's T8: `docs/status/app-fixture-recording.md`, "Reproducing T10", says where they are
 and how to make them again.
 
 What else was seen: A's and B's reports carry different `CHIP_ID`s (the VMs ran on different hosts), and neither

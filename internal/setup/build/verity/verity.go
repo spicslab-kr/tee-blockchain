@@ -1,6 +1,6 @@
 // Package verity makes the read-only application image of Option 2: a squashfs image of the application tree and its
 // dm-verity hash tree, with the settings that gave the same image and root hash on two machines (the SEV-SNP and the
-// TDX guest, 2026-11-11; docs/plan/test-matrix.md, footnote 9). TDX carries the image inside the initrd, SEV-SNP on
+// TDX guest, 2026-11-11; docs/status/test-matrix.md, footnote 9). TDX carries the image inside the initrd, SEV-SNP on
 // disk; both build it here, so the settings exist once.
 //
 // The settings are those of internal/setup/build/cpio/testdata/make-verity-image.sh, which made the measured images;

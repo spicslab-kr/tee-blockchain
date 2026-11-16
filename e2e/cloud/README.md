@@ -90,7 +90,7 @@ breaks as soon as your public address changes, and it changes with the network y
 ## Order
 
 The procedures: Nitro, the flows in `e2e/README.md`; TDX and SEV-SNP, "Getting started" in `docs/build/tdx.md` and
-`docs/build/sev-snp.md` (one guest, then "The Auditor's half" on a second). `docs/plan/cvm-port.md` is the plan
+`docs/build/sev-snp.md` (one guest, then "The Auditor's half" on a second). `docs/status/cvm-port.md` is the plan
 behind them. Nitro comes first because it is the baseline the other two are compared against.
 
 ```
@@ -122,7 +122,7 @@ Each platform runs on one cloud: Nitro on AWS, TDX and SEV-SNP on GCP. SEV-SNP o
 2026-11-11; `aws-snp.sh` is kept only as a record of how that path works.
 
 They do not all have to exist at the same time. Each platform's rows in
-[`docs/plan/test-matrix.md`](../../docs/plan/test-matrix.md) can be filled in its own session.
+[`docs/status/test-matrix.md`](../../docs/status/test-matrix.md) can be filled in its own session.
 
 ## Cost
 

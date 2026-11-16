@@ -6,7 +6,7 @@ evidence from a running guest works (`att-ra-responder ra-serve --extractor snp-
 passed on a live guest with `snp-initrd` on 2026-11-12). Building and launching (`build` and `launch --platform
 amd-sev-snp-initrd | amd-sev-snp-verity`) **ran on real guests on 2026-11-15**: install, reboot and `launch --check`
 passed for both options, Option 2's PCR12 was the predicted value, and `audit` and `verify` passed from another
-machine (`docs/plan/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
+machine (`docs/status/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
 **The independent Auditor ran on 2026-11-16** ("The Auditor's half", two guests, both formats) and passed, and the
 **relay (T10) was reproduced** the same day: see "Same VM" (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Tools and versions: [toolchain.md](toolchain.md). A known weakness is
 written down below under "Same VM": SEV-SNP support is weaker here than Nitro or TDX, and that does not go away
@@ -28,8 +28,8 @@ README describes ("an independent Auditor rebuilds it, confirms the enclave real
 made that way says no more than the Vendor's own word. It shows that the chain works end to end. The Auditor's
 independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it needs two guests at once
 and **ran and passed on 2026-11-16**, both formats. The procedure was followed end to
-end in a clean environment on 2026-11-15 (`docs/plan/trial-2026-11-16.md`), and again from the documents alone, both
-options, on 2026-11-16 (`docs/plan/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside
+end in a clean environment on 2026-11-15 (`docs/status/trial-2026-11-16.md`), and again from the documents alone, both
+options, on 2026-11-16 (`docs/status/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside
 this page have been filled in since. If a step stops with an error, that is a finding; note it. And on
 SEV-SNP the evidence cannot prove that its two documents come from the same VM ([Same VM](#same-vm)); the procedure
 does not change that.
@@ -422,7 +422,7 @@ What this half does **not** change: SEV-SNP evidence still cannot prove that its
 
 The Auditor's values equal the Vendor's only if all of these are the same on both guests (the same rows with a check
 command for each: [reproduce.md](reproduce.md), "AMD SEV-SNP (GCP)"). Measured on 2026-11-15
-(`docs/plan/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
+(`docs/status/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
 `n2d-standard-2`, `us-central1-a`, built the same `app/hello.txt` into the same initrd and measured the same
 MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD; on 2026-11-16 a third guest of the same image gave the same five values
 again. That is the condition the whole half rests on.
@@ -567,7 +567,7 @@ The Vendor's and the Auditor's guests must be made from the **same exact image v
 command line the vTPM measures, names the root file system by its UUID (`root=UUID=9d4d258d-…`), and the Option 1
 base initrd is the image's own file. Both come **with the image**, not with the disk: every disk made from one image
 version carries the same file system UUID, the same partition UUID and the same `/boot` files. Measured on 2026-11-15
-(`docs/plan/trial-2026-11-16.md`): `attestamp-snp-vendor`, made 2026-11-10, and `attestamp-snp-auditor`, made
+(`docs/status/trial-2026-11-16.md`): `attestamp-snp-vendor`, made 2026-11-10, and `attestamp-snp-auditor`, made
 2026-11-15, both from `v20261105`, used the same base initrd `4703ec07…` and measured the same MEASUREMENT, PCR4,
 KERNEL, CMDLINE (`80dfd7d3…`) and INITRD (`11cd710e…`) for the same `app/hello.txt`.
 
@@ -773,7 +773,7 @@ the row says so.
 *Record:* with all of the above fixed, the application, its cpio archive and the dm-verity image hashed the same on GCP
 (Ubuntu 24.04, 26.04) and AWS (Amazon Linux 2023), across squashfs-tools 4.4, 4.6.1 and 4.7.5, in the 2026-11 runs.
 **Ours:** the dm-verity image was byte-identical on the SEV-SNP and the TDX guest (2026-11-11, squashfs-tools 4.6.1 on
-both; `docs/plan/test-matrix.md`, T1).
+both; `docs/status/test-matrix.md`, T1).
 
 What else changes the registered values (from the evidence's structure; **not measured by changing each one**):
 
@@ -790,7 +790,7 @@ What else changes the registered values (from the evidence's structure; **not me
 attempting initrdless boot.` and measures no initrd). An application in an initrd is then never loaded or measured.
 `ra-parse` refuses evidence without an initrd measurement. Turning the setting off, as below, makes the stock entry
 load the initrd; `internal/setup/build/cpio/testdata/make-grub-entry.sh` makes a separate entry from it for an
-application (`docs/plan/app-fixture-recording.md`). (*Record:* the 2026-11 scripts avoided it by booting their own
+application (`docs/status/app-fixture-recording.md`). (*Record:* the 2026-11 scripts avoided it by booting their own
 GRUB entry with `grub-reboot`.)
 
 ### Correction: SEV-SNP Option 1 as appended in 2026-11
@@ -802,7 +802,7 @@ ran `cat i.bin app.cpio`):
 - The base initrd, `/boot/initrd.img-7.0.0-1017-gcp`, is 50,100,283 bytes: **length mod 4 = 3**.
 - The application archive appended directly after it was discarded by the kernel:
   `Initramfs unpacking failed: invalid magic at start of compressed archive` (dmesg, both boots).
-- The marker the archive carries (`/dev/attestamp-app-marker`, see `docs/plan/app-fixture-recording.md`) was
+- The marker the archive carries (`/dev/attestamp-app-marker`, see `docs/status/app-fixture-recording.md`) was
   **absent**: the application never ran.
 - The guest booted normally on the base initramfs, and GRUB measured the whole combined file, so **INITRD changed with
   the application although the application was not there**. Nothing in the evidence shows it.
@@ -894,7 +894,7 @@ On a stock GCP boot step 5 verifies both signatures and the nonce and then refus
 Turn `GRUB_FORCE_PARTUUID` off first, as in "The boot setting: turning `GRUB_FORCE_PARTUUID` off" above; the stock
 entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five values. **To run an application, use
 `build` and `launch`** ("Getting started" above). To record a **test fixture** that carries an application (Option 1),
-or the dm-verity image with its root hash on the command line (Option 2), follow `docs/plan/app-fixture-recording.md`:
+or the dm-verity image with its root hash on the command line (Option 2), follow `docs/status/app-fixture-recording.md`:
 it builds the initrd with `mkappinitrd`, the image with `make-verity-image.sh`, and the boot entry with
 `make-grub-entry.sh` from the instance's own stock entry, so nothing is hard-coded.
 
@@ -1036,7 +1036,7 @@ values nobody registered. The control, B's own report next to A's attestation, w
 The binding works; the relay passes it. A and B ran on different hosts (different `CHIP_ID`s). The four documents,
 the table of where each value comes from, and a mitigation to study (pinning the AK certificate's instance, with its
 cost): `docs/build/ra-comparison.md`, "The SEV-SNP relay, measured". A live result: the recordings carry instance
-identifiers and are not committed (`docs/plan/app-fixture-recording.md`, "Reproducing T10").
+identifiers and are not committed (`docs/status/app-fixture-recording.md`, "Reproducing T10").
 
 Nitro and TDX return one document from one TEE and do not have this problem. On SEV-SNP it goes away only if the boot
 files are in the SNP launch measurement itself (direct kernel boot; whether GCP allows it is not confirmed), or if
@@ -1058,7 +1058,7 @@ AWS evidence is not on this list: SEV-SNP on AWS was decided against (see "Only 
 shell scripts outside this repository (`vendor/`, `auditor/`, `user/`, `option1-initrd/`, `option2-dm-verity/`,
 `relay-test/`, `mkcpio.py`). Their author has left the lab and they are no longer available anywhere (build-info gaps
 #5, #6). This document no longer points to them. Everything they did that this repository relies on was redone here:
-the recordings, their measured values and the procedures in `docs/plan/app-fixture-recording.md`. Lost and not
+the recordings, their measured values and the procedures in `docs/status/app-fixture-recording.md`. Lost and not
 replaced: "the seven 2026-11 tests" as one runnable set, and the relay test (T10, see above).
 
 ## Checking

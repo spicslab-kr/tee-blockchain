@@ -87,7 +87,7 @@ sudo ./record-tdx -out fx -nonce-text attestamp-tdx-fixture-0001
 ```
 
 `record-tdx` made the application recordings of 2026-11-11 and 2026-11-12. To record quotes with an application in the initrd, see
-`docs/plan/app-fixture-recording.md`.
+`docs/status/app-fixture-recording.md`.
 
 The quote carries no secret, but it does carry the PCK certificate of the physical machine it was made on. MROWNER is
 set by GCP and differs per instance; the parser ignores it.

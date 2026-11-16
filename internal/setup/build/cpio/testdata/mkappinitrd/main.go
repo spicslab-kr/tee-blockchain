@@ -1,4 +1,4 @@
-// Command mkappinitrd builds the initrd for an app-fixture recording (docs/plan/app-fixture-recording.md): an
+// Command mkappinitrd builds the initrd for an app-fixture recording (docs/status/app-fixture-recording.md): an
 // application archive written by internal/setup/build/cpio, joined with the guest's base initrd by cpio.Join.
 //
 // The application is either a one-line dummy file (-app-text, Option 1) or a directory tree copied in as it is

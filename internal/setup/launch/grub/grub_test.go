@@ -11,7 +11,7 @@ import (
 )
 
 // stockCfg is the shape of Ubuntu 24.04's grub.cfg on the GCP TDX guest with GRUB_FORCE_PARTUUID off: one stock
-// 'Ubuntu' entry with a linux and an initrd line (docs/plan/app-fixture-recording.md, "The stock entry").
+// 'Ubuntu' entry with a linux and an initrd line (docs/status/app-fixture-recording.md, "The stock entry").
 const stockCfg = `### BEGIN /etc/grub.d/10_linux ###
 menuentry 'Ubuntu' --class ubuntu --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-simple-9d4d258d' {
 	recordfail

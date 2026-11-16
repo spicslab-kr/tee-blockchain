@@ -12,7 +12,7 @@
 //
 // What the binding does not prove: that both documents come from the same VM. A vTPM attestation from one VM and an
 // SNP report from another VM, asked for with the first one's hash, verify together. That was reproduced on GCP and
-// AWS (docs/plan/test-matrix.md, T10) and is the reason SEV-SNP is weaker here than Nitro or TDX.
+// AWS (docs/status/test-matrix.md, T10) and is the reason SEV-SNP is weaker here than Nitro or TDX.
 //
 // The logic is identical for every role, so it lives here once. Each role's internal/tee/parse/<role>/snp.go is only
 // a thin adapter.

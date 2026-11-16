@@ -252,7 +252,7 @@ On `attestamp-tdx-vendor`, stock image `ubuntu-2404-noble-amd64-v20261105`, kern
 MRTD, RTMR0 and RTMR1 were the same on every boot. On the v2 boot `e2e/cvm/in-guest-verify.sh tdx intel-tdx` passed
 (11 of 11), and the live quote's RTMR2 equalled the recording's. **The tampered boot carried on to a normal login**: the
 script records `fail` and exits 0. That is enough for a verifier (RTMR2 differs from every registered value), but a
-locked guest (Phase 5 in `docs/plan/cvm-port.md`) must stop the boot instead.
+locked guest (Phase 5 in `docs/status/cvm-port.md`) must stop the boot instead.
 
 Committed as `gcp-c3-opt2m-v1-*` and `gcp-c3-opt2m-v2-*` with their boot logs; `TestMountedFixtures_OnlyRTMR2Changes`
 checks them. The tamper quote was not committed; its RTMR2 is above. Undone afterwards as in the next section, with
@@ -447,7 +447,7 @@ like Nitro's T8. What committing would have meant, kept for when that decision c
 - a test in `internal/tee/parse/snp` that pins what was observed: if the relay verifies, a test named for the known
   weakness that asserts it is accepted (so a future fix shows up as a deliberate test change); if it is refused, a test
   that asserts the refusal and the step;
-- the T10 cell in `docs/plan/test-matrix.md` becomes **code**, with the date of the recording.
+- the T10 cell in `docs/status/test-matrix.md` becomes **code**, with the date of the recording.
 
 **Identifiers.** Every `att.pb` carries the project ID inside the Google-signed AK certificate, and may carry the
 instance's identity too; check with `grep -a` before committing, as for the other SEV-SNP fixtures

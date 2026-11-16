@@ -40,5 +40,5 @@ pem2.pem
 # Local instance addresses (copy e2e/env.local.example.sh)
 e2e/env.local.sh
 # The overnight sessions' first-person work log: kept locally, not part of the project. What other documents cited
-# from it was moved into them (docs/plan/app-fixture-recording.md, docs/plan/test-matrix.md).
-docs/plan/night-log.md
+# from it was moved into them (docs/status/app-fixture-recording.md, docs/status/test-matrix.md).
+docs/status/night-log.md

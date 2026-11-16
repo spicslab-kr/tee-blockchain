@@ -16,7 +16,7 @@
 #   sh build-env-check.sh intel-tdx
 # No root and no network: a bare repository in a temporary folder stands for the Vendor's repository. Prints PASS/FAIL
 # per check, exits with the number of failed checks, and writes results.jsonl (the results contract of e2e/env.sh,
-# docs/plan/test-matrix.md) in the folder it prints. Copy it back and append it to e2e-work/results/<format>.jsonl.
+# docs/status/test-matrix.md) in the folder it prints. Copy it back and append it to e2e-work/results/<format>.jsonl.
 set -u
 FMT=$1
 HERE=$(pwd)

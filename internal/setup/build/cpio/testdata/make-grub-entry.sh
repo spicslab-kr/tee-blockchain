@@ -1,5 +1,5 @@
 #!/bin/sh
-# Makes a GRUB entry for an app-fixture recording (docs/plan/app-fixture-recording.md) from the stock Ubuntu entry,
+# Makes a GRUB entry for an app-fixture recording (docs/status/app-fixture-recording.md) from the stock Ubuntu entry,
 # changing only the title, the initrd file name and, if given, appending kernel arguments. Makes it the default
 # (GRUB_DEFAULT=<id>) rather than a one-shot grub-reboot entry, which a maintenance restart would lose.
 #

@@ -2,7 +2,7 @@
 // role-independent core; internal/setup/launch/{Vendor,auditor}/tdx are thin adapters.
 //
 // On a confidential VM, booting the VM is the launch. It takes two runs with a reboot between them
-// (docs/plan/cvm-port.md, "Phase 3 design"):
+// (docs/status/cvm-port.md, "Phase 3 design"):
 //
 //  1. Install: put the initrd in /boot and write a GRUB entry made from the stock one, as the default
 //     (internal/setup/launch/grub, shared with SEV-SNP).

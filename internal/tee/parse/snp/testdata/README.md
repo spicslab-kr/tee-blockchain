@@ -12,7 +12,7 @@ Evidence from one real AMD SEV-SNP guest on GCP (`attestamp-snp-vendor`), used b
 | `gcp-n2d-opt2-v1-*`, `gcp-n2d-opt2-v2-*` | Option 2, squashfs + dm-verity image on disk, verifying initrd, PCR12 extended | SHA3-512 | T5 pair (`amd-sev-snp-verity`); the first real evidence with a non-zero PCR12 |
 
 In each `v1`/`v2` pair the application differs by one byte (`attestamp app v1` → `attestamp app v2`) and nothing
-else. The procedure is `docs/plan/app-fixture-recording.md`.
+else. The procedure is `docs/status/app-fixture-recording.md`.
 
 ## The two Option 1 pairs, side by side
 
@@ -142,7 +142,7 @@ project number and instance ID are numbers Google assigned. Together they identi
 **Why they are committed anyway**, as `internal/tee/parse/aws/testdata/fixture-my-web.cbor` carries an EC2 instance
 ID: without committed evidence the parser tests cannot run in CI or for anyone else, and testing without hardware is
 what this project relies on. The choices before publishing (keep and document, delete the GCP project after the work so
-that the strings point at nothing, or re-record in a separate project) are listed in `docs/plan/build-info-gaps.md`,
+that the strings point at nothing, or re-record in a separate project) are listed in `docs/status/build-info-gaps.md`,
 #15. The T10 relay recordings of 2026-11-16 carry two more instances and were deliberately **not** committed.
 
 ## Recording another one
@@ -157,12 +157,12 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o reco
 (The 2026-11-10 recording used a separate scratch module with the same dependency versions, because the module did
 not depend on go-tpm-tools yet.) `crypto/sha3` needs Go 1.24 or later; the pinned go1.26.1 has it.
 
-To record evidence with an application in the initrd, see `docs/plan/app-fixture-recording.md`.
+To record evidence with an application in the initrd, see `docs/status/app-fixture-recording.md`.
 
 Then on an SEV-SNP guest booted with an initrd: `sudo ./record-snp -out fx -nonce-text attestamp-snp-fixture-0001`.
 
 For test-matrix row T10 the recorder also has `-relay-att <att.pb from another VM>`: it makes no vTPM attestation and
-requests this VM's report over SHA3-512 of the given file. The procedure is `docs/plan/app-fixture-recording.md`,
+requests this VM's report over SHA3-512 of the given file. The procedure is `docs/status/app-fixture-recording.md`,
 "Reproducing T10" (not run yet).
 
 ## Checking a recording with `ra-parse`

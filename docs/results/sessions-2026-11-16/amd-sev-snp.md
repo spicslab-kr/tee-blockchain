@@ -83,5 +83,5 @@ means, and what could be done about it: `docs/build/ra-comparison.md`, "Do both 
 
 The recordings are **not committed** (the operator's decision, 2026-11-16): every `att.pb` carries the project ID and
 an instance's name and ID inside Google's signed AK certificate. They are kept locally; where, their hashes and how to
-make them again: `docs/plan/app-fixture-recording.md`, "Reproducing T10". T10 therefore stays a live result, like
+make them again: `docs/status/app-fixture-recording.md`, "Reproducing T10". T10 therefore stays a live result, like
 Nitro's T8.
