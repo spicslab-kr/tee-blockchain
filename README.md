@@ -98,6 +98,17 @@ measurements. The most important:
    recorded anywhere.
 6. Docker itself: `docker build` decides file order and timestamps in each layer anew on every
    run, so two builds of the same files still differ.
+7. On TDX and SEV-SNP, the VM as well as the build: the same exact image version and the same
+   **machine type** on both sides. Measured on 2026-11-16 by changing only the machine type of one
+   guest ([session 4](docs/results/sessions-2026-11-16/session4-t1-t3-t7-t8.md#t1-machine-type-and-zone)):
+   - SEV-SNP: the vCPU count changes MEASUREMENT (`n2d-standard-4` against `n2d-standard-2`); more
+     memory with the same vCPUs (`n2d-highmem-2`) and another zone (`us-central1-b`) did not.
+   - TDX: the machine type changes RTMR0 (`c3-standard-8` against `c3-standard-4`). Whether it is the
+     vCPUs or the memory could not be told apart: GCP refused the shapes that would separate them
+     (`c3-highmem-4`, `c3-highcpu-8`) for a TDX VM.
+
+   So the Auditor makes its guest with the Vendor's machine type, as the guides' "The same inputs"
+   asks.
 
 **What we provide.** `att-vendor build` and `att-auditor build` take care of part of this:
 
