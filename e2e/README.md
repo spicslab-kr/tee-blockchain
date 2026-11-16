@@ -12,7 +12,12 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
 
 - Two Nitro-enabled EC2 instances (Linux), one for the Vendor and one for the Auditor. An optional
   third, arm64 (Graviton), is used only by the architecture comparison. `bash e2e/cloud/aws-nitro.sh create` makes
-  the two x86_64 instances; see [`cloud/README.md`](cloud/README.md) for the settings and cost.
+  the two x86_64 instances; see [`cloud/README.md`](cloud/README.md) for the settings and cost. If the account
+  already has the key pair `attestamp-e2e` (made from another machine, so its `.pem` is not on yours), `create` stops
+  with `could not create key pair`: give this machine names of its own,
+  `KEY_NAME=<name> SG_NAME=<name> TAG=<name> bash e2e/cloud/aws-nitro.sh create`, and the same `TAG=` to `status`,
+  `stop`, `start` and `delete`. The instances have no automatic stop; `sudo shutdown -h +360` on each, right after
+  `create`, is a safety net if a run is abandoned.
 - `git`, an `ssh` client and the pinned Go version on your machine. `0-Setup-local-install.sh`
   installs what is missing.
 - On Windows, run the scripts in Git Bash. Git Bash (MSYS) rewrites any argument that starts with `/` (or holds
@@ -108,7 +113,16 @@ Both flows run end to end on a local chain, so you can try the whole thing with 
 What the flows check (registered means trusted, anything else is refused) does not depend on which chain holds the
 registry; the contract is the same bytecode.
 
-1. Install [Foundry](https://getfoundry.sh) for `anvil`, the local chain the Go tests also use.
+1. Install `anvil` 1.8.0 from [Foundry](https://getfoundry.sh), the local chain the Go tests also use. On Linux,
+   macOS or WSL:
+
+   ```
+   curl -fsSL https://foundry.paradigm.xyz | bash
+   source ~/.bashrc
+   foundryup --install v1.8.0
+   ```
+
+   The release archive without an installer script, and Windows without WSL: `docs/build/tdx.md`, step 1.
 2. Start it in a terminal of its own and leave it running until the last script of the flow has finished. A later
    script reads the registry an earlier one deployed, and an anvil that is restarted starts empty:
 
@@ -147,6 +161,10 @@ A script that needs the chain stops at once with a message if nothing answers at
 bash e2e/0-Setup-local-install.sh   # git, ssh, and the pinned Go on your machine
 bash e2e/0-Setup-local-upload.sh    # build Linux binaries, upload them to both instances, install git there if missing
 ```
+
+On Linux the install script adds Go to `PATH` in `~/.bashrc`, which only a new interactive shell reads: open a new
+terminal (or `source ~/.bashrc`) before the upload script. A shell that does not read `~/.bashrc` (a script, `bash -c`,
+an IDE's runner) needs `export PATH=$PATH:/usr/local/go/bin` first.
 
 **The test application** is nginx's official image source, `https://github.com/nginx/docker-nginx` at commit
 `ef5a25a6314e652a2dcfbce6074bef729f4d9639` (2026-09-21), folder `mainline/alpine-slim`. The flow and arch scripts clone
@@ -194,7 +212,7 @@ The Vendor's registry address is saved in `e2e-work/registry-flow2.txt`.
 | `responder-check.sh` | `build --responder` refuses a responder built without `-trimpath`, with version control stamping, or for the wrong architecture |
 | `build-env-check.sh` | `receive` rejects a `build-config.json` whose `build_env` does not match the instance, and `--ignore-env` only warns |
 | `arch-record-check.sh` | the architecture in records and registrations; sends no transaction |
-| `replay-check.sh` | T9: two fresh documents from the running enclave differ, and document 1 against request 2's nonce is refused with exit 6. Needs a running enclave, no chain |
+| `replay-check.sh` | T9: two fresh documents from the running enclave differ, and document 1 against request 2's nonce is refused with exit 6. Needs a running enclave, no chain. Against a TDX or SEV-SNP guest with its responder running (`docs/build/tdx.md` step 9): `TEE_ADDR=<guest-ip>:5000 RESULTS_PLATFORM=intel-tdx NET=local bash e2e/replay-check.sh` (or `amd-sev-snp-initrd`, `amd-sev-snp-verity`); `NET=local` only labels the result lines. It uses `e2e-work/bin/att-user` (`att-user.exe` on Windows), which `0-Setup-local-upload.sh` builds; without the Nitro setup, build it with `CGO_ENABLED=0 go build -trimpath -buildvcs=false -o e2e-work/bin/att-user ./cmd/user` (`-o e2e-work/bin/att-user.exe` on Windows). A SEV-SNP guest on the stock boot fails `own-nonce-a/b` with exit 7 (`docs/build/sev-snp.md` step 9) |
 | `debug-mode-check.sh` | T8: the same EIF started with `nitro-cli run-enclave --debug-mode` gives a document that `ra-parse` refuses (exit 7, every PCR is zero); keeps the document as a fixture. No chain |
 | `arch-measurement-compare.sh` | the same source measures the same on two x86_64 hosts checked out under two different paths (T1, T3), and differently on arm64 (only with `ARM64_HOST`) |
 

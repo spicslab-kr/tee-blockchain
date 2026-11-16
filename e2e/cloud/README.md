@@ -60,6 +60,13 @@ The family moves to a new version every few weeks, and the disk UUIDs and the st
 and the SEV-SNP CMDLINE come with the image (`docs/build/tdx.md`, "Use the same image as the other side").
 `gcp-cvm.sh <plat> status` shows each boot disk's image.
 
+**Names already taken.** The default names (`attestamp-e2e` on AWS, `attestamp-<tdx|snp>-<role>` on GCP) are shared by
+everyone using the same account or project. `gcp-cvm.sh` reuses a VM of that name without creating one, and
+`aws-nitro.sh` cannot use a key pair whose `.pem` was made on another machine. Give your own names:
+`PREFIX=<you>-tdx bash e2e/cloud/gcp-cvm.sh tdx create vendor`, or
+`KEY_NAME=<you> SG_NAME=<you> TAG=<you> bash e2e/cloud/aws-nitro.sh create`, and pass the same `PREFIX=` or `TAG=` to
+`status`, `stop`, `start` and `delete`: each of them acts only on the VMs or instances with that prefix or tag.
+
 Each platform runs on one cloud: Nitro on AWS, TDX and SEV-SNP on GCP. SEV-SNP on AWS was decided against on
 2026-11-11; `aws-snp.sh` is kept only as a record of how that path works.
 
