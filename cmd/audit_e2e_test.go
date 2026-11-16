@@ -1,7 +1,7 @@
 // Two behaviours of att-auditor audit settled on 2026-11-16:
-//   - on a TDX or SEV-SNP format it refuses to register without --build-measurements, because it would register
-//     whatever the guest reports (a TDX guest booted without an initrd was registered that way and then trusted:
-//     docs/results/sessions-2026-11-16/tdx-initrdless.md);
+//   - on every platform it refuses to register without --build-measurements, because it would register whatever the
+//     TEE reports (a TDX guest booted without an initrd was registered that way and then trusted:
+//     docs/results/sessions-2026-11-16/tdx-initrdless.md); the trust model is the same on all three, so is the rule;
 //   - with --vendor-tee, a Vendor TEE that runs something else ends with exit 12 after the Auditor's own value is
 //     registered, and the message says the registration stands and not to run audit again.
 package cmd_test
@@ -18,7 +18,7 @@ import (
 	"attestamp/internal/tee/parse/snp"
 )
 
-func TestRun_E2E_AuditRefusesCVMWithoutBuild(t *testing.T) {
+func TestRun_E2E_AuditRefusesWithoutBuild(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
 	}
@@ -30,9 +30,12 @@ func TestRun_E2E_AuditRefusesCVMWithoutBuild(t *testing.T) {
 	tdxDir := filepath.Join(repoRoot(t), "internal", "tee", "parse", "tdx", "testdata")
 	tdxNonce := sha512.Sum512([]byte("attestamp-tdx-opt1-v1"))
 	snpNonce := sha256.Sum256([]byte("attestamp-snp-opt1p-v1"))
+	awsDir := filepath.Join(repoRoot(t), "internal", "tee", "parse", "aws", "testdata")
 	cases := []struct {
 		name, format, doc, nonce, guide string
 	}{
+		// --nonce takes hex or a file; the Nitro fixture's nonce is a file next to it.
+		{"nitro", "aws-nitro", filepath.Join(awsDir, "fixture-my-web.cbor"), filepath.Join(awsDir, "fixture-my-web.nonce"), "docs/build/aws-nitro.md"},
 		{"tdx", "intel-tdx", filepath.Join(tdxDir, "gcp-c3-opt1-v1-quote.bin"), hex.EncodeToString(tdxNonce[:]), "docs/build/tdx.md"},
 		{"snp", snp.FormatInitrd, snpDoc(t, t.TempDir(), "gcp-n2d-opt1p-v1"), hex.EncodeToString(snpNonce[:]), "docs/build/sev-snp.md"},
 	}
@@ -54,7 +57,7 @@ func TestRun_E2E_AuditRefusesCVMWithoutBuild(t *testing.T) {
 			if err == nil {
 				t.Fatalf("audit without --build-measurements on %s must be refused:\n%s", c.format, out)
 			}
-			for _, want := range []string{"without --build-measurements", "whatever the guest reports", c.guide} {
+			for _, want := range []string{"without --build-measurements", "register whatever the", "ra-request and ra-parse", c.guide} {
 				if !strings.Contains(string(out), want) {
 					t.Errorf("the refusal must say %q:\n%s", want, out)
 				}

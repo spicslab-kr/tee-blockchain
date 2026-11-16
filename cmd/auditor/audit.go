@@ -79,7 +79,7 @@ func auditCmd(args []string) error {
 	if *teeAddr == "" && *buildMeasurements == "" {
 		return errors.New("--tee-addr or --build-measurements is required")
 	}
-	if err := requireBuildOnCVM(*format, *buildMeasurements); err != nil {
+	if err := requireBuild(*format, *buildMeasurements); err != nil {
 		return err
 	}
 	if err := checkArch(*arch); err != nil {
@@ -290,24 +290,30 @@ func auditCmd(args []string) error {
 // 2026-11-16 this case exited 0. It is not a failed audit: the registration stands.
 var errVendorDiffers = errors.New("registered, but the Vendor's TEE runs something else")
 
-// requireBuildOnCVM refuses an audit of a TDX or SEV-SNP guest that has no value the Auditor built itself. Without
-// one, audit registers whatever the guest reports. Measured on 2026-11-16 (docs/results/sessions-2026-11-16/
-// tdx-initrdless.md): a TDX guest booted without an initrd, so with no application measured at all, was registered
-// that way and then verified as trusted. TDX evidence is the quote alone, so the parser cannot see that no initrd was
-// loaded (SEV-SNP's can: its evidence carries the event log); the Auditor's own build is what catches it. This does
-// not stop a register call made by hand with such values: that is an Auditor vouching for what it did not build.
-func requireBuildOnCVM(format, buildMeasurements string) error {
-	if buildMeasurements != "" || format == "aws-nitro" {
+// requireBuild refuses an audit that has no value the Auditor built itself, on every platform: the trust model is
+// that the Auditor rebuilds, and without a build value audit would register whatever the TEE reports.
+//
+// Why it started on the CVMs: measured on 2026-11-16 (docs/results/sessions-2026-11-16/tdx-initrdless.md), a TDX guest
+// booted without an initrd, so with no application measured at all, was registered that way and then verified as
+// trusted. TDX evidence is the quote alone, so the parser cannot see that no initrd was loaded (SEV-SNP's can: its
+// evidence carries the event log). On Nitro there is no such concrete gap (the enclave runs one EIF, all of it in PCR0),
+// but the rule is the same everywhere, as the trust model is. This does not stop a register call made by hand: that is
+// an Auditor vouching for what it did not build. To only look at what a TEE reports, use ra-request and ra-parse.
+func requireBuild(format, buildMeasurements string) error {
+	if buildMeasurements != "" {
 		return nil
 	}
-	doc := "docs/build/tdx.md"
-	if strings.HasPrefix(format, "amd-sev-snp") {
-		doc = "docs/build/sev-snp.md"
+	tee, doc, how := cli.TEENoun(format), "docs/build/aws-nitro.md", "build the source and pass its out/measurements.json"
+	switch {
+	case format == "intel-tdx":
+		doc, how = "docs/build/tdx.md, \"The Auditor's half\"", "rebuild and launch on your own guest, and pass its out/measurements.json"
+	case strings.HasPrefix(format, "amd-sev-snp"):
+		doc, how = "docs/build/sev-snp.md, \"The Auditor's half\"", "rebuild and launch on your own guest, and pass its out/measurements.json"
 	}
-	return fmt.Errorf("refusing to audit a %s guest without --build-measurements: without a value I rebuilt myself, "+
-		"this would register whatever the guest reports, and a boot that never measured the application (one without "+
-		"an initrd, for example) would be registered and then trusted. Rebuild and launch on your own guest, and pass "+
-		"its out/measurements.json (%s, \"The Auditor's half\")", format, doc)
+	return fmt.Errorf("refusing to audit without --build-measurements: without a value I rebuilt myself, this would "+
+		"register whatever the %s reports, and on TDX a boot that never measured the application (one without an "+
+		"initrd) was registered that way and then trusted. To audit, %s (%s). To only look at what a %s reports, use "+
+		"ra-request and ra-parse, which register nothing", tee, how, doc, tee)
 }
 
 // fileSize returns the size of the file at path, or 0 if it cannot be read.

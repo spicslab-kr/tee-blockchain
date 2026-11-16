@@ -103,8 +103,8 @@ func usage() {
                    --config takes service, version and the build env from the Vendor's build-config.json (receive put it in the
                    clone root); the flags override it, with a warning. --nonce pins the nonce (--vendor-nonce the Vendor's). with --service/--version empty and no
                    --config, takes them from an existing registration of the same measurements on this registry. without --tee-addr
-                   registers --build-measurements as is (no audit). on intel-tdx and amd-sev-snp-* --build-measurements is required:
-                   without it the guest's report would be registered as it is, whatever it booted.
+                   registers --build-measurements as is (no audit). with --tee-addr, --build-measurements is required on every platform:
+                   without it the TEE's report would be registered as it is (to only look at it: ra-request, ra-parse).
                    --vendor-tee also asks the Vendor's running TEE and says whether it runs the same value; what is
                    registered is still my value. if it runs something else: registered, and exit 12 (do not run again)
   receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
