@@ -6,7 +6,7 @@ evidence from a running guest works (`att-ra-responder ra-serve --extractor snp-
 passed on a live guest with `snp-initrd` on 2026-11-12). Building and launching (`build` and `launch --platform
 amd-sev-snp-initrd | amd-sev-snp-verity`) **ran on real guests on 2026-11-15**: install, reboot and `launch --check`
 passed for both options, Option 2's PCR12 was the predicted value, and `audit` and `verify` passed from another
-machine (`docs/status/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
+machine (`docs/results/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
 **The independent Auditor ran on 2026-11-16** ("The Auditor's half", two guests, both formats) and passed, and the
 **relay (T10) was reproduced** the same day: see "Same VM" (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Tools and versions: [toolchain.md](toolchain.md). A known weakness is
 written down below under "Same VM": SEV-SNP support is weaker here than Nitro or TDX, and that does not go away
@@ -28,7 +28,7 @@ README describes ("an independent Auditor rebuilds it, confirms the enclave real
 made that way says no more than the Vendor's own word. It shows that the chain works end to end. The Auditor's
 independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it needs two guests at once
 and **ran and passed on 2026-11-16**, both formats. The procedure was followed end to
-end in a clean environment on 2026-11-15 (`docs/status/trial-2026-11-16.md`), and again from the documents alone, both
+end in a clean environment on 2026-11-15 (`docs/results/trial-2026-11-16.md`), and again from the documents alone, both
 options, on 2026-11-16 (`docs/status/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside
 this page have been filled in since. If a step stops with an error, that is a finding; note it. And on
 SEV-SNP the evidence cannot prove that its two documents come from the same VM ([Same VM](#same-vm)); the procedure
@@ -422,7 +422,7 @@ What this half does **not** change: SEV-SNP evidence still cannot prove that its
 
 The Auditor's values equal the Vendor's only if all of these are the same on both guests (the same rows with a check
 command for each: [reproduce.md](reproduce.md), "AMD SEV-SNP (GCP)"). Measured on 2026-11-15
-(`docs/status/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
+(`docs/results/trial-2026-11-16.md`): two guests made five days apart from `ubuntu-2404-noble-amd64-v20261105`,
 `n2d-standard-2`, `us-central1-a`, built the same `app/hello.txt` into the same initrd and measured the same
 MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD; on 2026-11-16 a third guest of the same image gave the same five values
 again. That is the condition the whole half rests on.
@@ -567,7 +567,7 @@ The Vendor's and the Auditor's guests must be made from the **same exact image v
 command line the vTPM measures, names the root file system by its UUID (`root=UUID=9d4d258d-…`), and the Option 1
 base initrd is the image's own file. Both come **with the image**, not with the disk: every disk made from one image
 version carries the same file system UUID, the same partition UUID and the same `/boot` files. Measured on 2026-11-15
-(`docs/status/trial-2026-11-16.md`): `attestamp-snp-vendor`, made 2026-11-10, and `attestamp-snp-auditor`, made
+(`docs/results/trial-2026-11-16.md`): `attestamp-snp-vendor`, made 2026-11-10, and `attestamp-snp-auditor`, made
 2026-11-15, both from `v20261105`, used the same base initrd `4703ec07…` and measured the same MEASUREMENT, PCR4,
 KERNEL, CMDLINE (`80dfd7d3…`) and INITRD (`11cd710e…`) for the same `app/hello.txt`.
 

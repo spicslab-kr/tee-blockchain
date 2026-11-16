@@ -237,7 +237,7 @@ guests, the home folder still holds `base-initrd*.img`, `app`, `out`, the binari
 | one byte changed | initrd `ef4dd5f8c27c5efbcb13623c97911f1f69a6348d1530f71fb9e022ec60f5b8cae1e74154e77c5702c8caa4c144d16dd7`, RTMR2 `f36c52029f91989e2989d567a8ddbc3bb5558653fb0f4676c2b1eb86d8c18b105c725b213dd67db7f035151fde6ac24c` | root hash `15e18e5edb718e73e9e8fc18935e8a1b9d9d8ee3148b79272a8f43f9691027e7`, initrd `ebd3ad55…9a91`, RTMR2 `de2d3b8b895df40758e8c98d437819aa3ea69ded7aa98092d48b71a80645f853d7f2940b022f2aa04d9c2ce2685b3fea` |
 | record key | `0xe71fc43bf988ef8bb3d236324360798e6ad12124fda01933b5728c40429de2a9` | `0x926f767c7a9ee55488489ec3c471b844fdfec2ee756ee701ff8f4fdcc4883824` |
 
-Option 1's base initrd, initrd and all four values **equal the 2026-11-15 trial** (`docs/status/trial-2026-11-16.md`):
+Option 1's base initrd, initrd and all four values **equal the 2026-11-15 trial** (`docs/results/trial-2026-11-16.md`):
 a third guest of the same image, made a day later, measured the same.
 
 ### SEV-SNP

@@ -112,7 +112,7 @@ adapters in `internal/tee/request/{Vendor,auditor}/{tdx,snp}`, and `request/{Ven
 | # | Task | Pass criterion | State |
 |---|---|---|---|
 | 2.1 | `internal/tee/request/tdx` (ConfigFS TSM, REPORTDATA = nonce then zeros) and `internal/tee/request/snp` (GCE vTPM attestation, SHA3-512 into REPORT_DATA, SNP report and certificate table, the parse/snp container), with role adapters | the returned evidence parses with the Phase 1 and 4a parsers | **done, without hardware**: a fake TSM (go-configfs-tsm `faketsm`) answers only for the REPORTDATA each recording was made for, and the quote and evidence produced verify with the parsers |
-| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **Answered on the guest over 127.0.0.1, 2026-11-12** (`tdx`, `snp-initrd`); **from another machine on 2026-11-15** (TDX: `docs/status/trial-2026-11-16.md`) |
+| 2.2 | `--extractor tdx`, `snp-initrd`, `snp-verity` in `cmd/ra-responder` | the responder answers a request from another machine | code done. **Answered on the guest over 127.0.0.1, 2026-11-12** (`tdx`, `snp-initrd`); **from another machine on 2026-11-15** (TDX: `docs/results/trial-2026-11-16.md`) |
 | 2.3 | End to end: `att-user verify` against a running TDX and SEV-SNP instance | exit 0 and a `✓ matches` line | **Passed 2026-11-12, all on one guest** (`e2e/cvm/in-guest-verify.sh`, 11 of 11 checks each): `amd-sev-snp-initrd` on a stock boot; `intel-tdx` on a stock boot and again on a boot with the dm-verity application mounted (3.4) |
 
 **How 2.3 was run.** Without a firewall rule, everything runs on the guest and talks over `127.0.0.1`: the responder
@@ -240,14 +240,14 @@ check on the recorded quotes, and the event-log replay on a constructed log. **W
 
 Each item says what to run and what must come out. The pass criterion of 3.5 is the last line of the second step.
 
-1. **Done 2026-11-15, no VM** (`docs/status/trial-2026-11-16.md`): in a clean Ubuntu 24.04 WSL with squashfs-tools 4.6.1 and cryptsetup 2.7.0, `--option 2` on the recordings' v1 application gave root hash `e29ec085…af0c9` and `app.img` `28bdfcff…ec1c`, the measured values. What was asked: **The build with the real tools** (any Ubuntu 24.04 machine with squashfs-tools 4.6.1 and cryptsetup 2.7.0; not a
+1. **Done 2026-11-15, no VM** (`docs/results/trial-2026-11-16.md`): in a clean Ubuntu 24.04 WSL with squashfs-tools 4.6.1 and cryptsetup 2.7.0, `--option 2` on the recordings' v1 application gave root hash `e29ec085…af0c9` and `app.img` `28bdfcff…ec1c`, the measured values. What was asked: **The build with the real tools** (any Ubuntu 24.04 machine with squashfs-tools 4.6.1 and cryptsetup 2.7.0; not a
    TDX VM). `att-vendor build --platform intel-tdx --option 2 --app-dir <a folder holding one file app containing
    "attestamp app v1">` must give root hash `e29ec08585853c0fec829d6a5d7fd49d73dec6f4af88e5055752a52f6c3af0c9`, the
    value `make-verity-image.sh` gave on both guests on 2026-11-11 (`tdx/testdata/gcp-c3-opt2-v1-boot.txt`). The Go port
    lays the image out the same way (application under `opt/app`, every mode 755, every time 0, the same flags, padding,
    salt and UUID), and a test keeps the flags equal to the script's, but only the real tools can show the bytes are the
    same. WSL on the development machine had squashfs-tools 4.7.5 and no veritysetup, so this was not run.
-2. **Done 2026-11-15** (`docs/status/trial-2026-11-16.md`): on a new guest, install, reboot and `--check` passed; the CC event log replayed, GRUB's initrd event carried the path of its `initrd` command and the SHA-384 of the file, the marker was there. What was asked: **Launch on a TDX guest** (`gcp-cvm.sh tdx create vendor`, with approval). On the guest, `GRUB_FORCE_PARTUUID`
+2. **Done 2026-11-15** (`docs/results/trial-2026-11-16.md`): on a new guest, install, reboot and `--check` passed; the CC event log replayed, GRUB's initrd event carried the path of its `initrd` command and the SHA-384 of the file, the marker was there. What was asked: **Launch on a TDX guest** (`gcp-cvm.sh tdx create vendor`, with approval). On the guest, `GRUB_FORCE_PARTUUID`
    commented out (the install refuses otherwise):
    ```
    sudo ./att-vendor build --platform intel-tdx --app-dir app --base-initrd /boot/initrd.img-$(uname -r) --option 1 --verify
@@ -346,10 +346,10 @@ so a check fed the recorded evidence and those build values must pass, and fail 
 
 ### Phase 4b: what waits for a VM
 
-1. **Done 2026-11-15, no VM**: root hash `e29ec085…` (v1) and `a2f4df92…` (v2), and the predicted PCR12 `470379c7…` equals the recorded `opt2-v1` PCR12 (`docs/status/trial-2026-11-16.md`). What was asked: **The real tools for Option 2** (any Ubuntu 24.04, as for TDX): `build --platform amd-sev-snp-verity` with the
+1. **Done 2026-11-15, no VM**: root hash `e29ec085…` (v1) and `a2f4df92…` (v2), and the predicted PCR12 `470379c7…` equals the recorded `opt2-v1` PCR12 (`docs/results/trial-2026-11-16.md`). What was asked: **The real tools for Option 2** (any Ubuntu 24.04, as for TDX): `build --platform amd-sev-snp-verity` with the
    one-file v1 application must give root hash `e29ec085…af0c9`; the check above already showed that this root hash
    gives the recorded PCR12.
-2. **Done 2026-11-15** (`docs/status/trial-2026-11-16.md`): on a new guest, both options: install, reboot and `--check` passed; Option 2's PCR12 in the verified evidence was the predicted value; `audit` and `verify` passed from another machine; the undo returned the stock boot. What was asked: **Install and reboot on a SEV-SNP guest** (`gcp-cvm.sh snp create vendor`, with approval), `GRUB_FORCE_PARTUUID`
+2. **Done 2026-11-15** (`docs/results/trial-2026-11-16.md`): on a new guest, both options: install, reboot and `--check` passed; Option 2's PCR12 in the verified evidence was the predicted value; `audit` and `verify` passed from another machine; the undo returned the stock boot. What was asked: **Install and reboot on a SEV-SNP guest** (`gcp-cvm.sh snp create vendor`, with approval), `GRUB_FORCE_PARTUUID`
    commented out. Option 1: `build --platform amd-sev-snp-initrd --app-dir app --base-initrd /boot/initrd.img-$(uname
    -r) --verify`, `launch --platform amd-sev-snp-initrd --reboot`, then `launch … --check`. **Pass: "✓ the same".**
    Option 2: a base initrd built with `snp/testdata/record/initramfs-hook.sh` and `initramfs-local-bottom.sh`
