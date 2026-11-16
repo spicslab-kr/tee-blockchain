@@ -20,7 +20,7 @@ or **not confirmed**.
 
 This takes one SEV-SNP guest on Google Cloud and your own computer, and goes all the way: build what carries the
 application on the guest, boot it, read the measurements, register them on a chain, and have a User verify the guest.
-Type the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; nothing else needs filling in.
+Type the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; in "The Auditor's half" also `<auditor-guest-ip>`, the image name and the commit the Vendor hands over.
 
 **What steps 1 to 13 show, and what they do not.** They run against **one** guest, and in step 11 the Auditor
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
@@ -65,7 +65,8 @@ The same as [TDX step 1](tdx.md#1-on-your-computer-the-tools-and-the-source), wh
 2. `git`, then `git clone https://github.com/spicslab-kr/tee-blockchain`, `cd tee-blockchain`, then
    `bash e2e/0-Setup-local-install.sh` for Go **go1.26.1** exactly. On Linux open a new terminal (or
    `source ~/.bashrc`) before `go version`: the script adds Go to `PATH` in `~/.bashrc`, which only a new interactive
-   shell reads.
+   shell reads. On Windows, run it from Git Bash opened as administrator (installing Go needs it),
+   then open a new Git Bash window.
 3. `gcloud`, installed as in the TDX table (apt repository on Ubuntu/Debian and WSL, `winget install --id
    Google.CloudSDK` on Windows, the archive on macOS), then `gcloud auth login` and
    `gcloud config set project <your project id>`, with a project that has billing and **N2D** quota in
@@ -96,7 +97,7 @@ bash e2e/cloud/gcp-cvm.sh snp create vendor --yes
 ```
 
 This makes **one** VM, `attestamp-snp-vendor` (`n2d-standard-2`, AMD Milan, Ubuntu 24.04, SEV-SNP, zone
-`us-central1-a`), and a firewall rule `attestamp-ra` that lets **your computer's current address** reach port 5000 on
+`us-central1-a`), and a firewall rule `attestamp-ra` that lets **your computer's current address** (if the project has no such rule yet; if it has one, made from another computer, it is kept as it is and your address must be added to it: `e2e/cloud/README.md`, "From another computer, or after your address changed") reach port 5000 on
 it. It ends by printing the VM's `EXTERNAL_IP`: that is `<guest-ip>` below (`bash e2e/cloud/gcp-cvm.sh snp status`
 prints it again).
 
@@ -438,8 +439,7 @@ again. That is the condition the whole half rests on.
 | the format: `amd-sev-snp-initrd` or `amd-sev-snp-verity` | the Vendor says which | everything after the firmware |
 | this repository's commit | the same commit, built as in step 2 | the archive or image `build` writes (pinned by tests, but only the same code is sure to give the same bytes) |
 
-What the Vendor hands the Auditor, by any channel: the image name, the machine type and zone, the format, the `app`
-folder (or the commit of the source it comes from), its `out/build-value.json`, and for Option 2 its
+What the Vendor hands the Auditor, by any channel: the image name, the machine type and zone, the format, this repository's commit (`git rev-parse HEAD` on the Vendor's computer), the `app` folder (or the commit of the source it comes from), its `out/build-value.json`, and for Option 2 its
 `base-initrd-v.img`. From the Vendor's guest to the Vendor's computer:
 
 ```
@@ -454,7 +454,7 @@ The order with both halves: the Vendor's steps 1 to 10, then A1 to A9 instead of
 both guests. A1 to A9 are the Auditor's, on the Auditor's computer and its own guest. The commands show Option 1;
 for Option 2 write `amd-sev-snp-verity` wherever they say `amd-sev-snp-initrd`, and `snp-verity` for the extractor.
 
-**A1. On the Auditor's computer: tools and binaries.** Step 1 as written, at the Vendor's commit. Step 2, with
+**A1. On the Auditor's computer: tools and binaries.** Step 1 as written, then `git checkout <the Vendor's commit>` in the clone, so that both sides build the same code. Step 2, with
 `att-auditor` for the guest instead of `att-vendor`:
 
 ```
@@ -467,12 +467,12 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linu
 **A2. On the Auditor's computer: its own guest, from the Vendor's exact image.**
 
 ```
-IMAGE=ubuntu-2404-noble-amd64-v20261105 MACHINE=n2d-standard-2 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh snp create auditor --yes
+IMAGE=<the Vendor's image name> MACHINE=n2d-standard-2 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh snp create auditor --yes
 bash e2e/cloud/gcp-cvm.sh snp status
 ```
 
 `IMAGE`, `MACHINE` and `ZONE` are the Vendor's ("The same inputs"); the guest is `attestamp-snp-auditor` (with
-`PREFIX=` as in "Names", its own prefix). `status` lists each disk's image: both must name the same version. Its
+`PREFIX=` as in "Names", its own prefix). `IMAGE` is the exact name the Vendor's step 3 printed (`ubuntu-2404-noble-amd64-v20261105` is ours, an example). If you give the Auditor's guest its own `PREFIX=`, run `status`, `stop` and step 13's commands once per prefix: each acts only on the VMs of its own prefix, so one call shows or stops one guest. And if the Auditor's computer is not the one that first ran `gcp-cvm.sh … create` in this project, `attestamp-ra` does not let it reach port 5000 yet: add its address as `e2e/cloud/README.md`, "From another computer, or after your address changed", shows (one `/32`), or A8 times out. `status` lists each disk's image: both must name the same version. Its
 address is `<auditor-guest-ip>` below. Then copy what the build needs, one item per command:
 
 ```
@@ -489,8 +489,9 @@ Seen on TDX, 2026-11-16.)
 
 **A3. On the Auditor's guest: prepare it.** Step 4 as written, with `chmod +x att-auditor att-ra-responder`, and with
 two differences. Option 1: `base-initrd.img` is copied from `/boot` as written; its SHA-256 must equal
-`base_initrd_sha256` in the Vendor's `build-value.json` (`sha256sum base-initrd.img`). Option 2: install
-`squashfs-tools cryptsetup-bin` and make `/opt/app-verity`, but **do not** run the hook and `mkinitramfs` lines (nor
+`base_initrd_sha256` in the Vendor's `build-value.json` (`sha256sum base-initrd.img`). Option 2: `sudo apt-get update`,
+install `squashfs-tools cryptsetup-bin` (their versions must equal the Vendor's: `dpkg-query -W squashfs-tools
+cryptsetup-bin` on both, see [reproduce.md](reproduce.md)) and make `/opt/app-verity`, but **do not** run the hook and `mkinitramfs` lines (nor
 install `tpm2-tools`, which only `mkinitramfs` needs): use the Vendor's `base-initrd-v.img`, copied in A2. Check
 `uname -r` against the Vendor's.
 
@@ -550,7 +551,7 @@ Auditor who registers such values by hand with `register`; the trust model has t
 with exit 5, already registered). A User verifying the Vendor's guest will then be refused (A9), which is
 correct.
 
-**A9. On any computer: the User verifies the Vendor's guest.** Step 12 against the registry of A8:
+**A9. On the Auditor's computer (or any computer that `attestamp-ra` lets in and that reaches the chain; with the local anvil of step 11 that is the Auditor's): the User verifies the Vendor's guest.** Step 12 against the registry of A8:
 
 ```
 ./att-user verify --tee-addr <guest-ip>:5000 --format amd-sev-snp-initrd --rpc http://127.0.0.1:8545 --registry <0x…>
@@ -558,7 +559,7 @@ correct.
 
 Exit 0 and `✓ matches  hello 1.0.0 (amd64) by 0x7099…` now mean what README promises, within the limit of
 [Same VM](#same-vm): the Vendor's guest runs what an Auditor rebuilt and booted itself. Then step 13 on both guests
-(`attestamp-snp-auditor` too) and `bash e2e/cloud/gcp-cvm.sh snp stop`, which stops both.
+(`attestamp-snp-auditor` too) and `bash e2e/cloud/gcp-cvm.sh snp stop`, which stops both if they share a prefix (once per prefix otherwise).
 
 ### Use the same image as the other side
 

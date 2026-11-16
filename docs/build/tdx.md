@@ -19,7 +19,7 @@ Statements are marked **confirmed** (read from our recorded quote, a spec, a lib
 
 This takes one TDX guest on Google Cloud and your own computer, and goes all the way: build the application's
 initrd on the guest, boot it, read the measurements, register them on a chain, and have a User verify the guest. Type
-the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; nothing else needs filling in.
+the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; in "The Auditor's half" also `<auditor-guest-ip>`, the image name and the commit the Vendor hands over.
 
 **What steps 1 to 13 show, and what they do not.** They run against **one** guest, and in step 11 the Auditor
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
@@ -70,7 +70,9 @@ bash e2e/0-Setup-local-install.sh
 The script ends with `Ready - Go 1.26.1 confirmed exactly`. On Linux it puts Go in `/usr/local/go` and adds it to
 `PATH` in `~/.bashrc`, which only a **new interactive** shell reads: open a new terminal, or run `source ~/.bashrc`,
 and check `go version`. A script or `bash -c` does not read `~/.bashrc`; there, run
-`export PATH=$PATH:/usr/local/go/bin` first. On Windows, open a new Git Bash window. On Ubuntu the script also
+`export PATH=$PATH:/usr/local/go/bin` first. On Windows, installing Go needs Git Bash opened **as
+administrator** (the script stops and says so otherwise); afterwards open a new Git Bash window, so that `go` is on
+`PATH`, and check `go version`. On Ubuntu the script also
 installs `build-essential` (gcc); that is why every build in step 2 sets `CGO_ENABLED=0` (a native Linux build with gcc
 otherwise links cgo and gives another `att-ra-responder`).
 
@@ -141,7 +143,7 @@ bash e2e/cloud/gcp-cvm.sh tdx create vendor --yes
 ```
 
 This makes **one** VM, `attestamp-tdx-vendor` (`c3-standard-4`, Ubuntu 24.04, TDX, zone `us-central1-a`), and a
-firewall rule `attestamp-ra` that lets **your computer's current address** reach port 5000 on it. It ends by printing
+firewall rule `attestamp-ra` that lets **your computer's current address** reach port 5000 on it (if the project has no such rule yet; if it has one, made from another computer, it is kept as it is and your address must be added to it: `e2e/cloud/README.md`, "From another computer, or after your address changed"). It ends by printing
 the VM's `EXTERNAL_IP`: that is `<guest-ip>` below (`bash e2e/cloud/gcp-cvm.sh tdx status` prints it again).
 
 It also prints the exact image it used, for example `image ubuntu-os-cloud/ubuntu-2404-noble-amd64-v20261105`.
@@ -463,8 +465,7 @@ condition the whole half rests on.
 | the option (1 or 2) | the Vendor says which | the initrd, and for Option 2 the image |
 | this repository's commit | the same commit, built as in step 2 | the archive `build` writes (the cpio format is pinned by tests, but only the same code is sure to give the same bytes) |
 
-What the Vendor hands the Auditor, by any channel: the image name, the machine type and zone, the option, the `app`
-folder (or the commit of the source it comes from), its `out/build-value.json`, and for Option 2 its
+What the Vendor hands the Auditor, by any channel: the image name, the machine type and zone, the option, this repository's commit (`git rev-parse HEAD` on the Vendor's computer), the `app` folder (or the commit of the source it comes from), its `out/build-value.json`, and for Option 2 its
 `base-initrd-v.img`. From the Vendor's guest to the Vendor's computer:
 
 ```
@@ -478,7 +479,7 @@ gcloud compute scp attestamp-tdx-vendor:base-initrd-v.img vendor-base-initrd-v.i
 The order with both halves: the Vendor's steps 1 to 10, then A1 to A9 instead of step 11, then step 12, then step 13 on
 both guests. A1 to A9 are the Auditor's, on the Auditor's computer and its own guest.
 
-**A1. On the Auditor's computer: tools and binaries.** Step 1 as written, at the Vendor's commit. Step 2, with
+**A1. On the Auditor's computer: tools and binaries.** Step 1 as written, then `git checkout <the Vendor's commit>` in the clone, so that both sides build the same code. Step 2, with
 `att-auditor` for the guest instead of `att-vendor`:
 
 ```
@@ -491,11 +492,11 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linu
 **A2. On the Auditor's computer: its own guest, from the Vendor's exact image.**
 
 ```
-IMAGE=ubuntu-2404-noble-amd64-v20261105 MACHINE=c3-standard-4 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh tdx create auditor --yes
+IMAGE=<the Vendor's image name> MACHINE=c3-standard-4 ZONE=us-central1-a bash e2e/cloud/gcp-cvm.sh tdx create auditor --yes
 bash e2e/cloud/gcp-cvm.sh tdx status
 ```
 
-`IMAGE`, `MACHINE` and `ZONE` are the Vendor's ("The same inputs"); the guest is `attestamp-tdx-auditor` (with `PREFIX=` as in "Names", its own prefix).
+`IMAGE`, `MACHINE` and `ZONE` are the Vendor's ("The same inputs"); the guest is `attestamp-tdx-auditor` (with `PREFIX=` as in "Names", its own prefix). `IMAGE` is the exact name the Vendor's step 3 printed (`ubuntu-2404-noble-amd64-v20261105` is ours, an example). If you give the Auditor's guest its own `PREFIX=`, run `status`, `stop` and step 13's commands once per prefix: each acts only on the VMs of its own prefix, so one call shows or stops one guest. And if the Auditor's computer is not the one that first ran `gcp-cvm.sh … create` in this project, `attestamp-ra` does not let it reach port 5000 yet: add its address as `e2e/cloud/README.md`, "From another computer, or after your address changed", shows (one `/32`), or A8 times out.
 `status` lists each disk's image: both must name the same version. Its address is `<auditor-guest-ip>` below. Then
 copy what the build needs, one item per command:
 
@@ -513,8 +514,9 @@ another initrd, which A4's comparison catches. Seen 2026-11-16.)
 
 **A3. On the Auditor's guest: prepare it.** Step 4 as written, with `chmod +x att-auditor att-ra-responder`, and with
 two differences. Option 1: `base-initrd.img` is copied from `/boot` as written; its SHA-256 must equal
-`base_initrd_sha256` in the Vendor's `build-value.json` (`sha256sum base-initrd.img`). Option 2: install the packages
-(`squashfs-tools cryptsetup-bin`) and make `/opt/app-verity`, but **do not** run the hook and `mkinitramfs` lines: use
+`base_initrd_sha256` in the Vendor's `build-value.json` (`sha256sum base-initrd.img`). Option 2: `sudo apt-get update`, install the packages
+(`squashfs-tools cryptsetup-bin`; their versions must equal the Vendor's, `dpkg-query -W squashfs-tools cryptsetup-bin`
+on both, see [reproduce.md](reproduce.md)) and make `/opt/app-verity`, but **do not** run the hook and `mkinitramfs` lines: use
 the Vendor's `base-initrd-v.img`, copied in A2. Check `uname -r` against the Vendor's.
 
 **A4. On the Auditor's guest: build.** The Auditor's own build of the Vendor's application:
@@ -573,7 +575,7 @@ Auditor who registers such values by hand with `register`; the trust model has t
 with exit 5, already registered). A User verifying the Vendor's guest will then be refused (A9), which is
 correct.
 
-**A9. On any computer: the User verifies the Vendor's guest.** Step 12 against the registry of A8:
+**A9. On the Auditor's computer (or any computer that `attestamp-ra` lets in and that reaches the chain; with the local anvil of step 11 that is the Auditor's): the User verifies the Vendor's guest.** Step 12 against the registry of A8:
 
 ```
 ./att-user verify --tee-addr <guest-ip>:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry <0x…>
@@ -581,7 +583,7 @@ correct.
 
 Exit 0 and `✓ matches  hello 1.0.0 (amd64) by 0x7099…` now mean what README promises: the Vendor's guest runs what an
 Auditor rebuilt and booted itself. Then step 13 on both guests (`attestamp-tdx-auditor` too) and
-`bash e2e/cloud/gcp-cvm.sh tdx stop`, which stops both.
+`bash e2e/cloud/gcp-cvm.sh tdx stop`, which stops both if they share a prefix (once per prefix otherwise).
 
 ### Use the same image as the other side
 

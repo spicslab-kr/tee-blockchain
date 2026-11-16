@@ -1,8 +1,8 @@
 # Creating the instances
 
-Scripts that create, stop and delete the instances each platform needs. Every command they run is
-printed in the script's header comment, and every flag was taken from the vendor's own
-documentation (see the comments for which page).
+Scripts that create, stop and delete the instances each platform needs. Each script's header comment says how to call
+it and which of the vendor's documentation its flags were checked against; the `gcloud` and `aws` calls themselves are
+in the script, one function or case per action.
 
 **These scripts create billable resources.** Every `create`, `run-instances`, `delete` and
 `terminate-instances` they run costs money or destroys state. Run them only when you mean to, and if an automated

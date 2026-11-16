@@ -180,6 +180,7 @@ status)
   gcloud compute disks list --filter="name~^$PREFIX-" --format='table(name,zone.basename(),sourceImage.basename():label=IMAGE)'
   echo
   echo "ssh in with:  gcloud compute ssh <name> --zone $ZONE"
+  echo "              add --tunnel-through-iap where port 22 is open only to Google's IAP range (e2e/cloud/README.md)"
   ;;
 
 stop|start)
