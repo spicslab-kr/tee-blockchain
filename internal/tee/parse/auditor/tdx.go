@@ -1,6 +1,7 @@
 // Intel TDX parser for the intel-tdx format. It wraps attestamp/internal/tee/parse/tdx (the role-independent logic: quote
 // decoding, PCK chain and signature verification, MRTD and RTMR extraction) with auditor's RADoc and Measurements types.
 // The logic is identical for all three roles and lives in one place; this adapter converts the types and errors.
+
 package auditor
 
 import (

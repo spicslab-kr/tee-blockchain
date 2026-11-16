@@ -2,6 +2,7 @@
 // (the role-independent logic: the evidence container, AMD and vTPM signature checks, the binding, boot-value extraction)
 // with auditor's RADoc and Measurements types. The logic is identical for all three roles and lives in one place; this
 // adapter converts the types and errors.
+
 package auditor
 
 import (

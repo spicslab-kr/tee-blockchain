@@ -1,6 +1,7 @@
 // AWS Nitro parser for the aws-nitro format. It wraps attestamp/internal/tee/parse/aws (the role-independent logic: CBOR decoding, certificate
 // chain and signature verification, PCR extraction) with user's RADoc and Measurements types. The logic is identical
 // for all three roles and lives in one place; this adapter converts the types and errors.
+
 package user
 
 import (
