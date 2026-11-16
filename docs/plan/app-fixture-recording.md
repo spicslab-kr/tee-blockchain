@@ -294,9 +294,11 @@ nonce, and its boot log is committed next to it (`*-boot.txt`).
 - one boot ID (SEV-SNP Option 2 v2) was not captured; that boot's command line, carrying the v2 root hash, shows it
   happened.
 
-## Reproducing T10: evidence from two VMs combined (planned, not run)
+## Reproducing T10: evidence from two VMs combined
 
-**Status: written 2026-11-15, not run.** Test-matrix row T10 asks whether a vTPM attestation from one VM, combined with
+**Status: run on 2026-11-16; the relay is accepted (T10 reproduced).** The result and its reading:
+`docs/build/ra-comparison.md`, "The SEV-SNP relay, measured"; the run: `docs/results/sessions-2026-11-16/amd-sev-snp.md`;
+the recordings: "The 2026-11-16 recordings" at the end of this section. Written 2026-11-15. Test-matrix row T10 asks whether a vTPM attestation from one VM, combined with
 an SNP report from another, is refused. The only answer so far is the 2026-11 record ("it verifies"), made with a
 relay script that no longer exists. It is the project's main claim about SEV-SNP's weakness, so it has to be measured
 here.
@@ -400,7 +402,12 @@ Record for `relay.cbor`, whatever happens:
   anything in B's report could be compared with it. If nothing can, that is the structural reason T10 fails, and it
   goes into `docs/build/sev-snp.md`, "Same VM".
 
-### Commit, so T10 runs with no VM
+### Commit, so T10 runs with no VM (not done: decided against on 2026-11-16)
+
+The operator decided not to commit the recordings: each `att.pb` carries the project ID and an instance's name and
+numeric ID in the Google-signed AK certificate (checked: subject and the GCE instance-information extension), and
+adding identifiers to the history before the history question is settled is not to be done. T10 stays a live result,
+like Nitro's T8. What committing would have meant, kept for when that decision changes:
 
 - the three folders as fixtures `internal/tee/parse/snp/testdata/gcp-n2d-t10-{a,b,relay}-*`, with a `-boot.txt` each,
   in the same layout as the other recordings;
@@ -413,3 +420,36 @@ Record for `relay.cbor`, whatever happens:
 instance's identity too; check with `grep -a` before committing, as for the other SEV-SNP fixtures
 (`internal/tee/parse/snp/testdata/README.md`). An instance ID must not be committed (`CLAUDE.md`, rule 4); if the
 certificate holds one, committing these fixtures waits for the same publication decision as the others.
+
+### The 2026-11-16 recordings (kept locally, not committed)
+
+Made with the procedure above on `d3-snp-auditor` (VM A, running the registered application) and `d3-snp-vendor` (VM
+B, running a one-byte-changed one), two `n2d-standard-2` guests of `ubuntu-2404-noble-amd64-v20261105`, `record-snp`
+`5b0e8f5d…` built at `57b4350`, nonce text `attestamp-snp-t10` (nonce `0f8964068dccac4d42f09277c59a1e7d73e8ca5a163056d418ae173239df8766`).
+They are on the operator's machine under `e2e-work/t10/` (gitignored); the two VMs are stopped, not deleted, and hold
+the same folders in their home directories (`t10-a` on A; `t10-b`, `t10-relay` and `t10-a-att.pb` on B).
+
+| file | sha256 |
+|---|---|
+| `a/att.pb` (A's vTPM attestation; also `relay/att.pb`, unchanged) | `a1ff314e2d45a9eca6f2b3b4e85e672a314f18277422f5a4a563b56625350983` |
+| `a/report.bin` | `59295a51b0854438b8ccc0c710787b923c937ea1951348b3b67704f7746f38bb` |
+| `a/auxblob.bin` | `ea15e9de6481d6625d0df7a863797760f9fa863f7b2c4d52ab5b0619ae2adf03` |
+| `b/att.pb` | `f13734bcd1f373c72a56ea906fe9aa9fc0bad792bd70118b6540d11333042320` |
+| `b/report.bin` | `89c29b3dda784e388058cceceb114ed3e9bf2f8ce4b9aaf24e5f732dc9f0f110` |
+| `b/auxblob.bin` (also `relay/auxblob.bin`) | `980d9dff4f000ddfe69dcbd9b90cdb0525a3e0f7d7c622ddbd9b2bd61dcc3eac` |
+| `relay/report.bin` (B's report over A's attestation) | `e487d6c8e4bec527579246abad9049e57a30d27c1c21dc3713df5a77fdb200d7` |
+| `a.cbor` (packed) | `ab06f1af0599c455cfb30549ae8ffc7defeb44726ba57944421226de36dda32d` |
+| `b.cbor` | `8354dbf79497072952d0f66298b491fd9517f4c1179ccad2e5232919801d43af` |
+| `naive.cbor` | `8d4e51c28625a1a4eb858d7d35325848392b4a2db4a67a939a9540cce733d9ad` |
+| `relay.cbor` | `1dcaecdc570563ba1115272b47819992a43d7d621b3079b2c0f40685d963fda6` |
+
+REPORT_DATA of both `a/report.bin` and `relay/report.bin` is `62b9a1f3…2c14`, SHA3-512 of `a/att.pb`. What each
+document gave under `att-user ra-parse --format amd-sev-snp-initrd --nonce <the nonce above>`: `a.cbor` exit 0,
+`b.cbor` exit 0, `naive.cbor` exit 5 (the binding), `relay.cbor` **exit 0 with A's values**.
+
+**To run it again** (two SEV-SNP guests of one image, with approval): follow "Before you start" and "Record" above,
+then "Check, with no VM". Two things that differ on Windows: `gcloud compute scp` through PuTTY takes **one remote
+source per call**, so fetch each folder with `gcloud compute scp --recurse <vm>:t10-a <local folder>`; and VM A must be
+booted into an initrd (our entry), or every format refuses its evidence (exit 7) before the relay question is reached.
+To check that a relay's values would be trusted, `att-user lookup --measurements relay.json --platform
+amd-sev-snp-initrd` against the registry that holds A's registration.
