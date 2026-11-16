@@ -17,7 +17,10 @@ For tests that need no Nitro hardware, see `go test ./...` in the main README.
   with `could not create key pair`: give this machine names of its own,
   `KEY_NAME=<name> SG_NAME=<name> TAG=<name> bash e2e/cloud/aws-nitro.sh create --yes`, and the same `TAG=` to `status`,
   `stop`, `start` and `delete`. The instances have no automatic stop; `sudo shutdown -h +360` on each, right after
-  `create`, is a safety net if a run is abandoned.
+  `create`, is a safety net if a run is abandoned. **If SSH times out**, from another computer or after your network
+  changed: the security group allows only the addresses added to it, starting with the creating machine's. Run
+  `bash e2e/cloud/aws-nitro.sh status`; it says whether this machine is allowed and prints the `/32` commands to add it
+  ([`cloud/README.md`](cloud/README.md), "From another computer, or after your address changed").
 - `git`, an `ssh` client and the pinned Go version on your machine. `0-Setup-local-install.sh`
   installs what is missing.
 - On Windows, run the scripts in Git Bash. Git Bash (MSYS) rewrites any argument that starts with `/` (or holds

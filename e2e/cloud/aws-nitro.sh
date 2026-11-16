@@ -135,15 +135,19 @@ check_my_address() {
   if [ -z "$sg" ] || [ "$sg" = "None" ]; then echo "security group $SG_NAME not found"; return 0; fi
   myip=$(curl -fsS https://checkip.amazonaws.com 2>/dev/null | tr -d '[:space:]')
   if [ -z "$myip" ]; then echo "could not determine this machine's public address; check $sg by hand"; return 0; fi
+  local allowed=""
   for port in 22 "$RA_PORT"; do
     have=$(aws ec2 describe-security-groups --group-ids "$sg" \
              --query "SecurityGroups[0].IpPermissions[?FromPort==\`$port\`].IpRanges[].CidrIp" --output text)
+    allowed="$allowed  port $port: $(echo ${have:-nothing})
+"
     case " $(echo $have) " in
       *" $myip/32 "*) ;;
       *)
         if [ "$missing" = 0 ]; then
           echo "this machine's public address $myip/32 is NOT allowed in by $sg ($SG_NAME): SSH and the RA port will time out."
-          echo "To allow it (this script does not change the group; remove addresses you no longer use):"
+          echo "The group allows only the addresses added to it, starting with the machine that created it. To allow this one"
+          echo "(this script does not change the group; whoever may change it in this AWS account runs these):"
         fi
         missing=1
         echo "  aws --region $REGION ec2 authorize-security-group-ingress --group-id $sg --protocol tcp --port $port --cidr $myip/32"
@@ -151,6 +155,14 @@ check_my_address() {
     esac
   done
   [ "$missing" = 0 ] && echo "this machine's public address $myip/32 is allowed in by $sg on ports 22 and $RA_PORT"
+  echo "allowed in by $sg now:"
+  printf '%s' "$allowed"
+  case "$allowed" in
+    *0.0.0.0/0*) echo "WARNING: a rule is open to every address (0.0.0.0/0). Remove it:"
+                 echo "  aws --region $REGION ec2 revoke-security-group-ingress --group-id $sg --protocol tcp --port <port> --cidr 0.0.0.0/0" ;;
+  esac
+  echo "To remove an address you no longer use (an old network of yours, a computer you gave up):"
+  echo "  aws --region $REGION ec2 revoke-security-group-ingress --group-id $sg --protocol tcp --port <port> --cidr <address>/32"
   return 0
 }
 

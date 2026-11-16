@@ -89,6 +89,27 @@ To undo it: `gcloud compute firewall-rules create default-allow-ssh --network=de
 breaks as soon as your public address changes, and it changes with the network you are on: twice on 2026-11-16 alone
 (`aws-nitro.sh status` now tells you on AWS; on GCP check `attestamp-ra` and the SSH rule by hand).
 
+### From another computer, or after your address changed
+
+The firewall rules that matter here allow **single addresses** (`/32`), starting with the address of the machine that
+created them; nothing in them follows you to another computer or another network. The symptom is always the same:
+`ssh` (or a `verify` from outside) **times out**, with no other message.
+
+- **AWS (Nitro).** `aws-nitro.sh create` opened ports 22 and 5000 to the creating machine's `/32` and reuses the group
+  afterwards. From any other computer, or after your address changed, run `bash e2e/cloud/aws-nitro.sh status` (or
+  `start`, which runs the same check). It says whether this machine's public address is allowed, prints the exact
+  `authorize-security-group-ingress … --cidr <your address>/32` commands for whatever is missing, lists the addresses
+  the group allows now, and prints the `revoke-security-group-ingress` command to remove one you no longer use. It
+  changes nothing itself: whoever may change the group in that AWS account runs the commands. If it finds a rule open
+  to `0.0.0.0/0` it says so and prints the command that removes it; never add one.
+- **GCP, SSH.** Through IAP (above) your address does not matter, once the project has the IAP rule.
+- **GCP, the RA port.** `attestamp-ra` allows tcp:5000 from the `/32` of the machine that ran the first `gcp-cvm.sh
+  create`. Only a verifier outside the guest needs it (the procedures can run the whole chain on the guest). To allow
+  another address, list what is there with `gcloud compute firewall-rules describe attestamp-ra
+  --format='value(sourceRanges)'` and set the full list again, one `/32` each:
+  `gcloud compute firewall-rules update attestamp-ra --source-ranges=<old>/32,<new>/32`. `gcp-cvm.sh` does not check
+  this for you.
+
 ## Order
 
 The procedures: Nitro, the flows in `e2e/README.md`; TDX and SEV-SNP, "Getting started" in `docs/build/tdx.md` and
