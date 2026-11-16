@@ -146,7 +146,12 @@ A debug TEE lets the host read and change the guest's memory, so its measurement
 |---|---|---|---|
 | Signal | PCR0 all zero | TDATTRIBUTES bit 0 (TUD.DEBUG) | POLICY bit 19 (DEBUG) |
 | What the parser does | `Parse` drops every all-zero PCR and fails if all three are zero; `Info.Debug` reports PCR0 all zero | `Parse` refuses (`ErrBadDocument`); `Info.Debug` reports it | `Parse` refuses (`ErrBadDocument`); `Info.Debug` reports it; a POLICY that does not parse counts as debug |
-| Tested by | **live, 2026-11-15** (`e2e/debug-mode-check.sh`): a real debug enclave's document, genuinely signed, had all-zero PCRs and was refused (exit 7). Not a code test: a debug document is signed, so it cannot be made up, and the recorded one carries an instance ID and is not committed (test-matrix row T8) | `TestParse_DebugTDIsRefused` (bit set in a copy of the fixture) | `TestParse_DebugGuestIsRefused` (bit set in a copy of the fixture) |
+| Can our cloud launch one? | yes: `nitro-cli run-enclave --debug-mode` | **no**, on GCP (checked 2026-11-16): the Compute API's `ConfidentialInstanceConfig` has the technology type and nothing else in `v1`, plus a paravisor interrupt and vTPM mode in `alpha` (discovery documents, revision 20261106); no field in either API is named for debug, and `gcloud compute instances create` (SDK 592.0.0) has no such flag | **no**, on GCP, for the same reason |
+| Tested by | **live, 2026-11-15** (`e2e/debug-mode-check.sh`): a real debug enclave's document, genuinely signed, had all-zero PCRs and was refused (exit 7). Not a code test: a debug document is signed, so it cannot be made up, and the recorded one carries an instance ID and is not committed (test-matrix row T8) | `TestParse_DebugTDIsRefused` (bit set in a copy of the fixture). Live: not applicable on GCP; every live quote so far passed this check, i.e. had the bit clear | `TestParse_DebugGuestIsRefused` (bit set in a copy of the fixture). Live: not applicable on GCP; every live report so far passed this check, i.e. had the bit clear |
+
+The CVM check stays although GCP cannot launch a debug guest: the same evidence can come from another host (a KVM
+host of one's own sets the SEV-SNP guest policy and the TD attributes itself), and nothing stops GCP from adding the
+option later. A refusal tested only on a flipped bit is the most this platform allows.
 
 ## Values left out, and why
 
