@@ -114,7 +114,7 @@ cat /proc/sys/kernel/random/boot_id
 grep -n -E 'devtmpfs|conf/conf.d|tmpfs.*/run' /usr/share/initramfs-tools/init
 grep -n move /usr/share/initramfs-tools/scripts/init-bottom/udev
 
-# GRUB_FORCE_PARTUUID off (docs/build/sev-snp.md, "The boot setting changed"); skip if already commented out
+# GRUB_FORCE_PARTUUID off (docs/build/sev-snp.md, "The boot setting: turning GRUB_FORCE_PARTUUID off"); skip if already commented out
 grep -n GRUB_FORCE_PARTUUID /etc/default/grub.d/40-force-partuuid.cfg
 sudo cp -p /etc/default/grub.d/40-force-partuuid.cfg /root/40-force-partuuid.cfg.orig
 sudo sed -i 's/^GRUB_FORCE_PARTUUID=/#GRUB_FORCE_PARTUUID=/' /etc/default/grub.d/40-force-partuuid.cfg
@@ -147,7 +147,8 @@ sudo dmesg | grep -i -E 'initramfs|unpack' # a hint only
 ## AMD SEV-SNP (`attestamp-snp-vendor`): first
 
 Files to copy: `mkappinitrd`, `record-snp`, `make-verity-image.sh`, `initramfs-hook.sh`, `initramfs-local-bottom.sh`.
-`GRUB_FORCE_PARTUUID` is already off on this instance (since 2026-11-11).
+Turn `GRUB_FORCE_PARTUUID` off (common steps): it is on in every new guest of the image. On `attestamp-snp-vendor`, the
+instance the 2026-11-11 recordings were made on, it had already been turned off that day.
 
 ### Option 1 (`amd-sev-snp-initrd`, `AppLast`)
 
@@ -346,7 +347,7 @@ So the two possible results mean:
 - **A second SEV-SNP VM is a billable cloud resource: ask before creating it** (`e2e/cloud/README.md`). The first VM is
   `attestamp-snp-vendor`. The second one can be made with `bash e2e/cloud/gcp-cvm.sh snp create auditor` (same
   machine type, image and zone; it becomes `attestamp-snp-auditor`).
-- On VM A, `GRUB_FORCE_PARTUUID` must be off (`docs/build/sev-snp.md`, "The boot setting changed"), so that its vTPM
+- On VM A, `GRUB_FORCE_PARTUUID` must be off (`docs/build/sev-snp.md`, "The boot setting: turning `GRUB_FORCE_PARTUUID` off"), so that its vTPM
   event log measures an initrd and `ra-parse` gets as far as the binding. `attestamp-snp-vendor` already has it off.
   VM B's boot setting does not matter: only its SNP report is used.
 - On both: `sudo shutdown -h +240` as a safety stop.
@@ -375,7 +376,7 @@ sudo ./record-snp -out t10-relay -nonce-text attestamp-snp-t10 -relay-att t10-a-
 SHA3-512 of A's attestation; `record.txt` says `relay_att`. Also save on each VM, for the record: `uname -r`,
 `cat /proc/cmdline`, `/proc/sys/kernel/random/boot_id`, and `sudo dmesg | grep -i sev`.
 
-Copy the three folders back, then **stop both VMs**. Deleting VM B is a separate decision for the user.
+Copy the three folders back, then **stop both VMs**. Deleting the VMs is a separate decision, not part of this procedure.
 
 ### Check, with no VM
 
@@ -428,7 +429,7 @@ certificate holds one, committing these fixtures waits for the same publication 
 Made with the procedure above on `d3-snp-auditor` (VM A, running the registered application) and `d3-snp-vendor` (VM
 B, running a one-byte-changed one), two `n2d-standard-2` guests of `ubuntu-2404-noble-amd64-v20261105`, `record-snp`
 `5b0e8f5d…` built at `57b4350`, nonce text `attestamp-snp-t10` (nonce `0f8964068dccac4d42f09277c59a1e7d73e8ca5a163056d418ae173239df8766`).
-They are on the operator's machine under `e2e-work/t10/` (gitignored), the only copy: the two VMs, which held the same
+They are on the development machine that made them, under `e2e-work/t10/` (gitignored), the only copy: the two VMs, which held the same
 folders, were deleted on 2026-11-16 after these hashes were checked against the local files.
 
 | file | sha256 |

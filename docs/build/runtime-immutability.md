@@ -1,7 +1,7 @@
 # Runtime immutability: what a measurement can and cannot say about a running confidential VM
 
 A measurement says what was loaded at boot. Whether the guest is still running only that, later, is a separate
-question; the project lead and the supervising professor asked it, and this page is the answer so far. It is split into
+question, raised in the project's review, and this page is the answer so far. It is split into
 three layers. Each says what is **confirmed** (measured by us, or stated in a cited source) and what is only
 **reasoned** from confirmed pieces and not built.
 

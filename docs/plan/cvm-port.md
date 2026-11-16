@@ -74,7 +74,7 @@ Four properties the port has to reproduce on each new platform:
 | # | Task | Pass criterion |
 |---|---|---|
 | 0.1 | Clone the repository from GitHub with `--recursive` (a zip extract lacks `.git` and the OpenZeppelin submodule) | `git status` works; done |
-| 0.2 | `CLAUDE.md`, `.claude/settings.json`, `.claude/commands/`, `.claude/hooks/` | done |
+| 0.2 | Working rules for this repository | done; kept outside the repository since `5b310cf`, and the rules a contributor needs are in `CONTRIBUTING.md` and `STRUCTURE.md` |
 | 0.3 | **Record one TDX quote and commit it as a fixture** | a file under `testdata/` plus the nonce used |
 | 0.4 | Record one SEV-SNP report and one vTPM attestation from the same GCP instance | same |
 
@@ -246,7 +246,7 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
    value `make-verity-image.sh` gave on both guests on 2026-11-11 (`tdx/testdata/gcp-c3-opt2-v1-boot.txt`). The Go port
    lays the image out the same way (application under `opt/app`, every mode 755, every time 0, the same flags, padding,
    salt and UUID), and a test keeps the flags equal to the script's, but only the real tools can show the bytes are the
-   same. WSL on the operator's machine has squashfs-tools 4.7.5 and no veritysetup, so this was not run.
+   same. WSL on the development machine had squashfs-tools 4.7.5 and no veritysetup, so this was not run.
 2. **Done 2026-11-15** (`docs/plan/trial-2026-11-16.md`): on a new guest, install, reboot and `--check` passed; the CC event log replayed, GRUB's initrd event carried the path of its `initrd` command and the SHA-384 of the file, the marker was there. What was asked: **Launch on a TDX guest** (`gcp-cvm.sh tdx create vendor`, with approval). On the guest, `GRUB_FORCE_PARTUUID`
    commented out (the install refuses otherwise):
    ```

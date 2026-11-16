@@ -151,7 +151,7 @@ sudo shutdown -h +240              # a safety stop in 4 hours; a reboot cancels 
 ```
 
 Make the stock boot load an initrd. Google's Ubuntu images boot without one (`GRUB_FORCE_PARTUUID`; see "The boot
-setting changed" below and `docs/build/tdx.md`, "`GRUB_FORCE_PARTUUID`"), and the application, or for Option 2 the
+setting: turning `GRUB_FORCE_PARTUUID` off" below and `docs/build/tdx.md`, "`GRUB_FORCE_PARTUUID`"), and the application, or for Option 2 the
 hook that checks it, is in the initrd. The original file is kept for step 13:
 
 ```
@@ -601,7 +601,7 @@ They are bound by **REPORT_DATA = SHA3-512 of the vTPM attestation bytes**: the 
 it covers exactly the vTPM evidence carried next to it. SHA3-512 gives 64 bytes, the size of REPORT_DATA, so the hash
 goes in unchanged.
 
-The binding was SHA-512 until **2026-11-11**, when it was changed to SHA3-512 by decision of the project lead.
+The binding was SHA-512 until **2026-11-11**, when the project changed it to SHA3-512.
 *Record:* SHA-512 is what the 2026-11 test scripts used; those scripts are no longer available (build-info gaps #5).
 Results from 2026-11-10 and earlier were produced with SHA-512. Evidence bound with SHA-512 is now refused
 (`TestVerifySig_SHA512BindingIsRefused`, on the one SHA-512 recording this repository keeps).
@@ -819,9 +819,11 @@ base initrd they used. Those files, their scripts and any boot logs are gone, so
 Option 2 does not have this problem. The image is on disk, and a failed check shows as `fail` in PCR12 or a zero PCR12
 (measured: `status ok` and the expected PCR12 in both Option 2 recordings).
 
-### The boot setting changed on `attestamp-snp-vendor` (2026-11-11)
+### The boot setting: turning `GRUB_FORCE_PARTUUID` off
 
-Done to record `gcp-n2d-*`, the evidence with an initrd. Every step was checked on the instance:
+**Every new guest of this image has the setting on**, so do this on each guest that has to boot an initrd; "Getting
+started" step 4 does it for you. It was first done on `attestamp-snp-vendor` on 2026-11-11 to record `gcp-n2d-*`, the
+evidence with an initrd, and every step below was checked there:
 
 1. The setting is not in `/etc/default/grub` but in `/etc/default/grub.d/40-force-partuuid.cfg`, line 3:
    `GRUB_FORCE_PARTUUID=<the root partition's PARTUUID>`. The file's own comment says "Remove this line to enable boot
@@ -841,8 +843,8 @@ Done to record `gcp-n2d-*`, the evidence with an initrd. Every step was checked 
 To undo: `sudo cp -p /root/40-force-partuuid.cfg.orig /etc/default/grub.d/40-force-partuuid.cfg`, `sudo update-grub`,
 reboot.
 
-The setting stays changed on that instance; it boots with the initrd from now on. One side effect seen: the kernel
-command line lost `panic=-1`, which only the initrdless entry adds (observed in the two recordings).
+The setting stays changed on the guest until it is undone; it boots with the initrd from then on. One side effect seen:
+the kernel command line lost `panic=-1`, which only the initrdless entry adds (observed in the two recordings).
 
 ## The instance
 
@@ -886,7 +888,7 @@ describe` on 2026-11-11):
    then `att-user ra-parse --doc doc.cbor --format amd-sev-snp-initrd --nonce <hex nonce>`.
 
 On a stock GCP boot step 5 verifies both signatures and the nonce and then refuses, because the boot was initrdless.
-Turn `GRUB_FORCE_PARTUUID` off first, as in "The boot setting changed on `attestamp-snp-vendor`" above; the stock
+Turn `GRUB_FORCE_PARTUUID` off first, as in "The boot setting: turning `GRUB_FORCE_PARTUUID` off" above; the stock
 entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five values. **To run an application, use
 `build` and `launch`** ("Getting started" above). To record a **test fixture** that carries an application (Option 1),
 or the dm-verity image with its root hash on the command line (Option 2), follow `docs/plan/app-fixture-recording.md`:

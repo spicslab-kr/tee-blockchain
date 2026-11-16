@@ -120,7 +120,7 @@ not reproducible; `docs/build/sev-snp.md`, "Variables"):
 | T10 | a vTPM attestation from one VM with an SNP report from another verified | nothing yet: the cell says so, and "Reproducing T10" is the plan |
 
 ¹¹ **Local chain, not Sepolia.** The T4, T5 and T6 Nitro runs of 2026-11-15 used real enclaves on the two Nitro
-instances and a registry on a local anvil 1.8.0 on the operator's machine (`NET=local`, anvil's development accounts as
+instances and a registry on a local anvil 1.8.0 on the machine running the scripts (`NET=local`, anvil's development accounts as
 signing keys), because no Sepolia ETH was available. What these rows test, that a registered value is trusted and
 anything else is refused, does not depend on which chain holds the same contract; what they do not show is a public
 network's behaviour (confirmation delays, gas, a public RPC). Every result line of these runs carries `"chain":"local"`
