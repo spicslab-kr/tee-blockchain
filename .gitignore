@@ -22,6 +22,12 @@ e2e-work/
 /quote.bin*
 /evidence.cbor*
 /measurements.json
+# ... and "The Auditor's half" (both docs): what the Vendor hands over, fetched to the repository root
+/vendor-app/
+/vendor-app-snp/
+/vendor-base-initrd-v.img
+/vendor-snp-base-initrd-v.img
+/vendor-build-value*.json
 
 # SSH private key — never commit
 pem2.pem
