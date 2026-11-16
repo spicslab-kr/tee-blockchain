@@ -3,9 +3,10 @@
 #
 #   bash e2e/cloud/aws-nitro.sh create         # key pair, security group, two x86_64 instances (vendor, auditor)
 #   bash e2e/cloud/aws-nitro.sh create-arm64   # one more, arm64 (Graviton), for the architecture checks (ARM64_HOST)
-#   bash e2e/cloud/aws-nitro.sh status         # addresses, to paste into e2e/env.local.sh
+#   bash e2e/cloud/aws-nitro.sh status         # addresses, to paste into e2e/env.local.sh, and whether this
+#                                              # machine's public address is allowed in (only prints the command)
 #   bash e2e/cloud/aws-nitro.sh stop           # stop all of them (keeps the disks, stops the hourly charge)
-#   bash e2e/cloud/aws-nitro.sh start          # start them again
+#   bash e2e/cloud/aws-nitro.sh start          # start them again, then the same address check
 #   bash e2e/cloud/aws-nitro.sh delete         # terminate all of them and delete the security group
 #
 # Verified against the AWS docs (2026-11):
@@ -92,6 +93,36 @@ ensure_key_and_group() {
   fi
 }
 
+# check_my_address - is this machine's current public address allowed in by the security group on port 22 and the RA
+# port? If not, print the commands that would add it; never change the group here, and never suggest 0.0.0.0/0.
+# (2026-11-16: the address changed with the network, and every SSH then timed out with no other message.) Only an
+# exact <address>/32 rule counts as allowed; a wider range that happens to cover it is reported as missing.
+check_my_address() {
+  local sg myip port have missing=0
+  sg=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=$SG_NAME" \
+         --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null)
+  if [ -z "$sg" ] || [ "$sg" = "None" ]; then echo "security group $SG_NAME not found"; return 0; fi
+  myip=$(curl -fsS https://checkip.amazonaws.com 2>/dev/null | tr -d '[:space:]')
+  if [ -z "$myip" ]; then echo "could not determine this machine's public address; check $sg by hand"; return 0; fi
+  for port in 22 "$RA_PORT"; do
+    have=$(aws ec2 describe-security-groups --group-ids "$sg" \
+             --query "SecurityGroups[0].IpPermissions[?FromPort==\`$port\`].IpRanges[].CidrIp" --output text)
+    case " $(echo $have) " in
+      *" $myip/32 "*) ;;
+      *)
+        if [ "$missing" = 0 ]; then
+          echo "this machine's public address $myip/32 is NOT allowed in by $sg ($SG_NAME): SSH and the RA port will time out."
+          echo "To allow it (this script does not change the group; remove addresses you no longer use):"
+        fi
+        missing=1
+        echo "  aws --region $REGION ec2 authorize-security-group-ingress --group-id $sg --protocol tcp --port $port --cidr $myip/32"
+        ;;
+    esac
+  done
+  [ "$missing" = 0 ] && echo "this machine's public address $myip/32 is allowed in by $sg on ports 22 and $RA_PORT"
+  return 0
+}
+
 # launch_role <role> <instance type> <ami> - one instance with Nitro Enclaves on, unless one with that role exists.
 launch_role() {
   if [ -n "$(ids_by_role "$1")" ]; then echo "$1 instance already exists, skipping"; return 0; fi
@@ -147,6 +178,8 @@ status)
     echo "  AUDITOR_HOST=$A"
     echo "  ARM64_HOST=$R"
   fi
+  echo
+  check_my_address
   ;;
 
 stop|start)
@@ -154,9 +187,10 @@ stop|start)
         "Name=instance-state-name,Values=pending,running,stopping,stopped" \
         --query 'Reservations[].Instances[].InstanceId' --output text)
   [ -n "$ids" ] || die "no instances tagged Project=$TAG"
-  aws ec2 "$1-instances" --instance-ids $ids --query "${1^}pingInstances" --output text 2>/dev/null \
-    || aws ec2 "$1-instances" --instance-ids $ids >/dev/null
+  aws ec2 "$1-instances" --instance-ids $ids >/dev/null || die "$1-instances"
   echo "$1: $ids"
+  # A started instance gets a new address, and this machine's may have changed too: say whether it can get in.
+  [ "$1" = start ] && check_my_address
   ;;
 
 delete)
