@@ -1,10 +1,11 @@
-// att-ra-responder is the one binary every role's build layers into the enclave image.
+// att-ra-responder answers attestation requests from inside the TEE. On Nitro it is the one binary every role's build
+// layers into the enclave image, so it is measured; on TDX and SEV-SNP it runs from the guest's disk and is not.
 //
 // att-vendor and att-auditor are compiled from different source (cmd/vendor and cmd/auditor),
 // so a shared responder keeps the image PCR0/PCR2 identical between their independent
 // builds of the same Dockerfile.
 //
-// Inside a Nitro enclave only two commands run (see internal/setup/build's entrypoint.sh):
+// Inside a Nitro enclave only two commands run (see the entrypoint.sh that internal/setup/build/<role>/aws/build.go embeds):
 // "lo-up" and "ra-serve --extractor nsm". Inside an Intel TDX or AMD SEV-SNP guest it is
 // "ra-serve --extractor tdx | snp-initrd | snp-verity --listen tcp:0.0.0.0:<port>". None depends
 // on the role that built the image, so this binary carries just these, built once from one source.
@@ -56,7 +57,8 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `att-ra-responder runs inside the TEE. every role's build layers this one binary as is
+	fmt.Fprintln(os.Stderr, `att-ra-responder runs inside the TEE. in a Nitro enclave every role's build layers this one binary as is;
+on a TDX or SEV-SNP guest it runs from the guest's disk
 
   ra-serve  --listen tcp:<host:port> | vsock:<port>
             --extractor nsm | tdx | snp-initrd | snp-verity | fixture=<doc>  [--user-data <hex>]

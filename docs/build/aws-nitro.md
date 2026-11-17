@@ -128,8 +128,8 @@ Three commits had made the earlier ones stale:
 | `029bbdc` | adds a function to `internal/cli`, which the responder links but does not call | moved: the responder became `c61c988e…` (`docs/build/ra-comparison.md`, "What covering the responder costs") |
 
 **Stale again since 2026-11-17:** every build now passes `-ldflags=-buildid=` (above, "The Go build ID, measured"), so
-the responder is another file (`215423b8…` at `2efe8db`, before its comments were corrected) and PCR0 and PCR2 move
-once more. The values below are right for `c116845` and its responder; the values for the empty build ID are **not
+the responder is another file (`215423b8…` at `2efe8db`; after `cmd/ra-responder`'s stale comments and usage text
+were corrected the same day, `d6e3422d…` on amd64 and `f581d95c…` on arm64) and PCR0 and PCR2 move once more. The values below are right for `c116845` and its responder; the values for the empty build ID are **not
 taken yet** (they need a Nitro instance).
 
 The values at `c116845`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder `c61c988e…`,
