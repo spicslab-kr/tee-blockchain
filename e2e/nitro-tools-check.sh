@@ -88,7 +88,9 @@ mkdir app && printf 'hello\n' > app/hello && printf 'FROM scratch\nCOPY hello /h
 git init -q --bare --initial-branch=main remote.git
 git clone -q remote.git work && git -C work config user.email t@t && git -C work config user.name t
 echo seed > work/seed && git -C work add seed && git -C work commit -qm seed && git -C work push -q -u origin main
-push_cfg() { cp "$1" work/build-config.json && git -C work add build-config.json && git -C work commit -qm "$1" && git -C work push -q; }
+seed=$(git -C work rev-parse HEAD)
+# receive requires source.commit to be in the repository it clones: point the Vendor's config at this repository's seed
+push_cfg() { sed -E "s/(\"commit\": *\")[0-9a-f]+\"/\1$seed\"/" "$1" > work/build-config.json && git -C work add build-config.json && git -C work commit -qm "$1" && git -C work push -q; }
 n=0
 ok()  { echo "✅ $2"; echo "@@RESULT $1 $3 $3 $2"; }
 bad() { echo "❌ $2"; echo "@@RESULT $1 $3 $4 $2"; n=$((n+1)); }
