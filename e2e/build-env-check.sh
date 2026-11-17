@@ -53,6 +53,9 @@ git -C work config user.email t@t; git -C work config user.name t
 echo 'package main' > work/main.go
 git -C work add main.go; git -C work commit -qm seed; git -C work push -q -u origin main
 seed=\$(git -C work rev-parse HEAD)
+# aws-nitro configs carry ami_release, docker and nitro_cli (required). This host's own release, so that only the
+# architecture differs; receive does not compare the two versions (build --config does: nitro-tools-check.sh).
+REL=\$(. /etc/os-release; echo "\$PRETTY_NAME" | grep -oE '20[0-9]{2}\.[0-9]+\.[0-9]{8}')
 
 # push_cfg <arch> <trimpath> - push one build-config.json as a new commit
 push_cfg() {
@@ -64,7 +67,8 @@ push_cfg() {
   "platform": "aws-nitro",
   "source": { "repo": "https://example.com/svc.git", "commit": "\$seed" },
   "tee_info": { "instance_id": "i-0abc", "region": "eu-north-1", "ami_id": "ami-0123" },
-  "build_env": { "os": "linux", "arch": "\$1", "go": "$GOVER", "trimpath": \$2 }
+  "build_env": { "os": "linux", "arch": "\$1", "go": "$GOVER", "trimpath": \$2,
+                 "ami_release": "\$REL", "docker": "not-compared-by-receive", "nitro_cli": "not-compared-by-receive" }
 }
 CFG
   git -C work add build-config.json; git -C work commit -qm "cfg \$1" ; git -C work push -q

@@ -31,9 +31,15 @@ git -C src/docker-nginx checkout -q $SRC_COMMIT
 fix_modes src/docker-nginx
 step_stop "FETCHING SOURCE ($SRC_REPO @ $SRC_COMMIT)"
 
+# att-vendor build - builds the source into the image and measurements, and with --verify builds it a second time to
+#   confirm the same value comes out. The Vendor checks reproducibility itself before registering.
+step "BUILDING SOURCE (checking reproducibility)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out-dir out --verify
+
 # Write build-config.json in the clone root, in the shape att-vendor send pushes to the Auditor (an existing file is kept).
 #   The self-register below takes service, version and arch from it with --config. The file sits outside the app directory
 #   ($SRC_DIR), so it is not part of the measurement. tee_info comes from the instance metadata ("unknown" when unreadable).
+#   Written after build, because build installs docker and nitro-cli: ami_release (/etc/os-release), docker and nitro_cli
+#   (rpm -q) are required on aws-nitro, as att-vendor send would record them on the Vendor's instance.
 step_start "WRITING BUILD CONFIG"
 if [ -f src/docker-nginx/build-config.json ]; then
   echo "build-config.json already in the clone root - keeping it"
@@ -41,6 +47,8 @@ else
   case "$(uname -m)" in x86_64) GOARCH=amd64;; aarch64|arm64) GOARCH=arm64;; *) GOARCH=unknown;; esac
   TOK=$(curl -s -m 2 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null || true)
   md() { curl -s -m 2 -H "X-aws-ec2-metadata-token: $TOK" "http://169.254.169.254/latest/meta-data/$1" 2>/dev/null || echo unknown; }
+  REL=$(. /etc/os-release; echo "$PRETTY_NAME" | grep -oE '20[0-9]{2}\.[0-9]+\.[0-9]{8}')
+  read -r DOCKER_V NITRO_V < <(rpm -q --queryformat '%{VERSION}-%{RELEASE} ' docker aws-nitro-enclaves-cli)
   cat > src/docker-nginx/build-config.json <<EOF
 {
   "schema": "attestamp.build-config/1",
@@ -49,16 +57,13 @@ else
   "platform": "aws-nitro",
   "source": { "repo": "$SRC_REPO", "commit": "$SRC_COMMIT", "path": "$SRC_DIR" },
   "tee_info": { "instance_id": "$(md instance-id)", "region": "$(md placement/region)", "ami_id": "$(md ami-id)" },
-  "build_env": { "os": "linux", "arch": "$GOARCH", "go": "$GOVER", "trimpath": true }
+  "build_env": { "os": "linux", "arch": "$GOARCH", "go": "$GOVER", "trimpath": true,
+                 "ami_release": "$REL", "docker": "$DOCKER_V", "nitro_cli": "$NITRO_V" }
 }
 EOF
 fi
 cat src/docker-nginx/build-config.json
 step_stop "WRITING BUILD CONFIG"
-
-# att-vendor build - builds the source into the image and measurements, and with --verify builds it a second time to
-#   confirm the same value comes out. The Vendor checks reproducibility itself before registering.
-step "BUILDING SOURCE (checking reproducibility)" ./att-vendor build --app-dir src/docker-nginx/$SRC_DIR --out-dir out --verify
 
 # att-vendor launch - runs that image as an enclave in my TEE.
 step "LAUNCHING ENCLAVE" ./att-vendor launch --eif out/alpine-slim.eif

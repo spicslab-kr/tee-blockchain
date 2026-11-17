@@ -110,7 +110,8 @@ cat > "$WD/build-config.json" <<EOF
   "platform": "aws-nitro",
   "source": { "repo": "https://github.com/nginx/docker-nginx", "commit": "ef5a25a6314e652a2dcfbce6074bef729f4d9639", "path": "mainline/alpine-slim" },
   "tee_info": { "instance_id": "i-0check", "region": "eu-north-1", "ami_id": "ami-0check" },
-  "build_env": { "os": "linux", "arch": "arm64", "go": "$GOVER", "trimpath": true }
+  "build_env": { "os": "linux", "arch": "arm64", "go": "$GOVER", "trimpath": true,
+                 "ami_release": "2023.12.20261109", "docker": "25.0.18-1.amzn2023.0.3", "nitro_cli": "1.5.0-0.amzn2023" }
 }
 EOF
 cat > "$WD/measurements.json" <<EOF
