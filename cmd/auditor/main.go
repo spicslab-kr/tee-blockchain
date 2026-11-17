@@ -566,7 +566,7 @@ func launchCmd(args []string) error {
 	t.Done(fmt.Sprintf("%s document, %d bytes → %s", doc.Format, len(doc.Raw), selfDoc))
 
 	// The security group is changed only with --open-port-to, and only to that source; otherwise this reports and prints
-	// the command (internal/setup/launch/<role>/aws/port.go).
+	// the command (internal/setup/launch/aws/port.go).
 	launch.ReportPort(ctx, l.Port, *openTo, os.Stdout)
 	return nil
 }

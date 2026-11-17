@@ -152,6 +152,10 @@ cannot prove is compared in `docs/build/ra-comparison.md`, and what has been mea
 `docs/status/test-matrix.md`. gcp and azure exist so the format names, the Parser interface and the folder layout are
 already in place.
 
+`internal/setup/build/aws` and `internal/setup/launch/aws` are shared: the Nitro image build (docker, the responder
+layer, normalizing, the EIF and its PCRs, `--verify`) and launch (nitro-cli, the vsock bridge, the security-group port
+report), with thin role adapters in `setup/{build,launch}/{Vendor,auditor}/aws`. Until 2026-11-17 each role had its
+own full copy; the two were the same apart from one comment.
 `internal/setup/build/cpio` is shared: the deterministic cpio writer for confidential-VM initrds.
 `internal/setup/build/tdx` and `internal/setup/launch/tdx` are shared too: the TDX build (Option 1 and 2, `--verify`)
 and launch (GRUB entry, post-boot check), with thin role adapters in `setup/{build,launch}/{Vendor,auditor}/tdx`, the
@@ -244,8 +248,8 @@ The table is read from the imports of each `cmd/*` package (`go list -deps ./cmd
 | `tee/parse/aws` (shared) | Verify a Nitro document and extract measurements | yes | yes | yes | no |
 | `tee/parse/<role>` | Role-typed adapter over the shared parser | yes | yes | yes | no |
 | `setup/build` (root) | Architecture, toolchain pin, responder build check | yes | yes | no | no |
-| `setup/build/<role>/aws` | Reproducible image build, scan, verify | yes | yes | no | no |
-| `setup/launch/<role>/aws` | Start the enclave, bridge the port, measure | yes | yes | no | no |
+| `setup/build/aws` (shared) and its `<role>/aws` adapters | Reproducible image build, scan, verify | yes | yes | no | no |
+| `setup/launch/aws` (shared) and its `<role>/aws` adapters | Start the enclave, bridge the port, measure | yes | yes | no | no |
 | `setup/build/tdx`, `setup/launch/tdx` (shared) and their `<role>/tdx` adapters | Build the TDX initrd; install it under GRUB and check the boot | yes | yes | no | no |
 | `setup/build/snp`, `setup/launch/snp` (shared) and their `<role>/snp` adapters | Build the SEV-SNP initrd or image; install it and check the boot | yes | yes | no | no |
 | `setup/build/verity`, `setup/launch/grub` (shared) | The Option 2 image, and the GRUB install, for both TDX and SEV-SNP | yes | yes | no | no |

@@ -149,7 +149,7 @@ The Auditor needs read access to the repository. Exit codes 8 to 11 report git f
 
 - [main](main.go) switches on the first argument and calls one function per command. `exitCode` maps errors to exit codes.
 - [selfRegisterCmd](self_register.go) runs the flow 2 sequence.
-- [Build.Run](../../internal/setup/build/Vendor/aws/build.go) and [Launch.Run](../../internal/setup/launch/Vendor/aws/launch.go) build and start the enclave.
+- [Build.Run](../../internal/setup/build/aws/build.go) and [Launch.Run](../../internal/setup/launch/aws/launch.go) (through the role adapters in `internal/setup/{build,launch}/Vendor/aws`) build and start the enclave.
 - [BuildConfig](../../internal/core/transfer/Vendor/build_config.go) defines `build-config.json`, and `Validate` checks it.
 - [GitTransport](../../internal/core/transfer/Vendor/git.go) implements `Send` and `Receive`.
 - [Registrar](../../internal/chain/register/Vendor/register.go) registers a `Signed` with its `Meta` and returns a `Receipt`.

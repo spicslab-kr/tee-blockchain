@@ -155,7 +155,7 @@ well. The request packages do not import the parsers, so no verifier code is lin
 Until now Phase 3 existed as test scripts under `testdata/`; `att-vendor build` and `launch` were Nitro only. This is
 the design for putting TDX into the tool. **TDX only**: SEV-SNP (4b) follows the same shape once this is in place.
 
-**The same skeleton on every platform.** Nitro's `build` (`internal/setup/build/<role>/aws/build.go`) is five steps.
+**The same skeleton on every platform.** Nitro's `build` (`internal/setup/build/aws/build.go`) is five steps.
 The TDX build keeps the five, so all three platforms read alike:
 
 | step | Nitro (`aws`) | TDX (`tdx`) |

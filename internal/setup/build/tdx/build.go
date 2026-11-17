@@ -2,7 +2,7 @@
 // boot will measure from it. It is the role-independent core; internal/setup/build/{Vendor,auditor}/tdx are thin
 // adapters, the same two-layer shape as internal/tee/parse and internal/tee/request.
 //
-// It follows the five steps of the Nitro build (internal/setup/build/<role>/aws/build.go), so the platforms read alike;
+// It follows the five steps of the Nitro build (internal/setup/build/aws/build.go), so the platforms read alike;
 // docs/status/cvm-port.md, "Phase 3 design", has the side-by-side table:
 //
 //  1. tools: mksquashfs and veritysetup for Option 2, with their versions recorded
