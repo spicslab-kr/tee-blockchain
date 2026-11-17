@@ -69,8 +69,8 @@ func (e BuildEnv) String() string {
 	return s
 }
 
-// CurrentBuildEnv returns the environment this att binary runs in, which its build command uses to
-// compile att-ra-responder. Trimpath comes from the binary's own build info.
+// CurrentBuildEnv returns the environment this att binary runs in: send records it as build_env and receive compares
+// it with the Vendor's. Trimpath comes from the binary's own build info.
 func CurrentBuildEnv() BuildEnv {
 	e := BuildEnv{OS: runtime.GOOS, Arch: runtime.GOARCH, Go: runtime.Version()}
 	if info, ok := debug.ReadBuildInfo(); ok {
@@ -142,9 +142,8 @@ func (c BuildConfig) Validate() error {
 			errs = append(errs, "tee_info."+k+": required for "+c.Platform)
 		}
 	}
-	// The Auditor rebuilds to build_env, so aws-nitro and intel-tdx (measurements differ per architecture
-	// and toolchain, because the image carries att-ra-responder) require it. trimpath=false passes
-	// validation and the Auditor warns about it.
+	// The Auditor rebuilds to build_env, so every platform with a build requires it (needsBuildEnv: aws-nitro,
+	// intel-tdx and both amd-sev-snp formats). trimpath=false passes validation and the Auditor warns about it.
 	if needsBuildEnv(c.Platform) {
 		if c.BuildEnv.OS == "" {
 			errs = append(errs, "build_env.os: required for "+c.Platform)
@@ -172,9 +171,10 @@ func (c BuildConfig) Validate() error {
 	return join(errs)
 }
 
-// needsBuildEnv reports whether a platform's measurements depend on the build environment. On aws-nitro the
-// EIF, on intel-tdx and amd-sev-snp-initrd the application initrd, and on amd-sev-snp-verity the application
-// disk image contain att-ra-responder, whose bytes change with the CPU architecture and the Go toolchain.
+// needsBuildEnv reports whether a platform's measurements depend on the build environment. On aws-nitro the EIF
+// carries att-ra-responder, whose bytes change with the CPU architecture and the Go toolchain. On intel-tdx and
+// amd-sev-snp-* the responder is not measured, but att itself writes the measured initrd or disk image, and an
+// application compiled for it depends on the architecture and toolchain as well.
 func needsBuildEnv(platform string) bool {
 	switch platform {
 	case "aws-nitro", "intel-tdx", "amd-sev-snp-initrd", "amd-sev-snp-verity":

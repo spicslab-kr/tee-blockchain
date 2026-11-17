@@ -1,5 +1,5 @@
-// Package build holds tooling shared by the Vendor and Auditor build packages (aws.Build lives
-// under Vendor/aws and auditor/aws; this package is the role-agnostic part).
+// Package build holds tooling shared by the Vendor and Auditor build packages (aws.Build lives in
+// internal/setup/build/aws, with thin adapters under Vendor/aws and auditor/aws; this package is the role-agnostic part).
 //
 // Arch cross-builds att-ra-responder for every CPU architecture this project ships to, so the
 // per-architecture hash can be produced and compared the same way everywhere.

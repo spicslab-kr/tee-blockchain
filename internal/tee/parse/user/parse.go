@@ -36,7 +36,7 @@ type Parser interface {
 	Parse(ra r.RADoc) (Measurements, error)
 }
 
-// Info is what the document says besides the measurements. Comparison uses it to check expiry, freshness and debug mode.
+// Info is what the document says besides the measurements. ra-parse prints it; nothing decides on it (Parse itself refuses a debug-mode TEE).
 type Info struct {
 	Format    string
 	Timestamp time.Time // when the document was created; certificates are judged valid as of this time

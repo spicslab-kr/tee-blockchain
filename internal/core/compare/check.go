@@ -13,7 +13,7 @@ type RegInfo struct {
 // Check is the trust decision for a registration. It is used wherever a registration is on one side: an
 // Auditor or Vendor checking its own lookup right after registering, and the User's final check. It passes
 // when the measurement hash matches, the registration has not expired at now (the chain's clock), and the
-// approver is in trustedApprovers (normally the registry's AUDITOR and VENDOR addresses).
+// approver is in trustedApprovers (normally the registry's one APPROVER, fixed at deployment).
 func Check(measurementHash []byte, reg RegInfo, now int64, trustedApprovers []string) Verdict {
 	var reasons []string
 	if reg.Expires <= now {

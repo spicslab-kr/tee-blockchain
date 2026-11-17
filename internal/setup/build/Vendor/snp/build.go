@@ -45,7 +45,7 @@ type Result struct {
 	Record       string // build-value.json, read by launch
 	InitrdSHA256 string
 	RootHash     string // Option 2
-	KernelArgs   string // Option 2: for launch --kernel-args
+	KernelArgs   string // Option 2: the root hash argument; launch reads it from build-value.json
 }
 
 // Run builds; see internal/setup/build/snp.
