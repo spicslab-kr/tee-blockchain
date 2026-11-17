@@ -62,8 +62,8 @@ First `git` (Git for Windows and macOS already have it; on Ubuntu or Debian, als
 fetches:
 
 ```
-git clone https://github.com/spicslab-kr/tee-blockchain
-cd tee-blockchain
+git clone https://github.com/spicslab-kr/attestamp
+cd attestamp
 bash e2e/0-Setup-local-install.sh
 ```
 
@@ -125,7 +125,7 @@ https://github.com/foundry-rs/foundry/releases/tag/v1.8.0 and put `anvil.exe` on
 
 ### 2. On your computer: the binaries
 
-In the `tee-blockchain` folder of step 1:
+In the `attestamp` folder of step 1:
 
 ```
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-auditor ./cmd/auditor

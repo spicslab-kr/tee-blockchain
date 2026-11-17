@@ -62,7 +62,7 @@ The option is chosen by the format string; every command below takes it with `--
 The same as [TDX step 1](tdx.md#1-on-your-computer-the-tools-and-the-source), which gives every command:
 
 1. `bash`: a terminal, Git Bash on Windows, or WSL; `git`, Go, `gcloud` and the clone in the **same** environment.
-2. `git`, then `git clone https://github.com/spicslab-kr/tee-blockchain`, `cd tee-blockchain`, then
+2. `git`, then `git clone https://github.com/spicslab-kr/attestamp`, `cd attestamp`, then
    `bash e2e/0-Setup-local-install.sh` for Go **go1.26.1** exactly. On Linux open a new terminal (or
    `source ~/.bashrc`) before `go version`: the script adds Go to `PATH` in `~/.bashrc`, which only a new interactive
    shell reads. On Windows, run it from Git Bash opened as administrator (installing Go needs it),
@@ -79,7 +79,7 @@ Versions we used: [toolchain.md](toolchain.md).
 
 ### 2. On your computer: the binaries
 
-In the `tee-blockchain` folder of step 1:
+In the `attestamp` folder of step 1:
 
 ```
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-auditor ./cmd/auditor

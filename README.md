@@ -9,7 +9,7 @@
 <p align="center">
   <sub>CREATED AND MAINTAINED BY</sub><br>
   SPICS Lab, Kyung Hee University<br>
-  <a href="https://github.com/spicslab-kr/tee-blockchain/issues">GitHub issues</a> &nbsp;·&nbsp;
+  <a href="https://github.com/spicslab-kr/attestamp/issues">GitHub issues</a> &nbsp;·&nbsp;
   <a href="#contributors">Contributors</a>
 </p>
 
@@ -50,8 +50,8 @@ without a key from anyone.
 ### Get the source
 
 ```
-git clone https://github.com/spicslab-kr/tee-blockchain
-cd tee-blockchain
+git clone https://github.com/spicslab-kr/attestamp
+cd attestamp
 git submodule update --init contracts/evm/lib/openzeppelin-contracts
 ```
 
