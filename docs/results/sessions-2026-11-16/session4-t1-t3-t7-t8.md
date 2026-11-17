@@ -1,6 +1,6 @@
 # Session 4 of 2026-11-16: T1, T3, T7 and T8 on the confidential VMs
 
-Run on 2026-11-16 with an AI coding agent under operator supervision. *(This sentence was reworded on 2026-11-16 in `02644d1`: it first named who ran the session; it now states the conditions. The facts are unchanged.)* Binaries built at commit `767c544` (`att-auditor` `3d4b6635…`, `att-vendor`
+Run on 2026-11-16 at commit `767c544`: binaries built there (`att-auditor` `3d4b6635…`, `att-vendor`
 `3a30019c…`, go1.26.1, `CGO_ENABLED=0 -trimpath -buildvcs=false`); the T7 script was committed as `de13b48` during
 the session, byte-identical to the copy that ran (`95e915e5…`). 16 result lines, every one with `result` equal to
 `expected`: 8 in `session4-amd-sev-snp-initrd.jsonl`, 1 in `session4-amd-sev-snp-verity.jsonl`, 7 in

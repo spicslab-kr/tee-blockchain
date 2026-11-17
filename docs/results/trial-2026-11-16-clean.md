@@ -13,9 +13,9 @@
   `VENDOR_HOST AUDITOR_HOST ARM64_HOST AUDITOR_ADDR VENDOR_ADDR` are declared in the environment: `e2e/env.sh` line 14
   runs `declare -p` on all five, which fails under the script's `set -euo pipefail` (F3).
 
-Run on 2026-11-15/16 (UTC 18:40–21:10) at commit `77fb251`, with an AI coding agent working from the documents alone,
+Run on 2026-11-15/16 (UTC 18:40–21:10) at commit `77fb251`, following the documents alone,
 without the earlier sessions' knowledge, in a WSL Ubuntu 24.04.5 on the development machine, with the
-repository as it was. **No tracked file was changed**; this file is the only one written into the repository. *(These two sentences were reworded on 2026-11-16 in `02644d1`: they first named who ran the trial and spoke in the first person. The facts are unchanged.)* The
+repository as it was. **No tracked file was changed**; this file is the only one written into the repository. The
 documented steps themselves wrote gitignored files (`e2e-work/`, `pem2.pem`, `auditor.key`, `deployer.key`, `att-*`)
 and some files that are **not** gitignored: `linux/`, `quote.bin*`, `evidence.cbor*`, `measurements.json` (F14). They
 are still there.

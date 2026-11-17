@@ -5,8 +5,8 @@ it and which of the vendor's documentation its flags were checked against; the `
 in the script, one function or case per action.
 
 **These scripts create billable resources.** Every `create`, `run-instances`, `delete` and
-`terminate-instances` they run costs money or destroys state. Run them only when you mean to, and if an automated
-agent runs commands for you, have it ask before it runs any of these scripts' creating or deleting actions: a rule
+`terminate-instances` they run costs money or destroys state. Run them only when you mean to, and if another program
+runs commands for you, have it ask before it runs any of these scripts' creating or deleting actions: a rule
 that asks before `gcloud … create` or `aws ec2 run-instances` does not see the calls a script makes inside. Nothing is
 created without `--yes` ("Nothing is created without `--yes`", below).
 
@@ -141,8 +141,8 @@ typo stops it before anything runs.
   that). On 2026-11-16 a command run without a terminal went through the pause unseen and created two VMs nobody meant
   to make (`docs/results/build-info-gaps-2026-11.md`, #20).
 
-**Why a flag and not a pause, or an approval prompt.** An approval rule in an agent's or a tool's settings, such as
-"ask before `gcloud compute instances create`", sees only the command a person or an agent typed, for example
+**Why a flag and not a pause, or an approval prompt.** An approval rule in a tool's settings, such as
+"ask before `gcloud compute instances create`", sees only the command a person or a program typed, for example
 `bash e2e/cloud/gcp-cvm.sh snp create`. It does not see the `gcloud` or `aws` calls the script makes inside, so it
 never asks. A pause protects only someone watching a terminal. A flag in the typed command is the one thing both a
 person and an approval rule can see.

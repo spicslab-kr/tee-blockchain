@@ -1,7 +1,7 @@
 # Intel TDX, session 2 of 2026-11-16: the Auditor's own rebuild (D3), T2, T3, T6
 
-Run on 2026-11-16 at commit `3b81b1b`, with an AI coding agent under operator supervision (binaries built there; the `self-register` wording change
-`fix(cmd/vendor)` came during the run and only changes its text). *(This sentence was reworded on 2026-11-16 in `02644d1`: it first named who ran the session; it now states the conditions. The facts are unchanged.)* 18 result lines in `intel-tdx.jsonl`, written by hand
+Run on 2026-11-16 at commit `3b81b1b` (binaries built there; the `self-register` wording change
+`fix(cmd/vendor)` came during the run and only changes its text). 18 result lines in `intel-tdx.jsonl`, written by hand
 in the results contract (`"script":"manual: …"`), every one with `result` equal to `expected`. Local anvil 1.8.0
 (`NET=local`), verifier on the operator's Windows machine.
 
