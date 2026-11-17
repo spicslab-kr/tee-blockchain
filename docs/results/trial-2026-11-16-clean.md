@@ -176,7 +176,7 @@ manual lines) are not in the repository; the table below is their record here.
 |---|---|---|---|---|
 | EC2 tagged `Project=trial1116-nitro, Role=vendor` (no Name tag) | AWS eu-north-1 | m6i.xlarge, Nitro Enclaves on | the newest AL2023 x86_64 AMI of 2026-11-15 | **stopped** |
 | EC2 tagged `Project=trial1116-nitro, Role=auditor` | AWS eu-north-1 | m6i.xlarge | the same | **stopped** (started once more for the extra checks, stopped again) |
-| key pair `trial1116-nitro`, security group `trial1116-nitro` (22 and 5000 from `<my-ip>/32`) | AWS eu-north-1 | — | — | exist; no hourly cost |
+| key pair `trial1116-nitro`, security group `trial1116-nitro` (22 and 5000 from `<my-ip>/32`) | AWS eu-north-1 | — | — | exist; no hourly cost. *(Both deleted 2026-11-18.)* |
 | `trial1116-tdx-vendor` | GCP `<project-id>`, us-central1-a | c3-standard-4, TDX | `ubuntu-2404-noble-amd64-v20261105` | **stopped** (TERMINATED); put back to the stock boot |
 | `trial1116-snp-vendor` | GCP `<project-id>`, us-central1-a | n2d-standard-2, SEV-SNP | `ubuntu-2404-noble-amd64-v20261105` | **stopped** (TERMINATED); put back to the stock boot |
 
