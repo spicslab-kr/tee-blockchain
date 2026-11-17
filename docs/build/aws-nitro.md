@@ -118,8 +118,9 @@ The software's own files and logs are not touched.
 a different PCR0 and PCR2 from `fc105b0` on (PCR1, the kernel and init, does not change). PCR values recorded before
 that commit are marked "before `fc105b0`" where they appear.
 
-**The Nitro reference values were taken again on 2026-11-16, at `c116845`** (`docs/results/aws-nitro-2026-11-16.md`).
-Three commits had made the earlier ones stale:
+**The Nitro reference values were taken again on 2026-11-17, at `ea21b91`** (`docs/results/aws-nitro-2026-11-17.md`),
+after the empty build ID. Before that, on 2026-11-16 at `c116845` (`docs/results/aws-nitro-2026-11-16.md`), after
+three commits had made the earlier ones stale:
 
 | commit | what it changes | effect on the test application's PCR0/PCR2 |
 |---|---|---|
@@ -127,14 +128,18 @@ Three commits had made the earlier ones stale:
 | `ade66e6` | every build is `CGO_ENABLED=0` ("cgo, measured") | none on the recorded values: they were already built with the cgo-free responder `5573b538…` |
 | `029bbdc` | adds a function to `internal/cli`, which the responder links but does not call | moved: the responder became `c61c988e…` (`docs/build/ra-comparison.md`, "What covering the responder costs") |
 
-**Stale again since 2026-11-17:** every build now passes `-ldflags=-buildid=` (above, "The Go build ID, measured"), so
-the responder is another file (`215423b8…` at `2efe8db`; after `cmd/ra-responder`'s stale comments and usage text
-were corrected the same day, `d6e3422d…` on amd64 and `f581d95c…` on arm64) and PCR0 and PCR2 move once more. The values below are right for `c116845` and its responder; the values for the empty build ID are **not
-taken yet** (they need a Nitro instance).
+Then two more, which is why they were taken again on 2026-11-17:
 
-The values at `c116845`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder `c61c988e…`,
-x86_64, two machines identical: PCR0 `0c905480…`, PCR1 `4b4d5b36…`, PCR2 `6347a146…`. On arm64 (`c7g.xlarge`) all
-three differ: PCR0 `f1d4d679…`, PCR1 `3b4a7e1b…`, PCR2 `6e865138…`. **Every Nitro value is written next to the commit
+| commit | what it changes | effect on the test application's PCR0/PCR2 |
+|---|---|---|
+| `929a609` | every build passes `-ldflags=-buildid=` (above, "The Go build ID, measured") | moved: the responder became `215423b8…` (at `2efe8db`) |
+| `c91f094` | corrects `cmd/ra-responder`'s comments and its printed usage text | moved: the responder became `d6e3422d…` (amd64), `f581d95c…` (arm64) |
+
+**The current values**, at `ea21b91`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder
+`d6e3422d…` (amd64) / `f581d95c…` (arm64), 2026-11-17: x86_64, two machines identical: PCR0 `bfa0a428…`, PCR1 `4b4d5b36…`, PCR2 `aa36ce6f…`. On arm64
+(`c7g.xlarge`) all three differ: PCR0 `4f94d9c9…`, PCR1 `3b4a7e1b…`, PCR2 `79d0abea…`. PCR1 is the same as on 2026-11-16 on both (nitro-cli 1.5.0), on
+another x86_64 image (`ami-0f71b90bee7050a75`, release 2023.12.20261112). The values at `c116845` (responder
+`c61c988e…`) were x86_64 PCR0 `0c905480…`, PCR2 `6347a146…` and arm64 PCR0 `f1d4d679…`, PCR2 `6e865138…`. **Every Nitro value is written next to the commit
 it was measured at**: the responder's bytes, and so PCR0 and PCR2, changed with any change to a package the responder
 links until 2026-11-17, and still change with any change to code it can run or to the lines that code sits on, so a
 value without its commit cannot be compared.
@@ -181,8 +186,8 @@ The build tools are not fixed either. `build` installs `docker` and `aws-nitro-e
 `trimpath`, the Amazon Linux release (`ami_release`) and both package versions (`docker`, `nitro_cli`), and the
 Auditor checks them twice. `receive`, before anything is installed, compares the release: a proxy, not a guarantee: each Amazon Linux release has its own package repository, but a `dnf update` with another release, `releasever=latest` in `/etc/dnf/vars`, or a package installed by hand moves the versions without moving the release.
 `build --config <the Vendor's build-config.json>`, right after `dnf install`, compares the versions themselves and
-stops before building anything if either differs; that is the real check. **Not yet run on an instance**
-(`e2e/nitro-tools-check.sh`). Use the same AMI on both sides; to see the values by hand:
+stops before building anything if either differs; that is the real check. Run on two instances on 2026-11-17
+(`e2e/nitro-tools-check.sh`, `docs/results/aws-nitro-2026-11-17.md`): all six verdicts as expected. Use the same AMI on both sides; to see the values by hand:
 
 ```
 rpm -q docker aws-nitro-enclaves-cli

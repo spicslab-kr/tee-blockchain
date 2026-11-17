@@ -126,12 +126,25 @@ the same. The **arm64** instance of that day, a `c7g.xlarge` made with `aws-nitr
 | docker | `docker-25.0.18-1.amzn2023.0.3.aarch64`; `Docker version 25.0.14, build 0bab007` |
 | git | `git-2.50.1-1.amzn2023.0.2.aarch64`, installed by `0-Setup-local-upload.sh` |
 
+On **2026-11-17** (the baseline for the empty build ID, `docs/results/aws-nitro-2026-11-17.md`) three new instances,
+made with `aws-nitro.sh create --yes` and `create-arm64 --yes`. The two x86_64 ones were identical in every line, and
+on **another image** than the earlier x86_64 pair:
+
+| what | x86_64 (both) | arm64 |
+|---|---|---|
+| AMI | `ami-0f71b90bee7050a75` (the newest Amazon Linux 2023 that day) | `ami-0ce2f8dd9b0fcfb35` (the same as on 2026-11-16) |
+| OS | `PRETTY_NAME="Amazon Linux 2023.12.20261112"` | the same |
+| kernel | `6.18.62-127.179.amzn2023.x86_64` | `6.1.190-237.442.amzn2023.aarch64` |
+| aws-nitro-enclaves-cli | `aws-nitro-enclaves-cli-1.5.0-0.amzn2023.x86_64` (and `-devel`); `Nitro CLI 1.5.0` | `…1.5.0-0.amzn2023.aarch64`; `Nitro CLI 1.5.0` |
+| docker | `docker-25.0.18-1.amzn2023.0.3.x86_64`; `Docker version 25.0.14, build 0bab007` | `docker-25.0.18-1.amzn2023.0.3.aarch64`; the same |
+| git | `git-2.50.1-1.amzn2023.0.2.x86_64`, installed by `0-Setup-local-upload.sh` | `git-2.50.1-1.amzn2023.0.2.aarch64` |
+
 `build` and `launch` install docker and `aws-nitro-enclaves-cli` with `dnf` without a version, so another day's image
 may bring others. Since 2026-11-17 the Vendor's `send` records the Amazon Linux release and both package versions in
 `build_env`, the Auditor's `receive` compares the release and its `build --config` the versions after installing them
-(`docs/build/aws-nitro.md`, "What `build` cannot change"; not yet run on an instance). PCR1 depends on nitro-cli's kernel files: with 1.5.0 the test application's PCR1 was
-`4b4d5b36…a493` on x86_64 (2026-11-12 at `9a5668e` and 2026-11-16 at `c116845`) and `3b4a7e1b…` on arm64
-(2026-11-16 at `c116845`). To record a later instance the same way:
+(`docs/build/aws-nitro.md`, "What `build` cannot change"; run on two instances on 2026-11-17). PCR1 depends on nitro-cli's kernel files: with 1.5.0 the test application's PCR1 was
+`4b4d5b36…a493` on x86_64 (2026-11-12 at `9a5668e`, 2026-11-16 at `c116845`, and 2026-11-17 at `ea21b91` on the
+newer image) and `3b4a7e1b…` on arm64 (2026-11-16 at `c116845` and 2026-11-17 at `ea21b91`). To record a later instance the same way:
 
 ```
 rpm -q docker aws-nitro-enclaves-cli git
