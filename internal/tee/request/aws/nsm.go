@@ -1,3 +1,7 @@
+// Package aws gets an AWS Nitro attestation document from inside the enclave (/dev/nsm), and carries it between the
+// parent instance and the enclave (vsock, the TCP-to-vsock proxy, the enclave's loopback). It does not depend on the
+// role: each role's internal/tee/request/<role>/aws checks the nonce and turns the document into that role's RADoc, as
+// internal/tee/request/<role>/tdx does over internal/tee/request/tdx.
 package aws
 
 import (
@@ -5,8 +9,6 @@ import (
 	"fmt"
 
 	"github.com/fxamacker/cbor/v2"
-
-	"attestamp/internal/tee/request/Vendor"
 )
 
 // Format is the document format name of Nitro attestation documents.
@@ -31,10 +33,9 @@ type nsmResponse struct {
 	Error *string `cbor:"Error,omitempty"`
 }
 
-func encodeAttestationRequest(nonce vendor.Nonce, userData []byte) ([]byte, error) {
-	if err := nonce.Validate(); err != nil {
-		return nil, err
-	}
+// encodeAttestationRequest does not check the nonce's size: the role adapter does, with its own Nonce.Validate,
+// before calling Attest.
+func encodeAttestationRequest(nonce, userData []byte) ([]byte, error) {
 	return cbor.Marshal(nsmRequest{Attestation: nsmAttestationReq{UserData: userData, Nonce: nonce}})
 }
 

@@ -1,49 +1,27 @@
 package aws
 
 import (
-	"bytes"
-	"strings"
+	"context"
+	"path/filepath"
 	"testing"
-
-	"github.com/fxamacker/cbor/v2"
 
 	"attestamp/internal/tee/request/Vendor"
 )
 
-func TestNSM_RequestEncoding(t *testing.T) {
-	n := vendor.Nonce(bytes.Repeat([]byte{7}, 32))
-	b, err := encodeAttestationRequest(n, []byte("svc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var m map[string]map[string][]byte
-	if err := cbor.Unmarshal(b, &m); err != nil {
-		t.Fatal(err)
-	}
-	a, ok := m["Attestation"]
-	if !ok || !bytes.Equal(a["nonce"], n) || string(a["user_data"]) != "svc" || a["public_key"] != nil {
-		t.Fatalf("request shape: %v", m)
-	}
-	if _, err := encodeAttestationRequest(vendor.Nonce("short"), nil); err == nil {
-		t.Fatal("short nonce must be rejected")
+// A nonce of the wrong size is refused before any device is touched; the device here does not exist, so reaching it
+// would give another error.
+func TestExtract_RejectsShortNonce(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "no-nsm")
+	if _, err := (Extractor{Device: missing}).Extract(context.Background(), vendor.Nonce("short")); err == nil ||
+		err.Error() != vendor.Nonce("short").Validate().Error() {
+		t.Fatalf("short nonce: got %v, want the nonce size error", err)
 	}
 }
 
-func TestNSM_ResponseDecoding(t *testing.T) {
-	ok, _ := cbor.Marshal(map[string]any{"Attestation": map[string]any{"document": []byte("cose-sign1")}})
-	doc, err := decodeAttestationResponse(ok)
-	if err != nil || string(doc) != "cose-sign1" {
-		t.Fatalf("ok response: %v %q", err, doc)
-	}
-	bad, _ := cbor.Marshal(map[string]any{"Error": "InvalidArgument"})
-	if _, err := decodeAttestationResponse(bad); err == nil || !strings.Contains(err.Error(), "InvalidArgument") {
-		t.Fatalf("error response: %v", err)
-	}
-	empty, _ := cbor.Marshal(map[string]any{"Attestation": map[string]any{}})
-	if _, err := decodeAttestationResponse(empty); err == nil {
-		t.Fatal("empty document must be rejected")
-	}
-	if _, err := decodeAttestationResponse([]byte{0xff}); err == nil {
-		t.Fatal("garbage must be rejected")
+func TestExtract_StopsOnDoneContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := (Extractor{}).Extract(ctx, make(vendor.Nonce, vendor.NonceSize)); err != context.Canceled {
+		t.Fatalf("done context: got %v, want context.Canceled", err)
 	}
 }

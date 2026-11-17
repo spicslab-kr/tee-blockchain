@@ -5,7 +5,7 @@
 // so a shared responder keeps the image PCR0/PCR2 identical between their independent
 // builds of the same Dockerfile.
 //
-// Inside a Nitro enclave only two commands run (see the entrypoint.sh that internal/setup/build/<role>/aws/build.go embeds):
+// Inside a Nitro enclave only two commands run (see the entrypoint.sh that internal/setup/build/aws/build.go embeds):
 // "lo-up" and "ra-serve --extractor nsm". Inside an Intel TDX or AMD SEV-SNP guest it is
 // "ra-serve --extractor tdx | snp-initrd | snp-verity --listen tcp:0.0.0.0:<port>". None depends
 // on the role that built the image, so this binary carries just these, built once from one source.

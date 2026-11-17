@@ -101,14 +101,14 @@ sub-package.
 ```
 internal/tee/request/
 ├── Vendor/          role package  (package vendor)
-│   ├── aws/         platform module: AWS Nitro, implemented
+│   ├── aws/         platform module: AWS Nitro, implemented (role adapter over internal/tee/request/aws)
 │   ├── tdx/         platform module: Intel TDX, implemented (role adapter over internal/tee/request/tdx)
 │   ├── snp/         platform module: AMD SEV-SNP, implemented (role adapter over internal/tee/request/snp)
 │   ├── gcp/         platform module: GCP Confidential Space, partial
 │   └── azure/       platform module: Azure, empty
 ├── auditor/         role package  (package auditor), same shape
 │   └── aws/ tdx/ snp/ gcp/ azure/
-├── tdx/, snp/       the role-independent request code for TDX and SEV-SNP
+├── aws/, tdx/, snp/ the role-independent request code for Nitro, TDX and SEV-SNP
 └── user/            role package  (package user), no platform sub-folders
 ```
 
@@ -244,7 +244,7 @@ The table is read from the imports of each `cmd/*` package (`go list -deps ./cmd
 
 | Module | Job | att-vendor | att-auditor | att-user | att-ra-responder |
 | --- | --- | :-: | :-: | :-: | :-: |
-| `tee/request/<role>` and `<role>/aws` | Request an attestation document; the responder side runs inside the enclave | yes | yes | yes (role only) | yes (Vendor copy, with aws, tdx and snp) |
+| `tee/request/<role>` and `<role>/aws`, over `tee/request/aws` (shared) | Request an attestation document; the responder side runs inside the enclave | yes | yes | yes (role only) | yes (Vendor copy, with aws, tdx and snp, and the shared aws, tdx and snp) |
 | `tee/parse/aws` (shared) | Verify a Nitro document and extract measurements | yes | yes | yes | no |
 | `tee/parse/<role>` | Role-typed adapter over the shared parser | yes | yes | yes | no |
 | `setup/build` (root) | Architecture, toolchain pin, responder build check | yes | yes | no | no |

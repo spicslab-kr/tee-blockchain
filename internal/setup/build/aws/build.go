@@ -3,7 +3,7 @@
 //
 // One step goes in here beyond building the software: layering in the attestation responder. A Nitro enclave can open
 // /dev/nsm only from inside and has no network, so for a third party to request attestation the responder has to be
-// inside the image. The responder's code lives in internal/tee/request/Vendor/aws (Extractor, vsock), and its ra-serve command runs from the image's entrypoint.
+// inside the image. The responder's code lives in internal/tee/request/aws (NSM, vsock), through the Vendor's adapter internal/tee/request/Vendor/aws, and its ra-serve command runs from the image's entrypoint.
 // The build adds the responder binary, an entrypoint script and the software's original command on top of the software image, and leaves the software's own files as they are.
 package aws
 
