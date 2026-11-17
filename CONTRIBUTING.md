@@ -153,6 +153,6 @@ type(scope): what changed, in the imperative
 ## Releases
 
 Tags are `vMAJOR.MINOR.PATCH`. A release attaches the four Linux binaries for `amd64` and
-`arm64`, built with the pinned toolchain and `-trimpath -buildvcs=false -ldflags=-buildid=`, plus a `SHA256SUMS` file. The
+`arm64`, built with the pinned toolchain, `CGO_ENABLED=0` and `-trimpath -buildvcs=false -ldflags=-buildid=`, plus a `SHA256SUMS` file. The
 `att-ra-responder` sha256 in a release is the one both Vendor and Auditor should see in their
 build logs.

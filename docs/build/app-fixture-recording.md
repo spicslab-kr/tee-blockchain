@@ -82,9 +82,9 @@ From `docs/build/sev-snp.md`, "Variables", built into `internal/setup/build/cpio
 From the repository root, one command per line:
 
 ```
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o mkappinitrd ./internal/setup/build/cpio/testdata/mkappinitrd
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o record-tdx ./internal/tee/parse/tdx/testdata/record
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o record-snp ./internal/tee/parse/snp/testdata/record
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o mkappinitrd ./internal/setup/build/cpio/testdata/mkappinitrd
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o record-tdx ./internal/tee/parse/tdx/testdata/record
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o record-snp ./internal/tee/parse/snp/testdata/record
 sha256sum mkappinitrd record-tdx record-snp
 ```
 
@@ -384,7 +384,7 @@ So the two possible results mean:
 - Build the recorder and the packer on your machine:
 
 ```
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o record-snp ./internal/tee/parse/snp/testdata/record
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o record-snp ./internal/tee/parse/snp/testdata/record
 ```
 
 Copy `record-snp` to both VMs (`gcloud compute scp`, one file per call).

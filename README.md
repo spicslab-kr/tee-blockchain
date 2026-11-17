@@ -102,7 +102,7 @@ measurements. **The full checklist, per platform, with the values to use, how to
 each one moves: [docs/build/reproduce.md](docs/build/reproduce.md).** The most important:
 
 1. The same CPU architecture (`amd64` or `arm64`) on both sides.
-2. The same Go toolchain (pinned, go1.26.1) with `-trimpath -buildvcs=false -ldflags=-buildid=`, and one and the same
+2. The same Go toolchain (pinned, go1.26.1) with `CGO_ENABLED=0` and `-trimpath -buildvcs=false -ldflags=-buildid=`, and one and the same
    `att-ra-responder` file on both sides.
 3. A base image pinned by digest (`FROM nginx@sha256:…`), and every package, dependency and
    `git clone` pinned to an exact version or commit.

@@ -82,7 +82,7 @@ carries the REPORTDATA written, and also saves the kernel command line and boot 
 build it by name from the repository root and run it as root on the guest:
 
 ```
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o record-tdx ./internal/tee/parse/tdx/testdata/record
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o record-tdx ./internal/tee/parse/tdx/testdata/record
 sudo ./record-tdx -out fx -nonce-text attestamp-tdx-fixture-0001
 ```
 

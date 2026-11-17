@@ -11,7 +11,7 @@
 // It only runs on a TDX guest with ConfigFS TSM (/sys/kernel/config/tsm/report, provider tdx_guest; Linux 6.7 or
 // later). It uses only the standard library. It is under testdata, so `go build ./...` skips it; build it with
 //
-//	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o record-tdx ./internal/tee/parse/tdx/testdata/record
+//	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o record-tdx ./internal/tee/parse/tdx/testdata/record
 //
 // and run it as root:  record-tdx -out fx -nonce-text attestamp-tdx-app-v1
 package main

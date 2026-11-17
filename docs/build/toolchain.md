@@ -21,7 +21,7 @@ The platform guides refer here: [AWS Nitro](aws-nitro.md), [Intel TDX](tdx.md), 
 
 | step | where | tools it calls |
 |---|---|---|
-| `go build` of `att-vendor`, `att-auditor`, `att-user`, `att-ra-responder` | your machine | go (`-trimpath -buildvcs=false -ldflags=-buildid=`, pinned version; `build` refuses a responder built otherwise) |
+| `go build` of `att-vendor`, `att-auditor`, `att-user`, `att-ra-responder` | your machine | go (`CGO_ENABLED=0` and `-trimpath -buildvcs=false -ldflags=-buildid=`, pinned version; `build` refuses a responder built otherwise) |
 | `go test ./...` | your machine | go; anvil for the chain tests (looked up on `PATH`, then `~/.foundry/bin`); git for the `core/transfer` tests |
 | `go generate` (the Registry binding) | your machine | forge → solc 0.8.28, called as `$HOME/.foundry/bin/forge` (where foundryup installs it; `PATH` is not searched); `python` under that name (where only `python3` exists, as on stock Ubuntu, add a `python` link or alias); `go run …/abigen` |
 | `att-vendor build`, `att-auditor build`, `pack` | Nitro instance | dnf, systemctl, docker (`build`, `create`, `export`, `image inspect`), nitro-cli (`build-enclave`, `describe-eif`) |

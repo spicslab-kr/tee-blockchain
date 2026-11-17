@@ -246,6 +246,7 @@ checking a Vendor's self-registration later in flow 2.
 | `-trimpath` (go build) | keeps the build folder path out of the binary | no for `att-ra-responder`: `build` refuses it |
 | `-buildvcs=false` (go build) | keeps the git commit, its time and the uncommitted-changes flag out of the binary | no for `att-ra-responder`: `build` refuses it |
 | `CGO_ENABLED=0` (environment of go build) | keeps cgo out, so a native Linux build gives the same file as a cross-build | no for `att-ra-responder`: `build` refuses it |
+| `-ldflags=-buildid=` (go build) | keeps Go's build ID, a hash of every input of the build, out of the binary | no for `att-ra-responder`: `build` refuses it |
 | `--verify` (`build`) | builds twice and compares | yes, but then you do not know whether the build is reproducible |
 | `--ignore-env` (`receive`) | turns a `build_env` mismatch into a warning | only to look around; the values will not match |
 | `--build-measurements` (`launch`) | starts a received image only if it measures the same | yes, but then a swapped image starts unchecked |

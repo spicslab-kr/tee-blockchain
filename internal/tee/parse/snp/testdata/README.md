@@ -151,7 +151,7 @@ that the strings point at nothing, or re-record in a separate project) are liste
 module's own pinned dependencies (go-tpm-tools v0.4.11). From the repository root:
 
 ```
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o record-snp ./internal/tee/parse/snp/testdata/record
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o record-snp ./internal/tee/parse/snp/testdata/record
 ```
 
 (The 2026-11-10 recording used a separate scratch module with the same dependency versions, because the module did
