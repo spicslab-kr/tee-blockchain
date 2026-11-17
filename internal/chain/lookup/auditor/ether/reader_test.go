@@ -30,34 +30,45 @@ func newKey(t *testing.T) ([]byte, common.Address) {
 	return crypto.FromECDSA(k), crypto.PubkeyToAddress(k.PublicKey)
 }
 
-func chain(t *testing.T, funded ...common.Address) *simulated.Backend {
+// chain is a simulated chain with no block producer in the background. Every transaction the returned client sends is
+// sealed into a block at once, on the goroutine that sent it, and a test that wants more blocks calls Commit itself.
+// It used to commit every 50 ms from a goroutine of its own. go-ethereum's SimulatedBeacon.Commit takes no lock, and
+// TxPool.Sync, which every Commit calls, keeps a single waiter: when that goroutine and a test's own Commit ran at
+// once, one of them waited forever. On 2026-11-17 that held TestReader_Lookup_ScansMultipleLogChunks at its own
+// Commit until go test's 10-minute limit, in a full run with the other packages in parallel.
+func chain(t *testing.T, funded ...common.Address) sealing {
 	t.Helper()
 	alloc := types.GenesisAlloc{}
 	for _, a := range funded {
 		alloc[a] = types.Account{Balance: new(big.Int).Mul(big.NewInt(100), big.NewInt(1e18))}
 	}
 	b := simulated.NewBackend(alloc)
-	stop := make(chan struct{})
-	go func() {
-		tick := time.NewTicker(50 * time.Millisecond)
-		defer tick.Stop()
-		for {
-			select {
-			case <-stop:
-				return
-			case <-tick.C:
-				b.Commit()
-			}
-		}
-	}()
-	t.Cleanup(func() { close(stop); _ = b.Close() })
-	return b
+	t.Cleanup(func() { _ = b.Close() })
+	return sealing{Client: b.Client(), b: b}
 }
+
+// sealing is the simulated chain's client, except that SendTransaction also seals the transaction into a block, so
+// bind.WaitMined and bind.WaitDeployed return without anything committing in the background.
+type sealing struct {
+	simulated.Client
+	b *simulated.Backend
+}
+
+func (s sealing) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+	if err := s.Client.SendTransaction(ctx, tx); err != nil {
+		return err
+	}
+	s.b.Commit()
+	return nil
+}
+
+// Commit seals one more block.
+func (s sealing) Commit() { s.b.Commit() }
 
 func TestReader_FindRecordKeysAndLookup(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	auditorKey, auditorAddr := newKey(t)
-	client := chain(t, deployer, auditorAddr).Client()
+	client := chain(t, deployer, auditorAddr)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
@@ -138,8 +149,7 @@ func TestReader_FindRecordKeysAndLookup(t *testing.T) {
 func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	auditorKey, auditorAddr := newKey(t)
-	sim := chain(t, deployer, auditorAddr)
-	client := sim.Client()
+	client := chain(t, deployer, auditorAddr)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
@@ -161,7 +171,11 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 
 	// Pile up several more blocks after registration: on a real chain time passes and the latest block is far ahead of the registration.
 	for i := 0; i < 8; i++ {
-		sim.Commit()
+		client.Commit()
+	}
+	// The blocks come only from the commits above, so the scan has exactly these eight to step back through.
+	if latest, err := client.BlockNumber(ctx); err != nil || latest != receipt.Block+8 {
+		t.Fatalf("latest block = %d (%v), want the registration's block %d + 8", latest, err, receipt.Block)
 	}
 
 	reader := Reader{RegistryAddr: contract, Backend: client, LogRangeChunk: 1}
@@ -179,7 +193,7 @@ func TestReader_Lookup_ScansMultipleLogChunks(t *testing.T) {
 func TestReader_FindRecordKeys_PerPlatform(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	approverKey, approverAddr := newKey(t)
-	client := chain(t, deployer, approverAddr).Client()
+	client := chain(t, deployer, approverAddr)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 

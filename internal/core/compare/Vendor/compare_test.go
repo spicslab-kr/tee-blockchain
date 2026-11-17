@@ -46,34 +46,45 @@ func newKey(t *testing.T) ([]byte, common.Address) {
 	return crypto.FromECDSA(k), crypto.PubkeyToAddress(k.PublicKey)
 }
 
-func chain(t *testing.T, funded ...common.Address) *simulated.Backend {
+// chain is a simulated chain with no block producer in the background. Every transaction the returned client sends is
+// sealed into a block at once, on the goroutine that sent it, and a test that wants more blocks calls Commit itself.
+// It used to commit every 50 ms from a goroutine of its own. go-ethereum's SimulatedBeacon.Commit takes no lock, and
+// TxPool.Sync, which every Commit calls, keeps a single waiter: when that goroutine and a test's own Commit ran at
+// once, one of them waited forever. On 2026-11-17 that held TestReader_Lookup_ScansMultipleLogChunks at its own
+// Commit until go test's 10-minute limit, in a full run with the other packages in parallel.
+func chain(t *testing.T, funded ...common.Address) sealing {
 	t.Helper()
 	alloc := types.GenesisAlloc{}
 	for _, a := range funded {
 		alloc[a] = types.Account{Balance: new(big.Int).Mul(big.NewInt(100), big.NewInt(1e18))}
 	}
 	b := simulated.NewBackend(alloc)
-	stop := make(chan struct{})
-	go func() {
-		tick := time.NewTicker(50 * time.Millisecond)
-		defer tick.Stop()
-		for {
-			select {
-			case <-stop:
-				return
-			case <-tick.C:
-				b.Commit()
-			}
-		}
-	}()
-	t.Cleanup(func() { close(stop); _ = b.Close() })
-	return b
+	t.Cleanup(func() { _ = b.Close() })
+	return sealing{Client: b.Client(), b: b}
 }
+
+// sealing is the simulated chain's client, except that SendTransaction also seals the transaction into a block, so
+// bind.WaitMined and bind.WaitDeployed return without anything committing in the background.
+type sealing struct {
+	simulated.Client
+	b *simulated.Backend
+}
+
+func (s sealing) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+	if err := s.Client.SendTransaction(ctx, tx); err != nil {
+		return err
+	}
+	s.b.Commit()
+	return nil
+}
+
+// Commit seals one more block.
+func (s sealing) Commit() { s.b.Commit() }
 
 func TestCheck_AgainstRealChainRegistration(t *testing.T) {
 	deployerKey, deployer := newKey(t)
 	vendorKey, vendorAddr := newKey(t)
-	client := chain(t, deployer, vendorAddr).Client()
+	client := chain(t, deployer, vendorAddr)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
