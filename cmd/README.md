@@ -44,7 +44,7 @@ from two different commits, or from a tree with uncommitted changes, then gives 
 
 **`-ldflags=-buildid=`.** By default Go writes a build ID into the binary, a hash of every input of the build. Any
 change to a package `att-ra-responder` links then moves its bytes, even when no code it can run changed: one unused
-function added to `internal/cli` did (`029bbdc`). With an empty build ID it did not, and neither does a comment that
+function added to `internal/cli` did (`a9a45f2`). With an empty build ID it did not, and neither does a comment that
 moves no line of code; code that moved to other lines still changes the bytes (measured 2026-11-17,
 `docs/status/build-info-gaps.md`, Q1). Go does not record `-ldflags` in a `-trimpath` binary's build info, so `build`
 reads the build ID from the binary itself (`go tool buildid <file>` prints it; empty is right).

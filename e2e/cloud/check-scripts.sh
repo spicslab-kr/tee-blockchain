@@ -7,7 +7,7 @@
 #
 # Why every action, as far as its CLI call: on 2026-11-16 the scripts were checked this way by hand for create only,
 # and `aws-nitro.sh stop` and `start` (and the same two in aws-snp.sh) still ended at once with "$1: unbound
-# variable", found on 2026-11-17 when the instances had to be stopped (fixed in 28e1e1e). So a script action that no
+# variable", found on 2026-11-17 when the instances had to be stopped (fixed in bc87898). So a script action that no
 # case below runs up to its aws or gcloud call fails this check, and a new action fails it until a case is added.
 #
 # Safety: PATH is the stand-in folder and /usr/bin:/bin only, and the check stops before running any script unless

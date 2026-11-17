@@ -14,7 +14,7 @@ import (
 
 // TestCommitReferences checks that every commit a document names exists in this repository and is named
 // unambiguously. The documents' convention: a commit is a bare hex string of 7 to 12 characters in backticks
-// (`029bbdc`); a value is written with a trailing "…" (`c61c988e…`) and is not a commit, so it is not checked here.
+// (`a9a45f2`); a value is written with a trailing "…" (`c61c988e…`) and is not a commit, so it is not checked here.
 //
 // It needs the full history: in a shallow clone it skips. If the history is ever rewritten, every reference to a
 // commit before the rewrite fails here, which is the point: the documents would then name commits that no longer

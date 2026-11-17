@@ -143,8 +143,8 @@ on **another image** than the earlier x86_64 pair:
 may bring others. Since 2026-11-17 the Vendor's `send` records the Amazon Linux release and both package versions in
 `build_env`, the Auditor's `receive` compares the release and its `build --config` the versions after installing them
 (`docs/build/aws-nitro.md`, "What `build` cannot change"; run on two instances on 2026-11-17). PCR1 depends on nitro-cli's kernel files: with 1.5.0 the test application's PCR1 was
-`4b4d5b36…a493` on x86_64 (2026-11-12 at `9a5668e`, 2026-11-16 at `c116845`, and 2026-11-17 at `ea21b91` on the
-newer image) and `3b4a7e1b…` on arm64 (2026-11-16 at `c116845` and 2026-11-17 at `ea21b91`). To record a later instance the same way:
+`4b4d5b36…a493` on x86_64 (2026-11-12 at `f2aa809`, 2026-11-16 at `db5f48c`, and 2026-11-17 at `82cbe9b` on the
+newer image) and `3b4a7e1b…` on arm64 (2026-11-16 at `db5f48c` and 2026-11-17 at `82cbe9b`). To record a later instance the same way:
 
 ```
 rpm -q docker aws-nitro-enclaves-cli git

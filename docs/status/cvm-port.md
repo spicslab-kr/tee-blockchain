@@ -76,7 +76,7 @@ Four properties the port has to reproduce on each new platform:
 | # | Task | Pass criterion |
 |---|---|---|
 | 0.1 | Clone the repository from GitHub with `--recursive` (a zip extract lacks `.git` and the OpenZeppelin submodule) | `git status` works; done |
-| 0.2 | Working rules for this repository | done; kept outside the repository since `5b310cf`, and the rules a contributor needs are in `CONTRIBUTING.md` and `STRUCTURE.md` |
+| 0.2 | Working rules for this repository | done; kept outside the repository since `2f20c35`, and the rules a contributor needs are in `CONTRIBUTING.md` and `STRUCTURE.md` |
 | 0.3 | **Record one TDX quote and commit it as a fixture** | a file under `testdata/` plus the nonce used |
 | 0.4 | Record one SEV-SNP report and one vTPM attestation from the same GCP instance | same |
 
@@ -136,7 +136,7 @@ from the verifier's address (narrow the existing `attestamp-ra` rule's source ra
 reason to offer it to the internet.
 
 **The responder is shared with Nitro.** `att-ra-responder` is also layered into the Nitro EIF, so adding these
-extractors changed its bytes, and Nitro PCR2 with them. The Nitro baseline has to be taken after commit `60de6b0` as
+extractors changed its bytes, and Nitro PCR2 with them. The Nitro baseline has to be taken after commit `4012600e` as
 well. The request packages do not import the parsers, so no verifier code is linked into the responder.
 
 ## Phase 3 — TDX build and launch (needs two GCP TDX instances)
@@ -234,8 +234,8 @@ check on the recorded quotes, and the event-log replay on a constructed log. **W
 
 | # | state | proved by |
 |---|---|---|
-| 3.5 build | **done without hardware**, both options: `internal/setup/build/tdx` and adapters (`63d138f`), `att-vendor`/`att-auditor build --platform intel-tdx` (`fc0f460`) | `internal/setup/build/tdx` tests (also run on Linux under WSL); `TestCmd_E2E_TDXBuild_VendorAndAuditorAgree` (on Linux the two roles' builds are byte-identical) |
-| 3.5 launch | **done, and run on real guests** (2026-11-15, again 2026-11-16 on two guests): install and the post-boot check (`400d2cd`, CLI `fc0f460`) | GRUB entry and install against a temporary root; a recorded quote verifies and a foreign event log is refused; the replay, the initrd comparison and the marker checks on constructed input |
+| 3.5 build | **done without hardware**, both options: `internal/setup/build/tdx` and adapters (`54721d4`), `att-vendor`/`att-auditor build --platform intel-tdx` (`49028ab`) | `internal/setup/build/tdx` tests (also run on Linux under WSL); `TestCmd_E2E_TDXBuild_VendorAndAuditorAgree` (on Linux the two roles' builds are byte-identical) |
+| 3.5 launch | **done, and run on real guests** (2026-11-15, again 2026-11-16 on two guests): install and the post-boot check (`d6d4b91`, CLI `49028ab`) | GRUB entry and install against a temporary root; a recorded quote verifies and a foreign event log is refused; the replay, the initrd comparison and the marker checks on constructed input |
 | 3.6 `--verify` | **done**: a one-byte change between the two builds fails the build and names `/opt/app/app` (Option 1) or the root hash (Option 2); a replaced base initrd is named too | `TestVerify_OneByteChangedFailsTheBuild`, `TestVerify_ChangedBaseInitrdIsNamed` |
 
 ### Phase 3: what waits for a VM
@@ -269,7 +269,7 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
 3. **Done 2026-11-15**: check passed, `/run/attestamp-status` `ok <root hash>`, `dmsetup` `V`, the application readable; the root hash equal to the one built in WSL. What was asked: **Option 2 on the guest.** The base initrd built with `tdx/testdata/record/initramfs-hook.sh` and
    `initramfs-local-bottom.sh` installed (as for the `gcp-c3-opt2m-*` recordings), then the same three commands with
    `--option 2`. Pass as above, and `/run/attestamp-status` reads `ok <root hash>`.
-4. **Measured 2026-11-15: the values match.** Two guests made five days apart from one image have the same root UUID, PARTUUID and stock base initrd (they come with the image), so the same application gave the same initrd and **the same MRTD and RTMR0–2**. Both sides must pin the exact image, not the family: since 2026-11-16 `gcp-cvm.sh` takes `IMAGE=<exact name>` and prints the name it resolved (`3520a56`), and both procedures say why ("Use the same image as the other side"). Not measured: whether RTMR0 follows the machine type. What was asked: **The Auditor's half.** A second TDX guest builds from the same files and the Vendor's base initrd: the initrd
+4. **Measured 2026-11-15: the values match.** Two guests made five days apart from one image have the same root UUID, PARTUUID and stock base initrd (they come with the image), so the same application gave the same initrd and **the same MRTD and RTMR0–2**. Both sides must pin the exact image, not the family: since 2026-11-16 `gcp-cvm.sh` takes `IMAGE=<exact name>` and prints the name it resolved (`bcdb1e7`), and both procedures say why ("Use the same image as the other side"). Not measured: whether RTMR0 follows the machine type. What was asked: **The Auditor's half.** A second TDX guest builds from the same files and the Vendor's base initrd: the initrd
    SHA-384 must be equal (`build-value.json`), and after its own launch the four values must equal the Vendor's, if both
    guests have the same firmware, kernel and command line. The command line names the root disk's UUID, which differs
    per disk (`docs/build/tdx.md`, "Variables"): **expect RTMR2 to differ between two guests until the command line is
@@ -278,7 +278,7 @@ Each item says what to run and what must come out. The pass criterion of 3.5 is 
 5. **Done 2026-11-15**: from a WSL on another machine, `ra-request`, `audit` (registered on a local anvil) and `verify` (exit 0, `✓ matches`). What was asked: **The verifier from another machine.** `att-user verify` against the guest's responder (Phase 2.2), with
    `measurements.json` registered by the Vendor or audited by the Auditor.
 6. **Done 2026-11-16, both options, every pass below met** (`docs/results/sessions-2026-11-16/intel-tdx.md`, at
-   `1b981df`): two guests from `ubuntu-2404-noble-amd64-v20261105` in one call; equal builds and equal values; `audit
+   `3b81b1b`): two guests from `ubuntu-2404-noble-amd64-v20261105` in one call; equal builds and equal values; `audit
    --vendor-tee` registered the Auditor's own value; the User's `verify` of the Vendor's guest exit 0; the negative
    control refused. The procedure needed one fix (A2's copy of `app`). What was asked: **the Auditor's half as a
    procedure** (`docs/build/tdx.md`, "The Auditor's half", A1 to A9), for each option:
@@ -341,9 +341,9 @@ so a check fed the recorded evidence and those build values must pass, and fail 
 
 | | state | proved by |
 |---|---|---|
-| shared code | the verity image (`setup/build/verity`) and the GRUB install (`setup/launch/grub`) moved out of TDX (`66e28d9`) | the TDX tests unchanged, and `verity`/`grub` tests |
-| build | **done without hardware**, both formats, `--verify` (`ce08d93`, CLI `cac5d28`) | Option 1's archive from the recordings' one-file application is **byte-identical** to the archive the `opt1p-v1` and `opt1p-v2` guests booted (`TestBuild_Option1_TheArchiveTheGuestBooted`); a one-byte change fails `--verify`; run on Linux too |
-| launch check | **done on recorded evidence** (`b5d7086`) | `opt1p-v1` passes with its INITRD `a4504052…`; `opt2-v1` passes with INITRD `b0fd172d…` and the PCR12 predicted from root hash `e29ec085…`; v2's values are refused; a replayed nonce is refused |
+| shared code | the verity image (`setup/build/verity`) and the GRUB install (`setup/launch/grub`) moved out of TDX (`4fc1b53`) | the TDX tests unchanged, and `verity`/`grub` tests |
+| build | **done without hardware**, both formats, `--verify` (`2cbd700`, CLI `4f1f673`) | Option 1's archive from the recordings' one-file application is **byte-identical** to the archive the `opt1p-v1` and `opt1p-v2` guests booted (`TestBuild_Option1_TheArchiveTheGuestBooted`); a one-byte change fails `--verify`; run on Linux too |
+| launch check | **done on recorded evidence** (`ffcfd3c`) | `opt1p-v1` passes with its INITRD `a4504052…`; `opt2-v1` passes with INITRD `b0fd172d…` and the PCR12 predicted from root hash `e29ec085…`; v2's values are refused; a replayed nonce is refused |
 | launch install | **done, and run on real guests** (2026-11-15, again 2026-11-16 on two guests, both formats); in code against a temporary root | `TestInstall_Option2PutsImageAndRootHash` |
 
 ### Phase 4b: what waits for a VM
@@ -357,12 +357,12 @@ so a check fed the recorded evidence and those build values must pass, and fail 
    Option 2: a base initrd built with `snp/testdata/record/initramfs-hook.sh` and `initramfs-local-bottom.sh`
    installed, then the same with `amd-sev-snp-verity`; pass also needs `/run/attestamp-status` `ok` and PCR12 as
    predicted.
-3. **Measured 2026-11-15: CMDLINE is the same.** The root UUID comes with the image, so two guests of `ubuntu-2404-noble-amd64-v20261105` gave the same MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD for the same application. Pin the exact image on both sides: `gcp-cvm.sh` `IMAGE=` since 2026-11-16 (`3520a56`). Not measured: whether MEASUREMENT follows the machine type. What was asked: **The Auditor's half**: as on TDX, the command line names the root disk (`root=UUID=`), so CMDLINE will differ
+3. **Measured 2026-11-15: CMDLINE is the same.** The root UUID comes with the image, so two guests of `ubuntu-2404-noble-amd64-v20261105` gave the same MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD for the same application. Pin the exact image on both sides: `gcp-cvm.sh` `IMAGE=` since 2026-11-16 (`bcdb1e7`). Not measured: whether MEASUREMENT follows the machine type. What was asked: **The Auditor's half**: as on TDX, the command line names the root disk (`root=UUID=`), so CMDLINE will differ
    between two guests' disks; and the Auditor uses the Vendor's base initrd (D1 (a)). Measure first whether CMDLINE
    can be made equal.
 4. **T10** stays as it is: the build and launch do not change what the evidence can say about the same VM. **Reproduced 2026-11-16** on the two guests of item 5: the relay verifies (`docs/build/ra-comparison.md`, "The SEV-SNP relay, measured").
 5. **Done 2026-11-16, both formats, every pass below met** (`docs/results/sessions-2026-11-16/amd-sev-snp.md`, at
-   `57b4350`), Option 2 on two guests included; and T10 reproduced on the same two guests (item 4). What was asked:
+   `7083ab8`), Option 2 on two guests included; and T10 reproduced on the same two guests (item 4). What was asked:
    **the Auditor's half as a procedure** (`docs/build/sev-snp.md`, "The Auditor's half", A1 to A9), for each format
    (`amd-sev-snp-initrd`, `amd-sev-snp-verity`):
    1. **Two guests from one exact image**, the same machine type and zone, in one call:
@@ -490,7 +490,7 @@ chain itself extends can be forged by a changed boot chain, unless the boot chai
 |---|---|
 | Claim (slides) | slide 7: both options work on AWS and GCP |
 | Measured (2026-11-11, GCP, `attestamp-snp-vendor`) | with the unpadded append the 2026-11 scripts used (*record:* `cat i.bin app.cpio`; the scripts are no longer available), the base initrd was 50,100,283 bytes (**mod 4 = 3**); the kernel logged `Initramfs unpacking failed: invalid magic at start of compressed archive`; the application's marker was **absent**. The guest booted and INITRD changed with the application anyway, so the evidence looked right while the application never ran |
-| Fix | zero-pad the base initrd to a multiple of 4 before appending. Measured: with the padding the archive unpacked and the marker held the application's text. `cpio.Join(AppLast)` now does this (commit `3c57d4c`); padding changes the measured initrd |
+| Fix | zero-pad the base initrd to a multiple of 4 before appending. Measured: with the padding the archive unpacked and the marker held the application's text. `cpio.Join(AppLast)` now does this (commit `7e47556`); padding changes the measured initrd |
 | What stands | SEV-SNP Option 2 (image on disk, verifying initrd, PCR12) worked as claimed: `status ok`, the application mounted, PCR12 as computed, recorded twice. TDX prepends (`AppFirst`), which needs no padding |
 | Not known | whether the 2026-11 SEV-SNP Option 1 runs on GCP and AWS loaded the application: it depends on the length of the base initrd each run used, and those files were not kept |
 | Where | `docs/build/sev-snp.md`, "Correction: SEV-SNP Option 1 as appended in 2026-11"; fixtures with boot logs in `internal/tee/parse/snp/testdata/gcp-n2d-opt1-*` and `gcp-n2d-opt1p-*` |

@@ -13,9 +13,9 @@
   `VENDOR_HOST AUDITOR_HOST ARM64_HOST AUDITOR_ADDR VENDOR_ADDR` are declared in the environment: `e2e/env.sh` line 14
   runs `declare -p` on all five, which fails under the script's `set -euo pipefail` (F3).
 
-Run on 2026-11-15/16 (UTC 18:40–21:10) at commit `e29d028`, with an AI coding agent working from the documents alone,
+Run on 2026-11-15/16 (UTC 18:40–21:10) at commit `77fb251`, with an AI coding agent working from the documents alone,
 without the earlier sessions' knowledge, in a WSL Ubuntu 24.04.5 on the development machine, with the
-repository as it was. **No tracked file was changed**; this file is the only one written into the repository. *(These two sentences were reworded on 2026-11-16 in `9702f42`: they first named who ran the trial and spoke in the first person. The facts are unchanged.)* The
+repository as it was. **No tracked file was changed**; this file is the only one written into the repository. *(These two sentences were reworded on 2026-11-16 in `02644d1`: they first named who ran the trial and spoke in the first person. The facts are unchanged.)* The
 documented steps themselves wrote gitignored files (`e2e-work/`, `pem2.pem`, `auditor.key`, `deployer.key`, `att-*`)
 and some files that are **not** gitignored: `linux/`, `quote.bin*`, `evidence.cbor*`, `measurements.json` (F14). They
 are still there.
@@ -113,7 +113,7 @@ manual lines) are not in the repository; the table below is their record here.
 | Nitro: create (`e2e/cloud/README.md` "Order" 1) | `bash e2e/cloud/aws-nitro.sh create` → exit 1, `InvalidKeyPair.Duplicate … could not create key pair attestamp-e2e`. The account already has that key pair (and two stopped `attestamp-e2e` instances); a fresh clone has no `pem2.pem` | **[outside]** read the script for its variables; `KEY_NAME=trial1116-nitro SG_NAME=trial1116-nitro TAG=trial1116-nitro bash e2e/cloud/aws-nitro.sh create` | that `KEY_NAME`, `SG_NAME` and `TAG` exist, and what to do when the key pair exists but its `.pem` is not on this machine |
 | (same) | **[finding] F1** the failed create **left an empty `pem2.pem`** (the redirect `> "$PEM_OUT"` creates it before `aws` fails; `chmod 400` never runs). A rerun would print "pem2.pem already exists, reusing it" and never create the key | **[outside]** found it with `git status --ignored` and removed it (the settings deny reading `pem2.pem`, so I could not look inside) | write to a temporary file and move it only on success |
 | (same) | **[finding] F2** the run ends with exit **126**: `exec "$0" status` → `Permission denied`; the cloud scripts are mode `100644` in git and are run as `bash e2e/cloud/…`. The instances **were** created | ran `TAG=… bash e2e/cloud/aws-nitro.sh status` myself | `exec bash "$0" status`, or mode 755. `gcp-cvm.sh` line 121 has the same: every GCP create of this trial also ended with 126 |
-| Nitro: `0-Setup-local-upload.sh` | **[stuck] [finding] F3** exit 1 **with no output**, addresses given on the command line as `e2e/README.md` documents. `e2e/env.sh` line 14, `env_given=$(declare -p VENDOR_HOST AUDITOR_HOST ARM64_HOST AUDITOR_ADDR VENDOR_ADDR 2>/dev/null \| grep …)`, fails when any of the five is undeclared, and the upload script's `set -euo pipefail` ends it there, before the EXIT trap is set. Reproduced alone: `bash -c 'set -euo pipefail; . e2e/env.sh; echo REACHED'` → nothing, exit 1; with the five declared → `REACHED`. `env.local.sh` does not help: it is read after that line. Since `cc4ab2f` | **[outside]** declared the missing three as empty: `ARM64_HOST= AUDITOR_ADDR= VENDOR_ADDR=` before the command | a fix in `env.sh` (`… \|\| true`); until then, that workaround. The flow scripts use `set -uo pipefail` without `-e` and are not affected |
+| Nitro: `0-Setup-local-upload.sh` | **[stuck] [finding] F3** exit 1 **with no output**, addresses given on the command line as `e2e/README.md` documents. `e2e/env.sh` line 14, `env_given=$(declare -p VENDOR_HOST AUDITOR_HOST ARM64_HOST AUDITOR_ADDR VENDOR_ADDR 2>/dev/null \| grep …)`, fails when any of the five is undeclared, and the upload script's `set -euo pipefail` ends it there, before the EXIT trap is set. Reproduced alone: `bash -c 'set -euo pipefail; . e2e/env.sh; echo REACHED'` → nothing, exit 1; with the five declared → `REACHED`. `env.local.sh` does not help: it is read after that line. Since `7556db8` | **[outside]** declared the missing three as empty: `ARM64_HOST= AUDITOR_ADDR= VENDOR_ADDR=` before the command | a fix in `env.sh` (`… \|\| true`); until then, that workaround. The flow scripts use `set -uo pipefail` without `-e` and are not affected |
 | Nitro: flow 1 step 4 | try 1: exit 255, only `Connection closed by <ip> port 22`; `net_retry` did not retry although its pattern lists that message. `ssh` right after worked | ran it again | — (not reproduced) |
 | Nitro: flow 1 step 4 | try 2: **[finding] F4** exit 1, `Cannot connect to the Docker daemon`. In flow 1 the Vendor never runs `build`, so docker (pulled in as a dependency, `docker-25.0.18`) is installed but `inactive` and `disabled`; step 4 calls `sudo docker build` itself. (On the Auditor, which ran `build`, docker was `enabled` and came back after a stop/start) | **[outside]** `sudo systemctl start docker` on the Vendor; try 3 passed | step 4 should start docker (as `build` does), or say it needs it |
 | Nitro: anvil (`e2e/README.md` "Running without a public testnet" 1) | the README only links `https://getfoundry.sh`; the commands are in `tdx.md` step 1. Running the downloaded `foundryup` installer was **refused by my own tool-permission check** (not a fault of the documents) | **[outside]** `foundry_v1.8.0_linux_amd64.tar.gz` from the GitHub release, checked against the release's `foundry_v1.8.0_linux_amd64.sha256` and `toolchain.md`'s `8c8560de…ac57` (equal), unpacked into `~/.foundry/bin` | the release-archive route beside `foundryup`, with the checksum file's exact name (my first guess, `…tar.gz.sha256`, is a 404) |
@@ -217,7 +217,7 @@ guests, the home folder still holds `base-initrd*.img`, `app`, `out`, the binari
 | PCR0 | `2aacdf410ab98ea95138b9c99e48eb2436a0d2e6d9e7fc0f4b8d7084d92325174179c65b4292f5809f052b1d450c7520` |
 | PCR1 | `4b4d5b3661b3efc12920900c80e126e4ce783c522de6c02a2a5bf7af3a2b9327b86776f188e4be1c1c404a129dbda493` (= 2026-11-12) |
 | PCR2 | `e550477971775beb0f24a9afc2457e239404b5da83121b14c84478da7ed424bf730ce6e7d286dc6a3aec3f371b5dfc72` |
-| note | PCR0/PCR2 differ from 2026-11-12 (`d5bbd4af…`/`6b64250f…`) and 2026-11-15 (`47dbca56…`), as `test-matrix.md` T1 predicts after `fc105b0` and `ade66e6`. The first values at `e29d028`. Only the Auditor built, so this is **not** a two-machine T1. *Later the same day:* `029bbdc` changed the responder (`5573b538…` → `c61c988e…`), so these values are superseded too; the baseline was retaken at `c116845` (`docs/results/aws-nitro-2026-11-16.md`) |
+| note | PCR0/PCR2 differ from 2026-11-12 (`d5bbd4af…`/`6b64250f…`) and 2026-11-15 (`47dbca56…`), as `test-matrix.md` T1 predicts after `e02d06c` and `d3d9bb8`. The first values at `77fb251`. Only the Auditor built, so this is **not** a two-machine T1. *Later the same day:* `a9a45f2` changed the responder (`5573b538…` → `c61c988e…`), so these values are superseded too; the baseline was retaken at `db5f48c` (`docs/results/aws-nitro-2026-11-16.md`) |
 | reproducibility scan | 9 warnings in the nginx Dockerfile (unpinned base tag, `apk add` without versions, …) |
 | swapped image (flow 1 step 4) | PCR0 `9f1ebbec9da57cb0d95bc32bc2e7592ee8624ffdd85bde62178aea957295a6f638ef173875d35f444136e0a7ae1d81e2`, PCR2 `c7cd2011…cfcc` |
 | one byte changed | PCR0 `c0263871dbded159e22795f8f3bd4b07773aa37ba3e190953cf921f1f6b75f9e5bb0ebe8a079bbb4e57c9b323a1abb5a`, PCR1 unchanged, PCR2 `8aeabedf9dea0903a4a95a08362afe70e37105905f5dbd784516b47e6f2a1e67d68fce5d06e2e041f60471621733a094` |
@@ -282,27 +282,27 @@ checked with a stand-in `aws` that records its arguments, a read-only `gcp-cvm.s
 
 | finding | change | commit |
 |---|---|---|
-| F3 | `env.sh` no longer ends a `set -e` script when an address variable is unset | `593a38f` |
-| F1 | the key is written to a `.partial.pem` (gitignored) and moved on success; the error names `KEY_NAME`, `SG_NAME`, `TAG` | `ee00116` |
-| F2 | `exec bash "$0" status` in all three cloud scripts | `ee00116` |
-| F11, F12, D16 | `gcp-cvm.sh status`, `stop`, `start`, `delete` act only on `PREFIX`; `create` says a name is reused and how to choose another | `b26465d` |
-| F10 | `in-guest-verify.sh`'s `json_str` fixed, so `platform` and `reason` are written | `dc9a995` |
-| F4 | flow 1 step 4 (and flow 2 step 3) start docker before `docker build` | `948e73c` |
-| F14 | `/linux/`, `/quote.bin*`, `/evidence.cbor*`, `/measurements.json` in `.gitignore` | `70b271f` |
-| D12 | every command prints the values sorted by name, in one column | `641ab10` |
-| F5, F6, F13, F15, D18, step 9, `PREFIX`, the anvil archive, gcloud under WSL | `tdx.md` and `sev-snp.md` steps 1, 3, 7, 8, 9, 13 | `9c0073f`, `1bd1ede` |
-| F7, F11, D19, Go `PATH`, a Nitro safety stop | `e2e/README.md`, `e2e/cloud/README.md` | `85ea837` |
-| — | found while fixing F2: `1af3f87` had dropped `--region` from every `aws` call in `aws-nitro.sh` and `aws-snp.sh` (the CR-stripping wrapper replaced the one that added it), so they used the region of the profile or the environment. This trial's Nitro instances are in `eu-north-1`, the script's default, so that is what the profile gave here; another profile would have made them elsewhere | `ac9635f` |
+| F3 | `env.sh` no longer ends a `set -e` script when an address variable is unset | `55d9d23` |
+| F1 | the key is written to a `.partial.pem` (gitignored) and moved on success; the error names `KEY_NAME`, `SG_NAME`, `TAG` | `e245ffe` |
+| F2 | `exec bash "$0" status` in all three cloud scripts | `e245ffe` |
+| F11, F12, D16 | `gcp-cvm.sh status`, `stop`, `start`, `delete` act only on `PREFIX`; `create` says a name is reused and how to choose another | `f097aaa` |
+| F10 | `in-guest-verify.sh`'s `json_str` fixed, so `platform` and `reason` are written | `fcaa0e2` |
+| F4 | flow 1 step 4 (and flow 2 step 3) start docker before `docker build` | `3f41f62` |
+| F14 | `/linux/`, `/quote.bin*`, `/evidence.cbor*`, `/measurements.json` in `.gitignore` | `5750a02` |
+| D12 | every command prints the values sorted by name, in one column | `f3f69b9` |
+| F5, F6, F13, F15, D18, step 9, `PREFIX`, the anvil archive, gcloud under WSL | `tdx.md` and `sev-snp.md` steps 1, 3, 7, 8, 9, 13 | `1e41bd1`, `0290ea1` |
+| F7, F11, D19, Go `PATH`, a Nitro safety stop | `e2e/README.md`, `e2e/cloud/README.md` | `08d9319` |
+| — | found while fixing F2: `1b887e3` had dropped `--region` from every `aws` call in `aws-nitro.sh` and `aws-snp.sh` (the CR-stripping wrapper replaced the one that added it), so they used the region of the profile or the environment. This trial's Nitro instances are in `eu-north-1`, the script's default, so that is what the profile gave here; another profile would have made them elsewhere | `5a95671` |
 
 Not changed, and why:
 
 | finding | why |
 |---|---|
-| D3 (no independent rebuild on the CVMs) | *(Rewritten later on 2026-11-16, `91d0dc6`; first: "needs a second guest; 'The Auditor's own guest' in each doc is still unrun". Later still the same day it ran and passed, on both platforms: `docs/results/sessions-2026-11-16/`.)* **written, not run.** Both procedures now say that step 11 is not an audit, and "The Auditor's half" (A1 to A9) moves Nitro's flow 1 to the CVMs, with what "the same inputs" means (`docs/build/tdx.md`, `sev-snp.md`). Running it needs two guests at once; `docs/status/cvm-port.md` Phase 3 item 6 and Phase 4b item 5 say what run confirms it |
+| D3 (no independent rebuild on the CVMs) | *(Rewritten later on 2026-11-16, `cc47924`; first: "needs a second guest; 'The Auditor's own guest' in each doc is still unrun". Later still the same day it ran and passed, on both platforms: `docs/results/sessions-2026-11-16/`.)* **written, not run.** Both procedures now say that step 11 is not an audit, and "The Auditor's half" (A1 to A9) moves Nitro's flow 1 to the CVMs, with what "the same inputs" means (`docs/build/tdx.md`, `sev-snp.md`). Running it needs two guests at once; `docs/status/cvm-port.md` Phase 3 item 6 and Phase 4b item 5 say what run confirms it |
 | D1, D2, D4–D9, D11 | differences of the platforms themselves, not defects; the User's side is the same command |
 | D13 | TDX and SEV-SNP evidence has no module ID and no time to show |
 | D14 | the getting-started steps are typed by hand and write no JSONL; `in-guest-verify.sh` and `replay-check.sh` do |
-| D17 | *(Rewritten later on 2026-11-16, `91d0dc6`; first: "'enclave' in the CLI wording on VMs: cosmetic, left for a pass over all CLI text".)* partly: `audit` and `verify`, which the Auditor's half runs against guests, now say "guest" on TDX and SEV-SNP and "enclave" only on Nitro (`cli.TEENoun`); the TDX e2e test requires it. Other commands' wording (`ra-request`, `self-register`, `lookup`, usage text) is left for a pass over all CLI text |
+| D17 | *(Rewritten later on 2026-11-16, `cc47924`; first: "'enclave' in the CLI wording on VMs: cosmetic, left for a pass over all CLI text".)* partly: `audit` and `verify`, which the Auditor's half runs against guests, now say "guest" on TDX and SEV-SNP and "enclave" only on Nitro (`cli.TEENoun`); the TDX e2e test requires it. Other commands' wording (`ra-request`, `self-register`, `lookup`, usage text) is left for a pass over all CLI text |
 | F9 | the Nitro AMI and the `dnf` packages are unpinned; this run's versions are recorded above and equal the baseline's except git |
 | `net_retry` not retrying `Connection closed by …` | not reproduced |
 | `sudo` working although `sudo -n true` asked for a password | not investigated; outside the repository |

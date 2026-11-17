@@ -848,7 +848,7 @@ commit `067c5c24cef2`, and `Documentation/driver-api/early-userspace/buffer-form
 - Ubuntu 24.04's `mkinitramfs` writes the early cpios, then `cpio | zstd`, with no padding at the end, so the base
   initrd's length mod 4 is arbitrary.
 - The scripts' `cat base app.cpio` adds no padding either, and neither did `cpio.Join` until 2026-11-11 (it now pads
-  the base for `AppLast`, commit `3c57d4c`).
+  the base for `AppLast`, commit `7e47556`).
 - GRUB zero-pads each file to 4 bytes only when it loads several (`initrd a b`, `grub-core/loader/linux.c`). One
   combined file gets no padding.
 
@@ -864,7 +864,7 @@ used on both guests:
 Placement, not platform, decides the outcome: `AppFirst` works because the application archive is padded to 512
 bytes, so the base initrd that follows starts on a 4-byte boundary.
 
-After the padding fix in `cpio.Join` (commit `3c57d4c`), placement is a convention rather than a correctness
+After the padding fix in `cpio.Join` (commit `7e47556`), placement is a convention rather than a correctness
 requirement: both orders work. The order still changes the measured bytes, so each platform keeps the placement its
 fixtures were recorded with: `AppFirst` on TDX, `AppLast` on SEV-SNP.
 

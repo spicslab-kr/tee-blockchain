@@ -7,7 +7,7 @@ Measured, not changed.
 **Setup.** `d3-tdx-vendor` (session 2's guest, `ubuntu-2404-noble-amd64-v20261105`, `c3-standard-4`) after step 13
 had put it back to Google's stock boot: kernel command line `root=PARTUUID=27c09ec4-… ro console=ttyS0,115200
 panic=-1`, no initrd, `/boot/initrd-attestamp.img` absent. `att-ra-responder ra-serve --extractor tdx` and the local
-binaries built at `1b981df`/`57b4350` (no change to the TDX parser since). Local anvil 1.8.0.
+binaries built at `3b81b1b`/`7083ab8` (no change to the TDX parser since). Local anvil 1.8.0.
 
 | step | command | result |
 |---|---|---|
@@ -30,18 +30,18 @@ binaries built at `1b981df`/`57b4350` (no change to the TDX parser since). Local
 
 The guest was deleted afterwards (with its disk).
 
-*(Revised later on 2026-11-16, `868eeda`: the paragraph above first ended "What to do about it is an open question (`build-info-gaps.md`, "Design questions to review", Q2)". The question was decided, the sentence removed, and the section below added.)*
+*(Revised later on 2026-11-16, `6c11f6a`: the paragraph above first ended "What to do about it is an open question (`build-info-gaps.md`, "Design questions to review", Q2)". The question was decided, the sentence removed, and the section below added.)*
 
-## Measured again after the fix, at `fa871e1`
+## Measured again after the fix, at `6f2abd8`
 
 The fix (`fix(cmd/auditor): refuse to audit a TDX or SEV-SNP guest without --build-measurements`): `audit` on a CVM
 format needs a value the Auditor built. The parser was not changed, because TDX evidence is the quote alone and the
 event log that shows whether an initrd was loaded stays on the guest (`docs/status/build-info-gaps.md`, Q2: the real fix
 puts that log into the evidence, in a later session). Measured on `trial1116-tdx-vendor`, another guest of the same
 image on the same stock boot (`root=PARTUUID=… panic=-1`, no initrd); its quote gave the same RTMR2 `8d9317e9…`.
-Binaries at `fa871e1`, local anvil 1.8.0.
+Binaries at `6f2abd8`, local anvil 1.8.0.
 
-| step | before (at `1b981df`/`57b4350`) | after (at `fa871e1`) |
+| step | before (at `3b81b1b`/`7083ab8`) | after (at `6f2abd8`) |
 |---|---|---|
 | 1 `ra-parse` | exit 0 | **exit 0**, unchanged (the parser cannot see the missing initrd) |
 | 2 `verify` against the application's registration | exit 1, `nobody` | **exit 1**, `nobody`, unchanged |

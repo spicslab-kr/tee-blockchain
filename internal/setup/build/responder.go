@@ -11,7 +11,7 @@
 // responder that cannot match what the other side builds is refused.
 //
 // The build ID is a hash of every input of the build, so a change to any package the responder links moved its bytes
-// even when no code it can run changed (029bbdc: one unused function in internal/cli). -ldflags=-buildid= leaves it
+// even when no code it can run changed (a9a45f2: one unused function in internal/cli). -ldflags=-buildid= leaves it
 // empty. Go does not record -ldflags in the build info of a -trimpath build (they may hold paths), so the build ID is
 // read from the binary itself: the linker writes it into the ELF note section .note.go.buildid, and writes no such
 // section when it is empty. Measured with go1.26.1 on the responder: with an empty build ID, one unused function added
