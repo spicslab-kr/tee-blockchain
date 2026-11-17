@@ -139,12 +139,17 @@ on **another image** than the earlier x86_64 pair:
 | docker | `docker-25.0.18-1.amzn2023.0.3.x86_64`; `Docker version 25.0.14, build 0bab007` | `docker-25.0.18-1.amzn2023.0.3.aarch64`; the same |
 | git | `git-2.50.1-1.amzn2023.0.2.x86_64`, installed by `0-Setup-local-upload.sh` | `git-2.50.1-1.amzn2023.0.2.aarch64` |
 
+Later on **2026-11-17** (the baseline after the shared Nitro request package,
+`docs/results/aws-nitro-2026-11-17-shared-aws.md`) three more new instances, made the same way, came from the same two
+AMIs and gave **every line of the table above again**, on both x86_64 instances and on arm64.
+
 `build` and `launch` install docker and `aws-nitro-enclaves-cli` with `dnf` without a version, so another day's image
 may bring others. Since 2026-11-17 the Vendor's `send` records the Amazon Linux release and both package versions in
 `build_env`, the Auditor's `receive` compares the release and its `build --config` the versions after installing them
 (`docs/build/aws-nitro.md`, "What `build` cannot change"; run on two instances on 2026-11-17). PCR1 depends on nitro-cli's kernel files: with 1.5.0 the test application's PCR1 was
-`4b4d5b36…a493` on x86_64 (2026-11-12 at `f2aa809`, 2026-11-16 at `db5f48c`, and 2026-11-17 at `82cbe9b` on the
-newer image) and `3b4a7e1b…` on arm64 (2026-11-16 at `db5f48c` and 2026-11-17 at `82cbe9b`). To record a later instance the same way:
+`4b4d5b36…a493` on x86_64 (2026-11-12 at `f2aa809`, 2026-11-16 at `db5f48c`, and 2026-11-17 at `82cbe9b` and at
+`9ca51bb` on the newer image) and `3b4a7e1b…` on arm64 (2026-11-16 at `db5f48c` and 2026-11-17 at `82cbe9b` and at
+`9ca51bb`). To record a later instance the same way:
 
 ```
 rpm -q docker aws-nitro-enclaves-cli git

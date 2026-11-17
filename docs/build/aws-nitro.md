@@ -5,9 +5,11 @@ value, it can only be trusted if both builds give the same measurements. On Nitr
 measurements are PCR0, PCR1 and PCR2. The short version is in the README under
 [Build](../../README.md#build). What both sides must match, with a check for each: [reproduce.md](reproduce.md).
 Tools, which step calls them, and the versions used: [toolchain.md](toolchain.md)
-(the instance's AMI, kernel, docker and nitro-cli as of the 2026-11-12 baseline). The reference PCRs of the test
-application, at commit `db5f48c`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-16.md](../results/aws-nitro-2026-11-16.md)
-(the first baseline, at `f2aa809`: [docs/results/aws-nitro-2026-11-12.md](../results/aws-nitro-2026-11-12.md)).
+(the instance's AMI, kernel, docker and nitro-cli for each baseline). The reference PCRs of the test application, at
+commit `9ca51bb`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-17-shared-aws.md](../results/aws-nitro-2026-11-17-shared-aws.md)
+(earlier, each at its own commit: `82cbe9b`, [aws-nitro-2026-11-17.md](../results/aws-nitro-2026-11-17.md); `db5f48c`,
+[aws-nitro-2026-11-16.md](../results/aws-nitro-2026-11-16.md); the first baseline, at `f2aa809`,
+[aws-nitro-2026-11-12.md](../results/aws-nitro-2026-11-12.md)).
 
 ## The three values
 
@@ -118,8 +120,10 @@ The software's own files and logs are not touched.
 a different PCR0 and PCR2 from `e02d06c` on (PCR1, the kernel and init, does not change). PCR values recorded before
 that commit are marked "before `e02d06c`" where they appear.
 
-**The Nitro reference values were taken again on 2026-11-17, at `82cbe9b`** (`docs/results/aws-nitro-2026-11-17.md`),
-after the empty build ID. Before that, on 2026-11-16 at `db5f48c` (`docs/results/aws-nitro-2026-11-16.md`), after
+**The Nitro reference values were taken again later on 2026-11-17, at `9ca51bb`**
+(`docs/results/aws-nitro-2026-11-17-shared-aws.md`), after the Nitro request code moved into a shared package
+(`cc1be67`). Earlier that day at `82cbe9b` (`docs/results/aws-nitro-2026-11-17.md`), after the empty build ID. Before
+that, on 2026-11-16 at `db5f48c` (`docs/results/aws-nitro-2026-11-16.md`), after
 three commits had made the earlier ones stale:
 
 | commit | what it changes | effect on the test application's PCR0/PCR2 |
@@ -135,11 +139,20 @@ Then two more, which is why they were taken again on 2026-11-17:
 | `c4fd40c` | every build passes `-ldflags=-buildid=` (above, "The Go build ID, measured") | moved: the responder became `215423b8…` (at `da6bf36`) |
 | `a50a752` | corrects `cmd/ra-responder`'s comments and its printed usage text | moved: the responder became `d6e3422d…` (amd64), `f581d95c…` (arm64) |
 
-**The current values**, at `82cbe9b`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder
-`d6e3422d…` (amd64) / `f581d95c…` (arm64), 2026-11-17: x86_64, two machines identical: PCR0 `bfa0a428…`, PCR1 `4b4d5b36…`, PCR2 `aa36ce6f…`. On arm64
-(`c7g.xlarge`) all three differ: PCR0 `4f94d9c9…`, PCR1 `3b4a7e1b…`, PCR2 `79d0abea…`. PCR1 is the same as on 2026-11-16 on both (nitro-cli 1.5.0), on
-another x86_64 image (`ami-0f71b90bee7050a75`, release 2023.12.20261112). The values at `db5f48c` (responder
-`c61c988e…`) were x86_64 PCR0 `0c905480…`, PCR2 `6347a146…` and arm64 PCR0 `f1d4d679…`, PCR2 `6e865138…`. **Every Nitro value is written next to the commit
+And then one more, which is why they were taken a second time on 2026-11-17:
+
+| commit | what it changes | effect on the test application's PCR0/PCR2 |
+|---|---|---|
+| `61f7515` | moves the Nitro build and launch into shared packages | none: the responder does not link them, and stayed `d6e3422d…` / `f581d95c…` |
+| `cc1be67` | moves the Nitro request code, which the responder links, into the shared `internal/tee/request/aws` | moved: the responder became `b9ae17f3…` (amd64), `294efd1b…` (arm64) |
+
+**The current values**, at `9ca51bb`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder
+`b9ae17f3…` (amd64) / `294efd1b…` (arm64), 2026-11-17: x86_64, two machines identical: PCR0 `05662eae…`, PCR1
+`4b4d5b36…`, PCR2 `a3049e0d…`. On arm64 (`c7g.xlarge`) all three differ: PCR0 `a653991e…`, PCR1 `3b4a7e1b…`, PCR2
+`9660bc5e…`. PCR1 is the same as on 2026-11-16 on both (nitro-cli 1.5.0). The values at `82cbe9b` (responder
+`d6e3422d…` / `f581d95c…`, the same images) were x86_64 PCR0 `bfa0a428…`, PCR2 `aa36ce6f…` and arm64 PCR0 `4f94d9c9…`,
+PCR2 `79d0abea…`; at `db5f48c` (responder `c61c988e…`) x86_64 PCR0 `0c905480…`, PCR2 `6347a146…` and arm64 PCR0
+`f1d4d679…`, PCR2 `6e865138…`. **Every Nitro value is written next to the commit
 it was measured at**: the responder's bytes, and so PCR0 and PCR2, changed with any change to a package the responder
 links until 2026-11-17, and still change with any change to code it can run or to the lines that code sits on, so a
 value without its commit cannot be compared.
