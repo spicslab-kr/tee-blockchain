@@ -20,7 +20,9 @@ att-auditor receive --repo <git url> --into work/src
 `--ref` picks a commit, branch or tag. `receive` clones the repository, reads `build-config.json` and
 runs `CheckBuildEnv`: your OS, CPU architecture and Go version must match the Vendor's `build_env`,
 or the command stops with an error. `--ignore-env` turns that error into a warning. A Vendor build
-without `-trimpath` only gives a warning.
+without `-trimpath` only gives a warning. On `aws-nitro` the Amazon Linux release must match too
+(`build_env.ami_release`, which the Vendor's `send` records): it decides which docker and nitro-cli
+`build` will install. That is a proxy, not a guarantee: each Amazon Linux release has its own package repository, but a `dnf update` with another release, `releasever=latest` in `/etc/dnf/vars`, or a package installed by hand moves the versions without moving the release; a config without `ami_release` gets a warning.
 
 ## Build and launch
 
@@ -28,9 +30,14 @@ This is the Vendor's [build and launch](../vendor/README.md#build-and-launch) wi
 place of `att-vendor`:
 
 ```
-att-auditor build --app-dir work/src/<path> --out-dir out
+att-auditor build --config work/src/build-config.json --app-dir work/src/<path> --out-dir out
 att-auditor launch --eif out/<name>.eif
 ```
+
+With `--config`, `build` compares the docker and aws-nitro-enclaves-cli versions it has just installed with
+the Vendor's (`build_env.docker`, `nitro_cli`) and stops before building anything if either differs
+(`--ignore-env` makes it a warning). This is the real check behind `receive`'s release comparison. Without
+`--config` the versions are printed and not compared.
 
 Your own enclave's values are what you register. To check the Vendor's running enclave against them, give `audit`
 `--vendor-tee <vendor-instance>:5000` (below): it registers your value and then says whether the Vendor's enclave runs

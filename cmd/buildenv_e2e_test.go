@@ -1,5 +1,7 @@
 // build_env, end to end on the command line. att-vendor send writes its own build environment (OS, architecture, Go) into build-config.json,
 // and att-auditor receive compares it with its own instance and refuses if they differ (with --ignore-env it only warns).
+// On aws-nitro send also records the Amazon Linux release and the docker and nitro-cli versions, receive compares the
+// release, and build --config the versions; what can be seen off an instance is tested here.
 // The remote is a local bare repository and real git runs, the same way as the git tests under internal/core/transfer.
 package cmd_test
 
@@ -9,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -256,5 +259,120 @@ func TestBuildEnv_ReceiveRejectsConfigWithoutBuildEnv(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "build_env") {
 		t.Errorf("stderr must say what is missing, got:\n%s", stderr)
+	}
+}
+
+// onAmazonLinux reports whether this machine is Amazon Linux, where send and receive read a real release and rpm.
+func onAmazonLinux() bool {
+	b, err := os.ReadFile("/etc/os-release")
+	return err == nil && regexp.MustCompile(`(?m)^ID="?amzn"?\s*$`).Match(b)
+}
+
+// Off a Nitro parent instance, send cannot read the Amazon Linux release or the docker and nitro-cli versions: it says
+// so, sends the config anyway, and leaves the three fields out of build_env.
+func TestBuildEnv_SendOffAmazonLinuxLeavesNitroFieldsEmpty(t *testing.T) {
+	if onAmazonLinux() {
+		t.Skip("this machine is Amazon Linux: send reads the real values (e2e/nitro-tools-check.sh checks that on an instance)")
+	}
+	dir := t.TempDir()
+	vendor := build(t, dir, "./cmd/vendor")
+	remote, _ := newRemoteRepo(t)
+	cfgPath := filepath.Join(dir, "build-config.json")
+	if err := os.WriteFile(cfgPath, buildConfigJSON(t, "", nil), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, code := runCmd(t, vendor, "send", "--repo", remote, "--config", cfgPath, "--workdir", cloneRemote(t, remote))
+	if code != 0 {
+		t.Fatalf("send exit %d\n%s%s", code, stdout, stderr)
+	}
+	for _, want := range []string{"build_env.ami_release left empty", "build_env.docker and nitro_cli left empty"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("send must warn %q, got:\n%s", want, stderr)
+		}
+	}
+	b, err := os.ReadFile(filepath.Join(cloneRemote(t, remote), "build-config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"ami_release", "docker", "nitro_cli"} {
+		if strings.Contains(string(b), `"`+key+`"`) {
+			t.Errorf("pushed build-config.json must not carry an empty %s:\n%s", key, b)
+		}
+	}
+}
+
+// receive on aws-nitro compares the Amazon Linux release the Vendor recorded with this machine's. Here the machine is
+// not Amazon Linux, so a recorded release is refused naming it; --ignore-env makes it a warning. A config without one
+// gets a warning that it was not compared.
+func TestBuildEnv_ReceiveComparesAMIRelease(t *testing.T) {
+	if onAmazonLinux() {
+		t.Skip("this machine is Amazon Linux; the refusal off Amazon Linux cannot be seen here (e2e/nitro-tools-check.sh covers the instance)")
+	}
+	dir := t.TempDir()
+	auditor := build(t, dir, "./cmd/auditor")
+	remote, seed := newRemoteRepo(t)
+	env := map[string]any{"os": runtime.GOOS, "arch": runtime.GOARCH, "go": runtime.Version(), "trimpath": true,
+		"ami_release": "2023.12.20261109", "docker": "25.0.18-1.amzn2023.0.3", "nitro_cli": "1.5.0-0.amzn2023"}
+	pushConfig(t, remote, buildConfigJSON(t, seed, env))
+
+	stdout, stderr, code := runCmd(t, auditor, "receive", "--repo", remote, "--into", filepath.Join(t.TempDir(), "src"))
+	if code == 0 {
+		t.Fatalf("a recorded release on a machine that is not Amazon Linux must be refused\n%s%s", stdout, stderr)
+	}
+	for _, want := range []string{"ami_release: Vendor built on Amazon Linux 2023.12.20261109", "not Amazon Linux 2023", "--ignore-env"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr must contain %q, got:\n%s", want, stderr)
+		}
+	}
+	if !strings.Contains(stdout, "ami_release=2023.12.20261109 docker=25.0.18-1.amzn2023.0.3 nitro_cli=1.5.0-0.amzn2023 (Vendor)") {
+		t.Errorf("the Vendor's build env must be printed with its Nitro fields, got:\n%s", stdout)
+	}
+
+	stdout, stderr, code = runCmd(t, auditor, "receive", "--repo", remote, "--into", filepath.Join(t.TempDir(), "src"), "--ignore-env")
+	if code != 0 || !strings.Contains(stderr, "warning:") || !strings.Contains(stderr, "ami_release") {
+		t.Fatalf("--ignore-env must pass with a warning naming ami_release; exit %d\n%s%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "att-auditor build --config") {
+		t.Errorf("receive must point at build --config on aws-nitro, got:\n%s", stdout)
+	}
+
+	delete(env, "ami_release")
+	pushConfig(t, remote, buildConfigJSON(t, seed, env))
+	stdout, stderr, code = runCmd(t, auditor, "receive", "--repo", remote, "--into", filepath.Join(t.TempDir(), "src"))
+	if code != 0 || !strings.Contains(stderr, "no ami_release") {
+		t.Errorf("a config without ami_release: exit 0 and a warning; exit %d\n%s%s", code, stdout, stderr)
+	}
+}
+
+// build --config takes only an aws-nitro build-config.json, and without --config says the tools are not compared.
+// Both happen before the build starts, so they show on any machine.
+func TestBuild_ConfigFlag(t *testing.T) {
+	dir := t.TempDir()
+	auditor := build(t, dir, "./cmd/auditor")
+	app := t.TempDir()
+	if err := os.WriteFile(filepath.Join(app, "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tdx := map[string]any{
+		"schema": "attestamp.build-config/1", "service": "svc", "version": "1.2.0", "platform": "intel-tdx",
+		"source":    map[string]string{"repo": "https://example.com/svc.git", "commit": "0123456789abcdef"},
+		"tee_info":  map[string]string{"instance_name": "g", "project_id": "p", "zone": "z", "image": "i"},
+		"build_env": map[string]any{"os": "linux", "arch": "amd64", "go": runtime.Version(), "trimpath": true},
+	}
+	b, err := json.Marshal(tdx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := filepath.Join(dir, "tdx-config.json")
+	if err := os.WriteFile(cfgPath, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, code := runCmd(t, auditor, "build", "--app-dir", app, "--out-dir", t.TempDir(), "--config", cfgPath)
+	if code == 0 || !strings.Contains(stderr, "is for intel-tdx; this build is aws-nitro") {
+		t.Errorf("an intel-tdx config must be refused by the Nitro build; exit %d\n%s%s", code, stdout, stderr)
+	}
+	stdout, stderr, _ = runCmd(t, auditor, "build", "--app-dir", app, "--out-dir", t.TempDir())
+	if !strings.Contains(stderr, "no --config, so the docker and nitro-cli versions installed here are not compared") {
+		t.Errorf("build without --config must say what it does not compare, got:\n%s%s", stdout, stderr)
 	}
 }

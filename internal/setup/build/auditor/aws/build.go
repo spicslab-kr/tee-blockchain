@@ -47,6 +47,11 @@ type Build struct {
 	ResponderPath string
 	OutDir        string // result directory. Defaults to out
 	Verify        bool   // build the same Dockerfile once more without cache and check that the PCRs match (verify.go)
+
+	// AfterInstall, if set, gets the docker and aws-nitro-enclaves-cli versions dnf has just installed, before anything
+	// is built, and an error from it stops the build. The Auditor's build compares them with the versions the Vendor
+	// built with (transfer's CheckNitroTools); without it the versions are only printed.
+	AfterInstall func(build.NitroTools) error
 }
 
 // Result is what goes into the measurement record.
@@ -156,6 +161,20 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 	if err := r.run(ctx, "systemctl", "enable", "--now", "docker"); err != nil {
 		return res, err
+	}
+	// dnf installs no fixed version: what it gave decides PCR1 (nitro-cli's kernel and init) and how docker builds.
+	if tools, err := build.ReadNitroTools(ctx); err != nil {
+		if b.AfterInstall != nil {
+			return res, fmt.Errorf("reading the installed versions to compare them with the Vendor's: %w", err)
+		}
+		fmt.Fprintf(log, "warning: could not read the installed docker and nitro-cli versions: %v\n", err)
+	} else {
+		fmt.Fprintln(log, tools.String())
+		if b.AfterInstall != nil {
+			if err := b.AfterInstall(tools); err != nil {
+				return res, err
+			}
+		}
 	}
 
 	appImage := b.DockerImage

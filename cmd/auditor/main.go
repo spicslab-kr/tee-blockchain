@@ -108,7 +108,8 @@ func usage() {
                    --vendor-tee also asks the Vendor's running TEE and says whether it runs the same value; what is
                    registered is still my value. if it runs something else: registered, and exit 12 (do not run again)
   receive          --repo <url> [--ref <commit>] --into <dir> [--ignore-env]
-                   clone the source repository and read the build config. build from that directory
+                   clone the source repository and read the build config. build from that directory.
+                   stops if OS, architecture, Go or (aws-nitro) the Amazon Linux release differ from the Vendor's build_env
   send             --repo <url> --config <build-config.json> --measurements <out/measurements.json> --eif <file> [--build-tool-version <v>] [--workdir <clone>]
                    build the measurement record from the Vendor's build-config.json (service, version, build_env) and my
                    measurements.json (PCR0·1·2), write it next to the measurements, then commit and push it with the image.
@@ -116,9 +117,9 @@ func usage() {
   send             --repo <url> --record <measurement-record.json> [--eif <file>] [--workdir <clone>]
                    the same with a hand-written record. it must say which build environment it is for ("build_env": os,
                    arch amd64 | arm64, go, trimpath). measurements differ per architecture and per Go toolchain
-  build       --app-dir <dir with the software's Dockerfile>  [--image-name <n>] [--port 5000] [--out-dir out] [--responder <att-ra-responder>] [--verify]
+  build       --app-dir <dir with the software's Dockerfile>  [--config <the Vendor's build-config.json> [--ignore-env]] [--image-name <n>] [--port 5000] [--out-dir out] [--responder <att-ra-responder>] [--verify]
               on the Nitro parent instance. builds the software image, layers the RA responder on top, and writes the EIF and measurements (PCR0·1·2).
-              for source that the Auditor rebuilds
+              for source that the Auditor rebuilds. with --config, stops right after installing docker and nitro-cli if their versions differ from the Vendor's
   pack        --docker-image <docker image you built>  [--image-name <n>] [--port 5000] [--out-dir out] [--responder <att-ra-responder>]
               same as build minus the docker build: takes your image, layers the responder, writes the EIF and measurements.
               for an image handed over as a file
@@ -180,9 +181,18 @@ func receive(args []string) error {
 	// the Vendor said which environment it built in. this instance must be the same one, or
 	// a rebuild here can't reproduce its measurements, and would look like a lying Vendor.
 	have := tr.CurrentBuildEnv()
+	check := tr.CheckBuildEnv
+	if c.Platform == awsra.Format {
+		// on Nitro the Amazon Linux release decides which docker and nitro-cli build will install; nothing is installed
+		// yet, so the release is what can be compared now (a proxy; build --config compares the versions themselves)
+		if rel, err := toolchain.AmazonLinuxRelease(); err == nil {
+			have.AMIRelease = rel
+		}
+		check = tr.CheckBuildEnvNitro
+	}
 	fmt.Printf("build env: %s (Vendor)\n", c.BuildEnv)
 	fmt.Printf("build env: %s (this instance)\n", have)
-	warnings, err := tr.CheckBuildEnv(c.BuildEnv, have, *ignoreEnv)
+	warnings, err := check(c.BuildEnv, have, *ignoreEnv)
 	for _, w := range warnings {
 		cli.Errorf("warning: %s", w)
 	}
@@ -191,6 +201,12 @@ func receive(args []string) error {
 	}
 	if c.BuildEnv.OS == have.OS && c.BuildEnv.Arch == have.Arch && c.BuildEnv.Go == have.Go {
 		cli.Okln("build env matches the Vendor's")
+	}
+	if c.BuildEnv.AMIRelease != "" && c.BuildEnv.AMIRelease == have.AMIRelease {
+		cli.Okln("ami release matches the Vendor's (", have.AMIRelease, "): a proxy for the docker and nitro-cli versions build will install, not a guarantee")
+	}
+	if c.Platform == awsra.Format {
+		fmt.Printf("then:  att-auditor build --config %s --app-dir <the source> --out-dir out   (compares docker and nitro-cli with the Vendor's after installing them)\n", got.Path)
 	}
 	// the config carries service, version and build_env, so audit needs none of them typed again
 	fmt.Printf("next: att-auditor audit --config %s --tee-addr <this-instance>:5000 --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>\n", got.Path)
@@ -427,11 +443,37 @@ func buildCmd(args []string) error {
 	fs.StringVar(&b.OutDir, "out-dir", "out", "output directory")
 	fs.StringVar(&b.ResponderPath, "responder", "", "path to the responder (att-ra-responder). default: att-ra-responder next to this executable")
 	fs.BoolVar(&b.Verify, "verify", false, "build the Dockerfile a second time without cache and fail unless PCR0·1·2 come out the same, listing the files that differed")
+	config := fs.String("config", "", "the Vendor's build-config.json: right after installing docker and nitro-cli, build compares their versions with the ones the Vendor built with (build_env.docker, nitro_cli) and stops on a difference")
+	ignoreEnv := fs.Bool("ignore-env", false, "with --config: only warn when the docker or nitro-cli version differs from the Vendor's")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if b.AppDir == "" {
 		return errors.New("--app-dir is required")
+	}
+	if *config == "" {
+		cli.Errorf("warning: no --config, so the docker and nitro-cli versions installed here are not compared with the Vendor's")
+	} else {
+		cfg, err := loadBuildConfig(*config)
+		if err != nil {
+			return err
+		}
+		if cfg.Platform != awsra.Format {
+			return fmt.Errorf("--config: %s is for %s; this build is %s", *config, cfg.Platform, awsra.Format)
+		}
+		b.AfterInstall = func(t toolchain.NitroTools) error {
+			warnings, err := tr.CheckNitroTools(cfg.BuildEnv, t.Docker, t.NitroCLI, *ignoreEnv)
+			for _, w := range warnings {
+				cli.Errorf("warning: %s", w)
+			}
+			if err != nil {
+				return fmt.Errorf("%w (rerun with --ignore-env to proceed anyway)", err)
+			}
+			if cfg.BuildEnv.Docker == t.Docker && cfg.BuildEnv.NitroCLI == t.NitroCLI {
+				cli.Okln("docker and nitro-cli match the Vendor's")
+			}
+			return nil
+		}
 	}
 	built, err := b.Run(context.Background(), os.Stdout)
 	if err != nil {

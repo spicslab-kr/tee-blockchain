@@ -168,6 +168,9 @@ func send(args []string) error {
 	if cfg.BuildEnv.IsZero() {
 		cfg.BuildEnv = tr.CurrentBuildEnv()
 	}
+	if cfg.Platform == awsra.Format {
+		fillNitroEnv(context.Background(), &cfg.BuildEnv)
+	}
 	res, err := tr.GitTransport{WorkDir: *work}.Send(context.Background(), cfg, *repo)
 	if err != nil {
 		return err
@@ -175,6 +178,35 @@ func send(args []string) error {
 	fmt.Printf("sent %s → %s @ %s\n", res.Path, res.Repo, res.Commit)
 	fmt.Printf("build env: %s\n", cfg.BuildEnv)
 	return nil
+}
+
+// fillNitroEnv writes into env what this parent instance built with, where the config left it empty: the Amazon Linux
+// release, which the Auditor's receive compares before installing anything (a proxy), and the docker and
+// aws-nitro-enclaves-cli versions, which the Auditor's build --config compares after installing its own (the real
+// check). send runs after build, so both packages are installed here. What cannot be read is left empty with a
+// warning; the Auditor is then warned that it was not compared.
+func fillNitroEnv(ctx context.Context, env *tr.BuildEnv) {
+	if env.AMIRelease == "" {
+		if rel, err := toolchain.AmazonLinuxRelease(); err != nil {
+			cli.Errorf("warning: build_env.ami_release left empty, the Auditor's receive cannot compare it: %v", err)
+		} else {
+			env.AMIRelease = rel
+		}
+	}
+	if env.Docker != "" && env.NitroCLI != "" {
+		return
+	}
+	tools, err := toolchain.ReadNitroTools(ctx)
+	if err != nil {
+		cli.Errorf("warning: build_env.docker and nitro_cli left empty, the Auditor's build cannot compare them (send on the instance that ran build): %v", err)
+		return
+	}
+	if env.Docker == "" {
+		env.Docker = tools.Docker
+	}
+	if env.NitroCLI == "" {
+		env.NitroCLI = tools.NitroCLI
+	}
 }
 
 func receive(args []string) error {

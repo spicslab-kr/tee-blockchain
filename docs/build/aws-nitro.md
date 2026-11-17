@@ -177,8 +177,12 @@ values that change between machines rather than between runs.
 | `adduser`, `useradd` setting a **password** | the build day in `/etc/shadow` is handled (above); a password hash is not: its salt is random, so the image differs on every build. Do not set a password at build time |
 
 The build tools are not fixed either. `build` installs `docker` and `aws-nitro-enclaves-cli` with
-`dnf` without a version, and `build-config.json` records only `os`, `arch`, the Go version and
-`trimpath`. Use the same AMI on both sides and write these down:
+`dnf` without a version. Since 2026-11-17 `att-vendor send` records, next to `os`, `arch`, the Go version and
+`trimpath`, the Amazon Linux release (`ami_release`) and both package versions (`docker`, `nitro_cli`), and the
+Auditor checks them twice. `receive`, before anything is installed, compares the release: a proxy, not a guarantee: each Amazon Linux release has its own package repository, but a `dnf update` with another release, `releasever=latest` in `/etc/dnf/vars`, or a package installed by hand moves the versions without moving the release.
+`build --config <the Vendor's build-config.json>`, right after `dnf install`, compares the versions themselves and
+stops before building anything if either differs; that is the real check. **Not yet run on an instance**
+(`e2e/nitro-tools-check.sh`). Use the same AMI on both sides; to see the values by hand:
 
 ```
 rpm -q docker aws-nitro-enclaves-cli
@@ -203,6 +207,7 @@ checking a Vendor's self-registration later in flow 2.
 | `e2e/toolchain-pin-check.sh` | an `att` binary built with another Go patch version refuses to `build` |
 | `e2e/responder-check.sh` | `build --responder` refuses a responder without `-trimpath`, with version control stamping, with a Go build ID, or for the wrong architecture |
 | `e2e/build-env-check.sh` | `receive` rejects a `build_env` that does not match the instance; `--ignore-env` only warns |
+| `e2e/nitro-tools-check.sh` | `send` records the Amazon Linux release and the docker and nitro-cli versions; `receive` refuses another release; `build --config` refuses another docker version right after installing |
 | `e2e/arch-measurement-compare.sh` | the same source measures the same on two x86_64 hosts and differently on arm64 |
 
 ## If two builds differ

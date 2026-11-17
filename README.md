@@ -107,9 +107,10 @@ each one moves: [docs/build/reproduce.md](docs/build/reproduce.md).** The most i
 3. A base image pinned by digest (`FROM nginx@sha256:…`), and every package, dependency and
    `git clone` pinned to an exact version or commit.
 4. No time, host name or random value written into a file at build time.
-5. On Nitro, the same AMI and the same `docker` and `nitro-cli` versions. `build` does not record
-   them for you, so write yours down; the versions our runs used are in
-   [docs/build/toolchain.md](docs/build/toolchain.md).
+5. On Nitro, the same AMI and the same `docker` and `nitro-cli` versions. `att-vendor send` records
+   the Amazon Linux release and both versions in `build_env`; `att-auditor receive` compares the
+   release and `att-auditor build --config` the versions themselves (below). The versions our runs
+   used are in [docs/build/toolchain.md](docs/build/toolchain.md).
 6. Docker itself: `docker build` decides file order and timestamps in each layer anew on every
    run, so two builds of the same files still differ.
 7. On TDX and SEV-SNP, the VM as well as the build: the same exact image version and the same
@@ -134,7 +135,10 @@ each one moves: [docs/build/reproduce.md](docs/build/reproduce.md).** The most i
   another OS or architecture.
 - They warn about each Dockerfile line that breaks items 3 and 4. Fixing those lines is up to you.
 - `--verify` builds a second time from scratch and fails unless the measurements match.
-- `att-auditor receive` stops if the OS, architecture or Go version differs from the Vendor's.
+- `att-auditor receive` stops if the OS, architecture or Go version differs from the Vendor's, and on
+  Nitro the Amazon Linux release (a proxy, not a guarantee: each Amazon Linux release has its own package repository, but a `dnf update` with another release, `releasever=latest` in `/etc/dnf/vars`, or a package installed by hand moves the versions without moving the release).
+- `att-auditor build --config <the Vendor's build-config.json>` stops right after installing docker
+  and nitro-cli if their versions differ from the ones the Vendor built with. This is the real check.
 
 ```
 att-vendor build --app-dir <dir with Dockerfile> --out-dir out --verify
@@ -182,7 +186,7 @@ As an **Auditor**, on a Nitro instance, with the Vendor's repository. A registry
 ```
 att-auditor registry-deploy --rpc <url> --deployer-key-file <key> --approver <0x… address of your signing key>
 att-auditor receive --repo <git url> --into work/src
-att-auditor build   --app-dir work/src/<path> --out-dir out
+att-auditor build   --config work/src/build-config.json --app-dir work/src/<path> --out-dir out
 att-auditor launch  --eif out/<name>.eif
 att-auditor audit   --config work/src/build-config.json --tee-addr <my-instance>:5000 \
                    --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>

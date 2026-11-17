@@ -37,18 +37,36 @@ type BuildEnv struct {
 	Arch     string `json:"arch"`     // GOARCH, e.g. amd64 or arm64
 	Go       string `json:"go"`       // runtime.Version() of the att binary, e.g. go1.26.1
 	Trimpath bool   `json:"trimpath"` // whether the att binary (and so att-ra-responder) was built with -trimpath
+
+	// aws-nitro only, written by att-vendor send on the Vendor's parent instance after its build (empty elsewhere).
+	// build installs docker and aws-nitro-enclaves-cli with dnf and no version, and both decide the measurements.
+	// AMIRelease is the Amazon Linux release (e.g. 2023.12.20261109), which the Auditor's receive compares before
+	// anything is installed: a proxy for the versions, since each release has its own package repository, and no
+	// guarantee (a dnf update with another release, releasever=latest or a package installed by hand moves the
+	// versions without it). Docker and NitroCLI are the package versions themselves, which the Auditor's build
+	// compares right after installing its own (internal/setup/build, NitroTools).
+	AMIRelease string `json:"ami_release,omitempty"`
+	Docker     string `json:"docker,omitempty"`    // rpm version-release, e.g. 25.0.18-1.amzn2023.0.3
+	NitroCLI   string `json:"nitro_cli,omitempty"` // rpm version-release of aws-nitro-enclaves-cli, e.g. 1.5.0-0.amzn2023
 }
 
 // IsZero reports that no field is set (a build-config.json that has no build_env).
 func (e BuildEnv) IsZero() bool { return e == BuildEnv{} }
 
-// String formats the environment on one line, e.g. "linux/amd64 go1.26.1 trimpath=true".
+// String formats the environment on one line, e.g. "linux/amd64 go1.26.1 trimpath=true", followed by the Nitro
+// fields that are set, e.g. " ami_release=2023.12.20261109 docker=25.0.18-1.amzn2023.0.3 nitro_cli=1.5.0-0.amzn2023".
 func (e BuildEnv) String() string {
 	tp := "false"
 	if e.Trimpath {
 		tp = "true"
 	}
-	return e.OS + "/" + e.Arch + " " + e.Go + " trimpath=" + tp
+	s := e.OS + "/" + e.Arch + " " + e.Go + " trimpath=" + tp
+	for _, f := range []struct{ k, v string }{{"ami_release", e.AMIRelease}, {"docker", e.Docker}, {"nitro_cli", e.NitroCLI}} {
+		if f.v != "" {
+			s += " " + f.k + "=" + f.v
+		}
+	}
+	return s
 }
 
 // CurrentBuildEnv returns the environment this att binary runs in, which its build command uses to

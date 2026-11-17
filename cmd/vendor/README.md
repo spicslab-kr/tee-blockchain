@@ -91,7 +91,9 @@ att-vendor receive --repo <auditor git url> --into from-auditor
 
 `send` commits the file to the repository root and pushes it. `--workdir` reuses an existing clone.
 If you leave `build_env` out, `send` fills it in
-from the running binary.
+from the running binary. On `aws-nitro` it also fills in, where empty, the Amazon Linux release (`ami_release`, from `/etc/os-release`) and the docker and
+aws-nitro-enclaves-cli versions (`docker`, `nitro_cli`, from `rpm -q`), so run it on the instance that ran
+`build`. The Auditor's `receive` compares the release and its `build --config` the versions.
 
 ```json
 {
@@ -112,7 +114,7 @@ from the running binary.
 | `platform` | `aws-nitro`, `intel-tdx`, `amd-sev-snp-initrd` or `amd-sev-snp-verity`. It decides which `tee_info` keys are required. |
 | `source` | `repo` and `commit` are required. `path` is the optional app folder. |
 | `tee_info` | For `aws-nitro`: `instance_id`, `region`, `ami_id`. For `intel-tdx` and both `amd-sev-snp-*` (guests on GCP): `instance_name`, `project_id`, `zone`, `image` (`TEEInfoKeys` in `internal/core/transfer/*/build_config.go`). For the CVMs, `image` is the exact image version both sides must boot (`docs/build/tdx.md`, "The same inputs"). |
-| `build_env` | `os`, `arch` (`amd64` or `arm64`) and `go` are required. `trimpath` may be false, and the Auditor warns about it. |
+| `build_env` | `os`, `arch` (`amd64` or `arm64`) and `go` are required. `trimpath` may be false, and the Auditor warns about it. On `aws-nitro`, `send` adds `ami_release` (e.g. `2023.12.20261109`), `docker` (e.g. `25.0.18-1.amzn2023.0.3`) and `nitro_cli` (e.g. `1.5.0-0.amzn2023`); optional, but without them the Auditor cannot compare them. |
 
 The Auditor needs read access to the repository. Exit codes 8 to 11 report git failures from `send` and
 `receive` (see [Exit codes](../README.md#exit-codes)).

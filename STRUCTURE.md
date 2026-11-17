@@ -49,7 +49,7 @@ This page lists every folder in the repository, then explains the one idea that 
 │   ├── flow1-auditor-registers/       Auditor rebuilds and registers; tamper steps included
 │   ├── flow2-vendor-self-registers/   Vendor registers itself; tamper steps included
 │   ├── *-check.sh, *-compare.sh       single-purpose Nitro checks (toolchain pin, build environment,
-│   │                                  architecture, responder, debug mode, replay)
+│   │                                  docker and nitro-cli, architecture, responder, debug mode, replay)
 │   ├── cloud/              create, start, stop and delete the instances: aws-nitro.sh (Nitro), gcp-cvm.sh (TDX and
 │   │                       SEV-SNP guests), aws-snp.sh (SEV-SNP on AWS, kept for reference); README on accounts,
 │   │                       cost, images and SSH
@@ -221,7 +221,7 @@ the role-neutral logic is pulled out into the shared pieces above wherever Go al
 | File | How it differs |
 | --- | --- |
 | `core/transfer/<role>/transport.go` and `git.go` | Opposite directions. The Vendor sends the build config and receives the measurement record; the Auditor receives the build config (clone) and sends the measurement record. |
-| `core/transfer/auditor/build_env_check.go` | Only the Auditor has it: the OS, CPU architecture and Go version check. |
+| `core/transfer/auditor/build_env_check.go` | Only the Auditor has it: the OS, CPU architecture and Go version check, the Amazon Linux release (receive) and the docker and nitro-cli versions (build --config). |
 | `chain/lookup/user` (`lookup.go`, `ether/reader.go`) | The User's reader differs from the Vendor and Auditor ones. |
 | `core/compare/user/compare.go` | The User has no register package, so it recomputes the measurement hash itself. |
 | Tests in `core/transfer`, `chain/lookup/*/ether`, `core/compare/user` | Follow the code above. |
