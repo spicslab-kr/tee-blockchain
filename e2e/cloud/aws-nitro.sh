@@ -230,10 +230,10 @@ stop|start)
         "Name=instance-state-name,Values=pending,running,stopping,stopped" \
         --query 'Reservations[].Instances[].InstanceId' --output text)
   [ -n "$ids" ] || die "no instances tagged Project=$TAG"
-  aws ec2 "$1-instances" --instance-ids $ids >/dev/null || die "$1-instances"
-  echo "$1: $ids"
+  aws ec2 "$ACTION-instances" --instance-ids $ids >/dev/null || die "$ACTION-instances"
+  echo "$ACTION: $ids"
   # A started instance gets a new address, and this machine's may have changed too: say whether it can get in.
-  if [ "$1" = start ]; then check_my_address; fi   # not "[ … ] && …": on stop that would end the script with exit 1
+  if [ "$ACTION" = start ]; then check_my_address; fi   # not "[ … ] && …": on stop that would end the script with exit 1
   ;;
 
 delete)

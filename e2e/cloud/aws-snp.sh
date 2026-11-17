@@ -169,7 +169,7 @@ stop|start)
   ids=$(aws ec2 describe-instances --filters "Name=tag:Project,Values=$TAG" --query 'Reservations[].Instances[].InstanceId' --output text)
   [ -n "$ids" ] || die "no instances tagged Project=$TAG"
   # shellcheck disable=SC2086
-  aws ec2 "$1-instances" --instance-ids $ids >/dev/null && echo "$1: $ids"
+  aws ec2 "$ACTION-instances" --instance-ids $ids >/dev/null && echo "$ACTION: $ids"
   ;;
 
 delete)
