@@ -51,8 +51,9 @@ This page lists every folder in the repository, then explains the one idea that 
 │   ├── *-check.sh, *-compare.sh       single-purpose Nitro checks (toolchain pin, build environment,
 │   │                                  docker and nitro-cli, architecture, responder, debug mode, replay)
 │   ├── cloud/              create, start, stop and delete the instances: aws-nitro.sh (Nitro), gcp-cvm.sh (TDX and
-│   │                       SEV-SNP guests), aws-snp.sh (SEV-SNP on AWS, kept for reference); README on accounts,
-│   │                       cost, images and SSH
+│   │                       SEV-SNP guests), aws-snp.sh (SEV-SNP on AWS, kept for reference); check-scripts.sh runs
+│   │                       every action of the three against stand-in CLIs (also from go test ./cmd); README on
+│   │                       accounts, cost, images and SSH
 │   └── cvm/                scripts that run on a TDX or SEV-SNP guest: in-guest-verify.sh (the whole chain on
 │                           the guest) and build-env-check.sh (T7)
 │

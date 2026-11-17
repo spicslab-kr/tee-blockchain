@@ -148,7 +148,15 @@ typo stops it before anything runs.
 never asks. A pause protects only someone watching a terminal. A flag in the typed command is the one thing both a
 person and an approval rule can see.
 
-**Testing these scripts without creating anything.** Use `--dry-run` first. To go further, put stand-in `gcloud` and
+**Testing these scripts without creating anything.** Run `bash e2e/cloud/check-scripts.sh` (`go test ./cmd` runs it
+too, as `TestCloudScripts`). It runs every action of the three scripts against stand-in `aws`, `gcloud` and `curl`
+commands that only log their arguments, checks each exit status and the CLI calls each action made, and fails when a
+script has an action that no case runs as far as its CLI call. The stand-ins must be what `PATH` finds, or it stops
+before running anything. It was written on 2026-11-17: the check by hand the night before ran `create` only, and
+`stop` and `start` in both AWS scripts still failed at once on `$1` (fixed in `28e1e1e`); run on those versions, it
+fails on exactly those four. A new action needs a new case there.
+
+For a one-off look at a single command, use `--dry-run` first. To go further by hand, put stand-in `gcloud` and
 `aws` scripts (that only print or log their arguments) first on `PATH`, and check with `which gcloud aws` that they are
 the ones found **before** running anything. In Git Bash write the folder as `/c/Users/...`, never `C:/Users/...`:
 `PATH` is split at every colon, so `C:/Users/.../fakebin:$PATH` becomes `C` and `/Users/.../fakebin`, neither of which
