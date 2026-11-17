@@ -205,7 +205,7 @@ followed by a passing line; the file explains them. PCR1 did not move on either 
 because the responder changed (`c4fd40c`, `a50a752`).
 
 ¹⁹ **2026-11-17, second run: the Nitro baseline after the shared request package**
-(`docs/results/aws-nitro-2026-11-17-shared-aws.md` and `.jsonl`, 32 lines, one written by hand): three new instances
+(`docs/results/aws-nitro-2026-11-17-shared-aws.md` and `.jsonl`, 32 lines, one written by hand; six more added later, from a `responder-check.sh` run with longer SSH retry waits): three new instances
 on the same images as ¹⁸ (x86_64 `ami-0f71b90bee7050a75`, arm64 `ami-0ce2f8dd9b0fcfb35`, release 2023.12.20261112,
 nitro-cli 1.5.0, docker 25.0.18); binaries and scripts at `9ca51bb`, responder `b9ae17f3…` (amd64) / `294efd1b…`
 (arm64). The six chain-free scripts. The one line that misses its expectation is the arm64 responder step, whose SSH

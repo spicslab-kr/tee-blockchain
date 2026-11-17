@@ -7,7 +7,8 @@ moved the Nitro build and launch the same way; the responder does not link them,
 commit (`d6e3422d…` / `f581d95c…`). This run takes the values again with the same scripts as the first run. Every
 verdict is in [`aws-nitro-2026-11-17-shared-aws.jsonl`](aws-nitro-2026-11-17-shared-aws.jsonl), 32 lines: 31 written
 by the scripts and copied unchanged from `e2e-work/results/aws-nitro.jsonl` (each script has its own `run` id), and
-one written by hand (below).
+one written by hand (below). *(Added later on 2026-11-17.)* Six more lines follow them, 38 in all: a later
+`responder-check.sh` run with longer SSH retry waits (last section).
 
 ## What ran, from which code
 
@@ -61,18 +62,27 @@ message as in every earlier run on this network. Step 7's remote command was the
 exit 1, "att-ra-responder was built for GOARCH=arm64 but this instance is amd64; the enclave runs the parent
 instance's architecture". That is the hand-written line (its `at` is approximate).
 
-## Known problem: the SSH resets, and why ControlMaster does not fix them here (added later on 2026-11-17)
+## The SSH resets: two fixes tried (added later on 2026-11-17)
 
-Step 7 had to be run by hand on every run on this network (2026-11-12, -16, and both runs of -17); it still does. With
-the same three instances started again (new addresses), sharing one SSH connection per host was tried:
+Step 7 had to be run by hand on every run on this network (2026-11-12, -16, and both runs of -17). With the same three
+instances started again (new addresses), two fixes were tried.
 
-**ControlMaster: does not work in Git Bash.** Git Bash's own OpenSSH 9.8p1
+**ControlMaster (one shared SSH connection per host): does not work in Git Bash.** Git Bash's own OpenSSH 9.8p1
 started the master and answered `ssh -O check` ("Master running"), but every session through it failed with
-`mux_client_request_session: read from master failed` (`Connection reset by peer`, then `Software caused
-connection abort`). With `ControlMaster=auto` the command failed (exit 255, "Failed to connect to new control
-master"); with `ControlMaster=no` ssh quietly opened a new connection instead, so nothing was shared. The cause: a
-session through the master hands its stdin, stdout and stderr to the master over the Unix socket (file descriptor
-passing), which MSYS, under Git Bash, does not provide; Windows' own OpenSSH has no ControlMaster at all. Only the
-control commands, which pass no descriptors, work. `env.sh` was not changed for it, apart from a comment saying so.
-Not worth trying again on Windows; on Linux or macOS it should work. The SSH resets remain a known problem on this
-network, and step 7 is still run by hand when they hit.
+`mux_client_request_session: read from master failed` (`Connection reset by peer`, then `Software caused connection
+abort`). With `ControlMaster=auto` the command failed (exit 255, "Failed to connect to new control master"); with
+`ControlMaster=no` ssh quietly opened a new connection instead, so nothing was shared. The cause: a session through
+the master hands its stdin, stdout and stderr to the master over the Unix socket (file descriptor passing), which
+MSYS, under Git Bash, does not provide; Windows' own OpenSSH has no ControlMaster at all. Only the control commands,
+which pass no descriptors, work. This is a known problem: not worth trying again on Windows; on Linux or macOS it
+should work. `env.sh` has a comment saying so and no ControlMaster setting.
+
+**Longer waits between attempts: passed once.** `net_retry` in `e2e/env.sh` now makes 4 attempts 10 s, 20 s and 40 s
+apart (it was 3 attempts, 3 s and 6 s apart). Measured once, on 2026-11-17: `responder-check.sh` ran from start to end
+and **step 7 passed without manual intervention**. Its first connection was reset again ("attempt 1 of 4; trying
+again in 10 s"), the second got through, and `build` refused the arm64 responder, exit 1, "built for GOARCH=arm64 but
+this instance is amd64". All six verdicts were as expected; they are the last six lines of the `.jsonl` (run
+`20261117T095615Z`, copied unchanged), with responder `b9ae17f3…`, the scripts at `9ca51bb` plus this change to
+`env.sh`. It is the first of the four runs in which step 7 needed no hand run, and it could not be repeated: the
+instances were deleted afterwards. So this network resets a burst of new SSH connections, and on that one run ten
+seconds were enough for it to let the next one through.

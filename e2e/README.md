@@ -234,7 +234,7 @@ Set in `e2e/env.sh` unless noted.
 | `SSH_USER` | login user on the instances, `ec2-user` |
 | `PEM` | SSH key file, relative to the repository root, default `pem2.pem` |
 | `SSH`, `SCP` | the ssh and scp command lines built from `PEM`; every connection goes through `net_retry` |
-| `SSH_TRIES` | attempts per ssh/scp when the connection itself cannot be set up (default 3). Some networks abort a burst of new connections ("kex_exchange_identification … Software caused connection abort"); such an attempt is retried after 3 s, then 6 s. A remote command that fails is never retried, and after the last attempt the failure stands |
+| `SSH_TRIES` | attempts per ssh/scp when the connection itself cannot be set up (default 4). Some networks abort or reset a burst of new connections ("kex_exchange_identification … Software caused connection abort" or "Connection reset by peer"); such an attempt is retried after 10 s, 20 s, then 40 s (3 s and 6 s were not enough on one network; 10 s was, measured once on 2026-11-17). A remote command that fails is never retried, and after the last attempt the failure stands |
 | `V`, `A`, `R` | functions that run a command on the Vendor, Auditor or arm64 instance |
 | `NET` | `sepolia` (default), `mainnet` (also needs `CONFIRM_MAINNET=1`) or `local` |
 | `RPC` | the RPC URL chosen by `NET`: a public endpoint, or `LOCAL_RPC` for `local` |

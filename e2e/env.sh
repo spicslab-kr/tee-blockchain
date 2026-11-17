@@ -90,15 +90,16 @@ R() { need_host ARM64_HOST; net_retry $SSH "$SSH_USER@$ARM64_HOST" "$@"; }   # a
 #     never retried, so a failure is never hidden or a command run twice.
 #   - scp's own form of the same abort is a bare "scp: Connection closed" (2026-11-16: the Auditor's measurements.json
 #     was not fetched after a good build, and nothing retried it). It counts too: a copy can be repeated harmlessly.
-#   - At most SSH_TRIES attempts (default 3), waiting 3 s, then 6 s. After the last one the original exit code is
-#     returned and the script fails as before.
+#   - At most SSH_TRIES attempts (default 4), waiting 10 s, 20 s, then 40 s. After the last one the original exit code
+#     is returned and the script fails as before. Until 2026-11-17 it was 3 attempts 3 s and 6 s apart, and
+#     responder-check.sh's step 7 failed all three on every run on one network (2026-11-12, -16, -17 twice); with the
+#     longer waits it passed untouched, measured once on 2026-11-17 (docs/results/aws-nitro-2026-11-17-shared-aws.md).
 #   - Sharing one connection per host (ssh ControlMaster) does not work in Git Bash: a session through the master
-#     must pass its file descriptors over the Unix socket, which MSYS cannot do (tried 2026-11-17; known problem in
-#     docs/results/aws-nitro-2026-11-17-shared-aws.md).
+#     must pass its file descriptors over the Unix socket, which MSYS cannot do (tried 2026-11-17, same file).
 #   - stdin (the heredoc of V 'bash -s' <<REMOTE) is kept in a file and given again to every attempt; a terminal is
 #     left alone.
 # ssh/scp error output is shown after the attempt ends rather than as it is written.
-SSH_TRIES=${SSH_TRIES:-3}
+SSH_TRIES=${SSH_TRIES:-4}
 net_retry() {
   local n=1 rc errf inf=""
   errf=$(mktemp)
@@ -110,8 +111,8 @@ net_retry() {
        || ! grep -qE 'kex_exchange_identification|banner exchange|Software caused connection abort|Connection (refused|reset by peer|timed out)|Operation timed out|Network is unreachable|No route to host|Connection closed by [^ ]+ port [0-9]+$|^scp: Connection closed$' "$errf"; then
       break
     fi
-    echo "$1: the connection could not be set up (attempt $n of $SSH_TRIES); trying again in $((n * 3)) s" >&2
-    sleep $((n * 3)); n=$((n + 1))
+    echo "$1: the connection could not be set up (attempt $n of $SSH_TRIES); trying again in $((10 << (n - 1))) s" >&2
+    sleep $((10 << (n - 1))); n=$((n + 1))
   done
   rm -f "$errf" ${inf:+"$inf"}
   return $rc
