@@ -1,7 +1,6 @@
 # Contributing
 
-This is a private, shared working repository. These are the rules we keep so the next person
-can pick it up without asking.
+These are the rules we keep so that anyone can pick the work up without asking.
 
 ## Build
 
@@ -41,8 +40,8 @@ go test ./...
 ```
 
 Unit tests run anywhere. `cmd/*_e2e_test.go` build the binaries and run them against a local
-`anvil` and a recorded attestation document; the chain-backed ones skip themselves when `anvil`
-is neither on `PATH` nor in `~/.foundry/bin`. No Nitro hardware is needed for any test.
+`anvil` and recorded Nitro, TDX and SEV-SNP evidence; the chain-backed ones skip themselves when `anvil`
+is neither on `PATH` nor in `~/.foundry/bin`. No TEE hardware is needed for any test.
 Files the `e2e/` scripts fetch from instances land in `e2e-work/`, which is ignored.
 
 `internal/doccheck` checks every document reference in the tracked files: Markdown links and their anchors, file
@@ -98,26 +97,32 @@ Option 1 registers five values and Option 2 six (PCR12 added), so they are two f
 
 ## Adding a platform
 
-A platform is identified by one format string, carried in `RADoc.Format`. The wire protocol sends it as a
-length-prefixed string, so a new platform needs no protocol change. `contracts/evm/Registry.sol` does not change
-either: `recordKey = keccak256(approver, platform, measurement)`, so each platform string is already its own namespace
-on the chain. The files to touch:
+A platform is identified by a format string, carried in `RADoc.Format`; one platform may have more than one (SEV-SNP
+has `amd-sev-snp-initrd` and `amd-sev-snp-verity`). The wire protocol sends it as a length-prefixed string, so a new
+platform needs no protocol change. `contracts/evm/Registry.sol` does not change either: `recordKey =
+keccak256(approver, platform, measurement)`, so each format string is already its own namespace on the chain. Below,
+`<plat>` is the folder name (`aws`, `tdx`, `snp`) and `<format>` a format string. The files to touch:
 
 | # | path | what |
 |---|---|---|
-| 1 | `internal/tee/parse/<plat>/` | the real parser: document, verification, nonce, measurements, embedded root certificate, `const Format` |
+| 1 | `internal/tee/parse/<plat>/` | the real parser: document, verification, nonce, measurements, embedded root certificate, and a constant per format string (`Format`; SEV-SNP has `FormatInitrd` and `FormatVerity`) |
 | 2 | `internal/tee/parse/{Vendor,auditor,user}/<plat>.go` | thin type-converting adapters, one per role |
-| 3 | `internal/tee/request/{Vendor,auditor}/<plat>/` | getting the evidence inside the instance |
-| 4 | `cmd/ra-responder/main.go` | one more `--extractor` case |
-| 5 | `cmd/{vendor,auditor,user}/parse.go` | one more `case` in the parser switch |
-| 6 | `internal/core/transfer/{Vendor,auditor}/build_config.go` | `TEEInfoKeys["<plat>"]` |
-| 7 | `internal/core/transfer/{Vendor,auditor}/measurement_record.go` | `MeasurementNames["<plat>"]` and a `case` in `Validate` |
-| 8 | `internal/setup/build/{Vendor,auditor}/<plat>/` | producing the measured image |
-| 9 | `internal/setup/launch/{Vendor,auditor}/<plat>/` | starting it and measuring it |
-| 10 | `docs/build/<plat>.md` | what changes the measurements on this platform |
+| 3 | `internal/tee/request/<plat>/` | getting the evidence inside the TEE, once for all roles |
+| 4 | `internal/tee/request/{Vendor,auditor}/<plat>/` | the role's `Extractor`, a thin adapter over 3 |
+| 5 | `cmd/ra-responder/main.go` | one more `--extractor` case |
+| 6 | `cmd/{vendor,auditor,user}/parse.go` | one more `case` in the parser switch |
+| 7 | `internal/core/transfer/{Vendor,auditor}/build_config.go` | `TEEInfoKeys["<format>"]`, one entry per format string |
+| 8 | `internal/core/transfer/{Vendor,auditor}/measurement_record.go` | `MeasurementNames["<format>"]` per format string, and the format in a `case` of `Validate` |
+| 9 | `internal/setup/build/<plat>/` and `internal/setup/build/{Vendor,auditor}/<plat>/` | producing the measured image: the shared code once, a thin adapter per role |
+| 10 | `internal/setup/launch/<plat>/` and `internal/setup/launch/{Vendor,auditor}/<plat>/` | starting it and measuring it, in the same two layers |
+| 11 | `cmd/{vendor,auditor}/<plat>.go`, and the `--platform` cases in `buildCmd` and `launchCmd` of `cmd/{vendor,auditor}/main.go` | the `build` and `launch` commands for the platform |
+| 12 | the four `hash_golden_test.go` (below) | the expected hash of one real recording per new format string, the same in all four |
+| 13 | `.gitignore` | an exception line for the embedded root certificate (below) |
+| 14 | `docs/build/<guide>.md` (today `aws-nitro.md`, `tdx.md`, `sev-snp.md`) | what changes the measurements on this platform |
 
 Follow the two-layer shape the existing platforms use: the role-independent logic once, next to the role folders
-(`internal/tee/parse/aws` holds the real Nitro parser), and per role only a thin adapter. Record one real attestation
+(`internal/tee/parse/aws` holds the real Nitro parser, `internal/setup/build/tdx` the TDX build), and per role only a
+thin adapter. Record one real attestation
 document, commit it under `testdata/`, and write the parser against it, so that parse, adapters, CLI wiring and the
 trust decision can be tested with no instance running. What a parser must drop and check is in `STRUCTURE.md`,
 "What every platform's parser must do".
@@ -142,7 +147,7 @@ type(scope): what changed, in the imperative
 
 ## Pull requests
 
-- Branch from `main`, open a PR, get one review from the other person.
+- Branch from `main`, open a PR, and get one review from a maintainer other than the author.
 - `go vet ./...` and `go test ./...` must pass. If you touched `build` or the responder, also
   run the measurement check once on an instance (`e2e/arch-measurement-compare.sh`): the
   point of this project is that the bytes come out identical.
@@ -152,7 +157,7 @@ type(scope): what changed, in the imperative
 
 ## Releases
 
-Tags are `vMAJOR.MINOR.PATCH`. A release attaches the four Linux binaries for `amd64` and
+There are no releases yet. When there are: tags are `vMAJOR.MINOR.PATCH`, and a release attaches the four Linux binaries for `amd64` and
 `arm64`, built with the pinned toolchain, `CGO_ENABLED=0` and `-trimpath -buildvcs=false -ldflags=-buildid=`, plus a `SHA256SUMS` file. The
 `att-ra-responder` sha256 in a release is the one both Vendor and Auditor should see in their
 build logs.
