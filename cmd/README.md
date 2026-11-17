@@ -105,7 +105,7 @@ Each role is one `main` package. Files with the same name in different roles do 
 | [vendor/self_register.go](vendor/self_register.go) | Vendor `self-register`: register the Vendor's own measurements. |
 | [auditor/audit.go](auditor/audit.go) | Auditor `audit`: compare the rebuilt image with the Vendor's measurements and register. |
 | [user/verify.go](user/verify.go) | User `verify`: request, verify, look up and decide in one command. |
-| [vendor/arch.go](vendor/arch.go), [auditor/arch.go](auditor/arch.go) | CPU architecture handling (`amd64` or `arm64`) for `build`, `pack` and the build environment. |
+| [vendor/arch.go](vendor/arch.go), [auditor/arch.go](auditor/arch.go) | CPU architecture names (`amd64` or `arm64`) for `--arch` of `register`, `self-register` and `audit`, and the toolchain warning of the Auditor's `send` and the Vendor's `receive`. |
 | [vendor/quiet.go](vendor/quiet.go), [auditor/quiet.go](auditor/quiet.go), [user/quiet.go](user/quiet.go) | The `quiet` flag that silences single-step commands when a bundled command calls them. |
 | [ra-responder/main.go](ra-responder/main.go) | `att-ra-responder`: the one binary layered into the enclave image; it only runs `lo-up` and `ra-serve`. |
 

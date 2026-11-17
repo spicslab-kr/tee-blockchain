@@ -88,7 +88,7 @@ func usage() {
                    (--config <build-config.json> | --service <name> --version <v> [--arch amd64|arm64]) [--platform aws-nitro] [--expires 2160h]
                    sign the measurements with my signing key and register them on the registry. the record key in the output is the lookup coordinate.
                    --config takes service, version and the build env from my build-config.json; the flags override it, with a warning
-  lookup           --rpc <url> --registry <0x…> (--record-key <0x…> | --measurements <measurements.json | NAME=hex,…>)
+  lookup           --rpc <url> --registry <0x…> (--record-key <0x…> | --measurements <measurements.json | NAME=hex,…>) [--platform aws-nitro|intel-tdx|amd-sev-snp-*]
                    read one record key directly, or find the record key(s) for the measurements first and read them all
   compare          --attested <measurements.json | NAME=hex,…> --expected <same shape>
                    match two sets of measurements as they are (parsed vs built, etc.). prints PASS/FAIL with the reasons
@@ -163,8 +163,8 @@ func send(args []string) error {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return fmt.Errorf("build config: %w", err)
 	}
-	// the build command compiles att-ra-responder in the current environment, so that is the build_env
-	// the Auditor rebuilds to. a config that already declares one is kept as written.
+	// send runs where build ran, and build used this environment (it checks the prebuilt att-ra-responder against it),
+	// so that is the build_env the Auditor rebuilds to. a config that already declares one is kept as written.
 	if cfg.BuildEnv.IsZero() {
 		cfg.BuildEnv = tr.CurrentBuildEnv()
 	}

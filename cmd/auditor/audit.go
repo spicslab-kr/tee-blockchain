@@ -21,7 +21,8 @@ import (
 // auditCmd runs the Auditor's part in one command: request an attestation document from its own TEE and verify it, compare it with the values I built and measured,
 // register those values only if they match, then read the registration back and check it. The screen shows one sentence per step.
 //
-// With only --tee-addr, the attested values are registered as they are (no check). With only --build-measurements, that file is registered as it is.
+// --tee-addr needs --build-measurements on every platform (requireBuild): the attested values must equal the ones I built, or
+// nothing is registered. With only --build-measurements, that file is registered as it is.
 func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "my TEE's host:port (a Nitro enclave, or a TDX or SEV-SNP guest), from which an attestation is requested first")
@@ -275,7 +276,7 @@ func auditCmd(args []string) error {
 	t.Done("value, expiry and approver all check out")
 	cli.Why("the same check a User will run: read the registration back and make sure it matches, is not expired, and was signed by the approver this registry trusts")
 	cli.Okln("PASS: audited and registered. Users can now verify against registry ", *registry)
-	fmt.Printf("this registration is for %s only. Put \"arch\": \"%s\" in measurement-record.json; a build for the other architecture measures differently and is registered on its own\n", *arch, *arch)
+	fmt.Printf("this registration is for %s only. Put \"build_env\": {\"arch\": \"%s\", …} in measurement-record.json; a build for the other architecture measures differently and is registered on its own\n", *arch, *arch)
 	if vendorRunsSomethingElse {
 		return fmt.Errorf("%w: the registration above SUCCEEDED (record key %s on registry %s). Only the comparison "+
 			"with the Vendor's %s at %s failed: it does not run this value, so a User verifying that %s against this "+

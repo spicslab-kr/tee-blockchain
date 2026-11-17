@@ -87,8 +87,10 @@ On success you see:
 ```
     record key  0x...
     tx          0x...
+    block       <n>
     expires     <time>
     approver    0x...
+    build env   linux/amd64 go1.26.1 trimpath=true …
 PASS: audited and registered. Users can now verify against registry 0x...
 ```
 
@@ -120,7 +122,7 @@ One service and version has one record and one registration per CPU architecture
 | `ra-parse` | Verifies a document and extracts its measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP the five or six values); `--format` for a guest. |
 | `register` | Signs and registers measurements. `audit` calls it. |
 | `lookup` | Finds registrations by `--measurements` or `--record-key`. |
-| `compare` | Compares two sets of measurements, or a document with a registration. |
+| `compare` | Compares two sets of measurements, or a set of measurements with a registration (`--record-key`). |
 | `version` | Prints the pinned Go toolchain and the one in use. |
 | `ra-serve` | Runs inside the enclave and answers attestation requests. |
 | `ra-proxy` | Forwards TCP connections to the enclave's vsock. |

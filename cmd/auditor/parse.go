@@ -26,7 +26,7 @@ func raParse(args []string) error {
 	format := fs.String("format", p.AWSFormat, "document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity")
 	rootPath := fs.String("root", "", "platform verification key (root certificate PEM). empty uses the built-in one")
 	outFile := fs.String("out-file", "", "file to save the measurements to (default: <doc>.measurements.json)")
-	at := fs.String("at", "", "time at which to judge the certificate chain (RFC3339). empty uses the document's time on aws-nitro and the current time on intel-tdx, whose quote carries no time")
+	at := fs.String("at", "", "time at which to judge the certificate chain (RFC3339). empty uses the document's time on aws-nitro and the current time on intel-tdx and amd-sev-snp-*, whose evidence carries no time")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

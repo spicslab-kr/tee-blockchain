@@ -50,7 +50,7 @@ func usage() {
   ra-request  --tee-addr <host:port> [--out-file <file>] [--format <name>] [--timeout 30s]
               generates a nonce, sends it, and saves the RA document. the nonce goes to <file>.nonce.
               with --format, accepts only a document of that format. aws-nitro, intel-tdx and amd-sev-snp-* documents can be parsed and verified; gcp-cs-jwt and azure-maa-jwt exist only on the request side
-  lookup      --rpc <url> --registry <0x…> (--record-key <0x…> | --measurements <measurements.json | NAME=hex,…>)
+  lookup      --rpc <url> --registry <0x…> (--record-key <0x…> | --measurements <measurements.json | NAME=hex,…>) [--platform aws-nitro|intel-tdx|amd-sev-snp-*]
               read one record key directly, or find the record key(s) for the measurements first and read them all. a User reads the registry only
   compare     --attested <measurements.json | NAME=hex,…> --rpc <url> --registry <0x…> --record-key <0x…> [--trusted-approvers <0x…,0x…>]
               match the value from ra-parse against the chain registration: value, expiry and approver. exit 1 on failure
