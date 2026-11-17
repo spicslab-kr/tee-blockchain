@@ -59,6 +59,9 @@ att-auditor audit --config work/src/build-config.json --tee-addr <my-instance>:5
     --build-measurements out/measurements.json --rpc <url> --registry <0x...> --signing-key-file <key>
 ```
 
+`--config` does not set the document format: `--format` defaults to `aws-nitro`, so on TDX or SEV-SNP add
+`--format intel-tdx`, `amd-sev-snp-initrd` or `amd-sev-snp-verity`. The command `receive` prints names it.
+
 `--build-measurements` is required whenever `--tee-addr` is given, on every platform (since 2026-11-16): without a
 value you built yourself, `audit` would register whatever the TEE reports. To look at a TEE's report without
 registering anything, use `ra-request` and `ra-parse`. With `--vendor-tee`, a Vendor TEE that runs something else
