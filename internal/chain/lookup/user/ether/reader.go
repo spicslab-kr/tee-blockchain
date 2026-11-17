@@ -189,7 +189,6 @@ func (r Reader) TrustedApprovers(ctx context.Context) ([]string, error) {
 	return []string{a.Hex()}, nil
 }
 
-// findRegisteredEvent finds the Registered event by scanning backwards from the latest block, chunk blocks at a time.
 // findRegisteredEvent scans backwards from the latest block, chunk blocks at a time, for the Registered event of a record
 // key. The contract rejects duplicates, so the first match is the only one. Reaching block 0 without a match returns nil.
 func findRegisteredEvent(ctx context.Context, backend Backend, registry *regether.Registry, recordKey common.Hash, chunk uint64) (*regether.RegistryRegistered, error) {
@@ -202,6 +201,11 @@ func findRegisteredEvent(ctx context.Context, backend Backend, registry *regethe
 	}
 	to := latest
 	for {
+		// Every query below gets ctx, but whether it returns when ctx ends is up to the backend: ethclient's calls do,
+		// and a Backend that does not would keep this loop going to block 0, one query per chunk. So check it here too.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		var from uint64
 		if to >= chunk {
 			from = to - chunk + 1

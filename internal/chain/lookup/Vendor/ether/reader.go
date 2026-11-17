@@ -178,6 +178,11 @@ func findRegisteredEvent(ctx context.Context, backend Backend, registry *regethe
 	}
 	to := latest
 	for {
+		// Every query below gets ctx, but whether it returns when ctx ends is up to the backend: ethclient's calls do,
+		// and a Backend that does not would keep this loop going to block 0, one query per chunk. So check it here too.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		var from uint64
 		if to >= chunk {
 			from = to - chunk + 1
