@@ -812,7 +812,7 @@ ran `cat i.bin app.cpio`):
 - With the base zero-padded to 50,100,284 bytes (`truncate -s %4`), the same append unpacked: no error line, and the
   marker read `attestamp app v1` (and `v2` on the next boot).
 
-Fixed in `cpio.Join(AppLast)`, which now pads the base (commit `7e47556`). Both pairs are kept as fixtures with their
+Fixed in `cpio.Join(AppLast)`, which now pads the base (commit `fcc89fa`). Both pairs are kept as fixtures with their
 boot logs: `internal/tee/parse/snp/testdata/gcp-n2d-opt1-*` (unpadded) and `gcp-n2d-opt1p-*` (padded).
 
 Whether the 2026-11 SEV-SNP Option 1 runs, on GCP or AWS, actually ran the application depends on the length of the

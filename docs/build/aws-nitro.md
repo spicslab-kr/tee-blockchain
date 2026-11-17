@@ -6,9 +6,9 @@ measurements are PCR0, PCR1 and PCR2. The short version is in the README under
 [Build](../../README.md#build). What both sides must match, with a check for each: [reproduce.md](reproduce.md).
 Tools, which step calls them, and the versions used: [toolchain.md](toolchain.md)
 (the instance's AMI, kernel, docker and nitro-cli for each baseline). The reference PCRs of the test application, at
-commit `9ca51bb`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-17-shared-aws.md](../results/aws-nitro-2026-11-17-shared-aws.md)
-(earlier, each at its own commit: `82cbe9b`, [aws-nitro-2026-11-17.md](../results/aws-nitro-2026-11-17.md); `db5f48c`,
-[aws-nitro-2026-11-16.md](../results/aws-nitro-2026-11-16.md); the first baseline, at `f2aa809`,
+commit `2f04a13`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-17-shared-aws.md](../results/aws-nitro-2026-11-17-shared-aws.md)
+(earlier, each at its own commit: `5e34c55`, [aws-nitro-2026-11-17.md](../results/aws-nitro-2026-11-17.md); `ac71726`,
+[aws-nitro-2026-11-16.md](../results/aws-nitro-2026-11-16.md); the first baseline, at `8cb1fff`,
 [aws-nitro-2026-11-12.md](../results/aws-nitro-2026-11-12.md)).
 
 ## The three values
@@ -30,44 +30,44 @@ In our measurements a different file in the image changed PCR0 and PCR2, and so 
 | Go go1.26.1 (pinned) | a different patch version gives a different `att-ra-responder`, so different values | `build` and `pack` refuse another version; `att-vendor version` and `att-auditor version` show it |
 | `-trimpath` | without it the build folder's path ends up inside the binary | `build` refuses a responder built without it; `receive` warns if the Vendor built without it |
 | `-buildvcs=false` | without it the git commit, its time and whether the tree had uncommitted changes end up inside the binary (see below) | `build` refuses a responder that carries them |
-| `CGO_ENABLED=0` | without it a native Linux build with a C compiler links cgo and gives other bytes than a cross-build (see below) | `build` refuses a responder built with cgo (since `d3d9bb8`) |
-| `-ldflags=-buildid=` | without it Go writes a build ID, a hash of every input of the build, so a change to any package the responder links moves its bytes even when no code it runs changed (`a9a45f2`; see below) | `build` refuses a responder that carries a build ID (since 2026-11-17) |
+| `CGO_ENABLED=0` | without it a native Linux build with a C compiler links cgo and gives other bytes than a cross-build (see below) | `build` refuses a responder built with cgo (since `9374e2d`) |
+| `-ldflags=-buildid=` | without it Go writes a build ID, a hash of every input of the build, so a change to any package the responder links moves its bytes even when no code it runs changed (`38b49e7`; see below) | `build` refuses a responder that carries a build ID (since 2026-11-17) |
 | one `att-ra-responder` file | it is layered into the image | `build` checks its Go version, `-trimpath`, `-buildvcs=false`, `CGO_ENABLED=0`, the empty build ID, OS and architecture and prints its sha256 |
 | same OS | part of `build_env` | `receive` compares it |
 
 **Version control stamping, measured.** Go stamps `vcs.revision`, `vcs.time` and `vcs.modified` into main binaries by
 default (since Go 1.18; `-buildvcs=auto`). `-trimpath` does NOT remove them. Measured on 2026-11-11 with go1.26.1,
 `GOOS=linux GOARCH=amd64 go build -trimpath ./cmd/ra-responder` in a clone of this repository: identical Go source
-committed under two different commits (`2f325bf` and `1f64817`; the responder's packages, `go.mod` and `go.sum` do not
+committed under two different commits (`263cf5c` and `e7c1cc1`; the responder's packages, `go.mod` and `go.sum` do not
 differ between them) produced two different binaries (`c46d2919…79a0` and `c2e433f2…e44f`), and a tree with
-uncommitted changes (`1f64817` plus one line appended to `README.md`) produced a third (`11802de5…714f`). With
+uncommitted changes (`e7c1cc1` plus one line appended to `README.md`) produced a third (`11802de5…714f`). With
 `-trimpath -buildvcs=false` the first and the third gave the same file (`82aba5f6…9207`). `go version -m` shows the
-stamp, and with it a module version derived from the commit (`v0.0.0-20261111045839-2f325bf877a3`). Also observed: a
+stamp, and with it a module version derived from the commit (`v0.0.0-20261111045839-263cf5c575de`). Also observed: a
 `git worktree` checkout of the same commits (where `.git` is a file, not a directory) built with no stamp at all, so
 whether a build is stamped depends on how the source was checked out. `-buildvcs=false` removes that dependence.
 
 **cgo, measured.** Go links cgo by default when the build is native (target OS and architecture equal the host's)
 and a C compiler is on PATH. `att-ra-responder` imports `net`, so with cgo it carries the cgo DNS resolver and links
 libc dynamically. Measured on 2026-11-15 in a clean Ubuntu 24.04 under WSL (go1.26.1, gcc from `build-essential`),
-commit `d0727f3`, the same `-trimpath -buildvcs=false` command:
+commit `34adc9a`, the same `-trimpath -buildvcs=false` command:
 
 | build | `go version -m` | sha256 of `att-ra-responder` |
 |---|---|---|
-| native Linux build, no `CGO_ENABLED` (the README's command before `d3d9bb8`) | `CGO_ENABLED=1` | `a71bedfc6b81fc5c535d29fc938c57398626e48fa885f18784c1b559d764a186` |
+| native Linux build, no `CGO_ENABLED` (the README's command before `9374e2d`) | `CGO_ENABLED=1` | `a71bedfc6b81fc5c535d29fc938c57398626e48fa885f18784c1b559d764a186` |
 | the same machine with `CGO_ENABLED=0` | `CGO_ENABLED=0` | `5573b5381ac72b1812263b886d04b667854bcb60c5d84573e1fcc34f8124d668` |
 | cross-build from Windows (no C compiler; cgo is off) | `CGO_ENABLED=0` | `5573b5381ac72b1812263b886d04b667854bcb60c5d84573e1fcc34f8124d668` |
 
-Rebuilt at `d3d9bb8` on 2026-11-16 the three gave the same hashes again. So before `d3d9bb8` the PCR0 and PCR2 of an
-image depended on whether the machine that built the responder was Linux with gcc. Since `d3d9bb8` every build
+Rebuilt at `9374e2d` on 2026-11-16 the three gave the same hashes again. So before `9374e2d` the PCR0 and PCR2 of an
+image depended on whether the machine that built the responder was Linux with gcc. Since `9374e2d` every build
 command sets `CGO_ENABLED=0` and `build` refuses a responder that records anything else. These hashes are for the code
-at `d0727f3` and `d3d9bb8`; later code gives other bytes (from `a9a45f2` on the `CGO_ENABLED=0` responder is
+at `34adc9a` and `9374e2d`; later code gives other bytes (from `38b49e7` on the `CGO_ENABLED=0` responder is
 `c61c988e…`, below), and the cgo comparison itself still holds.
 
-**The Go build ID, measured.** `a9a45f2` added one function to `internal/cli`, which the responder links but never
+**The Go build ID, measured.** `38b49e7` added one function to `internal/cli`, which the responder links but never
 calls, and the responder went from `5573b538…` to `c61c988e…`: the linker drops the unused code, but the build ID Go
 writes into the binary is a hash of every input of the build. Measured on 2026-11-17 (go1.26.1, linux/amd64 cross-builds
 from Windows, `CGO_ENABLED=0 -trimpath -buildvcs=false`): with `-ldflags=-buildid=` the responder with and without that
-function is the same file (`215423b8…`, at `da6bf36`). With an empty build ID a comment reworded in
+function is the same file (`215423b8…`, at `925f6fe`). With an empty build ID a comment reworded in
 `cmd/ra-responder/main.go` without moving a line, or appended after its last function, left the bytes as they were; a
 comment that added a line above code did not (`4913a62c…`), because the binary keeps the line numbers of its code. So
 comments can be fixed without moving the measurements as long as no line of code moves. The full record is
@@ -112,46 +112,46 @@ contents the layer bytes still differ, and PCR0 and PCR2 with them. After `docke
 | remove package-manager logs: `/var/log/apk.log`, `dpkg.log`, `alternatives.log`, `apt`, `yum.log`, `dnf*.log`, `hawkey.log` | install times (nginx alpine-slim: only `apk.log` differed out of 725 files) |
 | set apk virtual-package versions to 0 in `/etc/apk/world` and `/lib/apk/db/installed` | the install time used as a version (haproxy, memcached) |
 | remove `/var/cache/ldconfig/aux-cache`, `/root/.wget-hsts`, `/root/.gnupg/random_seed`, `/root/.cache` | cache state: inodes, times, seeds (mariadb, tomcat) |
-| empty field 3 ("last password change", days since 1970) of every line in `/etc/shadow` and `/etc/shadow-` (since `e02d06c`, 2026-11-15) | the **build day**, which `adduser` and `useradd` write. Measured: nginx alpine-slim built from a 2026-11-12 cache had `nginx:!:20769:…`, rebuilt on 2026-11-15 `20772`, and that one field changed PCR0 and PCR2. Empty is what the distributions' own base accounts carry; an enclave has no login, so password ageing does nothing there |
+| empty field 3 ("last password change", days since 1970) of every line in `/etc/shadow` and `/etc/shadow-` (since `4d70d74`, 2026-11-15) | the **build day**, which `adduser` and `useradd` write. Measured: nginx alpine-slim built from a 2026-11-12 cache had `nginx:!:20769:…`, rebuilt on 2026-11-15 `20772`, and that one field changed PCR0 and PCR2. Empty is what the distributions' own base accounts carry; an enclave has no login, so password ageing does nothing there |
 
 The software's own files and logs are not touched.
 
 **This changes the measurements.** Every image with an account `adduser` made, the test application included, has
-a different PCR0 and PCR2 from `e02d06c` on (PCR1, the kernel and init, does not change). PCR values recorded before
-that commit are marked "before `e02d06c`" where they appear.
+a different PCR0 and PCR2 from `4d70d74` on (PCR1, the kernel and init, does not change). PCR values recorded before
+that commit are marked "before `4d70d74`" where they appear.
 
-**The Nitro reference values were taken again later on 2026-11-17, at `9ca51bb`**
+**The Nitro reference values were taken again later on 2026-11-17, at `2f04a13`**
 (`docs/results/aws-nitro-2026-11-17-shared-aws.md`), after the Nitro request code moved into a shared package
-(`cc1be67`). Earlier that day at `82cbe9b` (`docs/results/aws-nitro-2026-11-17.md`), after the empty build ID. Before
-that, on 2026-11-16 at `db5f48c` (`docs/results/aws-nitro-2026-11-16.md`), after
+(`7fd3a8b`). Earlier that day at `5e34c55` (`docs/results/aws-nitro-2026-11-17.md`), after the empty build ID. Before
+that, on 2026-11-16 at `ac71726` (`docs/results/aws-nitro-2026-11-16.md`), after
 three commits had made the earlier ones stale:
 
 | commit | what it changes | effect on the test application's PCR0/PCR2 |
 |---|---|---|
-| `e02d06c` | `build` empties the build day in `/etc/shadow` (above) | moved |
-| `d3d9bb8` | every build is `CGO_ENABLED=0` ("cgo, measured") | none on the recorded values: they were already built with the cgo-free responder `5573b538…` |
-| `a9a45f2` | adds a function to `internal/cli`, which the responder links but does not call | moved: the responder became `c61c988e…` (`docs/build/ra-comparison.md`, "What covering the responder costs") |
+| `4d70d74` | `build` empties the build day in `/etc/shadow` (above) | moved |
+| `9374e2d` | every build is `CGO_ENABLED=0` ("cgo, measured") | none on the recorded values: they were already built with the cgo-free responder `5573b538…` |
+| `38b49e7` | adds a function to `internal/cli`, which the responder links but does not call | moved: the responder became `c61c988e…` (`docs/build/ra-comparison.md`, "What covering the responder costs") |
 
 Then two more, which is why they were taken again on 2026-11-17:
 
 | commit | what it changes | effect on the test application's PCR0/PCR2 |
 |---|---|---|
-| `c4fd40c` | every build passes `-ldflags=-buildid=` (above, "The Go build ID, measured") | moved: the responder became `215423b8…` (at `da6bf36`) |
-| `a50a752` | corrects `cmd/ra-responder`'s comments and its printed usage text | moved: the responder became `d6e3422d…` (amd64), `f581d95c…` (arm64) |
+| `7ef0114` | every build passes `-ldflags=-buildid=` (above, "The Go build ID, measured") | moved: the responder became `215423b8…` (at `925f6fe`) |
+| `c6c39a0` | corrects `cmd/ra-responder`'s comments and its printed usage text | moved: the responder became `d6e3422d…` (amd64), `f581d95c…` (arm64) |
 
 And then one more, which is why they were taken a second time on 2026-11-17:
 
 | commit | what it changes | effect on the test application's PCR0/PCR2 |
 |---|---|---|
-| `61f7515` | moves the Nitro build and launch into shared packages | none: the responder does not link them, and stayed `d6e3422d…` / `f581d95c…` |
-| `cc1be67` | moves the Nitro request code, which the responder links, into the shared `internal/tee/request/aws` | moved: the responder became `b9ae17f3…` (amd64), `294efd1b…` (arm64) |
+| `c5c4889` | moves the Nitro build and launch into shared packages | none: the responder does not link them, and stayed `d6e3422d…` / `f581d95c…` |
+| `7fd3a8b` | moves the Nitro request code, which the responder links, into the shared `internal/tee/request/aws` | moved: the responder became `b9ae17f3…` (amd64), `294efd1b…` (arm64) |
 
-**The current values**, at `9ca51bb`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder
+**The current values**, at `2f04a13`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder
 `b9ae17f3…` (amd64) / `294efd1b…` (arm64), 2026-11-17: x86_64, two machines identical: PCR0 `05662eae…`, PCR1
 `4b4d5b36…`, PCR2 `a3049e0d…`. On arm64 (`c7g.xlarge`) all three differ: PCR0 `a653991e…`, PCR1 `3b4a7e1b…`, PCR2
-`9660bc5e…`. PCR1 is the same as on 2026-11-16 on both (nitro-cli 1.5.0). The values at `82cbe9b` (responder
+`9660bc5e…`. PCR1 is the same as on 2026-11-16 on both (nitro-cli 1.5.0). The values at `5e34c55` (responder
 `d6e3422d…` / `f581d95c…`, the same images) were x86_64 PCR0 `bfa0a428…`, PCR2 `aa36ce6f…` and arm64 PCR0 `4f94d9c9…`,
-PCR2 `79d0abea…`; at `db5f48c` (responder `c61c988e…`) x86_64 PCR0 `0c905480…`, PCR2 `6347a146…` and arm64 PCR0
+PCR2 `79d0abea…`; at `ac71726` (responder `c61c988e…`) x86_64 PCR0 `0c905480…`, PCR2 `6347a146…` and arm64 PCR0
 `f1d4d679…`, PCR2 `6e865138…`. **Every Nitro value is written next to the commit
 it was measured at**: the responder's bytes, and so PCR0 and PCR2, changed with any change to a package the responder
 links until 2026-11-17, and still change with any change to code it can run or to the lines that code sits on, so a
@@ -168,7 +168,7 @@ was searched for the day number (`:20772:`), the epoch-seconds prefix (`17947`),
 | where | what | handled |
 |---|---|---|
 | `/var/log/apk.log` | the install time, on every line; the **only file that differed** between the two same-day builds | yes, removed |
-| `/etc/shadow` | the build day (`:20772:`); same within a day, so the two-build comparison cannot show it; the day-number search did | yes, since `e02d06c` |
+| `/etc/shadow` | the build day (`:20772:`); same within a day, so the two-build comparison cannot show it; the day-number search did | yes, since `4d70d74` |
 | anything else | no other file held the date, the day, the epoch seconds or the host name | — |
 
 `/etc/hostname`, `/etc/hosts` and `/etc/resolv.conf` are in the export as empty files docker created; empty, so the

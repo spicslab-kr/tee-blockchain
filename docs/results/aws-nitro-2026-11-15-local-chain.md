@@ -7,7 +7,7 @@ Sepolia**. Every verdict is in [`aws-nitro-2026-11-15-local-chain.jsonl`](aws-ni
 
 | | |
 |---|---|
-| code | scripts at commit `7556db8` (`NET=local` in `195f1a2`, addresses from the command line in `7556db8`); the `att` binaries and `att-ra-responder` on the instances were those of the 2026-11-15 T8/T9 run (code `1e51b51`, responder sha256 `5573b538…`); no Go code changed in between |
+| code | scripts at commit `72c25d3` (`NET=local` in `e141266`, addresses from the command line in `72c25d3`); the `att` binaries and `att-ra-responder` on the instances were those of the 2026-11-15 T8/T9 run (code `6ea2800`, responder sha256 `5573b538…`); no Go code changed in between |
 | chain | anvil 1.8.0 (commit `61ae26af`, the version the Go tests use) on `127.0.0.1:8545`, started once and kept running for both flows. Signing keys: anvil's development accounts 0 (deployer; the Vendor in flow 2) and 1 (the Auditor in flow 1). See `e2e/README.md`, "Running without a public testnet" |
 | instances | the two m6i.xlarge of the baseline, started again; new public IPs, passed on the command line |
 | security group | not changed: 22 and 5000 from the operator's address only. No instance reached the chain: every chain call ran on the operator's machine |
@@ -26,7 +26,7 @@ Sepolia**. Every verdict is in [`aws-nitro-2026-11-15-local-chain.jsonl`](aws-ni
 | T6 | User `verify` with both registries required | **not trusted, exit 1**: "only 1 of 2 registries vouch" |
 
 PCR0 of the test application: `d5bbd4af…` in flow 1 (the Auditor's docker cache from 2026-11-12), `47dbca56…` in flow 2
-(the Vendor built it again today). Why they differ is the finding below. *(Added the same day, `bcdd73a`:)* Both are values from **before `e02d06c`**,
+(the Vendor built it again today). Why they differ is the finding below. *(Added the same day, `0a550a0`:)* Both are values from **before `4d70d74`**,
 which empties the field that differed; the current `build` gives neither.
 
 ## Finding: the build day is in the image
@@ -45,7 +45,7 @@ cached image's `/etc/shadow` has `nginx:!:20769:0:99999:7:::`; day 20769 is 2026
 same source on different days give different PCR0 and PCR2**, and an Auditor rebuilding a day later than the Vendor
 would not match. The 2026-11-12 baseline (T1) compared two builds made on the same day and could not show this.
 
-*Update, the same day (`bcdd73a`), replacing what was first recorded here, "`build` does not normalise this field yet … Fixing it changes the measurement of every image that has users, so it is left for a decision rather than made here":* by the user's decision `build` now empties this field (`e02d06c`; `docs/build/aws-nitro.md`,
+*Update, the same day (`0a550a0`), replacing what was first recorded here, "`build` does not normalise this field yet … Fixing it changes the measurement of every image that has users, so it is left for a decision rather than made here":* by the user's decision `build` now empties this field (`4d70d74`; `docs/build/aws-nitro.md`,
 "What `build` changes in the image"). That changes PCR0 and PCR2 of every image with such an account.
 
 To go on, the Vendor's cached `alpine-slim:app` was rebuilt with `--no-cache` on the same day, and `--verify` then

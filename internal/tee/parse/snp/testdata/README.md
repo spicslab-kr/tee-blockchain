@@ -21,7 +21,7 @@ Both were recorded on 2026-11-11 on the same instance, from the same base initrd
 
 | | `gcp-n2d-opt1-*` (unpadded) | `gcp-n2d-opt1p-*` (padded) |
 |---|---|---|
-| how the initrd was made | base followed directly by the application archive | base zero-padded to 50,100,284 bytes (`truncate -s %4`), then the archive: the bytes `cpio.Join(AppLast)` writes since commit `7e47556` |
+| how the initrd was made | base followed directly by the application archive | base zero-padded to 50,100,284 bytes (`truncate -s %4`), then the archive: the bytes `cpio.Join(AppLast)` writes since commit `fcc89fa` |
 | kernel log (`dmesg`) | `Initramfs unpacking failed: invalid magic at start of compressed archive` | no such line |
 | marker `/dev/attestamp-app-marker` | **absent** | present: `file app 17` / `attestamp app v1` (v2) |
 | did the application run | **no** | yes |

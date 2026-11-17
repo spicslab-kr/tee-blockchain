@@ -1,7 +1,7 @@
 // The cloud scripts under e2e/cloud make billable instances, so they are never run here for real: e2e/cloud/check-scripts.sh
 // runs every action of each against stand-in aws, gcloud and curl commands and checks the calls each action makes.
 // This test runs that script, so that go test ./... catches an action that breaks before its CLI call, as stop and
-// start did in both AWS scripts until bc87898.
+// start did in both AWS scripts until 2ef1f13.
 package cmd_test
 
 import (
