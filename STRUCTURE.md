@@ -184,11 +184,14 @@ both:
 
 ### The shared pieces
 
-Two pieces of logic do not depend on the role and exist once:
+Logic that does not depend on the role exists once:
 
 - `internal/tee/parse/aws` holds the real Nitro parsing (CBOR decoding, certificate chain and
   signature check, PCR extraction, the embedded AWS root certificate). Each role's
   `tee/parse/<role>/aws.go` is a thin adapter that converts to and from that role's own types.
+- `internal/tee/request/aws`, `internal/setup/build/aws` and `internal/setup/launch/aws` hold the Nitro request (NSM,
+  vsock, the proxy), image build and launch; each role's `<role>/aws` folder is a thin adapter. The TDX and SEV-SNP
+  code has the same two layers (`tee/{parse,request}/{tdx,snp}`, `setup/{build,launch}/{tdx,snp}`).
 - `internal/core/compare/compare.go`, `check.go` and `types.go` hold the comparison and the trust
   decision. Each role's `core/compare/<role>` is a thin delegate that converts its own
   `Measurements` type into the shared `Items`.
@@ -237,6 +240,24 @@ sub-folders, because it only needs to ask and verify.
 Three tests sit directly in a feature folder because they cross roles:
 `chain/register/ether_test.go`, `core/transfer/vendor_auditor_test.go` and
 `tee/request/user_to_vendor_test.go`.
+
+### Why parse adapters are files and the others are folders
+
+A platform's role adapter is one file in the role package under `tee/parse` (`tee/parse/<role>/aws.go`), but a
+sub-folder under `tee/request`, `setup/build` and `setup/launch` (`tee/request/<role>/aws/`). The difference is
+deliberate and is not to be made uniform:
+
+- **What a binary links.** `tee/parse/<role>` imports `tee/request/<role>` for its types (`RADoc`, `Nonce`), so every
+  binary that parses links the request role package. `att-user` links `tee/request/auditor` that way, but not
+  `tee/request/auditor/aws` (`go list -deps ./cmd/user`). Were the Nitro request code a file in the role package, every
+  binary that only needs the types would link the NSM ioctl, vsock and the proxy too. A sub-folder is linked only by
+  the binaries that import it.
+- **Names.** Each platform folder uses the same names, `Format`, `Extractor`, `Build`, `Result`, `Launch`, and the
+  folder keeps them apart (`aws.Build`, `tdx.Build`). In one package they would need prefixes, as the parse adapters
+  have (`AWSParser`, `TDXFormat`).
+- **Why parse is files.** The parse role package is itself the place that picks a parser by format, every binary
+  needs every parser (a User verifies any platform), and each adapter is a short type conversion, so one package with
+  one file per platform costs nothing.
 
 ### Which binary uses what
 
