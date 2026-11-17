@@ -13,7 +13,7 @@ import (
 )
 
 // TestCommitReferences checks that every commit a document names exists in this repository and is named
-// unambiguously. The documents' convention: a commit is a bare hex string of 7 to 12 characters in backticks
+// unambiguously. The documents' convention: a commit is a bare hex string of 7 to 40 characters in backticks
 // (`1967749d`); a value is written with a trailing "…" (`c61c988e…`) and is not a commit, so it is not checked here.
 //
 // It needs the full history: in a shallow clone it skips. If the history is ever rewritten, every reference to a
@@ -107,6 +107,10 @@ var externalCommits = map[string]string{
 	"ef5a25a6":     "the docker-nginx commit the Nitro test application is pinned to",
 	"067c5c24cef2": "the Linux kernel commit whose initramfs buffer-format documentation tdx.md cites",
 	"1ae0d03":      "the main branch of the public GitHub repository on 2026-11-15, recorded by the trial",
+	// The same three commits written in full, where a document pins them exactly.
+	"61ae26af36320d4fa1020f7db53785885e29eeb5": "Foundry 1.8.0, in full (docs/build/toolchain.md)",
+	"cab19933c33c2ad1d4c7a84864a3601dddfd16f3": "OpenZeppelin Contracts v5.7.0, in full (the submodule's gitlink)",
+	"ef5a25a6314e652a2dcfbce6074bef729f4d9639": "the docker-nginx commit, in full (the test application's pin)",
 }
 
-var commitToken = regexp.MustCompile("`([0-9a-f]{7,12})`")
+var commitToken = regexp.MustCompile("`([0-9a-f]{7,40})`")
