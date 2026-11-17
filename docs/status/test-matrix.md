@@ -7,6 +7,9 @@ and the results are recorded side by side.
 Nitro is the baseline. It must be run on real instances and its results recorded in the same shape
 as the other two, not quoted from the README.
 
+This page says what is proven, and by what. Its pair, [build-info-gaps.md](build-info-gaps.md), says what the
+repository still lacks and which design questions are open.
+
 ## State (updated through 2026-11-17)
 
 Each cell says how far the row is proven, and by what:
@@ -198,7 +201,7 @@ fields checked named in the session file and in `docs/build/ra-comparison.md`, "
 ¹⁸ **2026-11-17, the Nitro baseline for the empty build ID** (`docs/results/aws-nitro-2026-11-17.md` and `.jsonl`, 44
 lines, two written by hand): three new instances, the x86_64 pair on a newer image (`ami-0f71b90bee7050a75`, release
 2023.12.20261112) with the same nitro-cli 1.5.0 and docker; binaries at `82cbe9b`, responder `d6e3422d…` (amd64) /
-`f581d95c…` (arm64). The five chain-free scripts, and for the first time `nitro-tools-check.sh` (gap 27: `send`
+`f581d95c…` (arm64). The five chain-free scripts, and for the first time `nitro-tools-check.sh` (gap 27, `docs/results/build-info-gaps-2026-11.md`: `send`
 records the release and the docker and nitro-cli versions, `receive` compares the release, `build --config` the
 versions). The lines that miss their expectation are SSH resets on this network and one bug in our own script, each
 followed by a passing line; the file explains them. PCR1 did not move on either architecture; PCR0 and PCR2 did,
@@ -239,27 +242,10 @@ called by every Nitro e2e script, and the same fields from `e2e/cvm/in-guest-ver
 A line passes when `result` equals `expected`. A run that quietly stops passing shows up as a missing or `error` line
 rather than as nothing at all.
 
+The platforms' rows do not have to be filled at the same time: each platform's rows can be filled in its own
+session, on its own instances, as long as every run writes this same contract. What a run needs is in `e2e/README.md`
+(Nitro) and in "Getting started" of `docs/build/tdx.md` and `docs/build/sev-snp.md`.
+
 Rows each script writes: `arch-measurement-compare.sh` T1, T3; `toolchain-pin-check.sh` T2; `responder-check.sh` T3;
 `build-env-check.sh` and `arch-record-check.sh` T7; flow 1 T4, T5; flow 2 T6; `in-guest-verify.sh` T4, T9;
 `cvm/build-env-check.sh` T7.
-
-## What running the baseline needs
-
-From `e2e/README.md`:
-
-- two Nitro-enabled EC2 instances (Vendor, Auditor) in `eu-north-1`, plus an optional arm64 (Graviton) for T1/T3.
-  The vCPU quota there was requested; its current value has to be read with an authenticated `aws` (the session
-  expired on 2026-11-11)
-- `git`, `ssh`, and exactly the pinned Go version on the local machine
-- an SSH key in the repository root, and **two funded key files**: `auditor.key` (approver in flow 1)
-  and `deployer.key` (pays gas, approver in flow 2), with their addresses set as `AUDITOR_ADDR` and `VENDOR_ADDR` in
-  `e2e/env.local.sh`
-- **test ETH on Sepolia** for both keys, which is the default network. `NET=mainnet` spends real ETH and additionally
-  requires `CONFIRM_MAINNET=1`. `NET=local` needs no ETH and no key files: a local anvil and its development accounts
-  (`e2e/README.md`, "Running without a public testnet")
-- `e2e/env.local.sh`, copied from `env.local.example.sh`, holding the instance addresses. It is
-  gitignored; never commit it
-
-SEV-SNP and TDX need GCP instances only (SEV-SNP on AWS was decided against on 2026-11-11). They do not all have to
-exist at the same time: each platform's rows can be filled in its own session, as long as every run writes to the
-same JSONL contract.

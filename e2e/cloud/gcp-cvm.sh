@@ -60,7 +60,7 @@ fi
 [ ${#ROLES[@]} -gt 0 ] || ROLES=(vendor auditor)
 # Every role is one billable VM, so only the two roles the project uses are accepted, each once. A stray word on the
 # command line stops the script before anything else runs: e2e/cloud/README.md once had "create vendor auditor user y",
-# which would have made four VMs (build-info gap #20).
+# which would have made four VMs (docs/results/build-info-gaps-2026-11.md, #20).
 if [ "$ACTION" = create ]; then
   seen=" "
   for role in "${ROLES[@]}"; do
@@ -84,7 +84,7 @@ NET_TAG=attestamp-ra
 RA_PORT=${RA_PORT:-5000}
 
 # create: say what would be made, before any gcloud call, and make it only with --yes. On 2026-11-16 a run meant as a
-# test, with no terminal to press Ctrl-C in, went through the old 4-second pause and created two VMs (gap #20).
+# test, with no terminal to press Ctrl-C in, went through the old 4-second pause and created two VMs (docs/results/build-info-gaps-2026-11.md, #20).
 if [ "$ACTION" = create ]; then
   names=""; for role in "${ROLES[@]}"; do names="$names $PREFIX-$role"; done
   echo "create: ${#ROLES[@]} billable VM(s):$names"

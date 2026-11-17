@@ -604,7 +604,7 @@ it covers exactly the vTPM evidence carried next to it. SHA3-512 gives 64 bytes,
 goes in unchanged.
 
 The binding was SHA-512 until **2026-11-11**, when the project changed it to SHA3-512.
-*Record:* SHA-512 is what the 2026-11 test scripts used; those scripts are no longer available (build-info gaps #5).
+*Record:* SHA-512 is what the 2026-11 test scripts used; those scripts are no longer available (`docs/results/build-info-gaps-2026-11.md`, #5).
 Results from 2026-11-10 and earlier were produced with SHA-512. Evidence bound with SHA-512 is now refused
 (`TestVerifySig_SHA512BindingIsRefused`, on the one SHA-512 recording this repository keeps).
 
@@ -1057,7 +1057,7 @@ AWS evidence is not on this list: SEV-SNP on AWS was decided against (see "Only 
 
 **The 2026-10/11 shell scripts (removed 2026-11-15).** *Record:* the SEV-SNP experiments of 2026-10 and 2026-11 used
 shell scripts outside this repository (`vendor/`, `auditor/`, `user/`, `option1-initrd/`, `option2-dm-verity/`,
-`relay-test/`, `mkcpio.py`). Their author has left the lab and they are no longer available anywhere (build-info gaps
+`relay-test/`, `mkcpio.py`). Their author has left the lab and they are no longer available anywhere (`docs/results/build-info-gaps-2026-11.md`,
 #5, #6). This document no longer points to them. Everything they did that this repository relies on was redone here:
 the recordings, their measured values and the procedures in `docs/build/app-fixture-recording.md`. Lost and not
 replaced: "the seven 2026-11 tests" as one runnable set, and the relay test (T10, see above).

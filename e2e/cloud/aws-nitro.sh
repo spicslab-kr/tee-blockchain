@@ -35,7 +35,7 @@ die() { echo "error: $*" >&2; exit 1; }
 # what they would make and stop, and --dry-run prints the same without calling aws at all. Every other action takes no
 # argument: an option given to it is refused, not ignored ("delete --dry-run" would otherwise really delete). The same
 # rules hold in gcp-cvm.sh and aws-snp.sh; on 2026-11-16 a 4-second pause, the guard before, let a run with no
-# terminal create two VMs (docs/status/build-info-gaps.md, #20).
+# terminal create two VMs (docs/results/build-info-gaps-2026-11.md, #20).
 ACTION=${1:-}; [ $# -gt 0 ] && shift
 YES=0; DRY=0
 for arg in "$@"; do

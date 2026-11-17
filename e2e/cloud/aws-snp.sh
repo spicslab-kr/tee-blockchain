@@ -38,7 +38,7 @@ die() { echo "error: $*" >&2; exit 1; }
 # Arguments, checked before any aws call, by the same rules as gcp-cvm.sh and aws-nitro.sh: base, mkami and vm create
 # billable resources only with --yes; without it they print what they would make and stop, and --dry-run prints the
 # same without calling aws at all. Every other action takes no argument: an option given to it is refused, not
-# ignored. Until 2026-11-16 these three ran with no warning and no pause (docs/status/build-info-gaps.md, #20).
+# ignored. Until 2026-11-16 these three ran with no warning and no pause (docs/results/build-info-gaps-2026-11.md, #20).
 ACTION=${1:-}; [ $# -gt 0 ] && shift
 YES=0; DRY=0
 for arg in "$@"; do

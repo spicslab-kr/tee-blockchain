@@ -2,7 +2,7 @@
 
 The two `.cpio` files here were written by `mkcpio.py`, the script the October-November 2026 SEV-SNP runs used to pack
 the application into the initrd, and committed on 2026-11-11 (`04d5daf`). **That script no longer exists:** it lived outside this
-repository, its author has left the lab, and it is not available anywhere (`docs/status/build-info-gaps.md`, #5).
+repository, its author has left the lab, and it is not available anywhere (`docs/results/build-info-gaps-2026-11.md`, #5).
 
 So these files are now the only record of what it wrote, and their job is to pin that equivalence:
 `TestWrite_MatchesMkcpioGolden` requires `internal/setup/build/cpio` to write the same trees byte for byte, and

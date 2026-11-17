@@ -149,7 +149,7 @@ var exceptions = []struct{ file, token, why string }{
 			"they are deliberately not committed (they carry instance identifiers)",
 	},
 	{
-		file:  "docs/status/build-info-gaps.md",
+		file:  "docs/results/build-info-gaps-2026-11.md",
 		token: "../../releases/latest",
 		why:   "gap #16 quotes the link the README used to have, which is why it was a gap; the README no longer has it",
 	},

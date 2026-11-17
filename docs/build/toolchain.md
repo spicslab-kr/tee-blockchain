@@ -160,4 +160,4 @@ cat /etc/os-release
 curl -s -H "X-aws-ec2-metadata-token: $(curl -s -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" http://169.254.169.254/latest/meta-data/ami-id
 ```
 
-(build-info gap #1.)
+(`docs/results/build-info-gaps-2026-11.md`, #1.)

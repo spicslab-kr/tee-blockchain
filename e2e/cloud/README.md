@@ -139,7 +139,7 @@ typo stops it before anything runs.
   `delete` acts on every VM of the prefix, not on one role.
 - **There is no pause to press Ctrl-C in.** The scripts used to warn and wait 4 seconds (`aws-snp.sh` did not even do
   that). On 2026-11-16 a command run without a terminal went through the pause unseen and created two VMs nobody meant
-  to make (`docs/status/build-info-gaps.md`, #20).
+  to make (`docs/results/build-info-gaps-2026-11.md`, #20).
 
 **Why a flag and not a pause, or an approval prompt.** An approval rule in an agent's or a tool's settings, such as
 "ask before `gcloud compute instances create`", sees only the command a person or an agent typed, for example

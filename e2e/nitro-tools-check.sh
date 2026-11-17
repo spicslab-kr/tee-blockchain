@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Docker and nitro-cli between the Vendor and the Auditor (gap 27 of docs/status/build-info-gaps.md), on the two real
+# Docker and nitro-cli between the Vendor and the Auditor (gap 27 of docs/results/build-info-gaps-2026-11.md), on the two real
 #    instances. build installs both with dnf and no version, and both decide the measurements (PCR1 follows nitro-cli's
 #    kernel and init; docker builds the image). att-vendor send records what the Vendor built with in build_env, and the
 #    Auditor checks it at two points:
