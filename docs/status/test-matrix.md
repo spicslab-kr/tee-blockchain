@@ -64,8 +64,7 @@ SEV-SNP tests" was the scripts' own and is not the same as T1–T10 here.
 
 ² Nitro behaves differently here by design. Attestamp pins the toolchain and `build` **refuses**
 to run under another patch version, rather than producing a different measurement. The underlying fact
-is the same (`toolchain-pin-check.sh` records that go1.26.2 and go1.26.8 give different binaries
-even with `-trimpath`), but the product behaviour differs, so record both: refused, and — in a
+is the same, but the product behaviour differs, so record both: refused, and — in a
 separate run with the pin bypassed — the measurement that differs.
 
 ³ Since `31ed378` every build also uses `-buildvcs=false`, and `build` refuses a responder without it: measured,
@@ -117,8 +116,8 @@ not reproducible; `docs/build/sev-snp.md`, "Variables"):
 | row | 2026-11 observation | what replaced it in the cell |
 |---|---|---|
 | T1 | the application, its cpio archive and the dm-verity image hashed the same on two GCP machines | our measurement of the image on two guests (2026-11-11) and the cpio golden tests |
-| T2 | Go 1.22.2 and 1.23.4 gave different application binaries | our responder bytes under two Go patch versions (2026-11-12); the SEV-SNP measurement itself is "needs VM" |
-| T3 | without `-trimpath`, two folders gave two binaries | our code test of the responder across checkout paths; the whole initrd is "needs VM" |
+| T2 | Go 1.22.2 and 1.23.4 gave different application binaries | our responder bytes under two Go patch versions (2026-11-12); the SEV-SNP measurement itself was "needs VM" until it was measured live on 2026-11-16 ¹⁵ |
+| T3 | without `-trimpath`, two folders gave two binaries | our code test of the responder across checkout paths; the whole initrd was "needs VM" until it was measured live on 2026-11-16 ¹⁷ |
 | T9 | replayed evidence was refused | our live replay refusal on the guest (2026-11-12) |
 | T10 | a vTPM attestation from one VM with an SNP report from another verified | *(until 2026-11-16)* nothing yet: the cell says so, and "Reproducing T10" is the plan |
 

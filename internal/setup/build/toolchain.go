@@ -2,8 +2,8 @@
 //
 // On AWS Nitro, att-ra-responder is layered straight into the enclave image, so the image's
 // measurements (PCR0/PCR2) depend on the exact bytes of that binary, and those bytes change with
-// the Go patch version (measured: go1.26.2 and go1.26.8 give different binaries even with
-// -trimpath). On Intel TDX and AMD SEV-SNP the responder is not measured; the measured initrd (and
+// the Go patch version (measured: go1.26.1 and go1.26.2 give different binaries even with
+// -trimpath; e2e/toolchain-pin-check.sh, docs/results/aws-nitro-2026-11-12.md). On Intel TDX and AMD SEV-SNP the responder is not measured; the measured initrd (and
 // Option 2's image) is written by att itself, so the pin keeps both sides on the same att.
 // The Auditor therefore receives the toolchain version together with the source, and every att
 // binary refuses to build under any other. GO_TOOLCHAIN in this directory is that pin: the

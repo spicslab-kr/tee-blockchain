@@ -657,7 +657,8 @@ Measured on four recordings from `attestamp-tdx-vendor` (Option 1 v1/v2 and Opti
 RTMR0 and RTMR1 were identical across all four, and only RTMR2 changed with the application. This confirms the
 assumed mapping of GRUB's measurements into RTMR2, and it is also why TDX needs no second format for Option 2: both
 options move the same single register. (`internal/tee/parse/tdx/app_fixture_test.go`. The rest of the mapping, which
-of RTMR0 and RTMR1 holds what, was not tested: nothing in those registers was changed.)
+of RTMR0 and RTMR1 holds what, was not tested: nothing in those registers was changed. Later, on 2026-11-16, another
+machine type moved RTMR0 and left RTMR1 as it was, as the mapping expects; RTMR1 itself has still not been moved.)
 
 Why all four, not RTMR2 alone: the firmware, boot loader and kernel extend RTMR2 themselves, so a changed kernel could
 extend the expected RTMR2 while running something else, and only MRTD and RTMR0–1 would show it. Nitro registers PCR0,
@@ -920,5 +921,5 @@ instead. This section only records a quote from a stock guest, as the first fixt
 | a failed dm-verity check at boot stopping the boot | Option 2 builds and boots with the real tools (2026-11-15), but a root hash that does not match still lets the boot go on; `launch --check` refuses it (`/run/attestamp-status`) |
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
-| the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |
+| the RTMR1 part of the mapping | not tested: no guest was booted with another kernel. RTMR2 moves with the initrd, and RTMR0 with the machine type (measured 2026-11-16, T1; "The same inputs") |
 | `AppLast` on TDX | not tested on 2026-11-11; the 2026-10 failure is the only record (`docs/status/build-info-gaps.md`, Still missing) |

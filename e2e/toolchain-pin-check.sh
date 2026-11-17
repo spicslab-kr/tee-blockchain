@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Go toolchain pin check. The bytes of att-ra-responder change with the Go patch version (measured: go1.26.2 and
-#    go1.26.8 give different binaries even with -trimpath), and so do the measurements (PCR0/2). The pinned version has
+# Go toolchain pin check. The bytes of att-ra-responder change with the Go patch version (measured: go1.26.1 and
+#    go1.26.2 give different binaries even with -trimpath), and so do the measurements (PCR0/2). The pinned version has
 #    one source, the file internal/setup/build/GO_TOOLCHAIN in the source tree; att embeds that file and at the start of
 #    build compares it with the toolchain it was built with, refusing if they differ. This script checks that the
 #    refusal really happens on a real Nitro host:
