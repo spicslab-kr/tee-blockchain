@@ -1,8 +1,8 @@
 # Nitro baseline after the shared Nitro request package, 2026-11-17 (second run)
 
-`7fd3a8b` moved the Nitro request code into the shared `internal/tee/request/aws`, with thin role adapters, and
+`f0fb80d` moved the Nitro request code into the shared `internal/tee/request/aws`, with thin role adapters, and
 `att-ra-responder` links it, so the responder is another file and the values taken earlier the same day
-([`aws-nitro-2026-11-17.md`](aws-nitro-2026-11-17.md), at `5e34c55`) are stale for x86_64 and arm64 alike. `c5c4889`
+([`aws-nitro-2026-11-17.md`](aws-nitro-2026-11-17.md), at `83cb2dc`) are stale for x86_64 and arm64 alike. `53bfd5e`
 moved the Nitro build and launch the same way; the responder does not link them, and it was unchanged after that
 commit (`d6e3422d…` / `f581d95c…`). This run takes the values again with the same scripts as the first run. Every
 verdict is in [`aws-nitro-2026-11-17-shared-aws.jsonl`](aws-nitro-2026-11-17-shared-aws.jsonl), 32 lines: 31 written
@@ -14,8 +14,8 @@ one written by hand (below). *(Added later on 2026-11-17.)* Six more lines follo
 
 | | |
 |---|---|
-| code | binaries built at **`2f04a13`** by `0-Setup-local-upload.sh`, and every script at the same commit; `2f04a13` changes only `STRUCTURE.md` after `7fd3a8b` |
-| `att-ra-responder` | sha256 **`b9ae17f365e59b0619398619e6fc59d309f5d27c5bfbadb7076df2fe6fb766d9`** (amd64) and **`294efd1b92716ae31b71b87b7c4b053d06ab44424089b5dd0995365db524e10e`** (arm64), go1.26.1, `CGO_ENABLED=0 -trimpath -buildvcs=false -ldflags=-buildid=`; it has been this since `7fd3a8b`. The upload printed `b9ae17f3…` on both x86_64 instances |
+| code | binaries built at **`6146c10`** by `0-Setup-local-upload.sh`, and every script at the same commit; `6146c10` changes only `STRUCTURE.md` after `f0fb80d` |
+| `att-ra-responder` | sha256 **`b9ae17f365e59b0619398619e6fc59d309f5d27c5bfbadb7076df2fe6fb766d9`** (amd64) and **`294efd1b92716ae31b71b87b7c4b053d06ab44424089b5dd0995365db524e10e`** (arm64), go1.26.1, `CGO_ENABLED=0 -trimpath -buildvcs=false -ldflags=-buildid=`; it has been this since `f0fb80d`. The upload printed `b9ae17f3…` on both x86_64 instances |
 | x86_64 instances | two new `m6i.xlarge` (`attestamp-e2e`, eu-north-1), made with `aws-nitro.sh create --yes` |
 | x86_64 image | `ami-0f71b90bee7050a75` (the same as in the first run): `PRETTY_NAME="Amazon Linux 2023.12.20261112"`, kernel `6.18.62-127.179.amzn2023.x86_64`, `aws-nitro-enclaves-cli-1.5.0-0.amzn2023` (`Nitro CLI 1.5.0`), `docker-25.0.18-1.amzn2023.0.3` (`Docker version 25.0.14`), `git-2.50.1-1.amzn2023.0.2`, on both |
 | arm64 instance | one new `c7g.xlarge`, made with `aws-nitro.sh create-arm64 --yes` |
@@ -27,7 +27,7 @@ one written by hand (below). *(Added later on 2026-11-17.)* Six more lines follo
 ## The reference values (test application)
 
 `https://github.com/nginx/docker-nginx` at `ef5a25a6314e652a2dcfbce6074bef729f4d9639`, folder `mainline/alpine-slim`,
-built with `att-vendor build`, **at commit `2f04a13` with responder `b9ae17f3…` (amd64) / `294efd1b…` (arm64)**, on
+built with `att-vendor build`, **at commit `6146c10` with responder `b9ae17f3…` (amd64) / `294efd1b…` (arm64)**, on
 2026-11-17:
 
 | | x86_64 (Vendor and Auditor, two checkout paths: identical) | arm64 |
@@ -36,9 +36,9 @@ built with `att-vendor build`, **at commit `2f04a13` with responder `b9ae17f3…
 | PCR1 | `4b4d5b3661b3efc12920900c80e126e4ce783c522de6c02a2a5bf7af3a2b9327b86776f188e4be1c1c404a129dbda493` (the same as before: nitro-cli 1.5.0's kernel and init) | `3b4a7e1b5f13c5a1000b3ed32ef8995ee13e9876329f9bc72650b918329ef9cf4e2e4d1e1e37375dab0ba56ba0974d03` (the same as before) |
 | PCR2 | `a3049e0dcb0bb04d1f4d205d8d61067a8d14a677154deee22d7f1eef8393fa67d7d0e85612d2f852f307bee04f021d5c` | `9660bc5e100201d469142bdc55e700f3acb74c4544c5ba62485b9c2f9e5ef7bca5f62fdef38a999aebd0727a570f596a` |
 
-How they relate to the first run of the day, at `5e34c55` (responder `d6e3422d…` / `f581d95c…`): x86_64 PCR0
+How they relate to the first run of the day, at `83cb2dc` (responder `d6e3422d…` / `f581d95c…`): x86_64 PCR0
 `bfa0a428…`, PCR2 `aa36ce6f…`, arm64 PCR0 `4f94d9c9…`, PCR2 `79d0abea…`. PCR0 and PCR2 moved because the responder
-changed (`7fd3a8b`); PCR1 did not, on either architecture. The images, kernels and tool versions were the same in both
+changed (`f0fb80d`); PCR1 did not, on either architecture. The images, kernels and tool versions were the same in both
 runs, so the responder is the only difference.
 
 These hold for this commit and this day. The Dockerfile starts `FROM alpine:3.24` (a tag) and installs `apk` packages
@@ -82,7 +82,7 @@ apart (it was 3 attempts, 3 s and 6 s apart). Measured once, on 2026-11-17: `res
 and **step 7 passed without manual intervention**. Its first connection was reset again ("attempt 1 of 4; trying
 again in 10 s"), the second got through, and `build` refused the arm64 responder, exit 1, "built for GOARCH=arm64 but
 this instance is amd64". All six verdicts were as expected; they are the last six lines of the `.jsonl` (run
-`20261117T095615Z`, copied unchanged), with responder `b9ae17f3…`, the scripts at `2f04a13` plus this change to
+`20261117T095615Z`, copied unchanged), with responder `b9ae17f3…`, the scripts at `6146c10` plus this change to
 `env.sh`. It is the first of the four runs in which step 7 needed no hand run, and it could not be repeated: the
 instances were deleted afterwards. So this network resets a burst of new SSH connections, and on that one run ten
 seconds were enough for it to let the next one through.

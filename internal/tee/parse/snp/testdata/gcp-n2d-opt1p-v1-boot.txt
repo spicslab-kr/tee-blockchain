@@ -1,6 +1,6 @@
 # Boot evidence for gcp-n2d-opt1p-v1-*, copied from the session on attestamp-snp-vendor, 2026-11-11 (UTC).
 # Option 1, application archive appended to the base initrd zero-padded to a multiple of 4 bytes
-# (the same bytes cpio.Join(AppLast) produces since commit fcc89fa).
+# (the same bytes cpio.Join(AppLast) produces since commit 393b1d9).
 
 $ sudo cp /boot/initrd.img-7.0.0-1017-gcp /root/base-padded.img && sudo truncate -s %4 /root/base-padded.img && sudo stat -c %s /root/base-padded.img
 50100284

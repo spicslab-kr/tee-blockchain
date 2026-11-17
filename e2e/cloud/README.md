@@ -152,7 +152,7 @@ too, as `TestCloudScripts`). It runs every action of the three scripts against s
 commands that only log their arguments, checks each exit status and the CLI calls each action made, and fails when a
 script has an action that no case runs as far as its CLI call. The stand-ins must be what `PATH` finds, or it stops
 before running anything. It was written on 2026-11-17: the check by hand the night before ran `create` only, and
-`stop` and `start` in both AWS scripts still failed at once on `$1` (fixed in `2ef1f13`); run on those versions, it
+`stop` and `start` in both AWS scripts still failed at once on `$1` (fixed in `582cfb3`); run on those versions, it
 fails on exactly those four. A new action needs a new case there.
 
 For a one-off look at a single command, use `--dry-run` first. To go further by hand, put stand-in `gcloud` and

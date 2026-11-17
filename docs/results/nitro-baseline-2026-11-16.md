@@ -9,12 +9,12 @@ Three commits since the 2026-11-12 baseline change what a Nitro build gives for 
 
 | commit | what it changes | effect on the test application's values |
 |---|---|---|
-| `4d70d74` | `build` empties the build day `adduser` writes into `/etc/shadow` | PCR0 and PCR2 move; PCR1 does not |
-| `9374e2d` | every build is `CGO_ENABLED=0` | none on the recorded values: they were already built with the cgo-free cross-built responder `5573b538…` |
-| `38b49e7` | adds `TEENoun` to `internal/cli`, which `att-ra-responder` imports | **the responder's bytes change, `5573b538…` → `c61c988e…`** (built just before and at `38b49e7`, 2026-11-16), so PCR0 and PCR2 move again. The responder never calls the new function; the package changing was enough |
+| `a402827` | `build` empties the build day `adduser` writes into `/etc/shadow` | PCR0 and PCR2 move; PCR1 does not |
+| `e57f02d` | every build is `CGO_ENABLED=0` | none on the recorded values: they were already built with the cgo-free cross-built responder `5573b538…` |
+| `1967749d` | adds `TEENoun` to `internal/cli`, which `att-ra-responder` imports | **the responder's bytes change, `5573b538…` → `c61c988e…`** (built just before and at `1967749d`, 2026-11-16), so PCR0 and PCR2 move again. The responder never calls the new function; the package changing was enough |
 
-So no recorded PCR0/PCR2 matches the current code, including the clean trial's (`2aacdf41…`, taken at `c5973d4`, before
-`38b49e7`). **Finding:** any change to a package the responder links (`internal/cli`, `internal/tee/request/...`) moves
+So no recorded PCR0/PCR2 matches the current code, including the clean trial's (`2aacdf41…`, taken at `6a92a1f`, before
+`1967749d`). **Finding:** any change to a package the responder links (`internal/cli`, `internal/tee/request/...`) moves
 Nitro's PCR0/PCR2, even one the responder does not call. Recorded, not changed; whether the responder should depend on
 `internal/cli` at all is a separate decision.
 
@@ -22,7 +22,7 @@ The test application's PCR0/PCR2 also depend on the day: the Dockerfile starts `
 `apk` packages without versions (`docs/results/aws-nitro-2026-11-12.md`). A re-measurement gives today's values; what
 the baseline tests is that two machines agree on the same day.
 
-*(Added later the same day, `ea35b5e`.)* **Recording rule, from this finding:** every measured value is written next to the commit it was measured at (and,
+*(Added later the same day, `736c4c9`.)* **Recording rule, from this finding:** every measured value is written next to the commit it was measured at (and,
 for Nitro, the responder's sha256). Without it, the next person who builds at another commit sees another value and
 takes it for a fault. All documents changed by this session follow it.
 
@@ -34,8 +34,8 @@ and one new `c7g.xlarge` (arm64):
 | script | row | what it gives |
 |---|---|---|
 | `arch-measurement-compare.sh` | T1, T3 | PCR0/1/2 from the Vendor and the Auditor (two checkout paths): **the new reference values**, and whether they agree; and arm64's values, which must differ |
-| `toolchain-pin-check.sh` | T2 | the refusal under go1.26.2, now with Nitro's reason (`2014666213a`); the two responders' hashes |
-| `responder-check.sh` | T3 | the four responder cases, including the cgo refusal (`9374e2d`) |
+| `toolchain-pin-check.sh` | T2 | the refusal under go1.26.2, now with Nitro's reason (`718b3b238ba`); the two responders' hashes |
+| `responder-check.sh` | T3 | the four responder cases, including the cgo refusal (`e57f02d`) |
 | `build-env-check.sh` | T7 | the x86_64 side as before, and **the arm64 mirror** (never run) |
 | `arch-record-check.sh` | T7 | the `uname -m` mapping on both architectures (the arm64 side never run) |
 
@@ -47,15 +47,15 @@ the arm64 instance is `ami-0ce2f8dd9b0fcfb35`, the newest Amazon Linux 2023 arm6
 
 | file | what is there | change after the run |
 |---|---|---|
-| `docs/results/aws-nitro-2026-11-12.md` | PCR0/PCR2 "before `4d70d74`" (`d5bbd4af…`, `6b64250f…`); the note "must be taken again at `9374e2d` or later" | keep as the record of that day; point to the new results file, and say that `38b49e7` moved them again |
+| `docs/results/aws-nitro-2026-11-12.md` | PCR0/PCR2 "before `a402827`" (`d5bbd4af…`, `6b64250f…`); the note "must be taken again at `e57f02d` or later" | keep as the record of that day; point to the new results file, and say that `1967749d` moved them again |
 | a new `docs/results/aws-nitro-2026-11-16.md` and `.jsonl` | — | the new reference values, the five scripts' verdicts, the arm64 values |
-| `docs/build/aws-nitro.md`, lines about "before `4d70d74`" and "taken again at `9374e2d` or later" | the warning that the values are stale | say they were taken again, at which commit, and add `38b49e7` to the list of what moved them |
-| `docs/status/test-matrix.md` | the "Nitro baseline 2026-11-12" legend, the T1 cell ("not yet measured"), footnote ¹³'s `c5973d4` values, and the arm64 parts of T1 and T7 ("not run") | the T1 cell gets the new two-machine values; arm64 T1 and T7 get their results; ¹³ notes that `38b49e7` moved its values |
-| `docs/status/build-info-gaps.md` row 2 | "the baseline must be retaken at `9374e2d` or later" | done, with the commit and the results file |
-| `docs/results/aws-nitro-2026-11-15.md`, `aws-nitro-2026-11-15-local-chain.md` | values from before `4d70d74` (`d5bbd4af…`, `47dbca56…`), already marked | leave as records of those days |
-| `docs/results/trial-2026-11-16-clean.md` | PCR0 `2aacdf41…`, PCR2 `e5504779…` at `c5973d4` | leave as the record of that run; add one line that `38b49e7` moved them |
-| `internal/tee/parse/aws/testdata/README.md`, `internal/tee/request/testdata/README.md` | the fixtures' PCR0/PCR2, marked "before `4d70d74`" | **leave**: those are the values signed into the recorded documents, not reference values |
-| `docs/build/aws-nitro.md` (cgo table), `docs/status/build-info-gaps.md` 2.3, `internal/setup/build/responder_test.go` (and the project's rules of that day; the rule without the values is now in `CONTRIBUTING.md`, "Build"; *reworded 2026-11-16, `264bf48`: it first named a local rules file*) | `5573b538…` as the cgo-free responder | **leave**: they record the cgo comparison at `34adc9a`/`9374e2d`, which is still true for that code; add in `aws-nitro.md` that later commits give other bytes |
+| `docs/build/aws-nitro.md`, lines about "before `a402827`" and "taken again at `e57f02d` or later" | the warning that the values are stale | say they were taken again, at which commit, and add `1967749d` to the list of what moved them |
+| `docs/status/test-matrix.md` | the "Nitro baseline 2026-11-12" legend, the T1 cell ("not yet measured"), footnote ¹³'s `6a92a1f` values, and the arm64 parts of T1 and T7 ("not run") | the T1 cell gets the new two-machine values; arm64 T1 and T7 get their results; ¹³ notes that `1967749d` moved its values |
+| `docs/status/build-info-gaps.md` row 2 | "the baseline must be retaken at `e57f02d` or later" | done, with the commit and the results file |
+| `docs/results/aws-nitro-2026-11-15.md`, `aws-nitro-2026-11-15-local-chain.md` | values from before `a402827` (`d5bbd4af…`, `47dbca56…`), already marked | leave as records of those days |
+| `docs/results/trial-2026-11-16-clean.md` | PCR0 `2aacdf41…`, PCR2 `e5504779…` at `6a92a1f` | leave as the record of that run; add one line that `1967749d` moved them |
+| `internal/tee/parse/aws/testdata/README.md`, `internal/tee/request/testdata/README.md` | the fixtures' PCR0/PCR2, marked "before `a402827`" | **leave**: those are the values signed into the recorded documents, not reference values |
+| `docs/build/aws-nitro.md` (cgo table), `docs/status/build-info-gaps.md` 2.3, `internal/setup/build/responder_test.go` (and the project's rules of that day; the rule without the values is now in `CONTRIBUTING.md`, "Build"; *reworded 2026-11-16, `c31a7f8`: it first named a local rules file*) | `5573b538…` as the cgo-free responder | **leave**: they record the cgo comparison at `d469e12`/`e57f02d`, which is still true for that code; add in `aws-nitro.md` that later commits give other bytes |
 
 ## Before running (once SSH works)
 

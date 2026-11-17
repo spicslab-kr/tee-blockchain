@@ -1,9 +1,9 @@
 # The whole chain inside one confidential VM, 2026-11-12
 
 The first run of request, verification, registration and lookup on **fresh** TDX and SEV-SNP evidence, before any
-build or launch existed for those platforms: `e2e/cvm/in-guest-verify.sh` (added in `ba6e94d`) on one GCP guest per
-platform, everything on that guest. Recorded on the day in the CVM port's working notes (`f84bf01` for SEV-SNP,
-`cd194df` for TDX), which are no longer tracked; this page is that record, unchanged in substance. The per-check
+build or launch existed for those platforms: `e2e/cvm/in-guest-verify.sh` (added in `71bad06`) on one GCP guest per
+platform, everything on that guest. Recorded on the day in the CVM port's working notes (`d723882` for SEV-SNP,
+`ffde8dd` for TDX), which are no longer tracked; this page is that record, unchanged in substance. The per-check
 `results.jsonl` the script wrote on the guests was not kept.
 
 ## How it ran

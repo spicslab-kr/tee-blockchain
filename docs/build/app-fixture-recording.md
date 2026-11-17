@@ -458,7 +458,7 @@ certificate holds one, committing these fixtures waits for the same publication 
 
 Made with the procedure above on `d3-snp-auditor` (VM A, running the registered application) and `d3-snp-vendor` (VM
 B, running a one-byte-changed one), two `n2d-standard-2` guests of `ubuntu-2404-noble-amd64-v20261105`, `record-snp`
-`5b0e8f5d…` built at `73d0d5d`, nonce text `attestamp-snp-t10` (nonce `0f8964068dccac4d42f09277c59a1e7d73e8ca5a163056d418ae173239df8766`).
+`5b0e8f5d…` built at `4dee010`, nonce text `attestamp-snp-t10` (nonce `0f8964068dccac4d42f09277c59a1e7d73e8ca5a163056d418ae173239df8766`).
 They are on the development machine that made them, under `e2e-work/t10/` (gitignored), the only copy: the two VMs, which held the same
 folders, were deleted on 2026-11-16 after these hashes were checked against the local files.
 

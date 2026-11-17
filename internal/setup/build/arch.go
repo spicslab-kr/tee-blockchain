@@ -9,7 +9,7 @@
 // machine code, and the base image layers all differ per architecture. That is expected. What must stay equal is the hash for one architecture built from two different checkout
 // paths, from two different commits whose code the responder can run is the same, or on two different machines, which is
 // why every build here passes -trimpath, -buildvcs=false and -ldflags=-buildid= and sets CGO_ENABLED=0. Without the empty
-// build ID a change to any package the responder links moved its bytes even when no code it runs changed (38b49e7).
+// build ID a change to any package the responder links moved its bytes even when no code it runs changed (1967749d).
 //
 // Add an architecture by adding one line to ArchTargets; nothing else in this package changes.
 package build
