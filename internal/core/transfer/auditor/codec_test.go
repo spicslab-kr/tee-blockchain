@@ -25,7 +25,10 @@ const (
     "os": "linux",
     "arch": "amd64",
     "go": "go1.26.1",
-    "trimpath": true
+    "trimpath": true,
+    "ami_release": "2023.12.20261109",
+    "docker": "25.0.18-1.amzn2023.0.3",
+    "nitro_cli": "1.5.0-0.amzn2023"
   }
 }
 `

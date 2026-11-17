@@ -13,7 +13,14 @@ func cfgAWS() BuildConfig {
 	return BuildConfig{Schema: SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "aws-nitro",
 		Source:   Source{Repo: "https://example.com/svc.git", Commit: commit},
 		TEEInfo:  map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
-		BuildEnv: envAWS()}
+		BuildEnv: envAWSNitro()}
+}
+
+// envAWSNitro is envAWS with the fields a build-config.json needs on aws-nitro (the instances of 2026-11-12 and -16).
+func envAWSNitro() BuildEnv {
+	e := envAWS()
+	e.AMIRelease, e.Docker, e.NitroCLI = "2023.12.20261109", "25.0.18-1.amzn2023.0.3", "1.5.0-0.amzn2023"
+	return e
 }
 
 func envAWS() BuildEnv {

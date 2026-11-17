@@ -28,7 +28,8 @@ func writeBuildConfig(t *testing.T, dir, service, version, arch, goVer string) s
   "platform": "aws-nitro",
   "source": { "repo": "https://example.com/svc.git", "commit": "0123456789abcdef0123456789abcdef01234567", "path": "mainline/alpine-slim" },
   "tee_info": { "instance_id": "i-0abc", "region": "eu-north-1", "ami_id": "ami-0123" },
-  "build_env": { "os": "linux", "arch": "` + arch + `", "go": "` + goVer + `", "trimpath": true }
+  "build_env": { "os": "linux", "arch": "` + arch + `", "go": "` + goVer + `", "trimpath": true,
+                 "ami_release": "2023.12.20261109", "docker": "25.0.18-1.amzn2023.0.3", "nitro_cli": "1.5.0-0.amzn2023" }
 }
 `
 	p := filepath.Join(dir, "build-config.json")
@@ -90,7 +91,7 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 		"registering cfg-svc 2.0.0 (" + arch + ", " + goVer + " -trimpath)",
 		"registered cfg-svc 2.0.0 (" + arch + ", " + goVer + " -trimpath)",
 		"build env   linux/" + arch + " " + goVer + " trimpath=true",
-		`"build_env": {"os":"linux","arch":"` + arch + `","go":"` + goVer + `","trimpath":true}`,
+		`"build_env": {"os":"linux","arch":"` + arch + `","go":"` + goVer + `","trimpath":true,"ami_release":"2023.12.20261109","docker":"25.0.18-1.amzn2023.0.3","nitro_cli":"1.5.0-0.amzn2023"}`,
 	} {
 		if !bytes.Contains(out, []byte(want)) {
 			t.Errorf("register --config: output lacks %q:\n%s", want, out)

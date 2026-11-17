@@ -40,37 +40,33 @@ func TestBuildEnv_NitroFields(t *testing.T) {
 	}
 }
 
-// receive, on aws-nitro: the Amazon Linux release is compared when the Vendor declared one.
-func TestCheckBuildEnvNitro_AMIRelease(t *testing.T) {
+// receive, on aws-nitro: the Amazon Linux release is compared (a config always declares one there; Validate).
+func TestCheckBuildEnv_AMIRelease(t *testing.T) {
 	want := BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true, AMIRelease: "2023.12.20261109"}
 	have := BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true, AMIRelease: "2023.12.20261109"}
-	if w, err := CheckBuildEnvNitro(want, have, false); err != nil || len(w) != 0 {
+	if w, err := CheckBuildEnv(want, have, false); err != nil || len(w) != 0 {
 		t.Fatalf("same release: warnings %v, err %v", w, err)
 	}
 
 	have.AMIRelease = "2023.13.20261201"
-	_, err := CheckBuildEnvNitro(want, have, false)
+	_, err := CheckBuildEnv(want, have, false)
 	if err == nil || !strings.Contains(err.Error(), "ami_release: Vendor built on Amazon Linux 2023.12.20261109, this instance is 2023.13.20261201") {
 		t.Fatalf("another release must be refused naming both: %v", err)
 	}
-	w, err := CheckBuildEnvNitro(want, have, true)
+	w, err := CheckBuildEnv(want, have, true)
 	if err != nil || len(w) != 1 || !strings.Contains(w[0], "--ignore-env") {
 		t.Errorf("with ignore the difference is a warning: %v, %v", w, err)
 	}
 
 	have.AMIRelease = "" // not Amazon Linux, or unreadable
-	if _, err := CheckBuildEnvNitro(want, have, false); err == nil || !strings.Contains(err.Error(), "not Amazon Linux 2023") {
+	if _, err := CheckBuildEnv(want, have, false); err == nil || !strings.Contains(err.Error(), "not Amazon Linux 2023") {
 		t.Errorf("an instance without a readable release must be refused: %v", err)
 	}
 
-	want.AMIRelease, have.AMIRelease = "", "2023.12.20261109"
-	w, err = CheckBuildEnvNitro(want, have, false)
-	if err != nil || len(w) != 1 || !strings.Contains(w[0], "no ami_release") {
-		t.Errorf("a Vendor without ami_release: one warning, no error; got %v, %v", w, err)
-	}
-	// the platform-independent check says nothing about a missing release (TDX and SEV-SNP configs have none)
+	// TDX and SEV-SNP configs declare no release: nothing to compare, nothing to warn about
+	want.AMIRelease, have.AMIRelease = "", ""
 	if w, err := CheckBuildEnv(want, have, false); err != nil || len(w) != 0 {
-		t.Errorf("CheckBuildEnv must not warn about ami_release: %v, %v", w, err)
+		t.Errorf("no release on either side: %v, %v", w, err)
 	}
 }
 
@@ -93,8 +89,34 @@ func TestCheckNitroTools(t *testing.T) {
 	if err != nil || len(w) != 1 || !strings.Contains(w[0], "docker:") || !strings.Contains(w[0], "aws-nitro-enclaves-cli:") {
 		t.Errorf("with ignore both differences are one warning: %v, %v", w, err)
 	}
-	w, err = CheckNitroTools(BuildEnv{}, "25.0.18-1.amzn2023.0.3", "1.5.0-0.amzn2023", false)
-	if err != nil || len(w) != 2 || !strings.Contains(w[0], "no docker version") || !strings.Contains(w[1], "no aws-nitro-enclaves-cli version") {
-		t.Errorf("a Vendor that recorded neither: two warnings, no error; got %v, %v", w, err)
+	_, err = CheckNitroTools(BuildEnv{}, "25.0.18-1.amzn2023.0.3", "1.5.0-0.amzn2023", false)
+	if err == nil || !strings.Contains(err.Error(), "docker: the Vendor recorded no version") || !strings.Contains(err.Error(), "aws-nitro-enclaves-cli: the Vendor recorded no version") {
+		t.Errorf("a version the Vendor did not record is a difference, not a pass: %v", err)
+	}
+}
+
+// On aws-nitro the three fields are required (since 2026-11-17), so no config can skip the Auditor's two checks. The
+// CVM formats have no docker or nitro-cli and do not need them.
+func TestBuildConfig_NitroFieldsRequiredOnAWS(t *testing.T) {
+	if err := cfgAWS().Validate(); err != nil {
+		t.Fatalf("the full aws-nitro config must validate: %v", err)
+	}
+	for _, field := range []string{"ami_release", "docker", "nitro_cli"} {
+		c := cfgAWS()
+		switch field {
+		case "ami_release":
+			c.BuildEnv.AMIRelease = ""
+		case "docker":
+			c.BuildEnv.Docker = ""
+		case "nitro_cli":
+			c.BuildEnv.NitroCLI = ""
+		}
+		err := c.Validate()
+		if err == nil || !strings.Contains(err.Error(), "build_env."+field+": required for aws-nitro") {
+			t.Errorf("aws-nitro without build_env.%s must be rejected, got %v", field, err)
+		}
+	}
+	if err := cfgTDX().Validate(); err != nil {
+		t.Errorf("intel-tdx needs none of the three: %v", err)
 	}
 }

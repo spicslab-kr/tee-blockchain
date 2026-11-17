@@ -181,18 +181,16 @@ func receive(args []string) error {
 	// the Vendor said which environment it built in. this instance must be the same one, or
 	// a rebuild here can't reproduce its measurements, and would look like a lying Vendor.
 	have := tr.CurrentBuildEnv()
-	check := tr.CheckBuildEnv
 	if c.Platform == awsra.Format {
 		// on Nitro the Amazon Linux release decides which docker and nitro-cli build will install; nothing is installed
 		// yet, so the release is what can be compared now (a proxy; build --config compares the versions themselves)
 		if rel, err := toolchain.AmazonLinuxRelease(); err == nil {
 			have.AMIRelease = rel
 		}
-		check = tr.CheckBuildEnvNitro
 	}
 	fmt.Printf("build env: %s (Vendor)\n", c.BuildEnv)
 	fmt.Printf("build env: %s (this instance)\n", have)
-	warnings, err := check(c.BuildEnv, have, *ignoreEnv)
+	warnings, err := tr.CheckBuildEnv(c.BuildEnv, have, *ignoreEnv)
 	for _, w := range warnings {
 		cli.Errorf("warning: %s", w)
 	}

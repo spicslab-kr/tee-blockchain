@@ -57,11 +57,22 @@ func cloneRemote(t *testing.T, remote string) string {
 
 // buildConfigJSON is the config to pass to send. build_env is left empty on purpose: the point is to see whether send fills it in.
 func buildConfigJSON(t *testing.T, commit string, env map[string]any) []byte {
+	return buildConfigJSONFor(t, "aws-nitro", commit, env)
+}
+
+// buildConfigJSONFor is buildConfigJSON for another platform. The OS, architecture and Go checks are the same on every
+// platform; intel-tdx is used where an aws-nitro config would also need ami_release, docker and nitro_cli, which only a
+// Nitro parent instance can supply.
+func buildConfigJSONFor(t *testing.T, platform, commit string, env map[string]any) []byte {
 	t.Helper()
+	teeInfo := map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"}
+	if platform == "intel-tdx" {
+		teeInfo = map[string]string{"instance_name": "g", "project_id": "p", "zone": "z", "image": "i"}
+	}
 	m := map[string]any{
-		"schema": "attestamp.build-config/1", "service": "svc", "version": "1.2.0", "platform": "aws-nitro",
+		"schema": "attestamp.build-config/1", "service": "svc", "version": "1.2.0", "platform": platform,
 		"source":   map[string]string{"repo": "https://example.com/svc.git", "commit": commit},
-		"tee_info": map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
+		"tee_info": teeInfo,
 	}
 	if env != nil {
 		m["build_env"] = env
@@ -108,13 +119,14 @@ func otherArch() string {
 	return "amd64"
 }
 
-// att-vendor send records the OS/architecture/Go it runs on as build_env and pushes.
+// att-vendor send records the OS/architecture/Go it runs on as build_env and pushes (intel-tdx: on aws-nitro send also
+// needs a Nitro parent instance, see TestBuildEnv_SendOffAmazonLinuxRefusesNitro).
 func TestBuildEnv_SendRecordsRunningEnv(t *testing.T) {
 	dir := t.TempDir()
 	vendor := build(t, dir, "./cmd/vendor")
 	remote, _ := newRemoteRepo(t)
 	cfgPath := filepath.Join(dir, "build-config.json")
-	if err := os.WriteFile(cfgPath, buildConfigJSON(t, "", nil), 0o644); err != nil {
+	if err := os.WriteFile(cfgPath, buildConfigJSONFor(t, "intel-tdx", "", nil), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -156,7 +168,7 @@ func TestBuildEnv_ReceiveMatchingEnvPasses(t *testing.T) {
 	auditor := build(t, dir, "./cmd/auditor")
 	remote, _ := newRemoteRepo(t)
 	cfgPath := filepath.Join(dir, "build-config.json")
-	if err := os.WriteFile(cfgPath, buildConfigJSON(t, "", nil), 0o644); err != nil {
+	if err := os.WriteFile(cfgPath, buildConfigJSONFor(t, "intel-tdx", "", nil), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if stdout, stderr, code := runCmd(t, vendor, "send", "--repo", remote, "--config", cfgPath, "--workdir", cloneRemote(t, remote)); code != 0 {
@@ -184,7 +196,7 @@ func TestBuildEnv_ReceiveRejectsOtherArch(t *testing.T) {
 	dir := t.TempDir()
 	auditor := build(t, dir, "./cmd/auditor")
 	remote, seed := newRemoteRepo(t)
-	pushConfig(t, remote, buildConfigJSON(t, seed, map[string]any{
+	pushConfig(t, remote, buildConfigJSONFor(t, "intel-tdx", seed, map[string]any{
 		"os": runtime.GOOS, "arch": otherArch(), "go": runtime.Version(), "trimpath": true,
 	}))
 
@@ -218,7 +230,7 @@ func TestBuildEnv_ReceiveRejectsOtherGoVersion(t *testing.T) {
 	dir := t.TempDir()
 	auditor := build(t, dir, "./cmd/auditor")
 	remote, seed := newRemoteRepo(t)
-	pushConfig(t, remote, buildConfigJSON(t, seed, map[string]any{
+	pushConfig(t, remote, buildConfigJSONFor(t, "intel-tdx", seed, map[string]any{
 		"os": runtime.GOOS, "arch": runtime.GOARCH, "go": "go1.0.0-not-this-one", "trimpath": true,
 	}))
 	stdout, stderr, code := runCmd(t, auditor, "receive", "--repo", remote, "--into", filepath.Join(t.TempDir(), "src"))
@@ -235,7 +247,7 @@ func TestBuildEnv_ReceiveWarnsOnNoTrimpath(t *testing.T) {
 	dir := t.TempDir()
 	auditor := build(t, dir, "./cmd/auditor")
 	remote, seed := newRemoteRepo(t)
-	pushConfig(t, remote, buildConfigJSON(t, seed, map[string]any{
+	pushConfig(t, remote, buildConfigJSONFor(t, "intel-tdx", seed, map[string]any{
 		"os": runtime.GOOS, "arch": runtime.GOARCH, "go": runtime.Version(), "trimpath": false,
 	}))
 	stdout, stderr, code := runCmd(t, auditor, "receive", "--repo", remote, "--into", filepath.Join(t.TempDir(), "src"))
@@ -268,9 +280,9 @@ func onAmazonLinux() bool {
 	return err == nil && regexp.MustCompile(`(?m)^ID="?amzn"?\s*$`).Match(b)
 }
 
-// Off a Nitro parent instance, send cannot read the Amazon Linux release or the docker and nitro-cli versions: it says
-// so, sends the config anyway, and leaves the three fields out of build_env.
-func TestBuildEnv_SendOffAmazonLinuxLeavesNitroFieldsEmpty(t *testing.T) {
+// Off a Nitro parent instance, send cannot read the Amazon Linux release or the docker and nitro-cli versions, which an
+// aws-nitro config requires: it refuses, saying where to run it, and pushes nothing.
+func TestBuildEnv_SendOffAmazonLinuxRefusesNitro(t *testing.T) {
 	if onAmazonLinux() {
 		t.Skip("this machine is Amazon Linux: send reads the real values (e2e/nitro-tools-check.sh checks that on an instance)")
 	}
@@ -282,28 +294,22 @@ func TestBuildEnv_SendOffAmazonLinuxLeavesNitroFieldsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout, stderr, code := runCmd(t, vendor, "send", "--repo", remote, "--config", cfgPath, "--workdir", cloneRemote(t, remote))
-	if code != 0 {
-		t.Fatalf("send exit %d\n%s%s", code, stdout, stderr)
+	if code == 0 {
+		t.Fatalf("send of an aws-nitro config off a Nitro instance must fail\n%s%s", stdout, stderr)
 	}
-	for _, want := range []string{"build_env.ami_release left empty", "build_env.docker and nitro_cli left empty"} {
+	for _, want := range []string{"build_env.ami_release is required for aws-nitro", "run send on the Nitro parent instance that ran build"} {
 		if !strings.Contains(stderr, want) {
-			t.Errorf("send must warn %q, got:\n%s", want, stderr)
+			t.Errorf("send must say %q, got:\n%s", want, stderr)
 		}
 	}
-	b, err := os.ReadFile(filepath.Join(cloneRemote(t, remote), "build-config.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, key := range []string{"ami_release", "docker", "nitro_cli"} {
-		if strings.Contains(string(b), `"`+key+`"`) {
-			t.Errorf("pushed build-config.json must not carry an empty %s:\n%s", key, b)
-		}
+	if _, err := os.Stat(filepath.Join(cloneRemote(t, remote), "build-config.json")); err == nil {
+		t.Errorf("nothing may be pushed when send refuses")
 	}
 }
 
 // receive on aws-nitro compares the Amazon Linux release the Vendor recorded with this machine's. Here the machine is
 // not Amazon Linux, so a recorded release is refused naming it; --ignore-env makes it a warning. A config without one
-// gets a warning that it was not compared.
+// is refused as invalid: the three Nitro fields are required.
 func TestBuildEnv_ReceiveComparesAMIRelease(t *testing.T) {
 	if onAmazonLinux() {
 		t.Skip("this machine is Amazon Linux; the refusal off Amazon Linux cannot be seen here (e2e/nitro-tools-check.sh covers the instance)")
@@ -338,9 +344,9 @@ func TestBuildEnv_ReceiveComparesAMIRelease(t *testing.T) {
 
 	delete(env, "ami_release")
 	pushConfig(t, remote, buildConfigJSON(t, seed, env))
-	stdout, stderr, code = runCmd(t, auditor, "receive", "--repo", remote, "--into", filepath.Join(t.TempDir(), "src"))
-	if code != 0 || !strings.Contains(stderr, "no ami_release") {
-		t.Errorf("a config without ami_release: exit 0 and a warning; exit %d\n%s%s", code, stdout, stderr)
+	stdout, stderr, code = runCmd(t, auditor, "receive", "--repo", remote, "--into", filepath.Join(t.TempDir(), "src"), "--ignore-env")
+	if code == 0 || !strings.Contains(stderr, "build_env.ami_release: required for aws-nitro") {
+		t.Errorf("a config without ami_release is invalid, even with --ignore-env; exit %d\n%s%s", code, stdout, stderr)
 	}
 }
 

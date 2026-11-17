@@ -22,7 +22,8 @@ runs `CheckBuildEnv`: your OS, CPU architecture and Go version must match the Ve
 or the command stops with an error. `--ignore-env` turns that error into a warning. A Vendor build
 without `-trimpath` only gives a warning. On `aws-nitro` the Amazon Linux release must match too
 (`build_env.ami_release`, which the Vendor's `send` records): it decides which docker and nitro-cli
-`build` will install. That is a proxy, not a guarantee: each Amazon Linux release has its own package repository, but a `dnf update` with another release, `releasever=latest` in `/etc/dnf/vars`, or a package installed by hand moves the versions without moving the release; a config without `ami_release` gets a warning.
+`build` will install. That is a proxy, not a guarantee: each Amazon Linux release has its own package repository, but a `dnf update` with another release, `releasever=latest` in `/etc/dnf/vars`, or a package installed by hand moves the versions without moving the release. On `aws-nitro` a config without `ami_release`, `docker` and `nitro_cli` is invalid (since 2026-11-17), so
+neither check can be skipped.
 
 ## Build and launch
 

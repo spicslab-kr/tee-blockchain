@@ -11,20 +11,10 @@ import (
 // ignore set, the error becomes a warning. A Vendor build without -trimpath always gives a warning, since
 // its measurements may depend on the checkout path.
 //
-// When the Vendor declared an Amazon Linux release (aws-nitro), have.AMIRelease must be the same: the release decides
-// which docker and nitro-cli dnf will install here. That is a proxy, not a guarantee (see BuildEnv.AMIRelease); the
-// versions themselves are compared by CheckNitroTools in build, after they are installed. A Vendor that declared no
-// release gives a warning when the platform is aws-nitro (nitro set).
+// When the Vendor declared an Amazon Linux release (required on aws-nitro, see Validate), have.AMIRelease must be the
+// same: the release decides which docker and nitro-cli dnf will install here. That is a proxy, not a guarantee (see
+// BuildEnv.AMIRelease); the versions themselves are compared by CheckNitroTools in build, after they are installed.
 func CheckBuildEnv(want, have BuildEnv, ignore bool) (warnings []string, err error) {
-	return checkBuildEnv(want, have, false, ignore)
-}
-
-// CheckBuildEnvNitro is CheckBuildEnv for an aws-nitro build-config.json: a missing ami_release is warned about.
-func CheckBuildEnvNitro(want, have BuildEnv, ignore bool) (warnings []string, err error) {
-	return checkBuildEnv(want, have, true, ignore)
-}
-
-func checkBuildEnv(want, have BuildEnv, nitro, ignore bool) (warnings []string, err error) {
 	var diffs []string
 	if want.OS != have.OS {
 		diffs = append(diffs, "os: Vendor built on "+want.OS+", this instance is "+have.OS)
@@ -46,10 +36,6 @@ func checkBuildEnv(want, have BuildEnv, nitro, ignore bool) (warnings []string, 
 	if !want.Trimpath {
 		warnings = append(warnings, "Vendor built without -trimpath: its measurements may depend on its checkout path")
 	}
-	if nitro && want.AMIRelease == "" {
-		warnings = append(warnings, "the Vendor's build_env has no ami_release, so the Amazon Linux release was not compared; "+
-			"build --config still compares the docker and nitro-cli versions if the Vendor recorded them")
-	}
 	if len(diffs) == 0 {
 		return warnings, nil
 	}
@@ -62,10 +48,11 @@ func checkBuildEnv(want, have BuildEnv, nitro, ignore bool) (warnings []string, 
 }
 
 // CheckNitroTools compares the docker and aws-nitro-enclaves-cli versions the Vendor built with (want.Docker and
-// want.NitroCLI, recorded by att-vendor send) with the ones build has just installed here. This is the real check
-// behind the ami_release proxy: a difference means this build will not give the Vendor's measurements (PCR1 follows
-// nitro-cli's kernel and init, the image follows docker). With ignore set, the error becomes a warning. A version the
-// Vendor did not record is not compared, with a warning.
+// want.NitroCLI, recorded by att-vendor send and required on aws-nitro) with the ones build has just installed here.
+// This is the real check behind the ami_release proxy: a difference means this build will not give the Vendor's
+// measurements (PCR1 follows nitro-cli's kernel and init, the image follows docker). A version the Vendor did not
+// record counts as a difference (a validated aws-nitro config always has both). With ignore set, the error becomes a
+// warning.
 func CheckNitroTools(want BuildEnv, haveDocker, haveNitroCLI string, ignore bool) (warnings []string, err error) {
 	var diffs []string
 	for _, c := range []struct{ name, want, have string }{
@@ -74,18 +61,18 @@ func CheckNitroTools(want BuildEnv, haveDocker, haveNitroCLI string, ignore bool
 	} {
 		switch {
 		case c.want == "":
-			warnings = append(warnings, "the Vendor's build_env has no "+c.name+" version, so it was not compared (installed here: "+c.have+")")
+			diffs = append(diffs, c.name+": the Vendor recorded no version, this instance installed "+c.have)
 		case c.want != c.have:
 			diffs = append(diffs, c.name+": Vendor built with "+c.want+", this instance installed "+c.have)
 		}
 	}
 	if len(diffs) == 0 {
-		return warnings, nil
+		return nil, nil
 	}
 	msg := "build tools differ from the Vendor's (" + strings.Join(diffs, "; ") +
 		"): this build cannot produce the Vendor's measurements"
 	if ignore {
-		return append(warnings, msg+" (continuing because of --ignore-env)"), nil
+		return []string{msg + " (continuing because of --ignore-env)"}, nil
 	}
-	return warnings, errors.New(msg)
+	return nil, errors.New(msg)
 }

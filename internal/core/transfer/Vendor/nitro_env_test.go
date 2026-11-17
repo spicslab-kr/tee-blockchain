@@ -39,3 +39,29 @@ func TestBuildEnv_NitroFields(t *testing.T) {
 		t.Errorf("a config with the Nitro fields must validate: %v", err)
 	}
 }
+
+// On aws-nitro the three fields are required (since 2026-11-17), so no config can skip the Auditor's two checks. The
+// CVM formats have no docker or nitro-cli and do not need them.
+func TestBuildConfig_NitroFieldsRequiredOnAWS(t *testing.T) {
+	if err := cfgAWS().Validate(); err != nil {
+		t.Fatalf("the full aws-nitro config must validate: %v", err)
+	}
+	for _, field := range []string{"ami_release", "docker", "nitro_cli"} {
+		c := cfgAWS()
+		switch field {
+		case "ami_release":
+			c.BuildEnv.AMIRelease = ""
+		case "docker":
+			c.BuildEnv.Docker = ""
+		case "nitro_cli":
+			c.BuildEnv.NitroCLI = ""
+		}
+		err := c.Validate()
+		if err == nil || !strings.Contains(err.Error(), "build_env."+field+": required for aws-nitro") {
+			t.Errorf("aws-nitro without build_env.%s must be rejected, got %v", field, err)
+		}
+	}
+	if err := cfgTDX().Validate(); err != nil {
+		t.Errorf("intel-tdx needs none of the three: %v", err)
+	}
+}

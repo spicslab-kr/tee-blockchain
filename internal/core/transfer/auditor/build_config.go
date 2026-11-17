@@ -38,7 +38,7 @@ type BuildEnv struct {
 	Go       string `json:"go"`       // runtime.Version() of the att binary, e.g. go1.26.1
 	Trimpath bool   `json:"trimpath"` // whether the att binary (and so att-ra-responder) was built with -trimpath
 
-	// aws-nitro only, written by att-vendor send on the Vendor's parent instance after its build (empty elsewhere).
+	// aws-nitro only, and required there; written by att-vendor send on the Vendor's parent instance after its build.
 	// build installs docker and aws-nitro-enclaves-cli with dnf and no version, and both decide the measurements.
 	// AMIRelease is the Amazon Linux release (e.g. 2023.12.20261109), which the Auditor's receive compares before
 	// anything is installed: a proxy for the versions, since each release has its own package repository, and no
@@ -154,6 +154,16 @@ func (c BuildConfig) Validate() error {
 		}
 		if c.BuildEnv.Go == "" {
 			errs = append(errs, "build_env.go: required for "+c.Platform)
+		}
+	}
+	// On aws-nitro the docker and nitro-cli build installs decide the measurements too. Required since 2026-11-17, so
+	// that no config can skip the Auditor's two checks (receive: ami_release; build --config: docker, nitro_cli).
+	// att-vendor send fills them in on the instance that ran build.
+	if c.Platform == "aws-nitro" {
+		for _, f := range []struct{ k, v string }{{"ami_release", c.BuildEnv.AMIRelease}, {"docker", c.BuildEnv.Docker}, {"nitro_cli", c.BuildEnv.NitroCLI}} {
+			if f.v == "" {
+				errs = append(errs, "build_env."+f.k+": required for aws-nitro (att-vendor send fills it in on the instance that ran build)")
+			}
 		}
 	}
 	if c.BuildEnv.Arch != "" && !validArch(c.BuildEnv.Arch) {

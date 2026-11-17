@@ -20,9 +20,10 @@ const commit = "0123456789abcdef0123456789abcdef01234567"
 func TestTransfer_VendorToAuditor_BuildConfig(t *testing.T) {
 	cases := []vendor.BuildConfig{
 		{Schema: vendor.SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "aws-nitro",
-			Source:   vendor.Source{Repo: "https://example.com/svc.git", Commit: commit},
-			TEEInfo:  map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
-			BuildEnv: vendor.BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true}},
+			Source:  vendor.Source{Repo: "https://example.com/svc.git", Commit: commit},
+			TEEInfo: map[string]string{"instance_id": "i-0abc", "region": "ap-northeast-2", "ami_id": "ami-0123"},
+			BuildEnv: vendor.BuildEnv{OS: "linux", Arch: "amd64", Go: "go1.26.1", Trimpath: true,
+				AMIRelease: "2023.12.20261109", Docker: "25.0.18-1.amzn2023.0.3", NitroCLI: "1.5.0-0.amzn2023"}},
 		{Schema: vendor.SchemaBuildConfig, Service: "svc", Version: "1.2.0", Platform: "gcp",
 			Source:  vendor.Source{Repo: "https://example.com/svc.git", Commit: commit},
 			TEEInfo: map[string]string{"instance_name": "svc-1", "project_id": "proj", "container_image": "gcr.io/proj/svc@sha256:" + strings.Repeat("cd", 32)}},
