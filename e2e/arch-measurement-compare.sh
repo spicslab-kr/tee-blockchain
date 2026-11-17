@@ -32,8 +32,8 @@ declare -A GOARCH_OF=( [x86_64]=amd64 [arm64]=arm64 )
 mkdir -p "$WORK/arch"
 for arch in $ARCHES; do
   ga=${GOARCH_OF[$arch]}
-  CGO_ENABLED=0 GOOS=linux GOARCH=$ga go build -trimpath -buildvcs=false -o "$WORK/arch/att-vendor-$arch"       ./cmd/vendor
-  CGO_ENABLED=0 GOOS=linux GOARCH=$ga go build -trimpath -buildvcs=false -o "$WORK/arch/att-ra-responder-$arch" ./cmd/ra-responder
+  CGO_ENABLED=0 GOOS=linux GOARCH=$ga go build -trimpath -buildvcs=false -ldflags=-buildid= -o "$WORK/arch/att-vendor-$arch"       ./cmd/vendor
+  CGO_ENABLED=0 GOOS=linux GOARCH=$ga go build -trimpath -buildvcs=false -ldflags=-buildid= -o "$WORK/arch/att-ra-responder-$arch" ./cmd/ra-responder
   echo "  $arch  responder sha256: $(sha256 "$WORK/arch/att-ra-responder-$arch" | cut -c1-64)"
 done
 

@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 # Responder build-info check. The enclave image measurement covers the att-ra-responder file that sits next to att, and
-#    that file's bytes depend on the Go patch version, on -trimpath, on -buildvcs, on CGO_ENABLED and on GOOS/GOARCH. The toolchain-pin
+#    that file's bytes depend on the Go patch version, on -trimpath, on -buildvcs, on CGO_ENABLED, on the Go build ID and on GOOS/GOARCH. The toolchain-pin
 #    check (toolchain-pin-check.sh) covers the Go version that built att itself. At the start of build and pack, att reads
 #    the build info Go left inside the responder binary (the output of go version -m) and refuses when the toolchain
-#    differs from the pin, -trimpath is missing, version control was stamped in, cgo was linked, the OS is not linux, or the architecture
-#    differs from this instance. This script checks that the refusal happens on a real Nitro host:
-#      1. cross-build four responders on your machine: a correct one (linux/amd64 -trimpath -buildvcs=false), one without
-#         -trimpath, one with -buildvcs=true, one for arm64 (all with CGO_ENABLED=0, so each has exactly one fault; the
-#         cgo refusal needs a native Linux build with gcc and is covered by TestReadResponder_NativeBuildLinksCgo instead)
+#    differs from the pin, -trimpath is missing, version control was stamped in, cgo was linked, the OS is not linux, the
+#    binary carries a Go build ID (no -ldflags=-buildid=; read from its ELF note, since Go does not record -ldflags in a
+#    -trimpath build), or the architecture differs from this instance. This script checks that the refusal happens on a
+#    real Nitro host:
+#      1. cross-build five responders on your machine: a correct one (linux/amd64 -trimpath -buildvcs=false -ldflags=-buildid=),
+#         one without -trimpath, one with -buildvcs=true, one without -ldflags=-buildid=, one for arm64 (all with
+#         CGO_ENABLED=0, so each has exactly one fault; the cgo refusal needs a native Linux build with gcc and is covered
+#         by TestReadResponder_NativeBuildLinksCgo instead)
 #      2. upload them to the Vendor host under different names and run `build --responder <file>` with each
 #      3. the one without -trimpath is refused with "without -trimpath", the stamped one with "built with version control
-#         stamping", the arm64 one with "GOARCH=arm64 ... this instance is amd64" (exit != 0), and the correct one passes
+#         stamping", the one with a build ID with "carries a Go build ID", the arm64 one with "GOARCH=arm64 ... this
+#         instance is amd64" (exit != 0), and the correct one passes
 #         the responder check and the build log gets one line "responder: att-ra-responder sha256 ... -trimpath" (the build
 #         may fail later for another reason; only the responder line is checked)
 #    Each verdict is also written as a results line (env.sh, result()).
@@ -37,19 +41,20 @@ else
 fi
 
 mkdir -p "$WORK/responder"
-step "2. CROSS-BUILDING FOUR RESPONDERS (correct, without -trimpath, with VCS stamping, arm64) AND att-vendor"
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-ok"        ./cmd/ra-responder
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -o "$WORK/responder/att-ra-responder-notrimpath" ./cmd/ra-responder
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -o "$WORK/responder/att-ra-responder-vcs"        ./cmd/ra-responder
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-arm64"     ./cmd/ra-responder
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-vendor" ./cmd/vendor
+step "2. CROSS-BUILDING FIVE RESPONDERS (correct, without -trimpath, with VCS stamping, with a build ID, arm64) AND att-vendor"
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o "$WORK/responder/att-ra-responder-ok"        ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags=-buildid= -o "$WORK/responder/att-ra-responder-notrimpath" ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=true -ldflags=-buildid= -o "$WORK/responder/att-ra-responder-vcs"        ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o "$WORK/responder/att-ra-responder-buildid"    ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o "$WORK/responder/att-ra-responder-arm64"     ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o "$WORK/responder/att-vendor" ./cmd/vendor
 OK_SHA="$(sha256 "$WORK/responder/att-ra-responder-ok" | cut -c1-16)"
 echo "correct responder sha256 (first 16): $OK_SHA - the host's build log must print the same value"
 
 step "3. UPLOADING TO THE VENDOR HOST"
 nitroBanner "Vendor"
 $SCP "$WORK/responder/att-vendor" "$WORK/responder/att-ra-responder-ok" "$WORK/responder/att-ra-responder-notrimpath" \
-     "$WORK/responder/att-ra-responder-vcs" "$WORK/responder/att-ra-responder-arm64" "$SSH_USER@$VENDOR_HOST:~/"
+     "$WORK/responder/att-ra-responder-vcs" "$WORK/responder/att-ra-responder-buildid" "$WORK/responder/att-ra-responder-arm64"      "$SSH_USER@$VENDOR_HOST:~/"
 
 # remote_build <responder file> - run `build` with that responder on the Vendor host and return stderr+stdout. The exit code is carried in an __EXIT= line.
 remote_build() {
@@ -83,7 +88,20 @@ else
   fail=1
 fi
 
-step "6. build WITH att-ra-responder-arm64 ON AN amd64 HOST - MUST BE REFUSED, NAMING BOTH ARCHITECTURES"
+step "6. build WITH att-ra-responder-buildid - MUST BE REFUSED, NAMING THE BUILD ID"
+out="$(remote_build att-ra-responder-buildid)"
+echo "$out" | sed 's/^/    /'
+ec="$(exit_of "$out")"
+if [ "${ec:-0}" != 0 ] && echo "$out" | grep -q "carries a Go build ID"; then
+  echo "✅ refused (exit $ec) - 'att-ra-responder carries a Go build ID'"
+  result T3 buildid-responder-refused refused refused "build refused (exit $ec): att-ra-responder carries a Go build ID"
+else
+  echo "❌ a responder with a Go build ID was not refused (exit ${ec:-?})"
+  result T3 buildid-responder-refused accepted refused "a responder built without -ldflags=-buildid= was not refused (exit ${ec:-?})"
+  fail=1
+fi
+
+step "7. build WITH att-ra-responder-arm64 ON AN amd64 HOST - MUST BE REFUSED, NAMING BOTH ARCHITECTURES"
 out="$(remote_build att-ra-responder-arm64)"
 echo "$out" | sed 's/^/    /'
 ec="$(exit_of "$out")"
@@ -96,7 +114,7 @@ else
   fail=1
 fi
 
-step "7. build WITH att-ra-responder-ok - MUST PASS THE RESPONDER CHECK"
+step "8. build WITH att-ra-responder-ok - MUST PASS THE RESPONDER CHECK"
 out="$(remote_build att-ra-responder-ok)"
 echo "$out" | sed 's/^/    /'
 if echo "$out" | grep -q "responder: att-ra-responder sha256 $OK_SHA .* -trimpath"; then

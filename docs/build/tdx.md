@@ -128,10 +128,10 @@ https://github.com/foundry-rs/foundry/releases/tag/v1.8.0 and put `anvil.exe` on
 In the `tee-blockchain` folder of step 1:
 
 ```
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user    ./cmd/user
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-auditor ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-user    ./cmd/user
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-vendor       ./cmd/vendor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-ra-responder ./cmd/ra-responder
 ```
 
 The first two run on your computer; the `linux/` two go to the guest.
@@ -483,10 +483,10 @@ both guests. A1 to A9 are the Auditor's, on the Auditor's computer and its own g
 `att-auditor` for the guest instead of `att-vendor`:
 
 ```
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor ./cmd/auditor
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user    ./cmd/user
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-auditor      ./cmd/auditor
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-auditor ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-user    ./cmd/user
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-auditor      ./cmd/auditor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-ra-responder ./cmd/ra-responder
 ```
 
 **A2. On the Auditor's computer: its own guest, from the Vendor's exact image.**

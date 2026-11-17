@@ -75,17 +75,17 @@ build otherwise links cgo and gives a different file, and with it different meas
 `build` refuses such a responder. It is on every line so the binaries are the same however they are built:
 
 ```
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user         ./cmd/user
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-vendor       ./cmd/vendor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-auditor      ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-user         ./cmd/user
 ```
 
 For a TEE instance or guest, which is Linux on x86_64 (add `.exe` nowhere; on Windows run this in Git Bash):
 
 ```
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-vendor       ./cmd/vendor
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-auditor      ./cmd/auditor
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -o linux/att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-vendor       ./cmd/vendor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-auditor      ./cmd/auditor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-ra-responder ./cmd/ra-responder
 ```
 
 `att-ra-responder` goes next to `att-vendor` or `att-auditor` on the instance: on Nitro, `build` layers that file
@@ -102,7 +102,7 @@ measurements. **The full checklist, per platform, with the values to use, how to
 each one moves: [docs/build/reproduce.md](docs/build/reproduce.md).** The most important:
 
 1. The same CPU architecture (`amd64` or `arm64`) on both sides.
-2. The same Go toolchain (pinned, go1.26.1) with `-trimpath -buildvcs=false`, and one and the same
+2. The same Go toolchain (pinned, go1.26.1) with `-trimpath -buildvcs=false -ldflags=-buildid=`, and one and the same
    `att-ra-responder` file on both sides.
 3. A base image pinned by digest (`FROM nginx@sha256:…`), and every package, dependency and
    `git clone` pinned to an exact version or commit.
@@ -130,7 +130,8 @@ each one moves: [docs/build/reproduce.md](docs/build/reproduce.md).** The most i
 - They repack the image files in a fixed order with fixed times and owners, and remove what only
   records when it was built (package-manager logs, apk install times, build caches, `/tmp`).
 - They refuse an `att-ra-responder` built with another Go version, without `-trimpath`, with the
-  git commit stamped in (no `-buildvcs=false`), or for another OS or architecture.
+  git commit stamped in (no `-buildvcs=false`), with cgo, with Go's build ID (no `-ldflags=-buildid=`), or for
+  another OS or architecture.
 - They warn about each Dockerfile line that breaks items 3 and 4. Fixing those lines is up to you.
 - `--verify` builds a second time from scratch and fails unless the measurements match.
 - `att-auditor receive` stops if the OS, architecture or Go version differs from the Vendor's.

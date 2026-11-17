@@ -7,9 +7,9 @@
 // A different architecture is expected to produce a different att-ra-responder binary, and with
 // it different PCR0/PCR2 once it's layered into an enclave image. Nitro's kernel, the compiled
 // machine code, and the base image layers all differ per architecture. That is expected. What must stay equal is the hash for one architecture built from two different checkout
-// paths, from two commits whose linked packages are identical, or on two different machines (a change to any package the
-// responder links moves its build ID and so its bytes, even when no code it runs changed: 029bbdc), which is why every build here passes
-// -trimpath and -buildvcs=false and sets CGO_ENABLED=0.
+// paths, from two different commits whose code the responder can run is the same, or on two different machines, which is
+// why every build here passes -trimpath, -buildvcs=false and -ldflags=-buildid= and sets CGO_ENABLED=0. Without the empty
+// build ID a change to any package the responder links moved its bytes even when no code it runs changed (029bbdc).
 //
 // Add an architecture by adding one line to ArchTargets; nothing else in this package changes.
 package build
@@ -40,11 +40,12 @@ var ArchTargets = []ArchTarget{
 
 // BuildResponderForArch cross-compiles cmd/ra-responder from repoRoot (a directory containing
 // go.mod) for target.GOARCH, with -trimpath, which keeps the checkout path out of the
-// binary, -buildvcs=false, which keeps the git commit out of it, and CGO_ENABLED=0, which keeps a
-// native Linux build with a C compiler from linking cgo and giving different bytes. The responder runs inside a Nitro
+// binary, -buildvcs=false, which keeps the git commit out of it, -ldflags=-buildid=, which keeps the Go build ID (a hash
+// of every input) out of it, and CGO_ENABLED=0, which keeps a native Linux build with a C compiler from linking cgo and
+// giving different bytes. The responder runs inside a Nitro
 // enclave or on a Linux TDX or SEV-SNP guest, so GOOS is always linux.
 func BuildResponderForArch(ctx context.Context, repoRoot string, target ArchTarget, outPath string) error {
-	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-o", outPath, "./cmd/ra-responder")
+	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", outPath, "./cmd/ra-responder")
 	cmd.Dir = repoRoot
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+target.GOARCH)
 	out, err := cmd.CombinedOutput()

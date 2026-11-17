@@ -17,10 +17,10 @@ The chain side is described in the [registry contract guide](../contracts/README
 ## Build the binaries
 
 ```
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user         ./cmd/user
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-vendor       ./cmd/vendor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-auditor      ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-user         ./cmd/user
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-ra-responder ./cmd/ra-responder
 ```
 
 Cross-compile for a Nitro instance or a TDX or SEV-SNP guest (Linux) with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or
@@ -42,6 +42,13 @@ uncommitted changes into the binary, and `-trimpath` does not remove them. Ident
 from two different commits, or from a tree with uncommitted changes, then gives different
 `att-ra-responder` bytes (measured; see `docs/build/aws-nitro.md`).
 
+**`-ldflags=-buildid=`.** By default Go writes a build ID into the binary, a hash of every input of the build. Any
+change to a package `att-ra-responder` links then moves its bytes, even when no code it can run changed: one unused
+function added to `internal/cli` did (`029bbdc`). With an empty build ID it did not, and neither does a comment that
+moves no line of code; code that moved to other lines still changes the bytes (measured 2026-11-17,
+`docs/status/build-info-gaps.md`, Q1). Go does not record `-ldflags` in a `-trimpath` binary's build info, so `build`
+reads the build ID from the binary itself (`go tool buildid <file>` prints it; empty is right).
+
 ### Where each binary runs
 
 - **Vendor's Nitro instance or TDX/SEV-SNP guest:** `att-vendor` and `att-ra-responder`, in the same directory.
@@ -57,8 +64,8 @@ embed different responders their measurements can never match.
 
 `build` and `pack` do not take the file on trust. They read the build info Go leaves inside every
 binary and refuse a responder that was built with a different Go than the pin, without
-`-trimpath`, with version control stamping (no `-buildvcs=false`), or for another OS or
-architecture than the instance they run on. The build log prints
+`-trimpath`, with version control stamping (no `-buildvcs=false`), with cgo, with a Go build ID (no
+`-ldflags=-buildid=`), or for another OS or architecture than the instance they run on. The build log prints
 the responder's sha256 so both sides can compare it by eye.
 
 `build`, `launch` and the responder work only on a Nitro-enabled EC2 instance (Linux) or on the TDX or SEV-SNP guest

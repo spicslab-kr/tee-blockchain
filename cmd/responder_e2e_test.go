@@ -71,7 +71,7 @@ func TestResponderCheck_E2E(t *testing.T) {
 
 	// a responder built without -trimpath: must be refused, naming -trimpath.
 	noTrim := filepath.Join(t.TempDir(), "att-ra-responder-notrimpath")
-	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", noTrim, "./cmd/ra-responder")
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-ldflags=-buildid=", "-o", noTrim, "./cmd/ra-responder")
 	cmd.Dir = repoRoot(t)
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+runtime.GOARCH)
 	if o, err := cmd.CombinedOutput(); err != nil {

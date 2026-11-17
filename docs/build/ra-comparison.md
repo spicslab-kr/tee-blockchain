@@ -100,6 +100,13 @@ runs. That is not intuitive, and it happened: commit `029bbdc` added one functio
 -buildvcs=false` linux/amd64 (2026-11-16). Every PCR0 and PCR2 recorded before it, the clean trial's at `e29d028`
 included, became stale at once.
 
+*(Found and changed 2026-11-17.)* The cause was not the function but Go's **build ID**, a hash of every input of the
+build that Go writes into the binary: built with `-ldflags=-buildid=` (an empty build ID) the responder is the same file
+with and without that function (`215423b8…`). Since then every build passes `-ldflags=-buildid=` and `build` refuses a
+responder that carries a build ID, so code the responder never runs, and comments that move no line of code, no longer
+move Nitro's values. A change to code it can run, or to the lines that code sits on, still does
+(`docs/status/build-info-gaps.md`, Q1).
+
 **This is Nitro only.** On Nitro the responder is layered into the EIF, so PCR2 (and PCR0) cover it. On TDX and SEV-SNP
 the responder runs from the guest's disk and is not measured, so the same change leaves RTMR2 and INITRD where they
 were.
@@ -109,11 +116,12 @@ The asymmetry is a trade-off, and this is one case of each side:
 | | Nitro | TDX and SEV-SNP |
 |---|---|---|
 | what the measurement covers | wide: the whole image, the program that produces the evidence included | narrow: the initrd (the application), not the program that produces the evidence |
-| cost | reference values go stale easily: any change to the responder or anything it links moves them | the responder is not covered: which program answered the request is not in the evidence. Its answer is signed by the hardware, so it cannot forge values, but nothing proves which responder ran |
+| cost | reference values go stale easily: any change to code the responder can run moves them (until 2026-11-17, any change to a package it links) | the responder is not covered: which program answered the request is not in the evidence. Its answer is signed by the hardware, so it cannot forge values, but nothing proves which responder ran |
 | consequence for records | every value needs the commit it was measured at (`docs/results/nitro-baseline-2026-11-16.md`) | values follow the application and the image, not the repository's code |
 
-Whether the responder should link `internal/cli` at all is an open design question (`docs/status/build-info-gaps.md`),
-not decided here.
+Whether the responder should link `internal/cli` at all was an open design question; since the empty build ID it no
+longer moves the values, and dropping it to shrink the code inside the measured EIF is left for after publication
+(`docs/status/build-info-gaps.md`, Q1).
 
 ## Roots of trust
 

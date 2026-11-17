@@ -6,14 +6,25 @@
 // absolute checkout path out of the binary), on -buildvcs (by default Go stamps the git commit,
 // its time and whether the tree had uncommitted changes into the binary, and -trimpath does not
 // remove them), on CGO_ENABLED (a native Linux build with a C compiler present links the cgo DNS
-// resolver and libc, a cross-build does not, and the two files differ) and on GOOS/GOARCH. Go records all of that inside every binary it produces
-// (debug/buildinfo), so the file is read and a responder that cannot match what the other side
-// builds is refused.
+// resolver and libc, a cross-build does not, and the two files differ), on the Go build ID and on GOOS/GOARCH. Go
+// records all of that but the build ID inside every binary it produces (debug/buildinfo), so the file is read and a
+// responder that cannot match what the other side builds is refused.
+//
+// The build ID is a hash of every input of the build, so a change to any package the responder links moved its bytes
+// even when no code it can run changed (029bbdc: one unused function in internal/cli). -ldflags=-buildid= leaves it
+// empty. Go does not record -ldflags in the build info of a -trimpath build (they may hold paths), so the build ID is
+// read from the binary itself: the linker writes it into the ELF note section .note.go.buildid, and writes no such
+// section when it is empty. Measured with go1.26.1 on the responder: with an empty build ID, one unused function added
+// to internal/cli, a comment reworded without moving a line and a comment appended after the last function each leave
+// the bytes as they are; a comment that adds a line above code still moves them, because the binary keeps the line
+// numbers of its code.
 
 package build
 
 import (
+	"bytes"
 	"debug/buildinfo"
+	"debug/elf"
 	"fmt"
 	"os"
 )
@@ -27,6 +38,7 @@ type ResponderInfo struct {
 	Trimpath bool   // -trimpath was given to go build
 	VCS      string // the "vcs" build setting (e.g. "git") when version control was stamped in; empty with -buildvcs=false
 	CGO      string // the "CGO_ENABLED" build setting: "0" or "1"; empty if the binary does not record it
+	BuildID  string // the Go build ID in the ELF note .note.go.buildid; empty with -ldflags=-buildid= (read for linux binaries only)
 	SHA256   string // lowercase hex sha256 of the whole file
 }
 
@@ -71,19 +83,57 @@ func ReadResponder(path string) (ResponderInfo, error) {
 			info.CGO = s.Value
 		}
 	}
+	if info.GOOS == "linux" {
+		if info.BuildID, err = elfGoBuildID(path); err != nil {
+			return info, err
+		}
+	}
 	if info.SHA256, err = SHA256File(path); err != nil {
 		return info, err
 	}
 	return info, nil
 }
 
+// elfGoBuildID returns the Go build ID the linker wrote into the ELF note section .note.go.buildid, or "" when the
+// binary has no such section (built with -ldflags=-buildid=). The note is the usual ELF layout: name size, descriptor
+// size and type (4 bytes each, in the file's byte order), the name "Go" padded to 4 bytes, then the build ID.
+func elfGoBuildID(path string) (string, error) {
+	f, err := elf.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("%s: reading it as an ELF file for its Go build ID: %w", path, err)
+	}
+	defer f.Close()
+	s := f.Section(".note.go.buildid")
+	if s == nil {
+		return "", nil
+	}
+	d, err := s.Data()
+	if err != nil {
+		return "", fmt.Errorf("%s: .note.go.buildid: %w", path, err)
+	}
+	if len(d) < 12 {
+		return "", fmt.Errorf("%s: .note.go.buildid is %d bytes, too short for an ELF note", path, len(d))
+	}
+	nameSize, descSize := f.ByteOrder.Uint32(d[0:]), f.ByteOrder.Uint32(d[4:])
+	descStart := 12 + (uint64(nameSize)+3)&^3
+	if descStart+uint64(descSize) > uint64(len(d)) {
+		return "", fmt.Errorf("%s: .note.go.buildid is malformed", path)
+	}
+	id := string(bytes.TrimRight(d[descStart:descStart+uint64(descSize)], "\x00"))
+	if id == "" {
+		// a section with an empty descriptor is not what an empty -buildid gives; say what it holds rather than pass it
+		return "(an empty .note.go.buildid section)", nil
+	}
+	return id, nil
+}
+
 // CheckResponder returns an error unless the responder was built with the pinned toolchain, with
-// -trimpath, with -buildvcs=false, with CGO_ENABLED=0, for linux, and for hostGOARCH, the architecture of the parent
-// instance, which is what the enclave runs. Callers pass runtime.GOARCH.
+// -trimpath, with -buildvcs=false, with CGO_ENABLED=0, for linux, with an empty build ID (-ldflags=-buildid=), and for
+// hostGOARCH, the architecture of the parent instance, which is what the enclave runs. Callers pass runtime.GOARCH.
 func CheckResponder(info ResponderInfo, hostGOARCH string) error {
 	want := RequiredToolchain()
 	rebuild := func(goarch string) string {
-		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s CGO_ENABLED=0 GOOS=linux GOARCH=%s go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder", want, goarch)
+		return fmt.Sprintf("rebuild it with: GOTOOLCHAIN=%s CGO_ENABLED=0 GOOS=linux GOARCH=%s go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-ra-responder ./cmd/ra-responder", want, goarch)
 	}
 	if info.Go != want {
 		return fmt.Errorf("att-ra-responder was built with %s but the project pins %s (internal/setup/build/GO_TOOLCHAIN); its bytes, and so the measurements, depend on the exact toolchain; %s", info.Go, want, rebuild(hostGOARCH))
@@ -103,6 +153,9 @@ func CheckResponder(info ResponderInfo, hostGOARCH string) error {
 	}
 	if info.GOOS != "linux" {
 		return fmt.Errorf("att-ra-responder was built for GOOS=%s but the enclave runs linux; %s", info.GOOS, rebuild(hostGOARCH))
+	}
+	if info.BuildID != "" {
+		return fmt.Errorf("att-ra-responder carries a Go build ID (%s), so it was built without -ldflags=-buildid=: the build ID is a hash of every input of the build, so a change to any package it links gives different bytes and different measurements even when no code it runs changed; %s", info.BuildID, rebuild(hostGOARCH))
 	}
 	if info.GOARCH != hostGOARCH {
 		return fmt.Errorf("att-ra-responder was built for GOARCH=%s but this instance is %s; the enclave runs the parent instance's architecture; %s", info.GOARCH, hostGOARCH, rebuild(hostGOARCH))

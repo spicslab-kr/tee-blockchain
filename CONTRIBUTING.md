@@ -10,17 +10,18 @@ The Go toolchain is pinned to exactly the version in `internal/setup/build/GO_TO
 version produces different `att-ra-responder` bytes and therefore different measurements.
 
 ```
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-vendor       ./cmd/vendor
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-auditor      ./cmd/auditor
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-user         ./cmd/user
-CGO_ENABLED=0 go build -trimpath -buildvcs=false -o att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-vendor       ./cmd/vendor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-auditor      ./cmd/auditor
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-user         ./cmd/user
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-ra-responder ./cmd/ra-responder
 ```
 
-For the instances: `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or `arm64`). Always `-trimpath -buildvcs=false`
+For the instances: `CGO_ENABLED=0 GOOS=linux GOARCH=amd64` (or `arm64`). Always `-trimpath -buildvcs=false -ldflags=-buildid=`
 and `CGO_ENABLED=0`; on Nitro the responder is layered into the enclave image, so the build path, or the git commit
-and its time, would otherwise end up in the PCRs, and without `CGO_ENABLED=0` a native Linux build with gcc
-installed links cgo and gives other bytes than a cross-build. `build` refuses a responder built without any of
-the three.
+and its time, would otherwise end up in the PCRs; without `-ldflags=-buildid=` Go's build ID, a hash of every input
+of the build, moves the responder's bytes whenever any package it links changes, even code it never runs; and without
+`CGO_ENABLED=0` a native Linux build with gcc installed links cgo and gives other bytes than a cross-build. `build`
+refuses a responder built without any of the four.
 
 Running `go build ./cmd/<role>/...` without `-o` drops a binary named after the package into the
 repo root; those names are in `.gitignore`, don't commit them.
@@ -152,6 +153,6 @@ type(scope): what changed, in the imperative
 ## Releases
 
 Tags are `vMAJOR.MINOR.PATCH`. A release attaches the four Linux binaries for `amd64` and
-`arm64`, built with the pinned toolchain and `-trimpath -buildvcs=false`, plus a `SHA256SUMS` file. The
+`arm64`, built with the pinned toolchain and `-trimpath -buildvcs=false -ldflags=-buildid=`, plus a `SHA256SUMS` file. The
 `att-ra-responder` sha256 in a release is the one both Vendor and Auditor should see in their
 build logs.

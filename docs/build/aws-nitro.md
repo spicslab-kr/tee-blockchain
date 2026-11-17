@@ -29,7 +29,8 @@ In our measurements a different file in the image changed PCR0 and PCR2, and so 
 | `-trimpath` | without it the build folder's path ends up inside the binary | `build` refuses a responder built without it; `receive` warns if the Vendor built without it |
 | `-buildvcs=false` | without it the git commit, its time and whether the tree had uncommitted changes end up inside the binary (see below) | `build` refuses a responder that carries them |
 | `CGO_ENABLED=0` | without it a native Linux build with a C compiler links cgo and gives other bytes than a cross-build (see below) | `build` refuses a responder built with cgo (since `ade66e6`) |
-| one `att-ra-responder` file | it is layered into the image | `build` checks its Go version, `-trimpath`, `-buildvcs=false`, `CGO_ENABLED=0`, OS and architecture and prints its sha256 |
+| `-ldflags=-buildid=` | without it Go writes a build ID, a hash of every input of the build, so a change to any package the responder links moves its bytes even when no code it runs changed (`029bbdc`; see below) | `build` refuses a responder that carries a build ID (since 2026-11-17) |
+| one `att-ra-responder` file | it is layered into the image | `build` checks its Go version, `-trimpath`, `-buildvcs=false`, `CGO_ENABLED=0`, the empty build ID, OS and architecture and prints its sha256 |
 | same OS | part of `build_env` | `receive` compares it |
 
 **Version control stamping, measured.** Go stamps `vcs.revision`, `vcs.time` and `vcs.modified` into main binaries by
@@ -60,6 +61,19 @@ command sets `CGO_ENABLED=0` and `build` refuses a responder that records anythi
 at `a5c4306` and `ade66e6`; later code gives other bytes (from `029bbdc` on the `CGO_ENABLED=0` responder is
 `c61c988e…`, below), and the cgo comparison itself still holds.
 
+**The Go build ID, measured.** `029bbdc` added one function to `internal/cli`, which the responder links but never
+calls, and the responder went from `5573b538…` to `c61c988e…`: the linker drops the unused code, but the build ID Go
+writes into the binary is a hash of every input of the build. Measured on 2026-11-17 (go1.26.1, linux/amd64 cross-builds
+from Windows, `CGO_ENABLED=0 -trimpath -buildvcs=false`): with `-ldflags=-buildid=` the responder with and without that
+function is the same file (`215423b8…`, at `2efe8db`). With an empty build ID a comment reworded in
+`cmd/ra-responder/main.go` without moving a line, or appended after its last function, left the bytes as they were; a
+comment that added a line above code did not (`4913a62c…`), because the binary keeps the line numbers of its code. So
+comments can be fixed without moving the measurements as long as no line of code moves. The full record is
+`docs/status/build-info-gaps.md`, Q1. Since 2026-11-17 every build command passes `-ldflags=-buildid=` and `build`
+refuses a responder that carries a build ID; Go does not record `-ldflags` in the build info of a `-trimpath` binary, so
+`build` reads the ELF note `.note.go.buildid`, which the linker leaves out when the build ID is empty
+(`go tool buildid <file>` prints the same value; nothing is right).
+
 `receive` stops when OS, architecture or Go version differ from the Vendor's `build_env`.
 `--ignore-env` turns that into a warning. Use it only to look around, since the values will not match.
 
@@ -69,7 +83,7 @@ Anything below that differs between the two builds changes the measurements. Wit
 have to take care of all of it. The sections after this one say which items `build` handles.
 
 - the CPU architecture (`amd64` or `arm64`)
-- the Go version, `-trimpath` and `-buildvcs=false` of `att-ra-responder`, and the very same responder file on both sides
+- the Go version, `-trimpath`, `-buildvcs=false`, `-ldflags=-buildid=` and `CGO_ENABLED=0` of `att-ra-responder`, and the very same responder file on both sides
 - the file order, timestamps and owners inside the Docker layers, which `docker build` decides anew on every run
 - `ENTRYPOINT`, `CMD` and `ENV` of the image
 - files left in `/tmp` and `/var/tmp`
@@ -113,11 +127,17 @@ Three commits had made the earlier ones stale:
 | `ade66e6` | every build is `CGO_ENABLED=0` ("cgo, measured") | none on the recorded values: they were already built with the cgo-free responder `5573b538…` |
 | `029bbdc` | adds a function to `internal/cli`, which the responder links but does not call | moved: the responder became `c61c988e…` (`docs/build/ra-comparison.md`, "What covering the responder costs") |
 
+**Stale again since 2026-11-17:** every build now passes `-ldflags=-buildid=` (above, "The Go build ID, measured"), so
+the responder is another file (`215423b8…` at `2efe8db`, before its comments were corrected) and PCR0 and PCR2 move
+once more. The values below are right for `c116845` and its responder; the values for the empty build ID are **not
+taken yet** (they need a Nitro instance).
+
 The values at `c116845`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder `c61c988e…`,
 x86_64, two machines identical: PCR0 `0c905480…`, PCR1 `4b4d5b36…`, PCR2 `6347a146…`. On arm64 (`c7g.xlarge`) all
 three differ: PCR0 `f1d4d679…`, PCR1 `3b4a7e1b…`, PCR2 `6e865138…`. **Every Nitro value is written next to the commit
-it was measured at**: the responder's bytes, and so PCR0 and PCR2, change with any change to a package the responder
-links, so a value without its commit cannot be compared.
+it was measured at**: the responder's bytes, and so PCR0 and PCR2, changed with any change to a package the responder
+links until 2026-11-17, and still change with any change to code it can run or to the lines that code sits on, so a
+value without its commit cannot be compared.
 
 ### Two builds compared (2026-11-15)
 
@@ -181,7 +201,7 @@ checking a Vendor's self-registration later in flow 2.
 | Auditor's own `build` | the only proof that another host gets the same values. Equal builds on one host do not prove it |
 | `launch --build-measurements <file>` | measures a received image and starts it only if the values match the file |
 | `e2e/toolchain-pin-check.sh` | an `att` binary built with another Go patch version refuses to `build` |
-| `e2e/responder-check.sh` | `build --responder` refuses a responder without `-trimpath`, with version control stamping, or for the wrong architecture |
+| `e2e/responder-check.sh` | `build --responder` refuses a responder without `-trimpath`, with version control stamping, with a Go build ID, or for the wrong architecture |
 | `e2e/build-env-check.sh` | `receive` rejects a `build_env` that does not match the instance; `--ignore-env` only warns |
 | `e2e/arch-measurement-compare.sh` | the same source measures the same on two x86_64 hosts and differently on arm64 |
 

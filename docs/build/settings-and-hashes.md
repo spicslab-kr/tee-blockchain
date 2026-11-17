@@ -89,7 +89,13 @@ The values both sides must match to get the same measurements are a separate lis
 
 ## Building
 
-The Go toolchain and the three build flags are in [reproduce.md](reproduce.md) and `CONTRIBUTING.md`, "Build". One
+The Go toolchain and the four build settings (`CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid=`)
+are in [reproduce.md](reproduce.md) and `CONTRIBUTING.md`, "Build". The fourth, since 2026-11-17: `-ldflags=-buildid=`
+leaves Go's build ID out of the binary. That ID is a hash of every input of the build, so with it a change to any
+package `att-ra-responder` links moved Nitro's PCR0 and PCR2 even when no code it can run changed (`029bbdc`); without
+it, code it never runs and comments that move no line of code leave the responder as it is (measured,
+`docs/status/build-info-gaps.md`, Q1). `build` refuses a responder that carries one, read from the ELF note
+`.note.go.buildid`, because Go does not record `-ldflags` in a `-trimpath` binary's build info. One
 setting changes the image itself: on Nitro, `build` and `pack` empty field 3 of `/etc/shadow` and `/etc/shadow-` (the
 day of the last password change), because it carried the build day into PCR0 and PCR2 (`fc105b0`; `aws-nitro.md`,
 "Two builds compared").
