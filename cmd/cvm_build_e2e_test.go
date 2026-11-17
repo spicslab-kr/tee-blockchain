@@ -1,7 +1,7 @@
 // build and launch --platform intel-tdx and amd-sev-snp-*, through the real att-vendor and att-auditor binaries. On Linux both roles
 // build the same initrd from the same files and base initrd (Option 1 needs no external tool). Elsewhere the build
 // refuses (file modes are part of the archive), which still shows the flag reaches the TDX build. The launch itself
-// needs a TDX guest (docs/status/cvm-port.md, "Phase 3: what waits for a VM").
+// needs a guest; it ran on TDX and SEV-SNP guests (docs/results/trial-2026-11-16.md, docs/results/sessions-2026-11-16/).
 package cmd_test
 
 import (

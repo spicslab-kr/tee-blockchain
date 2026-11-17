@@ -49,3 +49,8 @@ e2e/env.local.sh
 # The overnight sessions' first-person work log: kept locally, not part of the project. What other documents cited
 # from it was moved into them (docs/build/app-fixture-recording.md, docs/status/test-matrix.md).
 docs/status/night-log.md
+# The confidential-VM port's working plan (phases, open decisions, what waited for a VM): the work is done, so it is
+# kept locally, not part of the project. What other documents cited from it was moved into them (STRUCTURE.md, "Build
+# and launch on the three platforms"; docs/build/runtime-immutability.md; docs/results/cvm-in-guest-2026-11-12.md;
+# docs/status/build-info-gaps.md, Q5 and Q6).
+docs/status/cvm-port.md

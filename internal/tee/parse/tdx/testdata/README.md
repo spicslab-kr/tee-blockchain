@@ -9,7 +9,7 @@ Quotes from a real Intel TDX guest on GCP (`attestamp-tdx-vendor`), used by the 
 | `gcp-c3-quote.nonce` | The 64 bytes written to `inblob` (the TD's REPORTDATA), as 128 hex characters and a newline |
 | `gcp-c3-opt1-v1-*`, `gcp-c3-opt1-v2-*` | Option 1: a one-file application archive placed before the base initrd (`cpio.AppFirst`), recorded twice with the application changed by one byte |
 | `gcp-c3-opt2-v1-*`, `gcp-c3-opt2-v2-*` | Option 2: a squashfs + dm-verity image and its hash tree placed inside the initrd, also `AppFirst`, recorded twice with the image's content changed by one byte |
-| `gcp-c3-opt2m-v1-*`, `gcp-c3-opt2m-v2-*` | Option 2 with the image **opened and mounted at boot** (2026-11-12, Phase 3.4): the same two images, with a base initrd that carries `record/initramfs-hook.sh` and `record/initramfs-local-bottom.sh`. Nonce texts `attestamp-tdx-verity-mounted-v1` and `-v2` |
+| `gcp-c3-opt2m-v1-*`, `gcp-c3-opt2m-v2-*` | Option 2 with the image **opened and mounted at boot** (2026-11-12): the same two images, with a base initrd that carries `record/initramfs-hook.sh` and `record/initramfs-local-bottom.sh`. Nonce texts `attestamp-tdx-verity-mounted-v1` and `-v2` |
 
 sha256 of `gcp-c3-quote.bin`: `228da7b4e87f2fd21c7732d91bfe709f5fa81850f8216768b5b1d48fb46b8a4d`
 

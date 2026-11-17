@@ -672,8 +672,7 @@ and RTMR2, and the name list does not change.
 
 ### Option 1 and Option 2
 
-TDX, like SEV-SNP, has two ways to carry the application (`docs/status/cvm-port.md`, Phase 3.4, and the 2026-10-23
-slides, slide 16):
+TDX, like SEV-SNP, has two ways to carry the application (the 2026-10-23 slides, slide 16):
 
 - **Option 1:** the application is a cpio archive in the initrd (`internal/setup/build/cpio`).
 - **Option 2:** the application is a read-only squashfs image with a dm-verity hash tree, and that image is placed
@@ -689,7 +688,7 @@ ext4 is not reproducible even with a fixed UUID and `hash_seed`, so the image is
 -all-time 0`, file times set to 0, and dm-verity with a fixed `--salt` and `--uuid` (`docs/build/sev-snp.md`,
 "Variables").
 
-Option 2 on TDX was booted on 2026-11-12 (Phase 3.4). A script in the initrd
+Option 2 on TDX was booted on 2026-11-12. A script in the initrd
 (`internal/tee/parse/tdx/testdata/record/initramfs-local-bottom.sh`) verifies the image against the root hash that
 travels in the initrd. It then opens the image with dm-verity and mounts it read-only on `/opt/app-verity`.
 - Results for v1 and v2: `dmsetup status` `V`, and the application could be read.
@@ -734,7 +733,7 @@ guests of one image, made five days apart, gave the same four values (see "Use t
 | kernel command line | RTMR2 | it carries the root file system's UUID (`root=UUID=…` with our entry). That UUID comes with the image version, not the disk: two guests of one image had the same (measured 2026-11-15), so it changes only with another image |
 | base initrd | RTMR2 | `mkinitramfs` writes a random seed, so the Vendor's base initrd is used as published (as on SEV-SNP) |
 | application archive | RTMR2 | Go version, `-trimpath`, the cpio writer: the same as on SEV-SNP (`docs/build/sev-snp.md`). The archive is written by `internal/setup/build/cpio`; its output is pinned by the golden files in `internal/setup/build/cpio/testdata` |
-| archive placement | RTMR2 | the application archive goes **before** the base initrd (`cpio.AppFirst`), the placement the TDX fixtures were recorded with. An unpadded append failed in 2026-10 (Phase 3.2 record, not repeated since); the cause is 4-byte alignment, measured on SEV-SNP on 2026-11-11. See "Before or after the base initrd" below |
+| archive placement | RTMR2 | the application archive goes **before** the base initrd (`cpio.AppFirst`), the placement the TDX fixtures were recorded with. An unpadded append failed in 2026-10 (the 2026-10 record, not repeated since); the cause is 4-byte alignment, measured on SEV-SNP on 2026-11-11. See "Before or after the base initrd" below |
 | `GRUB_FORCE_PARTUUID` | RTMR2 | GCP's Ubuntu 24.04 image boots its stock entry without an initrd when this is set (confirmed on the SEV-SNP image of the same family). An application in an initrd is then never loaded. See "`GRUB_FORCE_PARTUUID`" below |
 
 ## Byte order
@@ -874,7 +873,7 @@ the application ran**: only the marker, or the boot log, does. The boot logs are
 (`*-boot.txt`).
 
 **TDX with `AppLast` was not tested on 2026-11-11.** The statement that an append failed to decompress on TDX comes
-from the Phase 3.2 record of 2026-10 (`docs/status/cvm-port.md`), not from this session. That base initrd and its serial
+from the record of a 2026-10 session, not from this one. That base initrd and its serial
 log were not kept. If its length was not a multiple of 4, the measurement above explains it; and an unpadded append
 lets the guest boot without the application, so "failed" there may mean the application was missing rather than that
 the boot stopped.
@@ -922,4 +921,4 @@ instead. This section only records a quote from a stock guest, as the first fixt
 | TCB level, CRLs | collateral is not fetched (see above) |
 | quote version 5 | the go-tdx-guest revision in `go.mod` decodes version 4 only; version 5 needs a newer one and its own fixture |
 | the RTMR0/RTMR1 part of the mapping, and the VM-shape dependence | not tested; only RTMR2 was (it moves with the initrd) |
-| `AppLast` on TDX | not tested on 2026-11-11; the 2026-10 failure is the Phase 3.2 record |
+| `AppLast` on TDX | not tested on 2026-11-11; the 2026-10 failure is the only record (`docs/status/build-info-gaps.md`, Still missing) |

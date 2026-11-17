@@ -65,9 +65,8 @@ This page lists every folder in the repository, then explains the one idea that 
     │                       baseline retake and the 2026-11-12 audit. Measured values are never changed;
     │                       labels, interpretation and status are updated as more is learned, each update
     │                       marked where it is made with when and what changed
-    ├── status/             where things stand: the test matrix (what is proven, and by what), the build-info gaps
-    │                       (what a reader still lacks, and the publication decisions), the CVM port's status and
-    │                       its one remaining plan (Phase 5)
+    ├── status/             where things stand: the test matrix (what is proven, and by what) and the build-info gaps
+    │                       (what a reader still lacks, and the design questions)
     └── img/                the logo and the diagrams used by the README (SVGs)
 ```
 
@@ -168,6 +167,11 @@ are the only chain modules, and they talk to any Ethereum-compatible chain.
 
 ### What every platform's parser must do
 
+What Nitro gave and every platform had to give again: one request returns one self-contained, signed piece of
+evidence; the measurement is the identity, so it must be reproducible; the nonce is inside the signature, so the
+hardware proves freshness; and debug mode is detected and refused. (SEV-SNP is the exception to the first: two
+documents from two signers, joined by a hash; `docs/build/ra-comparison.md`.)
+
 Two rules hold for every platform, and a new platform's parser (`internal/tee/parse/<plat>`) needs its own version of
 both:
 
@@ -181,6 +185,49 @@ both:
   trusted however they look. Each platform signals it differently and needs its own check: Nitro gives an all-zero PCR0
   (`aws/measure.go`, every PCR zero is refused), SEV-SNP sets POLICY bit 19 (`snp`, refused), TDX sets the DEBUG bit in
   TDATTRIBUTES (`tdx`, refused). `docs/build/ra-comparison.md`, "Debug mode".
+
+### Build and launch on the three platforms
+
+`build` has the same five steps on every platform, so the three read alike (`internal/setup/build/{aws,tdx,snp}`):
+
+| step | Nitro (`aws`) | TDX (`tdx`) | SEV-SNP (`snp`) |
+|---|---|---|---|
+| 1 tools | install `docker`, `nitro-cli` | check `mksquashfs` and `veritysetup` (Option 2 only) and record their versions; nothing is installed | the same as TDX |
+| 2 the software | `docker build` of the Vendor's Dockerfile | the application tree (`--app-dir`), read as files; a link or special file is refused | the same as TDX |
+| 3 what we add | the attestation responder, layered into the image | the boot marker that lets `launch` prove the archive was unpacked; for Option 2 the squashfs + dm-verity image of the tree | Option 1: the same marker; Option 2: the image, which stays on disk |
+| 4 reproducible bytes | the docker layers repacked in name order with time 0 | the cpio archive with fixed metadata (`setup/build/cpio`), **before** the Vendor's base initrd (`cpio.AppFirst`) | the archive **after** the base, zero-padded to 4 bytes (`cpio.AppLast`); without the padding the kernel drops the archive and still boots |
+| 5 the measured thing | `nitro-cli build-enclave` → EIF and PCR0·1·2 | the combined initrd and its **SHA-384**, which GRUB extends into RTMR2 | the initrd's **SHA-256** (INITRD) and, for Option 2, the root hash and the PCR12 it gives |
+
+Where the confidential VMs differ from Nitro:
+
+- **Files, not a container.** The application is a tree that lands under `/opt/app` in the initramfs (Option 1), or a
+  read-only squashfs image verified by dm-verity (Option 2): inside the initrd on TDX, covered by RTMR2; on disk on
+  SEV-SNP, with the root hash on the kernel command line (`attestamp.roothash=`, so in CMDLINE) and the verifying
+  initrd extending PCR12.
+- **The responder is not in the measured image.** In a confidential VM it runs in the guest OS and only relays
+  evidence the hardware signs, so it cannot forge any; its bytes stay out of the measurement.
+- **The build cannot produce the registered values.** MRTD, RTMR0 and RTMR1 (TDX), and MEASUREMENT, PCR4 and KERNEL
+  (SEV-SNP), come from the machine's firmware, boot loader and kernel, and the command line names the root disk. So
+  `launch` is two runs with a reboot between them: **install** puts the initrd in `/boot` and makes a GRUB entry from
+  the stock one the default (`setup/launch/grub`, shared); **check**, after the boot, verifies fresh evidence, requires
+  the measured initrd to be the built one (and on SEV-SNP Option 2 PCR12 to be the predicted value) and the boot marker
+  to be there, and writes the values to register. It is Nitro's `launch --build-measurements` and the measuring step
+  in one. TDX replays the CC event log itself (`setup/launch/tdx`); SEV-SNP's parser already replays the vTPM log.
+- **The base initrd is the Vendor's binary.** `mkinitramfs` writes a random seed, so the Auditor uses the Vendor's
+  published base initrd and reproduces only the application part (`docs/build/tdx.md`, `docs/build/sev-snp.md`). Other
+  ways are open design questions (`docs/status/build-info-gaps.md`).
+- **Format strings.** TDX's two options move only RTMR2, so both register `intel-tdx`. SEV-SNP's two options register
+  different numbers of values, and the measurement hash covers the list of names, so they are two formats:
+  `amd-sev-snp-initrd` (5 values) and `amd-sev-snp-verity` (6).
+
+**Shell or Go.** What decides a measured value is in reviewed, tested Go: the dm-verity image (`setup/build/verity`;
+its fixed squashfs flags, times, block size, salt and UUID decide the root hash; it still calls `mksquashfs` and
+`veritysetup`, because no Go writer is known to give the same bytes) and the GRUB entry (`setup/launch/grub`; it decides
+the GRUB commands that go into RTMR2 and CMDLINE). The scripts they were ported from stay in `testdata` as the record of
+how the fixtures were made, and a test fails if the verity script's parameters and the Go constants drift apart
+(`setup/build/verity`). The initramfs hook
+and local-bottom scripts stay shell: they run inside the initramfs, under busybox `sh`, and belong to the Vendor's base
+initrd, not to `build`.
 
 ### The shared pieces
 
@@ -302,5 +349,5 @@ Two details the table hides:
 | `e2e/` | Shell scripts, not run by `go test`; the Go end-to-end tests are in `cmd/` |
 | `docs/build/` | Guides and procedures a reader follows; the other docs folders point here for "how" |
 | `docs/results/` | Dated records, cited as evidence by `docs/status/` and the guides. **Measured values (hashes, PCRs, initrds, exit codes, the JSONL lines) are never changed.** Labels, interpretation and status are updated as more is learned, and each update is marked where it is made, in italics, with its date, its commit and, for replaced text, what it said before. A later run adds a new file. Paths to other documents follow when a file moves (those are the only unmarked edits; `git log --follow` shows them) |
-| `docs/status/` | `test-matrix.md`, `build-info-gaps.md`, `cvm-port.md`: the current state, updated as runs and fixes land |
+| `docs/status/` | `test-matrix.md`, `build-info-gaps.md`: the current state, updated as runs and fixes land |
 | `docs/img/` | `logo.svg`, `flow-auditor.svg`, `flow-vendor.svg` and `verify.svg` |

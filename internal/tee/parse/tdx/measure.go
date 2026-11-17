@@ -38,8 +38,9 @@ type Info struct {
 // imageRTMRs are the runtime registers that describe the boot chain. A UEFI TD guest's firmware extends what a TPM
 // would put in PCR1 and 7 into RTMR0, PCR2-6 into RTMR1 and PCR8-15 into RTMR2, so RTMR0 holds the virtual firmware's
 // configuration, RTMR1 the boot loader and kernel, and RTMR2 the kernel command line and the initrd (where the
-// application is). That mapping is the TDVF design's, not yet confirmed on GCP by changing each part in turn; see
-// docs/build/tdx.md. Together with MRTD (the virtual firmware itself) they are the four values registered.
+// application is). That mapping is the TDVF design's; on GCP, RTMR2 moved with the initrd and RTMR0 with the machine
+// type, and nothing else did (2026-11-11 and -16), while a kernel change moving RTMR1 was not measured; see
+// docs/build/tdx.md and docs/status/test-matrix.md, T1. Together with MRTD (the virtual firmware) they are registered.
 //
 // MRTD alone does not do: it is the same for every guest on the same firmware. RTMR2 alone does not do either: the
 // firmware, boot loader and kernel extend RTMR2 themselves, so a changed kernel could extend the expected RTMR2 while

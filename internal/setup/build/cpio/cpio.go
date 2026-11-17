@@ -151,7 +151,7 @@ type Placement int
 const (
 	// AppFirst puts the application archive before the base initrd. This is what the Intel TDX fixtures were recorded
 	// with (no padding needed: the archive is padded to 512 bytes, so the base starts aligned). An unpadded append
-	// failed on TDX in 2026-10 (docs/status/cvm-port.md, Phase 3.2); that was not repeated, and the alignment reason under
+	// failed on TDX in 2026-10 (docs/build/tdx.md, "Before or after the base initrd"); that was not repeated, and the alignment reason under
 	// AppLast, measured on SEV-SNP with the same base initrd, is the likely cause.
 	AppFirst Placement = iota
 	// AppLast appends the application archive after the base initrd, zero-padding the base to a multiple of 4 bytes

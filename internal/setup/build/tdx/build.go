@@ -3,7 +3,7 @@
 // adapters, the same two-layer shape as internal/tee/parse and internal/tee/request.
 //
 // It follows the five steps of the Nitro build (internal/setup/build/aws/build.go), so the platforms read alike;
-// docs/status/cvm-port.md, "Phase 3 design", has the side-by-side table:
+// STRUCTURE.md, "Build and launch on the three platforms", has the side-by-side table:
 //
 //  1. tools: mksquashfs and veritysetup for Option 2, with their versions recorded
 //  2. the software: the application tree, read as files
@@ -74,7 +74,7 @@ const markerEntry = "conf/conf.d/zz-attestamp-app-marker"
 // Build is the input to one build.
 type Build struct {
 	AppDir     string // the application: a directory tree of regular files, put under /opt/app
-	BaseInitrd string // the Vendor's published base initrd (docs/status/cvm-port.md, D1 (a)). For Option 2 it must carry the dm-verity hook
+	BaseInitrd string // the Vendor's published base initrd (STRUCTURE.md, "Build and launch on the three platforms"). For Option 2 it must carry the dm-verity hook
 	Option     int    // Option1 or Option2
 	OutDir     string // defaults to out
 	Verify     bool   // build a second time from the files and fail unless the bytes are the same (verify.go)

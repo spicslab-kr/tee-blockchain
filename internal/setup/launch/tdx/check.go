@@ -42,7 +42,7 @@ type Measured struct {
 }
 
 var (
-	// ErrInitrdMismatch: GRUB measured an initrd other than the one built. The pass criterion of Phase 3.5 failed.
+	// ErrInitrdMismatch: GRUB measured an initrd other than the one built, so the launch failed its check.
 	ErrInitrdMismatch = errors.New("the measured initrd is not the built one")
 	// ErrNotUnpacked: the boot marker is missing, so the kernel did not unpack the application archive even though
 	// the initrd was measured (docs/build/tdx.md, "Before or after the base initrd").
@@ -153,7 +153,7 @@ func (c Check) Run(ctx context.Context, log io.Writer) (Measured, error) {
 	return m, nil
 }
 
-// compareInitrd is the pass criterion of Phase 3.5: the initrd GRUB measured is the one built.
+// compareInitrd is what the launch check requires: the initrd GRUB measured is the one built.
 func compareInitrd(built buildtdx.Value, g grubBoot) error {
 	if got := hex.EncodeToString(g.initrdDigest); got != built.InitrdSHA384 {
 		return fmt.Errorf("%w: GRUB measured %s with sha384 %s, the build made %s", ErrInitrdMismatch, g.initrdPath, got, built.InitrdSHA384)

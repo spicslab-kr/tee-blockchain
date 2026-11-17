@@ -72,7 +72,7 @@ func TestAppFixtures_OnlyRTMR2Changes(t *testing.T) {
 	}
 }
 
-// The Option 2 recordings of 2026-11-12 in which the image is also opened and mounted at boot (Phase 3.4): the base
+// The Option 2 recordings of 2026-11-12 in which the image is also opened and mounted at boot: the base
 // initrd carries veritysetup and testdata/record/initramfs-local-bottom.sh, which verifies the image against the root
 // hash in the initrd, opens it with dm-verity and mounts it read-only. The boot logs (*-boot.txt) show "ok <root hash>",
 // the mount and the application text. Their nonce texts do not follow the attestamp-tdx-<cell> pattern above.

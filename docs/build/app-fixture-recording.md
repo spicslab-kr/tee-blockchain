@@ -225,7 +225,7 @@ sudo ./record-tdx -out opt2-v2 -nonce-text attestamp-tdx-opt2-v2
 ```
 
 This records what TDX Option 2 measures: the image and hash tree carried inside the initrd. Opening and mounting the
-image before the switch to the real root is Phase 3.4 and is not part of this recording; it was recorded separately on
+image before the switch to the real root is Option 2 opened at boot and is not part of this recording; it was recorded separately on
 2026-11-12, next section.
 
 ### TDX Option 2 mounted at boot (`gcp-c3-opt2m-*`, 2026-11-12)
@@ -252,7 +252,7 @@ On `attestamp-tdx-vendor`, stock image `ubuntu-2404-noble-amd64-v20261105`, kern
 MRTD, RTMR0 and RTMR1 were the same on every boot. On the v2 boot `e2e/cvm/in-guest-verify.sh tdx intel-tdx` passed
 (11 of 11), and the live quote's RTMR2 equalled the recording's. **The tampered boot carried on to a normal login**: the
 script records `fail` and exits 0. That is enough for a verifier (RTMR2 differs from every registered value), but a
-locked guest (Phase 5 in `docs/status/cvm-port.md`) must stop the boot instead.
+locked guest (`docs/build/runtime-immutability.md`, "What building layers 2 and 3 takes") must stop the boot instead.
 
 Committed as `gcp-c3-opt2m-v1-*` and `gcp-c3-opt2m-v2-*` with their boot logs; `TestMountedFixtures_OnlyRTMR2Changes`
 checks them. The tamper quote was not committed; its RTMR2 is above. Undone afterwards as in the next section, with
@@ -317,7 +317,7 @@ nonce, and its boot log is committed next to it (`*-boot.txt`).
   `/run`, so the marker goes to `/dev` (checked on both guests).
 - **The Option 2 image is reproducible across machines.** `make-verity-image.sh`, with `umask 022`, gave the same
   `app.img`, `app.hash` and root hash on both guests.
-- **TDX with `AppLast` was not tested.** The 2026-10 failure on TDX remains the Phase 3.2 record.
+- **TDX with `AppLast` was not tested.** The 2026-10 failure on TDX remains the only record.
 
 ### Not done
 

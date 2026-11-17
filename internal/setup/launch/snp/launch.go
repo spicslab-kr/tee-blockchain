@@ -1,7 +1,7 @@
 // Package snp launches what internal/setup/build/snp built on an AMD SEV-SNP guest on GCP, and reads back what the
 // boot measured. It is the role-independent core; internal/setup/launch/{Vendor,auditor}/snp are thin adapters.
 //
-// Two runs with a reboot between them, as on TDX (docs/status/cvm-port.md, "Phase 4b design"):
+// Two runs with a reboot between them, as on TDX (STRUCTURE.md, "Build and launch on the three platforms"):
 //
 //  1. Install (internal/setup/launch/grub, shared with TDX): the initrd into /boot and a GRUB entry for it as the
 //     default. For Option 2 also the image and hash tree into /var/lib/attestamp, and the root hash on the command line.

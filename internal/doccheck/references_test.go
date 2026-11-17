@@ -184,6 +184,7 @@ func exception(file, token string) int {
 var untracked = []struct{ path, why string }{
 	{"e2e/env.local.sh", "the reader's instance addresses, copied from e2e/env.local.example.sh; must never be committed"},
 	{"docs/status/night-log.md", "the overnight sessions' first-person work log, kept locally; what other documents cited from it was moved into them"},
+	{"docs/status/cvm-port.md", "the confidential-VM port's working plan, kept locally since the work is done; dated records still name it, and what other documents cited from it was moved into them"},
 	{"contracts/evm/out/Registry.abi", "written by forge build in the go:generate chain of internal/chain/register/*/ether, one line before abigen reads it"},
 	{"contracts/evm/out/Registry.bin", "the same: forge's output, read by abigen"},
 }

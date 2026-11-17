@@ -1,7 +1,7 @@
 // Package snp builds what carries an application into an AMD SEV-SNP guest on GCP, and records the values the guest's
 // boot will measure from it. It is the role-independent core; internal/setup/build/{Vendor,auditor}/snp are thin
-// adapters. It has the five steps of the Nitro and TDX builds; docs/status/cvm-port.md, "Phase 4b design", has what
-// differs from TDX:
+// adapters. It has the five steps of the Nitro and TDX builds; STRUCTURE.md, "Build and launch on the three
+// platforms", has them side by side. What differs from TDX:
 //
 //   - Option 1 (amd-sev-snp-initrd): the application archive goes after the base initrd, which is zero-padded to a
 //     multiple of 4 bytes first (cpio.AppLast). Without the padding the kernel drops the archive and still boots.

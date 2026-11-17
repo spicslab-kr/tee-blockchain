@@ -131,7 +131,7 @@ func TestVerify_PassesWhenNothingChanges(t *testing.T) {
 	}
 }
 
-// The pass criterion of Phase 3.6: one byte changed between the two builds fails the build, and the output says where.
+// What --verify must do: one byte changed between the two builds fails the build, and the output says where.
 func TestVerify_OneByteChangedFailsTheBuild(t *testing.T) {
 	for _, tc := range []struct {
 		opt  int

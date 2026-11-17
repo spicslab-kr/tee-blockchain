@@ -1,5 +1,5 @@
 #!/bin/sh
-# Phase 2.3 inside one confidential VM (docs/status/cvm-port.md): att-ra-responder makes fresh evidence on the guest,
+# The whole chain inside one confidential VM (run 2026-11-12: docs/results/cvm-in-guest-2026-11-12.md): att-ra-responder makes fresh evidence on the guest,
 # and the whole chain runs against it on 127.0.0.1 - request, nonce check, replay refusal, registry deploy on a local
 # anvil, audit (which registers), and verify. No firewall rule is needed; the only part it leaves out is a verifier on
 # another machine.

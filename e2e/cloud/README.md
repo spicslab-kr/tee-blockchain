@@ -113,8 +113,7 @@ created them; nothing in them follows you to another computer or another network
 ## Order
 
 The procedures: Nitro, the flows in `e2e/README.md`; TDX and SEV-SNP, "Getting started" in `docs/build/tdx.md` and
-`docs/build/sev-snp.md` (one guest, then "The Auditor's half" on a second). `docs/status/cvm-port.md` is the plan
-behind them. Nitro comes first because it is the baseline the other two are compared against.
+`docs/build/sev-snp.md` (one guest, then "The Auditor's half" on a second). Nitro comes first because it is the baseline the other two are compared against.
 
 ```
 1. Nitro baseline        bash e2e/cloud/aws-nitro.sh create --yes        # 2 instances, eu-north-1

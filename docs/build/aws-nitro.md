@@ -287,7 +287,7 @@ then it opened the port to `0.0.0.0/0` whenever the instance role allowed it, wi
 Public access is allowed by the design: anyone may verify an enclave, and the evidence is not secret. But opening to
 everyone has to be a decision someone writes down, not a side effect, and the usual source is the verifier's address.
 The confidential VMs follow the same rule: `docs/build/tdx.md` and `docs/build/sev-snp.md` say to allow port 5000
-only from the verifier's address, and `docs/status/cvm-port.md` says to narrow the `attestamp-ra` firewall rule to it.
+only from the verifier's address, through the `attestamp-ra` firewall rule.
 
 The e2e instances made by `e2e/cloud/aws-nitro.sh create` already allow ports 22 and 5000 from the creating
 machine's address only, so the e2e scripts need no `--open-port-to`.
