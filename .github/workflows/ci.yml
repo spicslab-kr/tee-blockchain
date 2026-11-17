@@ -1,0 +1,88 @@
+# Runs the whole test suite, doccheck included, on every push and pull request, on Linux for amd64 and arm64.
+#
+# Why Linux: TestReadResponder_NativeBuildLinksCgo, the test that build refuses a responder linked with cgo, can only
+# produce such a file on a native Linux build with a C compiler; anywhere else it skips. The step "cgo refusal ran"
+# fails if it skipped, so this is where that refusal is checked.
+#
+# The Go version comes from internal/setup/build/GO_TOOLCHAIN, the pin build enforces, and GOTOOLCHAIN=local keeps Go
+# from fetching another one. anvil 1.8.0, which the chain tests need, is checked against the release's sha256 values
+# written here (docs/build/tdx.md, step 1, gives the same amd64 value).
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            foundry: linux_amd64
+            foundry_sha256: 8c8560de380d58d1ee145934427887b107182367600a3c33aa71f16f2ce7ac57
+          - runner: ubuntu-24.04-arm
+            foundry: linux_arm64
+            foundry_sha256: 78a76b93bbb4d36a7e485b69a50a9c0550dbdc4d0c015ba4f21a578917bed12f
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # doccheck checks every commit the documents name; it skips in a shallow clone.
+          fetch-depth: 0
+
+      - name: Read the pinned Go version
+        id: pin
+        run: echo "version=$(sed 's/^go//' internal/setup/build/GO_TOOLCHAIN)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.pin.outputs.version }}
+
+      - name: Go is exactly the pinned version
+        run: test "$(go env GOVERSION)" = "$(cat internal/setup/build/GO_TOOLCHAIN)"
+
+      - name: Install anvil 1.8.0
+        run: |
+          curl -fsSLO "https://github.com/foundry-rs/foundry/releases/download/v1.8.0/foundry_v1.8.0_${{ matrix.foundry }}.tar.gz"
+          echo "${{ matrix.foundry_sha256 }}  foundry_v1.8.0_${{ matrix.foundry }}.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.foundry/bin"
+          tar -xzf "foundry_v1.8.0_${{ matrix.foundry }}.tar.gz" -C "$HOME/.foundry/bin"
+          rm "foundry_v1.8.0_${{ matrix.foundry }}.tar.gz"
+          "$HOME/.foundry/bin/anvil" --version
+
+      - name: A git identity for the tests that commit
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@example.invalid
+
+      - name: gofmt
+        run: test -z "$(gofmt -l ./cmd ./internal)"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -count=1 -timeout 30m ./...
+
+      - name: cgo refusal ran, not skipped
+        run: |
+          go test -count=1 -v -run '^TestReadResponder_NativeBuildLinksCgo$' ./internal/setup/build/ | tee cgo.txt
+          grep -q -- '--- PASS: TestReadResponder_NativeBuildLinksCgo' cgo.txt
+
+      - name: doccheck ran every check, not skipped
+        run: |
+          go test -count=1 -v ./internal/doccheck/ | tee doccheck.txt
+          grep -q -- '--- PASS: TestCommitReferences' doccheck.txt
+          grep -q -- '--- PASS: TestDocumentReferences' doccheck.txt
