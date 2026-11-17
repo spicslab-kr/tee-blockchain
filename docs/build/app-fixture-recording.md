@@ -224,9 +224,9 @@ sudo systemctl reboot
 sudo ./record-tdx -out opt2-v2 -nonce-text attestamp-tdx-opt2-v2
 ```
 
-This records what TDX Option 2 measures: the image and hash tree carried inside the initrd. Opening and mounting the
-image before the switch to the real root is Option 2 opened at boot and is not part of this recording; it was recorded separately on
-2026-11-12, next section.
+This records what TDX Option 2 measures: the image and hash tree carried inside the initrd. It does not open or mount
+the image at boot, before the switch to the real root; a boot that does was recorded separately on 2026-11-12, in the
+next section.
 
 ### TDX Option 2 mounted at boot (`gcp-c3-opt2m-*`, 2026-11-12)
 

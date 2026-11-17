@@ -302,9 +302,11 @@ deliberate and is not to be made uniform:
   `tee/request/auditor/aws` (`go list -deps ./cmd/user`). Were the Nitro request code a file in the role package, every
   binary that only needs the types would link the NSM ioctl, vsock and the proxy too. A sub-folder is linked only by
   the binaries that import it.
-- **Names.** Each platform folder uses the same names, `Format`, `Extractor`, `Build`, `Result`, `Launch`, and the
-  folder keeps them apart (`aws.Build`, `tdx.Build`). In one package they would need prefixes, as the parse adapters
-  have (`AWSParser`, `TDXFormat`).
+- **Names.** The platform folders reuse the same names, and the folder keeps them apart (`aws.Build`, `tdx.Build`):
+  `Extractor` under `tee/request` (with `Format` on Nitro and TDX; SEV-SNP has two formats), `Build` and `Result`
+  under `setup/build`, and under `setup/launch` `Launch` and `Result` on Nitro but `Install`, `Installed`, `Check` and
+  `Measured` on TDX and SEV-SNP. In one package they would need prefixes, as the parse adapters have (`AWSParser`,
+  `TDXFormat`).
 - **Why parse is files.** The parse role package is itself the place that picks a parser by format, every binary
   needs every parser (a User verifies any platform), and each adapter is a short type conversion, so one package with
   one file per platform costs nothing.
