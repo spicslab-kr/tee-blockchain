@@ -92,6 +92,9 @@ R() { need_host ARM64_HOST; net_retry $SSH "$SSH_USER@$ARM64_HOST" "$@"; }   # a
 #     was not fetched after a good build, and nothing retried it). It counts too: a copy can be repeated harmlessly.
 #   - At most SSH_TRIES attempts (default 3), waiting 3 s, then 6 s. After the last one the original exit code is
 #     returned and the script fails as before.
+#   - Sharing one connection per host (ssh ControlMaster) does not work in Git Bash: a session through the master
+#     must pass its file descriptors over the Unix socket, which MSYS cannot do (tried 2026-11-17; known problem in
+#     docs/results/aws-nitro-2026-11-17-shared-aws.md).
 #   - stdin (the heredoc of V 'bash -s' <<REMOTE) is kept in a file and given again to every attempt; a terminal is
 #     left alone.
 # ssh/scp error output is shown after the attempt ends rather than as it is written.

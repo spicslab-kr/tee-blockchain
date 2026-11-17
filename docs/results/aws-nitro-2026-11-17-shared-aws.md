@@ -21,7 +21,7 @@ one written by hand (below).
 | arm64 image | `ami-0ce2f8dd9b0fcfb35` (the same as in the first run), the same release, kernel `6.1.190-237.442.amzn2023.aarch64`, the same nitro-cli, docker and git versions |
 | chain | none (these scripts send no transaction; the `chain` field carries `NET`'s default) |
 | network | a new security group allows ports 22 and 5000 from this machine's address only (`/32`); no `0.0.0.0/0` |
-| state now | all three **stopped** with `aws-nitro.sh stop` (`describe-instances`: `stopped`), none terminated |
+| state now | all three **stopped** with `aws-nitro.sh stop` (`describe-instances`: `stopped`), none terminated. *(Updated later on 2026-11-17.)* Started once more for the SSH test below, then **terminated** with `terminate-instances` (not `aws-nitro.sh delete`, which would also delete the security group). Each had one root volume with `DeleteOnTermination` true; afterwards the three volume IDs were not found, and every enabled region (17) had **0 instances and 0 volumes**. The security group and the key pair `attestamp-e2e` were kept for the next run |
 
 ## The reference values (test application)
 
@@ -60,3 +60,19 @@ read: Connection reset by peer`, so `build` never ran there and no exit code was
 message as in every earlier run on this network. Step 7's remote command was then run by hand on the Vendor: refused,
 exit 1, "att-ra-responder was built for GOARCH=arm64 but this instance is amd64; the enclave runs the parent
 instance's architecture". That is the hand-written line (its `at` is approximate).
+
+## Known problem: the SSH resets, and why ControlMaster does not fix them here (added later on 2026-11-17)
+
+Step 7 had to be run by hand on every run on this network (2026-11-12, -16, and both runs of -17); it still does. With
+the same three instances started again (new addresses), sharing one SSH connection per host was tried:
+
+**ControlMaster: does not work in Git Bash.** Git Bash's own OpenSSH 9.8p1
+started the master and answered `ssh -O check` ("Master running"), but every session through it failed with
+`mux_client_request_session: read from master failed` (`Connection reset by peer`, then `Software caused
+connection abort`). With `ControlMaster=auto` the command failed (exit 255, "Failed to connect to new control
+master"); with `ControlMaster=no` ssh quietly opened a new connection instead, so nothing was shared. The cause: a
+session through the master hands its stdin, stdout and stderr to the master over the Unix socket (file descriptor
+passing), which MSYS, under Git Bash, does not provide; Windows' own OpenSSH has no ControlMaster at all. Only the
+control commands, which pass no descriptors, work. `env.sh` was not changed for it, apart from a comment saying so.
+Not worth trying again on Windows; on Linux or macOS it should work. The SSH resets remain a known problem on this
+network, and step 7 is still run by hand when they hit.

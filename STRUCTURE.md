@@ -190,7 +190,8 @@ Logic that does not depend on the role exists once:
   signature check, PCR extraction, the embedded AWS root certificate). Each role's
   `tee/parse/<role>/aws.go` is a thin adapter that converts to and from that role's own types.
 - `internal/tee/request/aws`, `internal/setup/build/aws` and `internal/setup/launch/aws` hold the Nitro request (NSM,
-  vsock, the proxy), image build and launch; each role's `<role>/aws` folder is a thin adapter. The TDX and SEV-SNP
+  vsock, the proxy), image build and launch; each role's `<role>/aws` folder is a thin adapter (the build and launch
+  ones only copy fields, as there are no role types to convert: that is on purpose, to keep the tdx and snp shape). The TDX and SEV-SNP
   code has the same two layers (`tee/{parse,request}/{tdx,snp}`, `setup/{build,launch}/{tdx,snp}`).
 - `internal/core/compare/compare.go`, `check.go` and `types.go` hold the comparison and the trust
   decision. Each role's `core/compare/<role>` is a thin delegate that converts its own
