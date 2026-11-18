@@ -83,10 +83,22 @@ guest_ip() {
   gcloud compute instances describe "$1" --zone "$ZONE" --format='value(networkInterfaces[0].accessConfigs[0].natIP)'
 }
 # guest_step <vm> <role> <action> [args] - copies e2e/cvm/guest/guest-step.sh to the guest and runs one action of it.
+# The guest's own exit code decides, not gcloud's: on the first rehearsal (2026-11-19) gcloud on Windows crashed
+# ("Segmentation fault") as a session closed after the action had succeeded. So the action's exit code is also written to
+# a file on the guest; when gcloud fails, that file is read, and only a missing file (the action did not finish) fails.
+STEP_RC=.attestamp-step.rc
 guest_step() {
-  local vm=$1 role=$2 action=$3; shift 3
+  local vm=$1 role=$2 action=$3 rc g; shift 3
   guest_put "$vm" "$here_cvm/guest/guest-step.sh" "$GUEST_STEP" || return 1
-  guest_run "$vm" "bash $GUEST_STEP $action $role $FORMAT $OPTION $*"
+  guest_run "$vm" "rm -f $STEP_RC; bash $GUEST_STEP $action $role $FORMAT $OPTION $*; rc=\$?; echo \$rc > $STEP_RC; exit \$rc"
+  rc=$?
+  [ $rc -eq 0 ] && return 0
+  g=$(guest_run "$vm" "cat $STEP_RC 2>/dev/null" | tr -d '\r\n ')
+  case "$g" in
+    ''|*[!0-9]*) echo "gcloud exit $rc and no exit code recorded on $vm: the action $action did not finish" >&2; return $rc ;;
+  esac
+  [ "$g" = "$rc" ] || echo "gcloud exit $rc, but $action on $vm finished with exit $g; going by the guest" >&2
+  return "$g"
 }
 
 # boot_id <vm> - the guest's current boot ID; one try, no retry, empty and non-zero when the guest does not answer.
@@ -123,7 +135,8 @@ install_and_reboot() {
   [ -n "$old" ] || { echo "cannot read the boot ID of $vm before the reboot" >&2; return 1; }
   echo "boot_id before the reboot: $old"
   guest_step "$vm" "$role" install || return 1
-  guest_run "$vm" 'sudo systemd-run --on-active=3 systemctl reboot' || return 1
+  # Whether the reboot happened is judged by the boot ID below, so a gcloud failure here is only reported.
+  guest_run "$vm" 'sudo systemd-run --on-active=3 systemctl reboot' || echo "gcloud failed on the reboot command; the boot ID decides" >&2
   wait_new_boot "$vm" "$old"
 }
 

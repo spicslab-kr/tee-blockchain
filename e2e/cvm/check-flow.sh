@@ -48,6 +48,11 @@ case "$a" in
   *" compute ssh "*"--command sha256sum "*)
     case "$3" in *auditor) [ -n "${FAKE_BASE_DIFF:-}" ] && { echo "2222  base"; exit 0; } ;; esac
     echo "1111  base" ;;
+  # The exit code the guest-side action recorded (FAKE_MARKER=none: nothing recorded), read after gcloud failed.
+  *" compute ssh "*"cat .attestamp-step.rc"*) [ "${FAKE_MARKER:-0}" = none ] || echo "${FAKE_MARKER:-0}" ;;
+  # gcloud crashing as the check-serve session closes, after the action finished (seen on 2026-11-19).
+  *" compute ssh "*"attestamp-guest-step.sh check-serve"*)
+    [ -n "${FAKE_CRASH_CHECK:-}" ] && { echo "Segmentation fault" >&2; exit 139; } ;;
   *" compute ssh "*) exit "${FAKE_SSH_EXIT:-0}" ;;
   *" compute scp "*)
     case "$3" in *:*) printf '{"MRTD":"aa","RTMR0":"bb"}\n' > "$4" ;; esac ;;
@@ -145,8 +150,8 @@ call 'compute scp linux/att-vendor attestamp-tdx-vendor:att-vendor .*--tunnel-th
 call 'compute scp linux/att-ra-responder attestamp-tdx-auditor:att-ra-responder'
 call 'compute scp linux/att-auditor attestamp-tdx-auditor:att-auditor'
 call 'compute scp .*guest/guest-step.sh attestamp-tdx-vendor:attestamp-guest-step.sh'
-call 'compute ssh attestamp-tdx-vendor .*--command bash attestamp-guest-step.sh prepare vendor intel-tdx 1'
-call 'compute ssh attestamp-tdx-auditor .*--command bash attestamp-guest-step.sh prepare auditor intel-tdx 1'
+call 'compute ssh attestamp-tdx-vendor .*--command .*bash attestamp-guest-step.sh prepare vendor intel-tdx 1'
+call 'compute ssh attestamp-tdx-auditor .*--command .*bash attestamp-guest-step.sh prepare auditor intel-tdx 1'
 call 'go build .*-trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-ra-responder'
 nocall 'initramfs-hook'; finish
 start "setup refuses guests of different images, before copying anything"
@@ -179,6 +184,12 @@ start "1: no new boot within REBOOT_TIMEOUT fails, says so, and audits nothing"
 run NET=local FAKE_BOOT=never REBOOT_TIMEOUT=2 REBOOT_POLL=1 bash "$F1" intel-tdx; exitis 1
 said 'no new boot on attestamp-tdx-auditor within 2 s'; said 'the old boot \(11111111-old\) still answered'
 nocall 'att-auditor audit'; nocall 'check-serve'; finish
+start "1: gcloud crashing after check-serve finished goes by the exit code the guest recorded"
+run NET=local FAKE_CRASH_CHECK=1 FAKE_MARKER=0 bash "$F1" intel-tdx; exitis 0
+call 'cat .attestamp-step.rc'; said 'finished with exit 0; going by the guest'; call 'att-auditor audit'; finish
+start "1: gcloud crashing with no exit code recorded on the guest fails the step"
+run NET=local FAKE_CRASH_CHECK=1 FAKE_MARKER=none bash "$F1" intel-tdx; exitis 1
+said 'did not finish'; nocall 'att-auditor audit'; finish
 start "1 -c: an existing registry, none deployed"
 run NET=local bash "$F1" intel-tdx -c 0x1111111111111111111111111111111111111111; exitis 0
 nocall 'registry-deploy'; call 'audit .*--registry 0x1111111111111111111111111111111111111111'; finish
