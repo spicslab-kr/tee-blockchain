@@ -60,8 +60,10 @@ openssl rand -hex 32 > auditor.key
 openssl rand -hex 32 > deployer.key
 ```
 
-The addresses, for `AUDITOR_ADDR` and `VENDOR_ADDR` in `e2e/env.local.sh`, come from `cast`, which Foundry installs
-together with `anvil`:
+The addresses, for `AUDITOR_ADDR` and `VENDOR_ADDR` in `e2e/env.local.sh`, come from Foundry's `cast`. `foundryup`
+installs it together with `anvil`. On Windows without WSL, take `cast.exe` from `foundry_v1.8.0_win32_amd64.zip`, the
+zip `docs/build/tdx.md` step 1 takes `anvil.exe` from (it holds both, with `forge.exe`, `chisel.exe` and `solar.exe`;
+checked 2026-11-18):
 
 ```
 cast wallet address --private-key 0x$(cat auditor.key)

@@ -120,7 +120,8 @@ The two hashes must be equal, and equal to the one in [toolchain.md](toolchain.m
 file is `…_linux_amd64.sha256`, not `….tar.gz.sha256`.
 
 On Windows without WSL, download `foundry_v1.8.0_win32_amd64.zip` from
-https://github.com/foundry-rs/foundry/releases/tag/v1.8.0 and put `anvil.exe` on `PATH`. The `curl` line needs
+https://github.com/foundry-rs/foundry/releases/tag/v1.8.0 and put `anvil.exe` on `PATH`, and `cast.exe` from the same zip
+if you will run the e2e scripts on a public network (`e2e/README.md`, "Key files", uses it). The `curl` line needs
 `curl` (`sudo apt-get install -y curl` on a minimal Ubuntu). Versions we used: [toolchain.md](toolchain.md).
 
 ### 2. On your computer: the binaries
