@@ -19,6 +19,13 @@ Anyone can then ask the enclave to attest itself and compare the answer with wha
 without a key from anyone.
 
 **Words used below.**
+- **The three roles**, one binary each ([which binary does what, and where it runs](cmd/README.md)):
+  - **Vendor** (`att-vendor`): ships the software. Builds the image the TEE runs, starts it, and hands its build
+    settings to an Auditor, or registers the measurement itself.
+  - **Auditor** (`att-auditor`): someone independent of the Vendor. Rebuilds the Vendor's source in a TEE of its own,
+    and registers the measurement on the chain only if its build matches what the TEE reports.
+  - **User** (`att-user`): anyone who connects to the Vendor's TEE. Asks it for an attestation and compares the
+    answer with the registry; needs no key and no TEE.
 - **TEE**: trusted execution environment. Here, a Nitro enclave or a confidential VM, called a **guest** (TDX,
   SEV-SNP).
 - **Measurement**: the hashes the TEE's hardware or firmware reports for what it loaded, signed by the platform.
