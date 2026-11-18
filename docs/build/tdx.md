@@ -714,7 +714,8 @@ Left out, because they describe the machine or whoever launched it, not the imag
 ## Nonce and time
 
 REPORTDATA is 64 bytes and a `tee/request` nonce is 32. `CheckNonce` requires REPORTDATA to be the nonce followed by
-zeros; a 64-byte nonce fills all of it. The TDX request side, when written, must put the nonce first and zeros after.
+zeros; a 64-byte nonce fills all of it. The TDX request side does that (`ReportData` in `internal/tee/request/tdx`),
+and refuses a quote that does not carry the REPORTDATA it wrote.
 
 A TDX quote has **no timestamp** (confirmed: the quote format has no time field). The PCK chain is therefore judged at
 verification time. That costs little: the PCK leaf in our quote is valid 2026-10-15 → 2033-10-15 (confirmed), not the
