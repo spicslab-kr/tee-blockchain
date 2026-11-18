@@ -58,8 +58,8 @@ VERSION=1.31.6
 
 # 0-Setup-local-upload.sh builds the binaries for your own machine here, apart from the Linux att-vendor and
 # att-auditor binaries that go to the instances (those are built into linux/)
-BIN=e2e-work/bin
-WORK=e2e-work
+WORK=${WORK:-e2e-work}   # a check script (e2e/cvm/check-flow.sh) points both at a temporary folder
+BIN=${BIN:-$WORK/bin}
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE=.exe;; *) EXE="";; esac   # Git Bash reports MINGW/MSYS
 VENDOR_BIN="$BIN/att-vendor$EXE"; AUDITOR_BIN="$BIN/att-auditor$EXE"; USER_BIN="$BIN/att-user$EXE"
 mkdir -p "$WORK"
