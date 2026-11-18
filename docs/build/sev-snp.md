@@ -798,7 +798,8 @@ GRUB entry with `grub-reboot`.)
 
 ### Correction: SEV-SNP Option 1 as appended in 2026-11
 
-The 2026-10-23 slides (slide 7) say both options work on AWS and GCP. **For SEV-SNP Option 1 that is wrong**, as
+The plan this work started from expected both options to work on AWS and on GCP. **For SEV-SNP Option 1 that is
+wrong**, as
 measured on 2026-11-11 on `attestamp-snp-vendor` with the same unpadded append the old out-of-repository scripts used (*record:* they
 ran `cat i.bin app.cpio`):
 

@@ -3,7 +3,7 @@
 **Status: run on 2026-11-11; see "Results" at the end.** This is how the **test fixtures** were recorded, with its own
 tools (`mkappinitrd`, `make-grub-entry.sh`, `make-verity-image.sh`). To run an application on a guest, use `build` and
 `launch --platform …` instead: "Getting started" in `docs/build/tdx.md` and `docs/build/sev-snp.md`. This procedure
-covers the four cells of the 2026-10-23 slides 7 and 16:
+covers four cells, each option on each platform, all four expected to work by the plan this work started from:
 
 | | Option 1: application cpio in the initrd | Option 2: squashfs + dm-verity image |
 |---|---|---|
@@ -291,13 +291,15 @@ All recorded in one session per platform. The guests ran from start to stop (GCP
 the same base initrd (50,100,283 bytes, size mod 4 = 3, sha256 `4703ec07…b0a2`). Every recording verifies with its
 nonce, and its boot log is committed next to it (`*-boot.txt`).
 
-### The four cells of the 2026-10-23 slides (7 and 16), against what was measured
+### The four cells, expected against measured
 
-| cell | slides claimed | measured | right or wrong |
+What the plan this work started from expected of each cell, and what was measured:
+
+| cell | expected | measured | right or wrong |
 |---|---|---|---|
 | **TDX, Option 1** (cpio, `AppFirst`) | works | the archive was unpacked on both boots (marker present); only RTMR2 changed between v1 and v2 (MRTD, RTMR0, RTMR1 equal); T5 refused v2 | **right** |
 | **TDX, Option 2** (image inside the initrd, `AppFirst`) | works; RTMR2 covers the image, nothing extended at run time | image, hash tree and root hash unpacked on both boots (marker); only RTMR2 changed; T5 refused v2. Mounting the image inside the TDX boot was not built or tested | **right for what is measured**; the run-time use of the image is not built |
-| **SEV-SNP, Option 1** (cpio, `AppLast`) | works on AWS and GCP | **as appended in 2026-11 (no padding), the kernel discarded the archive**: `Initramfs unpacking failed: invalid magic`, no marker, yet INITRD changed with the application. With the base zero-padded to 4 bytes: unpacked (marker present), only INITRD changed, T5 refused v2. `cpio.Join(AppLast)` now pads | **wrong as presented** (the application never ran); right once padded |
+| **SEV-SNP, Option 1** (cpio, `AppLast`) | works on AWS and GCP | **as appended in 2026-11 (no padding), the kernel discarded the archive**: `Initramfs unpacking failed: invalid magic`, no marker, yet INITRD changed with the application. With the base zero-padded to 4 bytes: unpacked (marker present), only INITRD changed, T5 refused v2. `cpio.Join(AppLast)` now pads | **wrong as appended** (the application never ran); right once padded |
 | **SEV-SNP, Option 2** (image on disk, PCR12) | works on AWS and GCP | `status ok` and the application mounted on both boots; PCR12 equal to the formula; CMDLINE and PCR12 changed, MEASUREMENT, PCR4, KERNEL, INITRD did not; first real `amd-sev-snp-verity` evidence; T5 refused v2 | **right** (on GCP; AWS is no longer used for SEV-SNP) |
 
 ### Expected against measured

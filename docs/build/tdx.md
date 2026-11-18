@@ -665,16 +665,16 @@ Why all four, not RTMR2 alone: the firmware, boot loader and kernel extend RTMR2
 extend the expected RTMR2 while running something else, and only MRTD and RTMR0–1 would show it. Nitro registers PCR0,
 1 and 2 together for the same reason.
 
-**"RTMR[2] alone" in the 2026-10-23 slides is a contrast, not a registration rule** (decided in the project,
-2026-11-11). The slides say one value moves with the application on TDX (RTMR2) where SEV-SNP Option 2 moves two
-(CMDLINE and PCR12). That is what the recordings show. It does not mean registering RTMR2 alone: that would open the
+**That RTMR2 alone moves is a contrast, not a registration rule** (decided in the project, 2026-11-11). One value
+moves with the application on TDX (RTMR2) where SEV-SNP Option 2 moves two (CMDLINE and PCR12); that is what the
+recordings show. It does not mean registering RTMR2 alone: that would open the
 attack in the previous paragraph, because whoever changes the kernel can make RTMR2 come out as expected while running
 something else, and only MRTD and RTMR0–1 would reveal it. `intel-tdx` registers all four values, MRTD, RTMR0, RTMR1
 and RTMR2, and the name list does not change.
 
 ### Option 1 and Option 2
 
-TDX, like SEV-SNP, has two ways to carry the application (the 2026-10-23 slides, slide 16):
+TDX, like SEV-SNP, has two ways to carry the application:
 
 - **Option 1:** the application is a cpio archive in the initrd (`internal/setup/build/cpio`).
 - **Option 2:** the application is a read-only squashfs image with a dm-verity hash tree, and that image is placed
