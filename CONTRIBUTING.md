@@ -150,7 +150,12 @@ type(scope): what changed, in the imperative
 - Branch from `main`, open a PR, and get one review from a maintainer other than the author.
 - `go vet ./...` and `go test ./...` must pass. If you touched `build` or the responder, also
   run the measurement check once on an instance (`e2e/arch-measurement-compare.sh`): the
-  point of this project is that the bytes come out identical.
+  point of this project is that the bytes come out identical. That script is Nitro only, where the responder is
+  inside the measured image. On TDX and SEV-SNP the responder is not measured, and what `build --platform` writes is
+  pinned by the golden files of `internal/setup/build/cpio` and the tests of `internal/setup/build/{tdx,snp}`, which
+  `go test ./...` runs. There is no script for a guest yet: if you changed what `build --platform` writes, run
+  `build --verify` on a guest, and "The Auditor's half" of `docs/build/tdx.md` or `docs/build/sev-snp.md` (two guests;
+  the Auditor's build must equal the Vendor's).
 - If you changed a command's flags or output, update the README section for that role.
 - Unless you say otherwise, code you contribute is licensed as MIT and
   documentation as CC BY 4.0, the same as the rest of the project.
