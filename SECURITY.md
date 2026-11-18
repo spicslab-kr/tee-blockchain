@@ -2,9 +2,9 @@
 
 ## Reporting a vulnerability
 
-Please report it privately, not in a public issue:
-
-**Contact: _[to be filled in by the maintainers]_**
+Please report it privately through GitHub, not in a public issue: on the repository's **Security** tab, choose
+**Report a vulnerability** (https://github.com/spicslab-kr/attestamp/security/advisories/new). Only the maintainers
+see the report, and the fix and its advisory are prepared with you before anything is published.
 
 Say what you found, how to reproduce it, and which commit you used. There are no releases yet, so only the current
 `main` is supported.
