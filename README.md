@@ -10,6 +10,8 @@
   <sub>CREATED AND MAINTAINED BY</sub><br>
   SPICS Lab, Kyung Hee University<br>
   <a href="https://github.com/spicslab-kr/attestamp/issues">GitHub issues</a> &nbsp;·&nbsp;
+  <a href="CONTRIBUTING.md">Contributing</a> &nbsp;·&nbsp;
+  <a href="SECURITY.md">Reporting a vulnerability</a> &nbsp;·&nbsp;
   <a href="#contributors">Contributors</a>
 </p>
 
@@ -335,6 +337,8 @@ hash, and register its own signed hash. The User can then require both registrie
 
 ## Project resources
 
+- [Contributing](CONTRIBUTING.md): build and test rules, commit messages, adding a platform
+- [Security](SECURITY.md): how to report a vulnerability privately, and what is in scope
 - [Project structure](STRUCTURE.md): every folder and module, and how the roles fit together
 - [End-to-end scripts](e2e/README.md): our runs against real Nitro instances
 - [Running without a public testnet](e2e/README.md#running-without-a-public-testnet): both flows on real enclaves
