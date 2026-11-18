@@ -94,7 +94,9 @@ closed as unfillable rather than pending.
 What replaces them: the SEV-SNP work was redone in this repository in 2026-11. The recorded evidence, the measured
 values and the procedures in `docs/build/app-fixture-recording.md` are ours and are reproducible from this repository
 alone. The one result that still rests only on the old scripts is T10 (evidence from two machines combined);
-`docs/build/app-fixture-recording.md`, "Reproducing T10", is the procedure to measure it ourselves.
+`docs/build/app-fixture-recording.md`, "Reproducing T10", is the procedure to measure it ourselves. *(Changed since,
+noted 2026-11-18: T10 was reproduced on 2026-11-16 with this repository's `record-snp -relay-att`;
+`docs/build/ra-comparison.md`, "The SEV-SNP relay, measured".)*
 | 7 | **The Nitro test application.** Done 2026-11-12: the pinned commit `ef5a25a6` of the personal fork is an unmodified upstream `nginx/docker-nginx` commit (an ancestor of upstream `master`; the fork's only own commit after it adds a built EIF and a record, which no script uses). The four scripts now clone upstream at the same commit; nothing to vendor | — | `e2e/README.md`, "Setup, once" |
 | 8 | **Fixture READMEs for Nitro.** Written 2026-11-12 with what the documents themselves say: signed timestamps (2026-09-21 and 2026-09-14), PCRs, sha256, nonce source, and that `fixture-my-web`'s PCR1 equals nitro-cli 1.5.0's on x86_64 while the other's does not. Still unknown: the AMI, nitro-cli version and application of each recording | person (who recorded them) | a `README.md` in each testdata folder |
 | 9 | **Packing SEV-SNP evidence for `ra-parse`.** Done 2026-11-12: `internal/tee/parse/snp/testdata/pack` joins a recording's three files; checked by packing `gcp-n2d-opt1p-v1` and verifying it with `ra-parse`. Live evidence from `ra-request` needs no packing | — | `internal/tee/parse/snp/testdata/README.md` |
