@@ -337,8 +337,8 @@ Two details the table hides:
 - `att-user` does not link any role's commands, but it does link `chain/register/auditor/ether`
   (the generated Registry binding) and, through it, `chain/lookup/auditor`, `tee/parse/auditor` and
   `tee/request/auditor`. `chain/lookup/user/ether/reader.go` imports that binding directly.
-- `att-ra-responder` is built from the Vendor request package only, and `build` layers it into the
-  enclave image.
+- `att-ra-responder` is built from the Vendor request package only. On Nitro `build` layers it into the
+  enclave image; on TDX and SEV-SNP it runs from the guest's disk and is not measured.
 
 ## Folder reference
 

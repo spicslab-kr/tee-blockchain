@@ -245,15 +245,16 @@ hash, and register its own signed hash. The User can then require both registrie
 
 - **One binary per role.** `att-vendor`, `att-auditor` and `att-user` each contain only their own
   role's commands. The User's binary has no `register` at all.
-- **A shared in-enclave responder.** `att-ra-responder` answers attestation requests inside the
-  enclave. `build` layers it into the image.
+- **A shared responder.** `att-ra-responder` answers attestation requests inside the TEE. On Nitro
+  `build` layers it into the enclave image, so it is measured; on TDX and SEV-SNP it runs from the guest's disk and
+  is not measured ([RA comparison](docs/build/ra-comparison.md)).
 - **Two flows.** Flow 1: the Auditor rebuilds and registers, and the User trusts only what the
   Auditor signed. Flow 2: a Vendor without an Auditor registers to its own registry, and the User
   can require that both registries agree.
 
 ### Vendor
 
-- **Reproducible enclave image.** `build` and `pack` layer the responder onto your Docker image and
+- **Reproducible enclave image.** On Nitro, `build` and `pack` layer the responder onto your Docker image and
   normalize everything Docker makes nondeterministic.
 - **Reproducibility scan.** Unpinned packages, `date`, random keys and the like are reported line by
   line, and `--verify` builds twice and fails unless both measurements are identical.
