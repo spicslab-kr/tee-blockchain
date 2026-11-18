@@ -145,6 +145,8 @@ if [ -z "$RECORD_KEY" ]; then
   [ -n "$RECORD_KEY" ] || { step_stop "TRANSFERRING TO VENDOR"; echo "no registration of this value found on $REGISTRY"; exit 1; }
 fi
 pcr() { grep -oE "\"$1\": *\"[0-9a-fA-F]+\"" "$WORK/from-auditor/measurements.json" | sed -E 's/.*"([0-9a-fA-F]+)"$/\1/'; }  # prints one PCR value from measurements.json
+# A hand-over note in this script's own shape, for step 2 (registry address, record key): not the
+#   attestamp.measurement-record/1 file att-auditor send writes, and no att command reads it.
 cat > "$WORK/from-auditor/measurement-record.json" <<EOF
 {
   "service": "$SERVICE",

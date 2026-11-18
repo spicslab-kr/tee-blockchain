@@ -155,7 +155,7 @@ What changes with `NET=local`:
   keys are public knowledge: never use them on a public network.
 - **Results.** Every line in `e2e-work/results/*.jsonl` carries `"chain":"local"`, so these runs are never confused
   with runs on Sepolia.
-- **Records.** The measurement record handed to the Vendor in flow 1 names `http://127.0.0.1:8545` as its RPC. That
+- **Records.** The hand-over note (`measurement-record.json`) the Auditor gives the Vendor in flow 1 names `http://127.0.0.1:8545` as its RPC. That
   record is only good on the machine that ran anvil.
 
 A script that needs the chain stops at once with a message if nothing answers at `LOCAL_RPC`.
@@ -262,7 +262,7 @@ All paths are under `e2e-work/` (gitignored).
 | `auditor-build-config.json` (copy of the build config) | flow 1 step 1 | the `audit` command in the same script |
 | `vendor-build.json`, `vendor-build-config.json` | flow 2 step 1 (`vendor-build.json` again in step 3) | `self-register` in the same script |
 | `from-auditor/alpine-slim.eif`, `measurements.json` | flow 1 step 1 | uploaded to the Vendor instance for flow 1 step 2 |
-| `from-auditor/measurement-record.json` | flow 1 step 1 | flow 1 step 2 (registry address, record key) |
+| `from-auditor/measurement-record.json` | flow 1 step 1 | flow 1 step 2 (registry address, record key). A hand-over note the script writes in its own shape, not the `attestamp.measurement-record/1` file `att-auditor send` writes; no `att` command reads it |
 | `vendor-check/doc.cbor`, `parsed.json` | flow 1 step 2 | `compare` in the same script |
 | `bin/att-*` | `0-Setup-local-upload.sh` | every script that runs a local `att` command |
 | `arch/`, `responder/`, `toolchain/` | the matching check script | the same script |
