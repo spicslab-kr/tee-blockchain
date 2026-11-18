@@ -13,7 +13,7 @@ The values both sides must match to get the same measurements are a separate lis
 | | |
 |---|---|
 | what it does | Google's Ubuntu images set it in `/etc/default/grub.d/40-force-partuuid.cfg`; with it set, GRUB boots the stock entry **without any initrd**, the kernel finding the root partition by PARTUUID. Commenting it out and running `update-grub` makes the stock entry load the image's initrd and name the root by file-system UUID |
-| why this value | the application is in the initrd (Option 1), or the dm-verity check runs from it (Option 2); without an initrd neither is ever loaded |
+| why this value | the application is in the initrd ([Option 1](tdx.md#option-1-and-option-2)), or the dm-verity check runs from it (Option 2); without an initrd neither is ever loaded |
 | what breaks if it is set | the boot measures no application: SEV-SNP evidence is refused by every format (exit 7); on TDX the quote alone cannot show it, `launch` refuses to install and `launch --check` refuses the boot, and `audit` requires the Auditor's own build since 2026-11-16 (`docs/results/sessions-2026-11-16/tdx-initrdless.md`). Seen on 2026-11-16: a guest whose step 13 had put it back refused `launch` |
 | side effect | the command line loses `panic=-1`, which only the initrdless entry adds (measured in the recordings) |
 | set by | "Getting started" step 4 in `tdx.md` and `sev-snp.md`; undone in step 13 |

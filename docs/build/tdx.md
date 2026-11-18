@@ -425,7 +425,7 @@ The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rule
 > measured the same four values, `audit --vendor-tee` registered the Auditor's own value, and the User's `verify` of
 > the Vendor's guest against it gave exit 0. With one byte changed on the Vendor's side only, `audit` said `the
 > Vendor's guest runs something else` and `verify` gave exit 1. One step was wrong and is fixed (A2's copy of `app`).
-> Measured afterwards (T1, same day): another machine type changes RTMR0; another zone did not change anything (see "The
+> Measured afterwards ([T1](../status/test-matrix.md#state-updated-through-2026-11-17), same day): another machine type changes RTMR0; another zone did not change anything (see "The
 > same inputs").
 
 This is what README's trust model asks of the Auditor: rebuild the Vendor's application independently, confirm that a

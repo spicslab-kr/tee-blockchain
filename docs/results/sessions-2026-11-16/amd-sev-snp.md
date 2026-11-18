@@ -1,4 +1,4 @@
-# AMD SEV-SNP, session 3 of 2026-11-16: the Auditor's own rebuild (D3), T2, T6, and the relay (T10)
+# AMD SEV-SNP, session 3 of 2026-11-16: the Auditor's own rebuild ([D3](../trial-2026-11-16-clean.md#every-difference-found)), T2, T6, and the relay (T10)
 
 Run on 2026-11-16 at commit `4dee010`. 21 result lines, written by hand in the results contract
 (`"script":"manual: …"`): 16 in `amd-sev-snp-initrd.jsonl`, 5 in `amd-sev-snp-verity.jsonl`. **20 have `result` equal

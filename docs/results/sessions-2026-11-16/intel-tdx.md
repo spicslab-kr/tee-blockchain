@@ -1,4 +1,4 @@
-# Intel TDX, session 2 of 2026-11-16: the Auditor's own rebuild (D3), T2, T3, T6
+# Intel TDX, session 2 of 2026-11-16: the Auditor's own rebuild ([D3](../trial-2026-11-16-clean.md#every-difference-found)), T2, T3, T6
 
 Run on 2026-11-16 at commit `a429597` (binaries built there; the `self-register` wording change
 `fix(cmd/vendor)` came during the run and only changes its text). 18 result lines in `intel-tdx.jsonl`, written by hand
