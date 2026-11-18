@@ -1,9 +1,10 @@
-# CVM flow 1 on two TDX guests, first run (rehearsal), 2026-11-18
+# CVM flow 1 on two TDX guests, first runs (rehearsal), 2026-11-18
 
-The first run of the CVM flow scripts (`e2e/cvm/`, "Flow 1 on TDX and SEV-SNP" in `e2e/README.md`) on real guests,
-to find what breaks before a recording, and how long each step takes. Times are UTC: 2026-11-18, the last step ending
-at 16:08Z (2026-11-19 in Korea). Results: [`cvm-flow-rehearsal-2026-11-18.jsonl`](cvm-flow-rehearsal-2026-11-18.jsonl), 7 lines,
-all as expected.
+The first runs of the CVM flow scripts (`e2e/cvm/`, "Flow 1 on TDX and SEV-SNP" in `e2e/README.md`) on real guests,
+to find what breaks before a recording, and how long each step takes: Option 1, then Option 2 on the same two guests
+("Option 2, the same evening" below). Times are UTC: 2026-11-18, the last step ending at 16:49Z (2026-11-19 in
+Korea). Results, all as expected: Option 1 [`cvm-flow-rehearsal-2026-11-18.jsonl`](cvm-flow-rehearsal-2026-11-18.jsonl),
+7 lines; Option 2 [`cvm-flow-rehearsal-2026-11-18-opt2.jsonl`](cvm-flow-rehearsal-2026-11-18-opt2.jsonl), 7 lines.
 
 | | |
 |---|---|
@@ -60,12 +61,50 @@ R3. **gcloud crashed as the check-serve session closed.** The local gcloud proce
 it failed step 1, although the guest had checked the boot and started the responder and port 5000 answered. Starting a
 background process over ssh by hand did not reproduce it; the cause on the gcloud side is not known. **Fixed**
 (`a5973db`): each guest action writes its exit code to a file on the guest, and when gcloud fails the script goes by
-that file; a missing file still fails the step. With it, steps 1, 2 and 4 passed although the crash recurred.
+that file; a missing file still fails the step. With it, steps 1, 2 and 4 passed although the crash recurred. In the
+Option 2 run it came three more times, once after `app` (so not only after `check-serve`), and the fix carried each.
 
-Not exercised by this run: Option 2 (`apt`, `mkinitramfs`, the Auditor taking the Vendor's `base-initrd-v.img`),
-SEV-SNP, Sepolia, and a User on another computer (the two `verify` scenes were typed on the machine that ran the flow).
+R4. **The result lines did not say which TDX option ran.** Both options register under the one format `intel-tdx`, so
+only the run IDs told the two runs apart. **Fixed** after the run: every line's `detail` now starts with
+`option <n>`. The Option 2 lines in the results file were written before the fix and have it added by hand.
+
+## Option 2, the same evening
+
+The same two guests, started again, `intel-tdx` Option 2 (the application as a squashfs image with a dm-verity hash
+tree inside the initrd), `NET=local`, scripts at `a5973db`.
+
+| step | verdict | time |
+|---|---|---|
+| `0-Setup-guests.sh intel-tdx 2` | `apt` installed `squashfs-tools` 1:4.6.1-1build1 and `cryptsetup-bin` 2:2.7.0-1ubuntu4.2 on both guests; the Vendor made `base-initrd-v.img` with `mkinitramfs` (`98a269e9…`) and the Auditor got that file; the Auditor's copy holds the hook `scripts/local-bottom/attestamp-verity` and `veritysetup` (`lsinitramfs`) | 321 s |
+| 1 Auditor | root hash `5dff1f1d…` (the value the WSL Option 2 build gave on 2026-11-15); boot, `launch --check` (RTMR2 `3ec16728…`), `audit` registered | 293 s |
+| 2 Vendor | the same root hash and values; `compare`, `lookup` and the chain comparison passed | 312 s |
+| 3, typed | exit 0, `trusted` | |
+| 2b Auditor | `same`, exit 0 | 18 s |
+| 4 Vendor | one byte changed: root hash `aba41856…`, RTMR2 `71a13225…` | 303 s |
+| 5, typed | exit 1, `nobody … registered` | |
+| 4b Auditor | `runs something else`, exit 12 | 18 s |
+
+On the Auditor's guest after step 1, by hand: `/run/attestamp-status` read `ok 5dff1f1d…`, and the image was mounted
+read-only on `/opt/app-verity` from `/dev/mapper/attestamp-app` (squashfs), with the application file readable.
+
+Inside the steps, in seconds:
+
+| step | prepare (Vendor, Auditor) | application | build | install and reboot (waiting for the new boot) | check and responder |
+|---|---|---|---|---|---|
+| setup | 40, 35 | | | | |
+| 1 Auditor | | 39 | 27 | 162 (111) | 27 |
+| 2 Vendor | | 25 | 51 | 174 (111) | 39 |
+| 4 Vendor | | 27 | 26 | 188 (138) | 41 |
+
+Against Option 1: each step took about as long (the steps are 293 to 312 s against 281 to 377 s); the build, which now
+also makes the image and its hash tree, took 26 to 51 s against 26 to 41 s; the setup, with `apt` and
+`mkinitramfs`, took 321 s against Option 1's 458 s (why it was shorter was not looked into). The time goes to the
+reboot and to gcloud.
+
+Not exercised by either run: SEV-SNP, Sepolia, and a User on another computer (the `verify` scenes were typed on the
+machine that ran the flow).
 
 ## Afterwards
 
-The firewall rule `attestamp-ra` was changed to the address of the machine running the flow before the run (its
-earlier definition kept outside the repository). Both guests were stopped, not deleted.
+The firewall rule `attestamp-ra` was changed to the address of the machine running the flow before the first run (its
+earlier definition kept outside the repository). After each run both guests were stopped, not deleted.
