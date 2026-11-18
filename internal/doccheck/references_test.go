@@ -143,6 +143,12 @@ func TestDocumentReferences(t *testing.T) {
 // is one exact token in one file.
 var exceptions = []struct{ file, token, why string }{
 	{
+		file:  "docs/build/aws-nitro.md",
+		token: "docs/plan/night-log.md",
+		why: "a path in the tree of commit 31ed378, read with git show: the 2026-11-11 record of the version-control " +
+			"stamping builds, kept only in the history since the night log stopped being tracked",
+	},
+	{
 		file:  "docs/build/app-fixture-recording.md",
 		token: "internal/tee/parse/snp/testdata/gcp-n2d-t10-{a,b,relay}-*",
 		why: "the names the T10 relay recordings would have had, under \"What committing would have meant\"; " +

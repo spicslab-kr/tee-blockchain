@@ -19,8 +19,10 @@ commit `6146c10`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-17-shared-aw
 | PCR1 | the Linux kernel and boot ramdisk that Nitro puts in the image |
 | PCR2 | the application: your software's files and the responder |
 
-In our measurements a different file in the image changed PCR0 and PCR2, and so did a different
-`ENTRYPOINT` with the same files.
+One differing file in the image, `/etc/shadow`, gave a different PCR0 and PCR2
+([aws-nitro-2026-11-15-local-chain.md](../results/aws-nitro-2026-11-15-local-chain.md)). That a different `ENTRYPOINT`
+with the same files changes them too was seen in the work before this repository (imported in `dcd8e90`); no record of
+that build was kept.
 
 ## Before building
 
@@ -44,7 +46,10 @@ uncommitted changes (`e883b62` plus one line appended to `README.md`) produced a
 `-trimpath -buildvcs=false` the first and the third gave the same file (`82aba5f6…9207`). `go version -m` shows the
 stamp, and with it a module version derived from the commit (`v0.0.0-20261111045839-3b21225a283f`). Also observed: a
 `git worktree` checkout of the same commits (where `.git` is a file, not a directory) built with no stamp at all, so
-whether a build is stamped depends on how the source was checked out. `-buildvcs=false` removes that dependence.
+whether a build is stamped depends on how the source was checked out. `-buildvcs=false` removes that dependence. The
+record of these builds, with the full hashes, is the night log of that day, no longer tracked but kept in the history:
+`git show 31ed378:docs/plan/night-log.md`, section "Decision 2026-11-11: `-buildvcs=false`, enforced". It names the
+two commits as they were called before the history was rewritten on 2026-11-17.
 
 **cgo, measured.** Go links cgo by default when the build is native (target OS and architecture equal the host's)
 and a C compiler is on PATH. `att-ra-responder` imports `net`, so with cgo it carries the cgo DNS resolver and links
@@ -103,7 +108,11 @@ have to take care of all of it. The sections after this one say which items `bui
 
 `docker build` decides file order and timestamps in each layer anew on every run. With identical file
 contents the layer bytes still differ, and PCR0 and PCR2 with them. After `docker build`, `build` and
-`pack` therefore export the files and do the following. Each item was found by measurement.
+`pack` therefore export the files and do the following. Each item answers a build that came out different. The
+`/etc/shadow` row is recorded (2026-11-15, [aws-nitro-2026-11-15-local-chain.md](../results/aws-nitro-2026-11-15-local-chain.md)).
+The others were found in the work before this repository (imported in `dcd8e90`), in the images named in brackets, and
+no record of those builds was kept; the code and its tests (`internal/setup/build/aws/normalize_scrub_test.go`) are
+what remains.
 
 | step | what it removes |
 |---|---|

@@ -13,7 +13,7 @@ import (
 )
 
 // scratchDirs are scratch directories that should be empty at run time anyway. Files left by mktemp and the like during the build have random
-// names and differ on every build (measured: the official memcached alpine Dockerfile left one /tmp/<random> file, and PCR0 and PCR2
+// names and differ on every build (seen before this repository, not recorded: the official memcached alpine Dockerfile left one /tmp/<random> file, and PCR0 and PCR2
 // diverged although all binaries were identical). The directory stays; only its contents are emptied.
 var scratchDirs = []string{"tmp", "var/tmp"}
 
@@ -47,7 +47,7 @@ const apkFixedIdentity = "C:Q10000000000000000000000000000="
 
 // fixApkVirtualVersions handles apk virtual packages (--virtual, name starting with ".", bundling dependencies without files).
 // Their version defaults to the install time, so the build time is embedded in /etc/apk/world and /lib/apk/db/installed
-// (measured: official haproxy and memcached alpine; of several hundred files only these two differed, and PCR0 and PCR2
+// (seen before this repository, not recorded: official haproxy and memcached alpine; of several hundred files only these two differed, and PCR0 and PCR2
 // diverged). That records when it was installed, not what, so the version is pinned to 0 and the identifier (C:)
 // derived from that version is replaced by a placeholder. It returns the relative paths of the files it fixed.
 func fixApkVirtualVersions(ctx context.Context, r runner, root string) []string {
@@ -156,7 +156,7 @@ func blankShadowDates(b []byte) ([]byte, bool) {
 }
 
 // buildCaches are caches tools leave during the build. Their content is the state of that moment, such as times and inodes, not file
-// content, so it differs on every build of the same source, and nothing inside the enclave uses it again (measured: the official
+// content, so it differs on every build of the same source, and nothing inside the enclave uses it again (seen before this repository, not recorded: the official
 // mariadb Dockerfile on two instances; of 13,063 entries only root/.wget-hsts (wget's HSTS store, with visit times) and
 // var/cache/ldconfig/aux-cache (ldconfig's cache of library stat data) differed, and PCR0 and PCR2 diverged. tomcat's aux-cache differed too). They are removed.
 var buildCaches = []string{
@@ -186,7 +186,7 @@ func stripBuildCaches(ctx context.Context, r runner, root string) []string {
 }
 
 // exists reports whether a path is present in the extracted tree. Inside directories only root can look into, such as /root (700) and /var/cache/ldconfig (700),
-// os.Lstat fails with a permission error (measured: that is why mariadb's root/.wget-hsts was not removed), so then the runner's (sudo) test -e is used.
+// os.Lstat fails with a permission error (seen before this repository: that is why mariadb's root/.wget-hsts was not removed), so then the runner's (sudo) test -e is used.
 func exists(ctx context.Context, r runner, path string) bool {
 	_, err := os.Lstat(path)
 	if err == nil {

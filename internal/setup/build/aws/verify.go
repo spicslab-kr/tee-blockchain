@@ -90,7 +90,7 @@ func short(v string) string {
 
 // verify builds the same Dockerfile once more without cache and checks that the same PCRs come out. The static check (lint) says "may differ";
 // this shows whether the builds do differ. Two equal builds on one host do not guarantee equality on another host, and a difference here means
-// no host will match; the report names the paths responsible (measured: redis, the redis-server binary; haproxy, two apk db files).
+// no host will match; the report names the paths responsible (seen before this repository, not recorded: redis, the redis-server binary; haproxy, two apk db files).
 // On a difference it returns an error. The first build's EIF and measurements are already in out/, and an Auditor could not reproduce them.
 func (b Build) verify(ctx context.Context, r runner, appDir, appImage string, first manifest, firstPCR map[string]string) error {
 	checkApp := appImage + "-verify"
