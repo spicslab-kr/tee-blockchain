@@ -24,9 +24,12 @@ The platform guides refer here: [AWS Nitro](aws-nitro.md), [Intel TDX](tdx.md), 
 | `go build` of `att-vendor`, `att-auditor`, `att-user`, `att-ra-responder` | your machine | go (`CGO_ENABLED=0` and `-trimpath -buildvcs=false -ldflags=-buildid=`, pinned version; `build` refuses a responder built otherwise) |
 | `go test ./...` | your machine | go; anvil for the chain tests (looked up on `PATH`, then `~/.foundry/bin`); git for the `core/transfer` tests |
 | `go generate` (the Registry binding) | your machine | forge → solc 0.8.28, called as `$HOME/.foundry/bin/forge` (where foundryup installs it; `PATH` is not searched); `python` under that name (where only `python3` exists, as on stock Ubuntu, add a `python` link or alias); `go run …/abigen` |
-| `att-vendor build`, `att-auditor build`, `pack` | Nitro instance | dnf, systemctl, docker (`build`, `create`, `export`, `image inspect`), nitro-cli (`build-enclave`, `describe-eif`) |
+| `att-vendor build`, `att-auditor build`, `pack` | Nitro instance | dnf, systemctl, docker (`build`, `create`, `export`, `image inspect`), nitro-cli (`build-enclave`, `describe-eif`); `build` also rpm (`rpm -q docker aws-nitro-enclaves-cli`, the versions it installed) |
 | `att-* launch` | Nitro instance | dnf, systemctl (the allocator), nitro-cli (`run-enclave`, `describe-enclaves`, `terminate-enclave`), aws (reading the security group; opening the port only with `--open-port-to`, when the instance role allows) |
-| `att-auditor send`, `receive`; `att-vendor send`, `receive` | anywhere | git |
+| `att-vendor send` | aws-nitro: the Nitro instance that ran `build` (it reads the Amazon Linux release from `/etc/os-release` and the docker and nitro-cli versions with rpm, unless `build_env` already holds them); other formats: anywhere | git; rpm on aws-nitro |
+| `att-auditor receive` | where you will build: it compares this machine's OS, architecture and Go with the Vendor's `build_env`, and on aws-nitro the Amazon Linux release, and refuses a mismatch unless `--ignore-env` | git |
+| `att-auditor send` | anywhere | git; with `--config --measurements`, nitro-cli (`--version`, for the record's `build_tool`) unless `--build-tool-version` is given |
+| `att-vendor receive` | anywhere | git |
 | e2e flow and check scripts | your machine, then the instances over ssh | bash, ssh, scp, go (cross-builds), curl (instance metadata), git (cloning the test application on the instance) |
 | `e2e/cloud/aws-nitro.sh` | your machine | aws, curl (your public IP) |
 | `e2e/cloud/gcp-cvm.sh` | your machine | gcloud |
