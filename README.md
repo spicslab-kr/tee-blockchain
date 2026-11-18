@@ -69,7 +69,9 @@ patch version produces a different `att-ra-responder` and therefore different me
 installed, set `GOTOOLCHAIN=go1.26.1` (for example `export GOTOOLCHAIN=go1.26.1`) and Go fetches and uses exactly that
 one. How to install it, and everything else each platform needs: [docs/build/toolchain.md](docs/build/toolchain.md).
 
-For your own machine (the User's `verify`, and every chain command). The `NAME=value command` form is POSIX shell;
+For your own machine: the User's `verify`, and the commands that only need the chain's RPC and a TEE's port
+(`registry-deploy`, `register`, `lookup`, `audit`, `self-register`; Quick start says which steps must run on the
+instance). The `NAME=value command` form is POSIX shell;
 on Windows run these in Git Bash. `CGO_ENABLED=0` matters for `att-ra-responder`: with gcc installed, a native Linux
 build otherwise links cgo and gives a different file, and with it different measurements, than a build anywhere else.
 `build` refuses such a responder. It is on every line so the binaries are the same however they are built:
@@ -159,37 +161,56 @@ by side, and which one to use: [RA comparison](docs/build/ra-comparison.md#which
 
 ## Quick start
 
-As a **User**, with an enclave address and a registry address. No keys, no ETH, no Nitro:
+As a **User**, on your own machine with the `att-user` you built above, an enclave address and a registry address. No
+keys, no ETH, no Nitro:
 
 ```
-att-user verify --tee-addr <vendor-public-ip>:5000 --rpc <ethereum rpc url> --registry <0x…>
+./att-user verify --tee-addr <vendor-public-ip>:5000 --rpc <ethereum rpc url> --registry <0x…>
 ```
 
 Exit 0 and a line like `✓ matches  nginx 1.31.6 (amd64) by 0x…, expires …` means a registration
 matches. Exit 1 prints the reason. Measured from Korea against a Nitro enclave in eu-north-1 and
 Ethereum mainnet: about 3 s and 21 MB peak.
 
-As a **Vendor**, on a Nitro instance, with the directory that holds your Dockerfile:
+The Vendor and the Auditor work on a Nitro instance (Amazon Linux 2023, user `ec2-user`). First copy the Linux binaries
+built above (`linux/`) to it from your own machine, the role's binary and `att-ra-responder`, which `build` layers into
+the enclave image:
 
 ```
-att-vendor build  --app-dir <dir> --out-dir out  # reproducible enclave image + measurements
-att-vendor launch --eif out/<name>.eif           # run it; add --open-port-to <verifier-ip>/32 to open the port
-att-vendor send   --repo <git url> --config build-config.json
+scp -i <your-key.pem> linux/att-vendor linux/att-ra-responder ec2-user@<instance-ip>:~/    # as the Vendor
+ssh -i <your-key.pem> ec2-user@<instance-ip> chmod +x att-vendor att-ra-responder
+scp -i <your-key.pem> linux/att-auditor linux/att-ra-responder ec2-user@<instance-ip>:~/   # as the Auditor
+ssh -i <your-key.pem> ec2-user@<instance-ip> chmod +x att-auditor att-ra-responder
+```
+
+(`e2e/0-Setup-local-upload.sh` builds and uploads them for the e2e flows.)
+
+As a **Vendor**, on the instance, with the directory that holds your Dockerfile:
+
+```
+./att-vendor build  --app-dir <dir> --out-dir out  # reproducible enclave image + measurements
+./att-vendor launch --eif out/<name>.eif           # run it; add --open-port-to <verifier-ip>/32 to open the port
+./att-vendor send   --repo <git url> --config build-config.json
 ```
 
 You write `build-config.json` yourself; its fields and an example are in the Vendor guide,
-[Hand-off with the Auditor](cmd/vendor/README.md#hand-off-with-the-auditor).
+[Hand-off with the Auditor](cmd/vendor/README.md#hand-off-with-the-auditor). `send` commits it to `--repo` and pushes,
+so the instance needs push access to that repository (an SSH key or token of yours there), and it must run on the
+instance that ran `build`: it records that instance's Amazon Linux release and tool versions.
 
-As an **Auditor**, on a Nitro instance, with the Vendor's repository. A registry is deployed once, before the first
-`audit`; it prints the address that `--registry` takes:
+As an **Auditor**, with the Vendor's repository. `receive`, `build` and `launch` run on your instance (on aws-nitro
+`receive` compares the instance's Amazon Linux release with the Vendor's, and `build` and `launch` need `nitro-cli`).
+`registry-deploy` and `audit` only talk to the chain's RPC and to the enclave's port, so they run there too, as below,
+or on your own machine with the `att-auditor` built above. A registry is deployed once, before the first `audit`; it
+prints the address that `--registry` takes:
 
 ```
-att-auditor registry-deploy --rpc <url> --deployer-key-file <key> --approver <0x… address of your signing key>
-att-auditor receive --repo <git url> --into work/src
-att-auditor build   --config work/src/build-config.json --app-dir work/src/<path> --out-dir out
-att-auditor launch  --eif out/<name>.eif
-att-auditor audit   --config work/src/build-config.json --tee-addr <my-instance>:5000 \
-                   --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>
+./att-auditor registry-deploy --rpc <url> --deployer-key-file <key> --approver <0x… address of your signing key>
+./att-auditor receive --repo <git url> --into work/src
+./att-auditor build   --config work/src/build-config.json --app-dir work/src/<path> --out-dir out
+./att-auditor launch  --eif out/<name>.eif
+./att-auditor audit   --config work/src/build-config.json --tee-addr <my-instance>:5000 \
+                     --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>
 ```
 
 A key file is one line, a 32-byte Ethereum private key in hex (with or without `0x`); how to make one and get its
@@ -197,7 +218,8 @@ address: [e2e/README.md, Key files](e2e/README.md#key-files). On a public networ
 from a Sepolia faucet. To try it all without any ETH or key files, run the registry on a local `anvil` chain:
 [Running without a public testnet](e2e/README.md#running-without-a-public-testnet). On TDX and SEV-SNP the roles are
 the same but the commands differ: `build` and `launch` run on the guest with `--platform` (and take a folder of files
-and a base initrd, not a Dockerfile), and `audit`, `self-register` and `verify` need `--format`. The getting-started
+and a base initrd, not a Dockerfile), and `audit`, `self-register` and `verify` need `--format` (`audit` and
+`self-register` take it from `--config` when given). The getting-started
 procedures linked above go through them step by step.
 
 ## Features
