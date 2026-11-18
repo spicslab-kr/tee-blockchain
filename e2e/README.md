@@ -8,6 +8,33 @@ script from the repository root.
 
 For tests that need no Nitro hardware, see `go test ./...` in the main README.
 
+## env.sh and env.local.sh
+
+`e2e/env.sh` holds the shared settings: SSH user and key, chain and RPC, signing and deployer key files, service name and
+version, and the helper functions the scripts use. It does not hold instance addresses. Those go in
+`e2e/env.local.sh`, which is gitignored: copy `e2e/env.local.example.sh` to `e2e/env.local.sh` and
+fill in
+
+```
+VENDOR_HOST=<vendor instance public IP or DNS>
+AUDITOR_HOST=<auditor instance public IP or DNS>
+ARM64_HOST=<arm64 instance, or leave empty>
+AUDITOR_ADDR=<address of auditor.key>
+VENDOR_ADDR=<address of deployer.key>
+```
+
+The two addresses are those of your key files ([Key files](#key-files), below); with `NET=local` they are not needed.
+`env.sh` reads the file automatically. A value set in the environment wins over the file, so a one-off run can pass
+the addresses on the command line. An instance without a fixed address gets a new public IP each time it is started
+(`bash e2e/cloud/aws-nitro.sh status` prints them):
+
+```
+VENDOR_HOST=<new vendor IP> AUDITOR_HOST=<new auditor IP> bash e2e/replay-check.sh
+```
+
+A script that needs a host that is not set stops with a message telling you to create the file. `ARM64_HOST` may stay empty: the architecture scripts then only
+print guidance.
+
 ## Prerequisites
 
 - Two Nitro-enabled EC2 instances (Linux), one for the Vendor and one for the Auditor. An optional
@@ -72,32 +99,6 @@ cast wallet address --private-key 0x$(cat deployer.key)
 
 Then send test ETH to both addresses on Sepolia. These files hold private keys: keep them out of every commit, message
 and screenshot, and use them for nothing but these tests.
-
-## env.sh and env.local.sh
-
-`e2e/env.sh` holds the shared settings: SSH user and key, chain and RPC, signing and deployer key files, service name and
-version, and the helper functions the scripts use. It does not hold instance addresses. Those go in
-`e2e/env.local.sh`, which is gitignored: copy `e2e/env.local.example.sh` to `e2e/env.local.sh` and
-fill in
-
-```
-VENDOR_HOST=<vendor instance public IP or DNS>
-AUDITOR_HOST=<auditor instance public IP or DNS>
-ARM64_HOST=<arm64 instance, or leave empty>
-AUDITOR_ADDR=<address of auditor.key>
-VENDOR_ADDR=<address of deployer.key>
-```
-
-`env.sh` reads it automatically. A value set in the environment wins over the file, so a one-off run can pass
-the addresses on the command line. An instance without a fixed address gets a new public IP each time it is started
-(`bash e2e/cloud/aws-nitro.sh status` prints them):
-
-```
-VENDOR_HOST=<new vendor IP> AUDITOR_HOST=<new auditor IP> bash e2e/replay-check.sh
-```
-
-A script that needs a host that is not set stops with a message telling you to create the file. `ARM64_HOST` may stay empty: the architecture scripts then only
-print guidance.
 
 ### Choosing the chain
 
