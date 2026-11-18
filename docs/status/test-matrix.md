@@ -43,7 +43,7 @@ Each cell says how far the row is proven, and by what:
 | cell | state | why it is open |
 |---|---|---|
 | T1, Nitro, across days | the same commit on two machines agrees; values differ across commits and days | by design: the code changed (`a402827`, `1967749d`, `45887c8`, `ec14e63`, `f0fb80d`), and the test application's Dockerfile pins neither its base image nor its packages (`docs/results/aws-nitro-2026-11-17-shared-aws.md`) |
-| T1, TDX, vCPUs vs memory | not separable on GCP | RTMR0 follows the machine type; GCP accepts TDX only on `c3-standard` shapes, where vCPUs and memory grow together (`c3-highmem-4` and `c3-highcpu-8` were refused) |
+| T1, TDX, vCPUs vs memory | not separable on GCP | RTMR0 follows the machine type; GCP refused `c3-highmem-4` and `c3-highcpu-8` for TDX, and Google's list of TDX machine types (read 2026-11-18) has only `standard` shapes, where vCPUs and memory grow together |
 | T8, TDX and SEV-SNP, live | **not applicable** on GCP | GCP offers no debug confidential VM. Running it live needs a host that can launch one (a KVM host of one's own); the refusal stays a code test |
 | T10, Nitro and TDX | not applicable | one signed document, nothing to combine (⁶) |
 | T10, SEV-SNP, as a code test | live only | the relay recordings carry instance identifiers and are not committed |

@@ -29,8 +29,9 @@
 #   SEV-SNP  N2D machine types only, CPU platform AMD Milan, --confidential-compute-type=SEV_SNP
 #            zones: asia-southeast1-a/b/c, europe-west3-a/b/c, europe-west4-a/b/c, us-central1-a/b/c
 #            the image needs the SEV_SNP_CAPABLE guest OS feature (Debian 12 has no SNP attestation)
-#   TDX      C3 (Sapphire Rapids) or C4 (Granite Rapids), --confidential-compute-type=TDX,
-#            and NO --min-cpu-platform. The image needs the TDX_CAPABLE guest OS feature.
+#   TDX      c3-standard-* (Sapphire Rapids), c4-standard-* (Granite Rapids) or a3-highgpu-1g; standard shapes only
+#            (re-read 2026-11-18; GCP refused c3-highmem-4 and c3-highcpu-8 on 2026-11-16; C4 and A3 not tried),
+#            --confidential-compute-type=TDX and NO --min-cpu-platform. The image needs the TDX_CAPABLE guest OS feature.
 #   Both     --maintenance-policy=TERMINATE; these machine types cannot live-migrate.
 #
 # vTPM: the Confidential VM docs do not state it, but our own runs confirmed /dev/tpm0 is present

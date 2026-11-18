@@ -731,7 +731,7 @@ guests of one image, made five days apart, gave the same four values (see "Use t
 | variable | which value | note |
 |---|---|---|
 | GCP's TDVF version | MRTD | GCP may update it; every registration would change |
-| VM shape (vCPUs, memory) | RTMR0 | **measured 2026-11-16**: `c3-standard-4` `8847ec5d…`, `c3-standard-8` `eba48352…`, nothing else moved. Which of vCPUs and memory does it was not separable (GCP allows TDX on `c3-standard` shapes only, where both grow together) |
+| VM shape (vCPUs, memory) | RTMR0 | **measured 2026-11-16**: `c3-standard-4` `8847ec5d…`, `c3-standard-8` `eba48352…`, nothing else moved. Which of vCPUs and memory does it was not separable: GCP refused `c3-highmem-4` and `c3-highcpu-8` for TDX, and Google's list of TDX machine types (read 2026-11-18) has only `standard` shapes, where both grow together |
 | shim, GRUB, kernel | RTMR1 | OS image updates |
 | kernel command line | RTMR2 | it carries the root file system's UUID (`root=UUID=…` with our entry). That UUID comes with the image version, not the disk: two guests of one image had the same (measured 2026-11-15), so it changes only with another image |
 | base initrd | RTMR2 | `mkinitramfs` writes a random seed, so the Vendor's base initrd is used as published (as on SEV-SNP) |
@@ -887,7 +887,7 @@ the boot stopped.
 
 | setting | value | why |
 |---|---|---|
-| machine type | `c3-standard-4` | TDX on GCP runs on C3 (Sapphire Rapids) or C4 (script header, checked against Google's docs 2026-11) |
+| machine type | `c3-standard-4` | Google lists `c3-standard-*` (Sapphire Rapids), `c4-standard-*` (Granite Rapids) and `a3-highgpu-1g` for TDX (read 2026-11-18). Only `c3-standard-4` and `-8` were used here; `c3-highmem-4` and `c3-highcpu-8` were refused; C4 and A3 were not tried |
 | confidential type | `--confidential-compute-type=TDX` | |
 | CPU platform | none | the script header says TDX must be created **without** `--min-cpu-platform` |
 | maintenance | `--maintenance-policy=TERMINATE` | these VMs cannot live-migrate |
