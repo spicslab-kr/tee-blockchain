@@ -142,7 +142,7 @@ func usage() {
               AMD SEV-SNP, as root on the guest: installs the initrd (and for -verity the image and the root hash) under GRUB
   launch      --platform amd-sev-snp-* --check [--build-value out/build-value.json] [--out-dir out]
               after that reboot: verifies fresh evidence, requires INITRD (and PCR12) to be the built values, writes measurements.json
-  ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc>  [--user-data <hex>]
+  ra-serve    --listen tcp:<host:port> | vsock:<port>  --extractor nsm | fixture=<doc> [--format <fmt>]  [--user-data <hex>]
               runs inside the TEE. takes a nonce per request and returns an RA document. a fixture is labelled aws-nitro
   lo-up       brings up loopback inside the enclave. once, before starting the software
   ra-proxy    --listen <host:port>  --vsock <cid>:<port>
@@ -377,6 +377,7 @@ func raServe(args []string) error {
 	fs := flag.NewFlagSet("ra-serve", flag.ContinueOnError)
 	listen := fs.String("listen", "tcp:127.0.0.1:5000", "tcp:<host:port> or vsock:<port>")
 	extractor := fs.String("extractor", "nsm", "nsm or fixture=<doc file>")
+	fixtureFormat := fs.String("format", awsra.Format, "format the fixture document is served as (fixture extractor only), e.g. intel-tdx")
 	userData := fs.String("user-data", "", "value to bind into the document (hex)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -390,7 +391,7 @@ func raServe(args []string) error {
 		}
 		ex = awsra.Extractor{UserData: ud}
 	case strings.HasPrefix(*extractor, "fixture="):
-		fx, err := ra.LoadFixture(awsra.Format, strings.TrimPrefix(*extractor, "fixture="))
+		fx, err := ra.LoadFixture(*fixtureFormat, strings.TrimPrefix(*extractor, "fixture="))
 		if err != nil {
 			return err
 		}
