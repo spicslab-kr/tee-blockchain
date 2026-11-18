@@ -38,9 +38,9 @@ tstep "AUDITING MY GUEST AND ASKING THE VENDOR'S" "$AUDITOR_BIN" audit --tee-add
 rc=$?
 echo "audit exit=$rc   registry=$REGISTRY"
 if [ $rc -eq 0 ]; then
-  result T4 audit-vendor-tee-same accepted accepted "audit --vendor-tee: the Vendor's guest runs what the Auditor built (exit 0)" "registry $REGISTRY"
+  result T4 audit-vendor-tee-same accepted accepted "audit --vendor-tee: the Vendor's guest runs what the Auditor built (exit 0)" "option $OPTION, registry $REGISTRY"
 else
-  result T4 audit-vendor-tee-same rejected accepted "audit --vendor-tee exit $rc, want 0" "registry $REGISTRY"
+  result T4 audit-vendor-tee-same rejected accepted "audit --vendor-tee exit $rc, want 0" "option $OPTION, registry $REGISTRY"
   exit $rc
 fi
 echo "next: 4-Vendor-tamper-rebuild-launch.sh ${args[*]}"

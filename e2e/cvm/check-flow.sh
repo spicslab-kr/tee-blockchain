@@ -180,6 +180,9 @@ call 'att-auditor registry-deploy --rpc http://127.0.0.1:8545 '
 call "att-auditor audit --tee-addr 192.0.2.20:5000 --format intel-tdx --build-measurements .*auditor-measurements.json --rpc http://127.0.0.1:8545 --registry $REG"
 call 'att-auditor lookup .*--platform intel-tdx'
 said 'new boot on attestamp-tdx-auditor after'; said 'registered under record key 0xabab'; finish
+start "1: the result line names the TDX option (both options share the format intel-tdx)"
+grep -q '"detail":"option 1, registry ' "$work/results/intel-tdx.jsonl" 2>/dev/null || bad="; no result line with detail \"option 1, registry …\" in $work/results/intel-tdx.jsonl"
+finish
 start "1: no new boot within REBOOT_TIMEOUT fails, says so, and audits nothing"
 run NET=local FAKE_BOOT=never REBOOT_TIMEOUT=2 REBOOT_POLL=1 bash "$F1" intel-tdx; exitis 1
 said 'no new boot on attestamp-tdx-auditor within 2 s'; said 'the old boot \(11111111-old\) still answered'

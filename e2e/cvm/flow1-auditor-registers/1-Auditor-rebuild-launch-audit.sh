@@ -50,9 +50,9 @@ tstep "AUDITING MY GUEST" "$AUDITOR_BIN" audit --tee-addr "$AUDITOR_IP:$RA_PORT"
   --signing-key-file "$AUDITOR_SIGNING_KEY" --service "$CVM_SERVICE" --version "$CVM_VERSION" --arch amd64
 rc=$?
 if [ $rc -eq 0 ]; then
-  result T4 auditor-audit-registers accepted accepted "audit: the Auditor's guest attests its own build, registered" "registry $REGISTRY"
+  result T4 auditor-audit-registers accepted accepted "audit: the Auditor's guest attests its own build, registered" "option $OPTION, registry $REGISTRY"
 else
-  result T4 auditor-audit-registers rejected accepted "audit exit $rc" "registry $REGISTRY"
+  result T4 auditor-audit-registers rejected accepted "audit exit $rc" "option $OPTION, registry $REGISTRY"
   exit $rc
 fi
 

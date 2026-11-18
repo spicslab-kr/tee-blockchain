@@ -38,8 +38,8 @@ rc=$?
 echo "audit exit=$rc   registry=$REGISTRY"
 if [ $rc -eq 12 ]; then
   echo "as expected: the Auditor's value is registered, and the Vendor's guest runs something else (exit 12)"
-  result T5 audit-vendor-tee-after-change different different "audit --vendor-tee exit 12: registered; the Vendor's guest runs something else" "registry $REGISTRY"
+  result T5 audit-vendor-tee-after-change different different "audit --vendor-tee exit 12: registered; the Vendor's guest runs something else" "option $OPTION, registry $REGISTRY"
   exit 0
 fi
-result T5 audit-vendor-tee-after-change error different "audit --vendor-tee exit $rc, want 12" "registry $REGISTRY"
+result T5 audit-vendor-tee-after-change error different "audit --vendor-tee exit $rc, want 12" "option $OPTION, registry $REGISTRY"
 exit 1

@@ -43,10 +43,10 @@ tstep "LOOKING UP MY VALUE ON THE REGISTRY" "$VENDOR_BIN" lookup --rpc "$RPC" --
 tstep "COMPARING TO THE CHAIN REGISTRATION" "$VENDOR_BIN" compare --attested "$CVM_WORK/vendor-check/parsed.json" --rpc "$RPC" --registry "$REGISTRY" --record-key "$RECORD_KEY"; b=$?
 if [ $a -eq 0 ] && [ $l -eq 0 ] && [ $b -eq 0 ]; then
   echo "OK: my guest runs exactly what the Auditor rebuilt and registered. Users will get 'trusted'."
-  result T4 vendor-checks-own-guest accepted accepted "the Vendor's guest equals the Auditor's values and its registration" "registry $REGISTRY"
+  result T4 vendor-checks-own-guest accepted accepted "the Vendor's guest equals the Auditor's values and its registration" "option $OPTION, registry $REGISTRY"
 else
   echo "MISMATCH: my guest runs something other than what the Auditor registered."
-  result T4 vendor-checks-own-guest rejected accepted "compare with the Auditor's values exit $a, lookup exit $l, compare with the registration exit $b" "registry $REGISTRY"
+  result T4 vendor-checks-own-guest rejected accepted "compare with the Auditor's values exit $a, lookup exit $l, compare with the registration exit $b" "option $OPTION, registry $REGISTRY"
   exit 1
 fi
 print_verify_line "$VENDOR_IP" "$REGISTRY" "trusted, exit 0"
