@@ -58,8 +58,10 @@ This page lists every folder in the repository, then explains the one idea that 
 │   │                       SEV-SNP guests), aws-snp.sh (SEV-SNP on AWS, kept for reference); check-scripts.sh runs
 │   │                       every action of the three against stand-in CLIs (also from go test ./cmd); README on
 │   │                       accounts, cost, images and SSH
-│   └── cvm/                scripts that run on a TDX or SEV-SNP guest: in-guest-verify.sh (the whole chain on
-│                           the guest) and build-env-check.sh (T7)
+│   └── cvm/                TDX and SEV-SNP: flow 1 on two guests (0-Setup-guests.sh, flow1-auditor-registers/,
+│                           env-cvm.sh, guest/guest-step.sh; check-flow.sh runs them against stand-ins, also from
+│                           go test ./cmd); and scripts that run on one guest: in-guest-verify.sh (the whole chain
+│                           on the guest) and build-env-check.sh (T7)
 │
 └── docs/
     ├── build/              how to use it and the procedures: one guide per platform (aws-nitro, tdx, sev-snp),

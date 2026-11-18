@@ -4,7 +4,8 @@ These scripts run both flows against real Nitro instances and a public chain, or
 ([without a public testnet](#running-without-a-public-testnet)). Everything runs from
 your own machine, in Git Bash, macOS or Linux; steps that must build or launch inside an instance
 connect over SSH and stream the script, so nothing is uploaded except the binaries. Run every
-script from the repository root.
+script from the repository root. Flow 1 also runs on TDX and SEV-SNP guests on GCP:
+[Flow 1 on TDX and SEV-SNP](#flow-1-on-tdx-and-sev-snp).
 
 For tests that need no Nitro hardware, see `go test ./...` in the main README.
 
@@ -209,6 +210,45 @@ The registry address is saved in `e2e-work/registry.txt` for the later steps.
 | `flow2-vendor-self-registers/5-User-tamper-verify-both-registries.sh` | User | verifies against both registries. The Vendor's says yes, the Auditor's says no, so the result is not trusted |
 
 The Vendor's registry address is saved in `e2e-work/registry-flow2.txt`.
+
+## Flow 1 on TDX and SEV-SNP
+
+The same flow on two confidential VMs on GCP, `<PREFIX>-vendor` and `<PREFIX>-auditor` (`PREFIX` default
+`attestamp-tdx` or `attestamp-snp`, `ZONE` default `us-central1-a`), made beforehand with
+`bash e2e/cloud/gcp-cvm.sh <tdx|snp> create --yes` from one image and machine type. Every script takes the format, and
+for TDX the option: `intel-tdx [1|2]`, `amd-sev-snp-initrd`, `amd-sev-snp-verity`. The steps are those of
+`docs/build/tdx.md` and `sev-snp.md` ("Getting started", "The Auditor's half"). The chain is `NET` as above, Sepolia by
+default, so that a User on another computer reaches it and the transactions show on Etherscan; `NET=local` for
+development.
+
+| script | who | what it does |
+|---|---|---|
+| `cvm/0-Setup-guests.sh` | both | checks both guests have the same image and machine type, builds the binaries, copies them, and prepares each guest (an initrd boot, the base initrd, the Option 2 packages; for Option 2 the Auditor gets the Vendor's `base-initrd-v.img`). Leaves what is done as it is, so it can be run before every take |
+| `cvm/flow1-auditor-registers/1-Auditor-rebuild-launch-audit.sh` | Auditor | builds the application on its guest, installs it, reboots, checks the boot, deploys a registry and runs `audit`. Option `-c 0x...` |
+| `cvm/flow1-auditor-registers/2-Vendor-build-launch-check-record.sh` | Vendor | the same build on its guest, then `compare` and `lookup` of its own value against the Auditor's and the registration. Prints the `att-user verify` line for the other computer: trusted |
+| `cvm/flow1-auditor-registers/2b-Auditor-audit-vendor.sh` | Auditor | `audit --vendor-tee` with both guests up: the Vendor's guest runs what the Auditor built, exit 0 |
+| `cvm/flow1-auditor-registers/4-Vendor-tamper-rebuild-launch.sh` | Vendor | changes one byte of the application, builds, reboots. Prints the `verify` line again: not trusted |
+| `cvm/flow1-auditor-registers/4b-Auditor-audit-vendor-tampered.sh` | Auditor | `audit --vendor-tee` again: the Auditor's value is registered and the Vendor's guest runs something else, exit 12 (the pass) |
+
+There is no User script: steps 3 and 5 are the printed `verify` line, typed on another computer. Its address must be
+allowed on port 5000 by the firewall rule `attestamp-ra` (`e2e/cloud/README.md`, "From another computer, or after your
+address changed").
+
+- **Commands on a guest** are a script file (`cvm/guest/guest-step.sh`) copied with `gcloud compute scp` and run with
+  `gcloud compute ssh --command`; nothing is piped into ssh, whose handling of piped input through PuTTY on Windows was
+  never checked. SSH goes through IAP (`IAP=0` for the public address).
+- **The reboot** is followed by comparing `/proc/sys/kernel/random/boot_id` before and after, polled every
+  `REBOOT_POLL` seconds (15) for up to `REBOOT_TIMEOUT` (600); past that the step fails and says what it last saw. The
+  serial console is not used (`docs/results/trial-2026-11-16-clean.md`, F6).
+- **Registries.** `audit` registers as part of its run, and a value already on a registry stops it at exit 5. So 2b
+  and 4b deploy a registry of their own each time (`-c 0x...` for a given one); step 1's registry is the one the
+  `verify` line names. Files go to `e2e-work/cvm/<format>/` (`intel-tdx-opt1` or `-opt2` for TDX), results to
+  `e2e-work/results/<format>.jsonl`.
+- **Checked without a guest** by `cvm/check-flow.sh` (also run by `go test ./cmd`, `TestCVMFlowScripts`): stand-in
+  gcloud, go, curl and att; the arguments, what goes to which guest, the boot_id wait and its timeout, the audit and
+  lookup calls, the exit codes 2b and 4b accept, the printed `verify` line, and the guest-side script's launch and build
+  flags per format. **Not checked without a guest:** gcloud ssh and scp through IAP from Git Bash, the build, the GRUB
+  entry and the reboot, `launch --check`, the responder, and the chain. None of these scripts has run on a guest yet.
 
 ## Checks outside the two flows
 
