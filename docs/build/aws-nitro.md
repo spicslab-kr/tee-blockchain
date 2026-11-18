@@ -79,7 +79,7 @@ comments can be fixed without moving the measurements as long as no line of code
 `docs/status/build-info-gaps.md`, Q1. Since 2026-11-17 every build command passes `-ldflags=-buildid=` and `build`
 refuses a responder that carries a build ID; Go does not record `-ldflags` in the build info of a `-trimpath` binary, so
 `build` reads the ELF note `.note.go.buildid`, which the linker leaves out when the build ID is empty
-(`go tool buildid <file>` prints the same value; nothing is right).
+(`go tool buildid <file>` reads the same note: for a correct responder it prints nothing).
 
 `receive` stops when OS, architecture or Go version differ from the Vendor's `build_env`.
 `--ignore-env` turns that into a warning. Use it only to look around, since the values will not match.
@@ -206,7 +206,7 @@ values that change between machines rather than between runs.
 The build tools are not fixed either. `build` installs `docker` and `aws-nitro-enclaves-cli` with
 `dnf` without a version. Since 2026-11-17 `att-vendor send` records, next to `os`, `arch`, the Go version and
 `trimpath`, the Amazon Linux release (`ami_release`) and both package versions (`docker`, `nitro_cli`), and the
-Auditor checks them twice. `receive`, before anything is installed, compares the release: a proxy, not a guarantee: each Amazon Linux release has its own package repository, but a `dnf update` with another release, `releasever=latest` in `/etc/dnf/vars`, or a package installed by hand moves the versions without moving the release.
+Auditor checks them twice. `receive`, before anything is installed, compares the release. That is a proxy, not a guarantee: each Amazon Linux release has its own package repository, but a `dnf update` with another release, `releasever=latest` in `/etc/dnf/vars`, or a package installed by hand moves the versions without moving the release.
 `build --config <the Vendor's build-config.json>`, right after `dnf install`, compares the versions themselves and
 stops before building anything if either differs; that is the real check. Run on two instances on 2026-11-17
 (`e2e/nitro-tools-check.sh`, `docs/results/aws-nitro-2026-11-17.md`): all six verdicts as expected. Use the same AMI on both sides; to see the values by hand:

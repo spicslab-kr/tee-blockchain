@@ -19,7 +19,7 @@ Statements are marked **confirmed** (read from our recorded quote, a spec, a lib
 
 This takes one TDX guest on Google Cloud and your own computer, and goes all the way: build the application's
 initrd on the guest, boot it, read the measurements, register them on a chain, and have a User verify the guest. Type
-the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; in "The Auditor's half" also `<auditor-guest-ip>`, the image name and the commit the Vendor hands over.
+the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; in "The Auditor's half" so are `<auditor-guest-ip>`, the image name and the commit, which the Vendor hands over.
 
 **What steps 1 to 13 show, and what they do not.** They run against **one** guest, and in step 11 the Auditor
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model

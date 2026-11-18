@@ -20,7 +20,7 @@ or **not confirmed**.
 
 This takes one SEV-SNP guest on Google Cloud and your own computer, and goes all the way: build what carries the
 application on the guest, boot it, read the measurements, register them on a chain, and have a User verify the guest.
-Type the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; in "The Auditor's half" also `<auditor-guest-ip>`, the image name and the commit the Vendor hands over.
+Type the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; in "The Auditor's half" so are `<auditor-guest-ip>`, the image name and the commit, which the Vendor hands over.
 
 **What steps 1 to 13 show, and what they do not.** They run against **one** guest, and in step 11 the Auditor
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
@@ -1028,10 +1028,10 @@ A's attestation next to a report B made over its *own* attestation is not the at
 | REPORT_ID | **different on every boot** of the same VM | no: it does not stay with a VM, and nothing in A's vTPM evidence carries it |
 | CHIP_ID | **changed** between our recordings of the same VM, as it moved hosts | no: it names the physical host, not the VM, and two VMs may share a host |
 
-The two findings fit together. T10 was an observation (the record of the old out-of-repository scripts says the relay verified); these
-measurements explain why it can work: B's report contains nothing a verifier could compare with A's vTPM evidence, so
-once the binding holds, there is no remaining check that could tell the two VMs apart. Whatever names A sits on the
-Google side (the AK certificate), and nothing on the AMD side matches it.
+The two findings fit together. The relay (T10) was first only reported, by the old out-of-repository scripts; these
+measurements explain why it can work. B's report contains nothing a verifier could compare with A's vTPM evidence, so
+once the binding holds, no check is left that could tell the two VMs apart. What names A is on the Google side (the AK
+certificate), and nothing on the AMD side matches it.
 
 **Reproduced on 2026-11-16.** Two guests of one image: A ran the registered application, B a one-byte-changed one. B's
 report requested over SHA3-512 of A's vTPM attestation (`record-snp -relay-att`) passed `ra-parse` with exit 0,
