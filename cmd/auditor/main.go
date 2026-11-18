@@ -206,9 +206,8 @@ func receive(args []string) error {
 	if c.Platform == awsra.Format {
 		fmt.Printf("then:  att-auditor build --config %s --app-dir <the source> --out-dir out   (compares docker and nitro-cli with the Vendor's after installing them)\n", got.Path)
 	}
-	// the config carries service, version and build_env, so audit needs none of them typed again. It does not set the
-	// document format (audit's --format defaults to aws-nitro), so the line names the config's platform.
-	fmt.Printf("next: att-auditor audit --config %s --format %s --tee-addr <this-instance>:5000 --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>\n", got.Path, c.Platform)
+	// the config carries the platform, service, version and build_env, so audit needs none of them typed again
+	fmt.Printf("next: att-auditor audit --config %s --tee-addr <this-instance>:5000 --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>\n", got.Path)
 	return nil
 }
 

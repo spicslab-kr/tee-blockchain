@@ -49,3 +49,31 @@ func TestResolveRegistration(t *testing.T) {
 		}
 	})
 }
+
+func TestResolvePlatform(t *testing.T) {
+	cfg := BuildConfig{Platform: "intel-tdx"}
+	cases := []struct {
+		name       string
+		cfg        *BuildConfig
+		flag, want string
+		warn       bool
+	}{
+		{"config only: its platform", &cfg, "", "intel-tdx", false},
+		{"flag equal to the config: no warning", &cfg, "intel-tdx", "intel-tdx", false},
+		{"flag differs: the flag wins, with a warning", &cfg, "amd-sev-snp-initrd", "amd-sev-snp-initrd", true},
+		{"neither: aws-nitro", nil, "", DefaultPlatform, false},
+		{"flag without a config", nil, "amd-sev-snp-verity", "amd-sev-snp-verity", false},
+	}
+	for _, c := range cases {
+		got, warns := ResolvePlatform(c.cfg, "format", c.flag)
+		if got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+		if c.warn != (len(warns) == 1) || len(warns) > 1 {
+			t.Errorf("%s: warnings %q", c.name, warns)
+		}
+		if c.warn && warns[0] != "--format amd-sev-snp-initrd differs from build-config.json (intel-tdx)" {
+			t.Errorf("%s: warning %q", c.name, warns[0])
+		}
+	}
+}

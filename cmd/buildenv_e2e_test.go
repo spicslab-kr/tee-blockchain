@@ -185,9 +185,9 @@ func TestBuildEnv_ReceiveMatchingEnvPasses(t *testing.T) {
 			t.Errorf("receive stdout must contain %q, got:\n%s", want, stdout)
 		}
 	}
-	// audit's --format defaults to aws-nitro, so the printed next command must name the config's platform.
-	if !regexp.MustCompile(`(?m)^next: att-auditor audit --config \S+ --format intel-tdx `).MatchString(stdout) {
-		t.Errorf("receive must print the audit command with --format intel-tdx, got:\n%s", stdout)
+	// audit takes the format from --config (TestConfig_E2E_AuditFormatFromConfig), so the printed command needs none.
+	if !regexp.MustCompile(`(?m)^next: att-auditor audit --config \S+ --tee-addr `).MatchString(stdout) {
+		t.Errorf("receive must print the audit command with --config, got:\n%s", stdout)
 	}
 	if strings.Contains(stderr, "cannot produce") {
 		t.Errorf("same env must not be refused:\n%s", stderr)
@@ -344,9 +344,6 @@ func TestBuildEnv_ReceiveComparesAMIRelease(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "att-auditor build --config") {
 		t.Errorf("receive must point at build --config on aws-nitro, got:\n%s", stdout)
-	}
-	if !regexp.MustCompile(`(?m)^next: att-auditor audit --config \S+ --format aws-nitro `).MatchString(stdout) {
-		t.Errorf("receive must print the audit command with --format aws-nitro, got:\n%s", stdout)
 	}
 
 	delete(env, "ami_release")

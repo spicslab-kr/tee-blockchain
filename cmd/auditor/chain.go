@@ -59,8 +59,8 @@ func register(args []string) (string, error) {
 	registry := fs.String("registry", "", "Registry contract address")
 	signingKeyFile := fs.String("signing-key-file", "", "signing key file (hex): its signature authorises the registration, and the same key sends the transaction")
 	measurements := fs.String("measurements", "", "measurements: a nitro measurements.json file, or NAME=hex,NAME=hex")
-	platform := fs.String("platform", "aws-nitro", "platform value recorded in the registration")
-	config := fs.String("config", "", "the Vendor's build-config.json (receive puts it in the clone root): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
+	platform := fs.String("platform", "", "platform value recorded in the registration. default: build-config.json's with --config, else aws-nitro")
+	config := fs.String("config", "", "the Vendor's build-config.json (receive puts it in the clone root): platform, service, version and build_env are taken from it, so --format/--platform, --service, --version and --arch are optional and only override it, with a warning")
 	service := fs.String("service", "", "service name")
 	version := fs.String("version", "", "version")
 	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). measurements differ per architecture, so one service/version is registered once per architecture. default: build-config.json's with --config, else this machine's")
@@ -72,6 +72,7 @@ func register(args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	resolvePlatform(cfg, "platform", platform)
 	// ask for any value not given as an option, in turn; service and version are not asked when --config provides them
 	askMainnetRPC(rpc)
 	ask(registry, "Registry address (0x…)", "")
@@ -168,6 +169,19 @@ func resolveRegistration(cfg *tr.BuildConfig, service, version, arch *string) er
 	}
 	*service, *version, *arch = svc, ver, a
 	return nil
+}
+
+// resolvePlatform sets *value, a --format or --platform flag, from the config when the flag is empty, else to
+// aws-nitro; a flag that is given and differs from the config wins, with one warning line. When a bundled command
+// (quiet) calls register, it has resolved the format itself and already warned, so the warning is not repeated.
+func resolvePlatform(cfg *tr.BuildConfig, flag string, value *string) {
+	v, warnings := tr.ResolvePlatform(cfg, flag, *value)
+	if !quiet {
+		for _, w := range warnings {
+			cli.Errorf("warning: %s", w)
+		}
+	}
+	*value = v
 }
 
 // buildEnvJSON returns the record's build_env object on one line, as it should be pasted into measurement-record.json.

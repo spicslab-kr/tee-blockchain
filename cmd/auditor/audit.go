@@ -27,7 +27,7 @@ func auditCmd(args []string) error {
 	fs := flag.NewFlagSet("audit", flag.ContinueOnError)
 	teeAddr := fs.String("tee-addr", "", "my TEE's host:port (a Nitro enclave, or a TDX or SEV-SNP guest), from which an attestation is requested first")
 	vendorTee := fs.String("vendor-tee", "", "the Vendor's TEE host:port. also ask it, and say whether it runs the same value I built. the value registered is always the one I built")
-	format := fs.String("format", "aws-nitro", "expected document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity")
+	format := fs.String("format", "", "expected document format: aws-nitro, intel-tdx, amd-sev-snp-initrd or amd-sev-snp-verity. default: build-config.json's platform with --config, else aws-nitro")
 	timeout := fs.Duration("timeout", 30*time.Second, "RA request timeout")
 	nonce := fs.String("nonce", "", "fixed nonce (e.g. for a test fixture). empty uses the one just sent")
 	vendorNonce := fs.String("vendor-nonce", "", "with --vendor-tee: fixed nonce for the Vendor's document (e.g. for a test fixture). empty uses the one just sent")
@@ -36,7 +36,7 @@ func auditCmd(args []string) error {
 	registry := fs.String("registry", "", "Registry contract address")
 	signingKeyFile := fs.String("signing-key-file", "", "signing key file (hex): its signature authorises the registration, and the same key sends the transaction")
 	platform := fs.String("platform", "", "platform value recorded in the registration. empty uses --format")
-	config := fs.String("config", "", "the Vendor's build-config.json (receive puts it in the clone root): service, version and build_env are taken from it, so --service/--version/--arch are optional and only override it, with a warning")
+	config := fs.String("config", "", "the Vendor's build-config.json (receive puts it in the clone root): platform, service, version and build_env are taken from it, so --format/--platform, --service, --version and --arch are optional and only override it, with a warning")
 	service := fs.String("service", "", "service name. empty takes it from --config, else from an existing registration of the same measurements (anyone's)")
 	version := fs.String("version", "", "version. empty takes it from --config, else from an existing registration, as above")
 	arch := fs.String("arch", "", "CPU architecture the image was built for and measured on (amd64|arm64). default: build-config.json's with --config, else this machine's. give the instance's if the measurements file came from another machine")
@@ -46,16 +46,17 @@ func auditCmd(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	// With --config, the format, service, version and arch come from it (a flag overrides it, with a one-line warning). Without it, the
+	// format is aws-nitro, service and version are found in an existing registration below or asked for, and arch is this machine's.
+	cfg, err := loadBuildConfig(*config)
+	if err != nil {
+		return err
+	}
+	resolvePlatform(cfg, "format", format)
 	tee := cli.TEENoun(*format) // "enclave" on Nitro, "guest" on TDX and SEV-SNP
 	// The record key includes the platform, so registering under one name and looking up under another finds nothing.
 	if *platform == "" {
 		*platform = *format
-	}
-	// With --config, service, version and arch come from it (a flag overrides it, with a one-line warning). Without it, service and version are
-	// found in an existing registration below or asked for, and arch is this machine's.
-	cfg, err := loadBuildConfig(*config)
-	if err != nil {
-		return err
 	}
 	if cfg != nil {
 		if err := resolveRegistration(cfg, service, version, arch); err != nil {

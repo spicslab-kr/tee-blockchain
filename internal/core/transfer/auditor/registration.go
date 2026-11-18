@@ -30,3 +30,21 @@ func ResolveRegistration(cfg *BuildConfig, service, version, arch string) (svc, 
 	archOut = pick("arch", arch, cfg.BuildEnv.Arch)
 	return svc, ver, archOut, warnings, nil
 }
+
+// DefaultPlatform is the format a command uses when neither its flag nor a build-config.json names one.
+const DefaultPlatform = "aws-nitro"
+
+// ResolvePlatform returns the format (platform string) a command works with when a build-config.json (cfg) may be
+// given. A flag that is given wins, with a warning when it differs from the config's platform; without one the
+// config's platform is used, and without a config DefaultPlatform. flag is the flag's name, for the warning.
+func ResolvePlatform(cfg *BuildConfig, flag, flagValue string) (platform string, warnings []string) {
+	switch {
+	case flagValue != "" && cfg != nil && flagValue != cfg.Platform:
+		return flagValue, []string{fmt.Sprintf("--%s %s differs from build-config.json (%s)", flag, flagValue, cfg.Platform)}
+	case flagValue != "":
+		return flagValue, nil
+	case cfg != nil:
+		return cfg.Platform, nil
+	}
+	return DefaultPlatform, nil
+}

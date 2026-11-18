@@ -6,6 +6,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -145,6 +146,107 @@ func TestConfig_E2E_RegisterFromBuildConfig(t *testing.T) {
 	}
 	if want := "registered cfg-svc 2.0.0 (" + arch + ", " + goVer + " -trimpath)"; !bytes.Contains(out, []byte(want)) {
 		t.Errorf("vendor register --config: output lacks %q:\n%s", want, out)
+	}
+}
+
+// TestConfig_E2E_AuditFormatFromConfig: with --config, audit, self-register and register take the format (the platform
+// registered under) from build-config.json, so an intel-tdx config needs no --format. A --format that is given wins, with
+// one warning naming both values. Before 2026-11-18 --format defaulted to aws-nitro even with an intel-tdx config.
+func TestConfig_E2E_AuditFormatFromConfig(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not on PATH")
+	}
+	rpc, stop := startAnvil(t)
+	defer stop()
+	keys := t.TempDir()
+	deployerFile := writeKeyFile(t, keys, "deployer.key", deployerKey)
+	auditorFile := writeKeyFile(t, keys, "auditor.key", auditorKey)
+	vendorFile := writeKeyFile(t, keys, "vendor.key", vendorKey)
+	bins := t.TempDir()
+	auditorBin := buildBin(t, bins, "./cmd/auditor")
+	vendorBin := buildBin(t, bins, "./cmd/vendor")
+	userBin := buildBin(t, bins, "./cmd/user")
+	registryAddr := deployFor(t, auditorBin, rpc, deployerFile, auditorAddr)
+	vendorRegistryAddr := deployFor(t, vendorBin, rpc, deployerFile, vendorAddr)
+
+	work := t.TempDir()
+	cfg := filepath.Join(work, "build-config.json")
+	env := map[string]any{"os": "linux", "arch": runtime.GOARCH, "go": runtime.Version(), "trimpath": true}
+	if err := os.WriteFile(cfg, buildConfigJSONFor(t, "intel-tdx", "0123456789abcdef0123456789abcdef01234567", env), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tdxDir := filepath.Join(repoRoot(t), "internal", "tee", "parse", "tdx", "testdata")
+	nonceOf := func(cell string) string {
+		s := sha512.Sum512([]byte("attestamp-tdx-" + cell))
+		return hex.EncodeToString(s[:])
+	}
+	parsed := func(cell string) (doc, out string) {
+		doc = filepath.Join(tdxDir, "gcp-c3-"+cell+"-quote.bin")
+		out = filepath.Join(work, cell+".json")
+		if o, err := exec.Command(auditorBin, "ra-parse", "--doc", doc, "--format", "intel-tdx", "--nonce", nonceOf(cell),
+			"--out-file", out).CombinedOutput(); err != nil {
+			t.Fatalf("ra-parse %s: %v\n%s", cell, err, o)
+		}
+		return doc, out
+	}
+	registeredAs := func(registry, measurements, platform string) bool {
+		t.Helper()
+		o, err := exec.Command(userBin, "lookup", "--rpc", rpc, "--registry", registry, "--measurements", measurements,
+			"--platform", platform).CombinedOutput()
+		if err != nil {
+			t.Fatalf("lookup --platform %s: %v\n%s", platform, err, o)
+		}
+		return !strings.Contains(string(o), "nothing registered")
+	}
+	v1, built1 := parsed("opt1-v1")
+	_, built2 := parsed("opt1-v2")
+	guest, stopGuest := startServeAs(t, vendorBin, v1, "intel-tdx")
+	defer stopGuest()
+
+	// 1. audit --config, no --format: the guest's intel-tdx quote is requested, checked and registered under intel-tdx.
+	out, err := exec.Command(auditorBin, "audit", "--config", cfg, "--tee-addr", guest, "--build-measurements", built1,
+		"--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile, "--nonce", nonceOf("opt1-v1")).CombinedOutput()
+	if err != nil {
+		t.Fatalf("audit --config with an intel-tdx config must take its format: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "intel-tdx document") || strings.Contains(string(out), "warning:") {
+		t.Errorf("audit --config: want an intel-tdx document and no warning:\n%s", out)
+	}
+	if !registeredAs(registryAddr, built1, "intel-tdx") || registeredAs(registryAddr, built1, "aws-nitro") {
+		t.Errorf("audit --config must register under intel-tdx, not aws-nitro")
+	}
+
+	// 2. an explicit --format wins over the config, with one warning naming both. Here it is the wrong one for the
+	// guest, so the request is refused and nothing more happens.
+	out, err = exec.Command(auditorBin, "audit", "--config", cfg, "--format", "aws-nitro", "--tee-addr", guest,
+		"--build-measurements", built1, "--rpc", rpc, "--registry", registryAddr, "--signing-key-file", auditorFile,
+		"--nonce", nonceOf("opt1-v1")).CombinedOutput()
+	if err == nil {
+		t.Fatalf("audit --format aws-nitro against a TDX guest must fail:\n%s", out)
+	}
+	const warn = "warning: --format aws-nitro differs from build-config.json (intel-tdx)"
+	if n := strings.Count(string(out), warn); n != 1 {
+		t.Errorf("want the warning %q exactly once, got %d:\n%s", warn, n, out)
+	}
+
+	// 3. the Vendor's self-register takes the format from --config the same way.
+	out, err = exec.Command(vendorBin, "self-register", "--config", cfg, "--tee-addr", guest, "--build-measurements", built1,
+		"--rpc", rpc, "--registry", vendorRegistryAddr, "--signing-key-file", vendorFile, "--nonce", nonceOf("opt1-v1")).CombinedOutput()
+	if err != nil {
+		t.Fatalf("self-register --config with an intel-tdx config must take its format: %v\n%s", err, out)
+	}
+	if strings.Contains(string(out), "warning:") || !registeredAs(vendorRegistryAddr, built1, "intel-tdx") {
+		t.Errorf("self-register --config must register under intel-tdx without a warning:\n%s", out)
+	}
+
+	// 4. register --config, no --platform: registered under the config's platform.
+	out, err = exec.Command(auditorBin, "register", "--config", cfg, "--measurements", built2, "--rpc", rpc,
+		"--registry", registryAddr, "--signing-key-file", auditorFile).CombinedOutput()
+	if err != nil {
+		t.Fatalf("register --config: %v\n%s", err, out)
+	}
+	if !registeredAs(registryAddr, built2, "intel-tdx") || registeredAs(registryAddr, built2, "aws-nitro") {
+		t.Errorf("register --config must register under intel-tdx, not aws-nitro:\n%s", out)
 	}
 }
 
