@@ -70,6 +70,9 @@ gcloud_retry() {
   return $rc
 }
 
+# tstep <title> <command...> - env.sh's step, then one line saying how long it took (to plan where a recording cuts).
+tstep() { local t0=$SECONDS rc; step "$@"; rc=$?; printf '  (%s: %d s)\n' "$1" $((SECONDS - t0)); return $rc; }
+
 # guest_run <vm> <command> - one command line on the guest, its output here.
 guest_run() { gcloud_retry compute ssh "$1" --zone "$ZONE" "${IAP_FLAG[@]}" --command "$2"; }
 # guest_put <vm> <local file> <remote name>, guest_get <vm> <remote file> <local file> - one file per call.

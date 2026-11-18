@@ -14,10 +14,10 @@ cd "$here/../../.."
 REGISTRY=$(cat "$CVM_WORK/registry.txt" 2>/dev/null)
 [ -n "$REGISTRY" ] || { echo "no registry from step 1 in $CVM_WORK: run steps 1 and 2 first" >&2; exit 1; }
 
-step "VENDOR: CHANGING ONE BYTE OF THE APPLICATION" guest_step "$VENDOR_VM" vendor app tampered || exit 1
-step "VENDOR: BUILDING THE CHANGED APPLICATION" guest_step "$VENDOR_VM" vendor build || exit 1
-step "VENDOR: INSTALLING AND REBOOTING" install_and_reboot "$VENDOR_VM" vendor || exit 1
-step "VENDOR: CHECKING THE BOOT AND STARTING THE RESPONDER" guest_step "$VENDOR_VM" vendor check-serve || exit 1
+tstep "VENDOR: CHANGING ONE BYTE OF THE APPLICATION" guest_step "$VENDOR_VM" vendor app tampered || exit 1
+tstep "VENDOR: BUILDING THE CHANGED APPLICATION" guest_step "$VENDOR_VM" vendor build || exit 1
+tstep "VENDOR: INSTALLING AND REBOOTING" install_and_reboot "$VENDOR_VM" vendor || exit 1
+tstep "VENDOR: CHECKING THE BOOT AND STARTING THE RESPONDER" guest_step "$VENDOR_VM" vendor check-serve || exit 1
 
 guest_get "$VENDOR_VM" out/measurements.json "$CVM_WORK/vendor-tampered-measurements.json" || exit 1
 VENDOR_IP=$(guest_ip "$VENDOR_VM")

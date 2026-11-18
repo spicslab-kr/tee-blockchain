@@ -21,10 +21,10 @@ while [ $# -gt 0 ]; do case "$1" in -c) REGISTRY=${2:-}; shift 2 ;; *) args+=("$
 need_addr AUDITOR_ADDR
 need_bins
 
-step "AUDITOR: THE APPLICATION" guest_step "$AUDITOR_VM" auditor app original || exit 1
-step "AUDITOR: BUILDING" guest_step "$AUDITOR_VM" auditor build || exit 1
-step "AUDITOR: INSTALLING AND REBOOTING" install_and_reboot "$AUDITOR_VM" auditor || exit 1
-step "AUDITOR: CHECKING THE BOOT AND STARTING THE RESPONDER" guest_step "$AUDITOR_VM" auditor check-serve || exit 1
+tstep "AUDITOR: THE APPLICATION" guest_step "$AUDITOR_VM" auditor app original || exit 1
+tstep "AUDITOR: BUILDING" guest_step "$AUDITOR_VM" auditor build || exit 1
+tstep "AUDITOR: INSTALLING AND REBOOTING" install_and_reboot "$AUDITOR_VM" auditor || exit 1
+tstep "AUDITOR: CHECKING THE BOOT AND STARTING THE RESPONDER" guest_step "$AUDITOR_VM" auditor check-serve || exit 1
 
 step_start "FETCHING THE AUDITOR'S OWN VALUE"
 guest_get "$AUDITOR_VM" out/measurements.json "$CVM_WORK/auditor-measurements.json" || exit 1
@@ -45,7 +45,7 @@ echo "registry: $REGISTRY ($NET)"
 # att-auditor audit - a fresh attestation from my guest must equal the value it measured after my own build; only then
 # is it registered. The format is given, not taken from a build-config.json: on a guest the Vendor hands over the
 # application folder and the base initrd (0-Setup-guests.sh), not a config.
-step "AUDITING MY GUEST" "$AUDITOR_BIN" audit --tee-addr "$AUDITOR_IP:$RA_PORT" --format "$FORMAT" \
+tstep "AUDITING MY GUEST" "$AUDITOR_BIN" audit --tee-addr "$AUDITOR_IP:$RA_PORT" --format "$FORMAT" \
   --build-measurements "$CVM_WORK/auditor-measurements.json" --rpc "$RPC" --registry "$REGISTRY" \
   --signing-key-file "$AUDITOR_SIGNING_KEY" --service "$CVM_SERVICE" --version "$CVM_VERSION" --arch amd64
 rc=$?

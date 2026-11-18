@@ -18,10 +18,10 @@ RECORD_KEY=$(cat "$CVM_WORK/record-key.txt" 2>/dev/null)
 [ -n "$REGISTRY" ] && [ -n "$RECORD_KEY" ] && [ -f "$CVM_WORK/auditor-measurements.json" ] \
   || { echo "no registration from step 1 in $CVM_WORK: run 1-Auditor-rebuild-launch-audit.sh $* first" >&2; exit 1; }
 
-step "VENDOR: THE APPLICATION" guest_step "$VENDOR_VM" vendor app original || exit 1
-step "VENDOR: BUILDING" guest_step "$VENDOR_VM" vendor build || exit 1
-step "VENDOR: INSTALLING AND REBOOTING" install_and_reboot "$VENDOR_VM" vendor || exit 1
-step "VENDOR: CHECKING THE BOOT AND STARTING THE RESPONDER" guest_step "$VENDOR_VM" vendor check-serve || exit 1
+tstep "VENDOR: THE APPLICATION" guest_step "$VENDOR_VM" vendor app original || exit 1
+tstep "VENDOR: BUILDING" guest_step "$VENDOR_VM" vendor build || exit 1
+tstep "VENDOR: INSTALLING AND REBOOTING" install_and_reboot "$VENDOR_VM" vendor || exit 1
+tstep "VENDOR: CHECKING THE BOOT AND STARTING THE RESPONDER" guest_step "$VENDOR_VM" vendor check-serve || exit 1
 
 step_start "RECORDING THE VENDOR'S VALUES"
 guest_get "$VENDOR_VM" out/measurements.json "$CVM_WORK/vendor-measurements.json" || exit 1
@@ -33,14 +33,14 @@ cat "$CVM_WORK/vendor-measurements.json"
 
 mkdir -p "$CVM_WORK/vendor-check"
 # att-vendor ra-request and ra-parse - a fresh attestation from my guest, verified.
-step "REQUESTING ATTESTATION" "$VENDOR_BIN" ra-request --tee-addr "$VENDOR_IP:$RA_PORT" --format "$FORMAT" --out-file "$CVM_WORK/vendor-check/doc.bin" || exit 1
-step "PARSING ATTESTATION" "$VENDOR_BIN" ra-parse --doc "$CVM_WORK/vendor-check/doc.bin" --format "$FORMAT" --out-file "$CVM_WORK/vendor-check/parsed.json" || exit 1
+tstep "REQUESTING ATTESTATION" "$VENDOR_BIN" ra-request --tee-addr "$VENDOR_IP:$RA_PORT" --format "$FORMAT" --out-file "$CVM_WORK/vendor-check/doc.bin" || exit 1
+tstep "PARSING ATTESTATION" "$VENDOR_BIN" ra-parse --doc "$CVM_WORK/vendor-check/doc.bin" --format "$FORMAT" --out-file "$CVM_WORK/vendor-check/parsed.json" || exit 1
 # att-vendor compare - what my guest attests against the values the Auditor measured on its own guest.
-step "COMPARING TO THE AUDITOR'S VALUES" "$VENDOR_BIN" compare --attested "$CVM_WORK/vendor-check/parsed.json" --expected "$CVM_WORK/auditor-measurements.json"; a=$?
+tstep "COMPARING TO THE AUDITOR'S VALUES" "$VENDOR_BIN" compare --attested "$CVM_WORK/vendor-check/parsed.json" --expected "$CVM_WORK/auditor-measurements.json"; a=$?
 # att-vendor lookup - who registered what my guest attests.
-step "LOOKING UP MY VALUE ON THE REGISTRY" "$VENDOR_BIN" lookup --rpc "$RPC" --registry "$REGISTRY" --measurements "$CVM_WORK/vendor-check/parsed.json" --platform "$FORMAT"; l=$?
+tstep "LOOKING UP MY VALUE ON THE REGISTRY" "$VENDOR_BIN" lookup --rpc "$RPC" --registry "$REGISTRY" --measurements "$CVM_WORK/vendor-check/parsed.json" --platform "$FORMAT"; l=$?
 # att-vendor compare - against the registration itself (value, expiry, approver).
-step "COMPARING TO THE CHAIN REGISTRATION" "$VENDOR_BIN" compare --attested "$CVM_WORK/vendor-check/parsed.json" --rpc "$RPC" --registry "$REGISTRY" --record-key "$RECORD_KEY"; b=$?
+tstep "COMPARING TO THE CHAIN REGISTRATION" "$VENDOR_BIN" compare --attested "$CVM_WORK/vendor-check/parsed.json" --rpc "$RPC" --registry "$REGISTRY" --record-key "$RECORD_KEY"; b=$?
 if [ $a -eq 0 ] && [ $l -eq 0 ] && [ $b -eq 0 ]; then
   echo "OK: my guest runs exactly what the Auditor rebuilt and registered. Users will get 'trusted'."
   result T4 vendor-checks-own-guest accepted accepted "the Vendor's guest equals the Auditor's values and its registration" "registry $REGISTRY"

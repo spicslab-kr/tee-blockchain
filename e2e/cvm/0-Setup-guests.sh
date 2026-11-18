@@ -62,14 +62,14 @@ if [ "$verity" = 1 ]; then
 fi
 step_stop
 
-step "PREPARING THE VENDOR'S GUEST" guest_step "$VENDOR_VM" vendor prepare || exit 1
+tstep "PREPARING THE VENDOR'S GUEST" guest_step "$VENDOR_VM" vendor prepare || exit 1
 if [ "$verity" = 1 ]; then
   step_start "COPYING THE VENDOR'S base-initrd-v.img TO THE AUDITOR"
   guest_get "$VENDOR_VM" base-initrd-v.img "$CVM_WORK/vendor-base-initrd-v.img" || exit 1
   guest_put "$AUDITOR_VM" "$CVM_WORK/vendor-base-initrd-v.img" base-initrd-v.img || exit 1
   step_stop
 fi
-step "PREPARING THE AUDITOR'S GUEST" guest_step "$AUDITOR_VM" auditor prepare || exit 1
+tstep "PREPARING THE AUDITOR'S GUEST" guest_step "$AUDITOR_VM" auditor prepare || exit 1
 
 step_start "COMPARING THE BASE INITRD"
 base=base-initrd.img; [ "$verity" = 1 ] && base=base-initrd-v.img

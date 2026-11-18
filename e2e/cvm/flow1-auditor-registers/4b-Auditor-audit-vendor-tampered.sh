@@ -30,7 +30,7 @@ if [ -z "$REGISTRY" ]; then
 fi
 echo "$REGISTRY" > "$CVM_WORK/registry-4b.txt"
 
-step "AUDITING MY GUEST AND ASKING THE VENDOR'S" "$AUDITOR_BIN" audit --tee-addr "$AUDITOR_IP:$RA_PORT" --format "$FORMAT" \
+tstep "AUDITING MY GUEST AND ASKING THE VENDOR'S" "$AUDITOR_BIN" audit --tee-addr "$AUDITOR_IP:$RA_PORT" --format "$FORMAT" \
   --build-measurements "$CVM_WORK/auditor-measurements.json" --vendor-tee "$VENDOR_IP:$RA_PORT" \
   --rpc "$RPC" --registry "$REGISTRY" --signing-key-file "$AUDITOR_SIGNING_KEY" \
   --service "$CVM_SERVICE" --version "$CVM_VERSION" --arch amd64
