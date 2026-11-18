@@ -72,7 +72,7 @@ The values both sides must match to get the same measurements are a separate lis
 | setting | what it does | why | if changed |
 |---|---|---|---|
 | `--confidential-compute-type=TDX` / `SEV_SNP` | makes the VM a TD or an SEV-SNP guest | the platform | another evidence format; GCP offers no debug variant (`ra-comparison.md`, "Debug mode") |
-| `--maintenance-policy=TERMINATE` | the VM stops for host maintenance instead of migrating | these VMs cannot live-migrate (`sev-snp.md`, "The instance") | **not checked** |
+| `--maintenance-policy=TERMINATE` | the VM stops for host maintenance instead of migrating | these VMs cannot live-migrate (`sev-snp.md`, "The guest VM") | **not checked** |
 | `--min-cpu-platform="AMD Milan"` (SEV-SNP) | puts the guest on Milan or newer | the CPU platform `gcp-cvm.sh`'s header names for SEV-SNP on N2D | MEASUREMENT by structure; **not checked** on another CPU |
 | `--image=<exact version>` | the boot disk's image | kernel, root UUID and base initrd come with it | the values move (`reproduce.md`) |
 | `--tags=attestamp-ra` | names the VM for the two firewall rules below | both rules target this tag only | no SSH (with port 22 closed to the internet) and no RA port |

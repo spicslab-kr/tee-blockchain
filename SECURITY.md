@@ -37,7 +37,7 @@ These are already written down; a report that goes beyond them is welcome.
 ## Out of scope
 
 - Weaknesses in the TEE hardware, firmware or cloud services themselves (AWS Nitro, Intel TDX, AMD SEV-SNP, Google
-  Cloud): report them to those vendors.
+  Cloud): report them to AWS, Intel, AMD or Google.
 - Attacks that need an approver's signing key.
 - Vulnerabilities in a dependency that do not affect Attestamp: report them upstream. If one does affect Attestamp,
   tell us too.

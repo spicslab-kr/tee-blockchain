@@ -28,12 +28,12 @@ This page lists every folder in the repository, then explains the one idea that 
 │   └── *_e2e_test.go       build the real binaries and drive them against a local anvil chain
 │
 ├── internal/               all library code; nothing here is importable from outside the module
-│   ├── tee/                talking to the enclave and reading what it says
+│   ├── tee/                talking to the TEE and reading what it says
 │   │   ├── request/        send a nonce, receive an attestation document
 │   │   └── parse/          verify the document's signature and nonce, extract the measurements
-│   ├── setup/              getting an enclave image built and running
+│   ├── setup/              getting the measured image built and running
 │   │   ├── build/          reproducible image build, reproducibility scan, toolchain and responder checks
-│   │   └── launch/         start the enclave, bridge the port, measure it
+│   │   └── launch/         Nitro: start the enclave, bridge the port; TDX, SEV-SNP: boot entry, --check; measure it
 │   ├── chain/              the Ethereum side: register and look up measurements
 │   │   ├── register/       sign a measurement (EIP-712) and write it to the registry
 │   │   └── lookup/         read registrations back (read only)
@@ -157,7 +157,7 @@ What is implemented, checked against the code:
 | gcp (Confidential Space) | No. | `tee/request/<role>/gcp` can fetch a token from the launcher socket and has a test. `tee/parse/<role>/gcp.go` returns "not implemented" for every method. Nothing in `cmd/*` constructs either. There is no gcp folder under `setup/`. |
 | azure (Confidential VM) | No. | `tee/request/<role>/azure` returns "not implemented" (it needs a vTPM library and MAA). `tee/parse/<role>/azure.go` returns "not implemented". Nothing in `cmd/*` constructs either. No azure folder under `setup/`. |
 | tdx (Intel TDX on GCP) | Yes, on GCP: build, launch, request, verify, audit and the independent Auditor ran on real guests (2026-11-15/16). | `tee/parse/tdx` (shared) and `tee/parse/<role>/tdx.go`; `tee/request/tdx` (shared) and `tee/request/{Vendor,auditor}/tdx`; `att-ra-responder ra-serve --extractor tdx`; `cmd/*` parse, audit and verify `intel-tdx`. Build and launch: `setup/build/tdx` and `setup/launch/tdx` (shared) with `setup/{build,launch}/{Vendor,auditor}/tdx` adapters; `att-vendor`/`att-auditor` `build` and `launch --platform intel-tdx`. Tested in code on recorded quotes and without a guest (fake TSM, fake squashfs tools, a constructed event log), and live on GCP `c3-standard-4` guests: install, reboot and `launch --check` for both options (2026-11-15), and the Auditor's own rebuild on a second guest with `audit --vendor-tee` and a User's `verify`, both options, with a negative control (2026-11-16, `docs/results/sessions-2026-11-16/intel-tdx.md`). |
-| snp (AMD SEV-SNP on GCP) | Yes, on GCP, with a known weakness: the two halves of the evidence are not bound to one VM (T10, reproduced 2026-11-16). | `tee/parse/snp` (shared) and `tee/parse/<role>/snp.go`; `tee/request/snp` (shared) and `tee/request/{Vendor,auditor}/snp`; `att-ra-responder ra-serve --extractor snp-initrd` or `snp-verity`; `cmd/*` parse `amd-sev-snp-initrd` and `amd-sev-snp-verity`. Build and launch: `setup/build/snp` and `setup/launch/snp` (shared) with `{Vendor,auditor}/snp` adapters; `build` and `launch --platform amd-sev-snp-*`. Tested in code on recorded evidence (the request side through a fake TSM and vTPM), and live on GCP `n2d-standard-2` guests: install, reboot and `launch --check` for both formats (2026-11-15), and the Auditor's own rebuild on a second guest with `audit --vendor-tee` and a User's `verify`, both formats, with a negative control (2026-11-16, `docs/results/sessions-2026-11-16/amd-sev-snp.md`). |
+| snp (AMD SEV-SNP on GCP) | Yes, on GCP, with a known weakness: the two halves of the evidence are not bound to one VM (T10, reproduced 2026-11-16). | `tee/parse/snp` (shared) and `tee/parse/<role>/snp.go`; `tee/request/snp` (shared) and `tee/request/{Vendor,auditor}/snp`; `att-ra-responder ra-serve --extractor snp-initrd` or `snp-verity`; `cmd/*` parse `amd-sev-snp-initrd` and `amd-sev-snp-verity`. Build and launch: `setup/build/snp` and `setup/launch/snp` (shared) with `{Vendor,auditor}/snp` adapters; `build` and `launch --platform amd-sev-snp-*`. Tested in code on recorded evidence (the request side through a fake TSM and vTPM), and live on GCP `n2d-standard-2` guests: install, reboot and `launch --check` for both options (2026-11-15), and the Auditor's own rebuild on a second guest with `audit --vendor-tee` and a User's `verify`, both options, with a negative control (2026-11-16, `docs/results/sessions-2026-11-16/amd-sev-snp.md`). |
 
 **aws**, **tdx** and **snp** work end to end (Nitro on AWS; TDX and SEV-SNP on GCP); what each one's evidence can and
 cannot prove is compared in `docs/build/ra-comparison.md`, and what has been measured on each is in

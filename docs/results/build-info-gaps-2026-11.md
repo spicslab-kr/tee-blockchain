@@ -19,7 +19,7 @@ filled** (closed: the information no longer exists anywhere, and the row says wh
 |---|---|
 | OpenZeppelin version: `.gitmodules` without a gitlink in this copy | pinned upstream at `cab19933…` (v5.7.0); `contracts/README.md`, `STRUCTURE.md`. The working copy was a zip extract; a recursive clone has the gitlink |
 | `att-ra-responder` bytes changed with every commit (Go's VCS stamp) | `-buildvcs=false` everywhere, refused by `build` otherwise; `docs/build/aws-nitro.md` |
-| exact GCP image of the recorded TDX and SEV-SNP guests | `ubuntu-2404-noble-amd64-v20261105`, with disk, Shielded VM and maintenance settings; `docs/build/tdx.md`, `docs/build/sev-snp.md`, "The instance" |
+| exact GCP image of the recorded TDX and SEV-SNP guests | `ubuntu-2404-noble-amd64-v20261105`, with disk, Shielded VM and maintenance settings; `docs/build/tdx.md`, `docs/build/sev-snp.md`, "The instance" *(Changed since, noted 2026-11-18: that section is now "The guest VM".)* |
 | the SEV-SNP boot change needed for an initrd | step by step, with undo; `docs/build/sev-snp.md` |
 | e2e approver addresses hard-coded to the original author's keys | `AUDITOR_ADDR` and `VENDOR_ADDR` are set in `e2e/env.local.sh`; since 2026-11-12 there is no default and the chain scripts stop without them (`need_addr`); `e2e/README.md`, `e2e/env.local.example.sh` |
 | `e2e/cloud/` not reachable from the e2e guide; "stop the instances from the console" | linked from `e2e/README.md`, which now names `aws-nitro.sh stop` |

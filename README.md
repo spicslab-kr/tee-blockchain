@@ -16,8 +16,8 @@
 </p>
 
 Software runs in a TEE (AWS Nitro Enclaves, or an Intel TDX or AMD SEV-SNP confidential VM on GCP). An independent Auditor rebuilds it, confirms the
-enclave really runs those bytes, and registers the measurement on an Ethereum-compatible chain.
-Anyone can then ask the enclave to attest itself and compare the answer with what is on-chain,
+TEE really runs those bytes, and registers the measurement on an Ethereum-compatible chain.
+Anyone can then ask the TEE to attest itself and compare the answer with what is on-chain,
 without a key from anyone.
 
 **Words used below.**
@@ -173,7 +173,7 @@ by side, and which one to use: [RA comparison](docs/build/ra-comparison.md#which
 
 ## Quick start
 
-As a **User**, on your own machine with the `att-user` you built above, an enclave address and a registry address. No
+As a **User**, on your own machine with the `att-user` you built above, a TEE address and a registry address. No
 keys, no ETH, no Nitro:
 
 ```
@@ -248,7 +248,7 @@ registers the hash it gets. The User trusts what the Auditor signed.
 </p>
 
 **Flow 2: the Vendor registers itself.** Without an Auditor, the Vendor signs and registers the hash
-of its own enclave. An Auditor can check it later: rebuild the source, ask the Vendor's TEE for its
+of its own TEE. An Auditor can check it later: rebuild the source, ask the Vendor's TEE for its
 hash, and register its own signed hash. The User can then require both registries to agree.
 
 <p align="center">
@@ -274,7 +274,7 @@ hash, and register its own signed hash. The User can then require both registrie
   line, and `--verify` builds twice and fails unless both measurements are identical.
 - **Build-environment declaration.** `build-config.json` records source, OS, CPU architecture and
   toolchain, so the Auditor can rebuild in the same environment.
-- **Launch and self-check.** `launch` starts the enclave, bridges the port, and attests itself. It
+- **Launch and self-check.** On Nitro `launch` starts the enclave, bridges the port, and attests itself (on TDX and SEV-SNP it installs the boot entry and `--check` reads the boot's measurements). It
   never opens the security group on its own: it prints the command, and opens the port only to the CIDR
   given with `--open-port-to` (`0.0.0.0/0` only when written), logging what it opened to whom
   ([details](docs/build/aws-nitro.md#opening-the-ra-port)).
@@ -286,7 +286,7 @@ hash, and register its own signed hash. The User can then require both registrie
 
 - **Environment check.** `receive` clones the Vendor's source and refuses to continue on a different
   OS, CPU architecture or Go version, because a mismatch would look like a finding.
-- **Same bytes or no registration.** `audit` registers only if the enclave's attested value equals
+- **Same bytes or no registration.** `audit` registers only if the TEE's attested value equals
   the Auditor's own build.
 - **One registry, one approver.** `registry-deploy` creates a registry that accepts only that
   approver's EIP-712 signature.
@@ -296,7 +296,7 @@ hash, and register its own signed hash. The User can then require both registrie
 
 ### User
 
-- **One command.** `verify` asks the enclave to attest, verifies the document against the platform
+- **One command.** `verify` asks the TEE to attest, verifies the document against the platform
   root, finds who registered that measurement, and checks every registration.
 - **No secrets.** No key, no ETH, no Nitro, no Docker.
 - **Trust decision.** A registration passes only if the measurement matches, it has not expired

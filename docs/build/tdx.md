@@ -23,7 +23,7 @@ the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step pri
 
 **What steps 1 to 13 show, and what they do not.** They run against **one** guest, and in step 11 the Auditor
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
-README describes ("an independent Auditor rebuilds it, confirms the enclave really runs those bytes"): a registration
+README describes ("an independent Auditor rebuilds it, confirms the TEE really runs those bytes"): a registration
 made that way says no more than the Vendor's own word. It shows that the chain works end to end. The Auditor's
 independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it needs two guests at once
 and **ran and passed on 2026-11-16**, both options. The procedure was followed end to end in a clean environment on 2026-11-15
@@ -707,7 +707,7 @@ Left out, because they describe the machine or whoever launched it, not the imag
 
 | field | why |
 |---|---|
-| MROWNER, MROWNERCONFIG, MRCONFIGID | set by whoever launches the TD; MROWNER is non-zero in our GCP quote (confirmed). That it differs per instance is the project's working assumption, not measured |
+| MROWNER, MROWNERCONFIG, MRCONFIGID | set by whoever launches the TD; MROWNER is non-zero in our GCP quote (confirmed). That it differs per guest is the project's working assumption, not measured |
 | RTMR3 | extended at run time by the guest; zero in our quote (confirmed) |
 | MRSEAM, MRSIGNERSEAM | the TDX module, i.e. the platform |
 
@@ -781,7 +781,7 @@ Researched 2026-11-11. What is **confirmed** has a source; the rest is marked.
 - Ubuntu's cloud-image build (`livecd-rootfs`, `live-build/functions`) sets it for images with a non-generic kernel,
   such as `linux-gcp`.
 - At image build time the function `force_boot_without_initramfs` writes the root partition's PARTUUID, as a literal
-  value, into `/etc/default/grub.d/40-force-partuuid.cfg`. Our instance has exactly that file (2026-11-11).
+  value, into `/etc/default/grub.d/40-force-partuuid.cfg`. Our guest has exactly that file (2026-11-11).
 - The GRUB side is Ubuntu's own patches to `grub2`: `ubuntu-support-initrd-less-boot.patch` and
   `ubuntu-add-initrd-less-boot-fallback.patch`.
 - Purpose: boot time ("no IO involved to lift the initrd… particularly relevant to cloud images", Launchpad bug
@@ -881,7 +881,7 @@ log were not kept. If its length was not a multiple of 4, the measurement above 
 lets the guest boot without the application, so "failed" there may mean the application was missing rather than that
 the boot stopped.
 
-## The instance
+## The guest VM
 
 `e2e/cloud/gcp-cvm.sh tdx create <roles…> --yes` creates it.
 
@@ -911,9 +911,9 @@ describe` on 2026-11-11):
 To build and run an application, follow [Getting started](#getting-started-from-nothing-to-a-verified-tdx-guest)
 instead. This section only records a quote from a stock guest, as the first fixture was made.
 
-1. `bash e2e/cloud/gcp-cvm.sh tdx create vendor --yes`, then on the instance `sudo shutdown -h +240` as a safety stop.
+1. `bash e2e/cloud/gcp-cvm.sh tdx create vendor --yes`, then on the guest `sudo shutdown -h +240` as a safety stop.
 2. Record a quote with ConfigFS TSM, as in `internal/tee/parse/tdx/testdata/README.md`.
-3. Copy `quote.bin` back (`gcloud compute scp`, one file per call) and stop the instance.
+3. Copy `quote.bin` back (`gcloud compute scp`, one file per call) and stop the guest.
 4. `att-user ra-parse --doc quote.bin --format intel-tdx --nonce <128 hex chars>` prints MRTD and RTMR0–2.
 
 ## Not done yet

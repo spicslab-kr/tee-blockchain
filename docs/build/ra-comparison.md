@@ -2,7 +2,7 @@
 
 A side-by-side view of the evidence Attestamp checks on its three platforms, at the moment a User or an Auditor
 verifies it. Everything here is read from the parsers in `internal/tee/parse/{aws,tdx,snp}` and from the evidence
-recorded on real instances in their `testdata/` folders. A row that is not settled says so.
+recorded on real Nitro instances and CVM guests in their `testdata/` folders. A row that is not settled says so.
 
 ## Which one to use
 
@@ -151,7 +151,7 @@ as MRTD. Google's documentation: "You can verify the Intel TDX module quote on i
   - "Bootloader, kernel, and userspace measurements: Shielded VM vTPM".
   - That vTPM is part of a "Software root of trust (hypervisor dependent)" and is "managed by the host hypervisor".
 
-**Measured on our own fixtures.** The two recordings in `internal/tee/parse/snp/testdata` come from the same instance,
+**Measured on our own fixtures.** The two recordings in `internal/tee/parse/snp/testdata` come from the same guest,
 one booted with an initrd (`gcp-n2d-*`) and one without (`gcp-n2d-initrdless-*`).
 
 - They carry the identical MEASUREMENT, `f67900851e25a378f04b4d4b5f1ea4410c11deb74e97ddcc7e3363a33f6e1dbb7880d304005387bc98e9cbdceec4ea28`
@@ -160,7 +160,7 @@ one booted with an initrd (`gcp-n2d-*`) and one without (`gcp-n2d-initrdless-*`)
   those offsets).
 - So on GCP the AMD signature identifies the firmware and says nothing about the workload: a different kernel
   command line, a different initrd, or none at all, gives the same AMD-signed value.
-- Since 2026-11-15 this holds on all eight reports of that instance (adding six boots with an application, and
+- Since 2026-11-15 this holds on all eight reports of that guest (adding six boots with an application, and
   AUTHOR_KEY_DIGEST, also zero), and is a code test: `TestReports_IdentifyFirmwareNotVM`. The same reports show that
   REPORT_ID is new on every boot and CHIP_ID changes with the host. It is also why the same-VM relay of the last
   section can pass (see there).
@@ -194,14 +194,14 @@ option later. A refusal tested only on a flipped bit is the most this platform a
 ## Values left out, and why
 
 The rule on every platform: register what describes the image, leave out what describes the machine, the launcher or
-the run. Otherwise the same image would register differently on every instance.
+the run. Otherwise the same image would register differently on every instance or guest.
 
 | Platform | Left out | Why | Where |
 |---|---|---|---|
 | Nitro | PCR3 | the IAM role of the parent instance | `aws/measure.go` comment |
 | | PCR4 | the parent instance's ID; non-zero on a real instance | same; `aws/measure_test.go` asserts it is dropped |
 | | PCR8 | the enclave image's signing certificate | `aws/measure.go` comment |
-| TDX | MROWNER | set by whoever launches the TD; assumed to differ per GCP instance, not measured (non-zero in our fixture) | `tdx/measure.go`; `tdx/measure_test.go` asserts it is excluded and that the fixture's is non-zero |
+| TDX | MROWNER | set by whoever launches the TD; assumed to differ per guest, not measured (non-zero in our fixture) | `tdx/measure.go`; `tdx/measure_test.go` asserts it is excluded and that the fixture's is non-zero |
 | | RTMR3 | extended by the guest at run time, not by the boot chain | same |
 | | MROWNERCONFIG, MRCONFIGID | set by the launcher | same |
 | | MRSEAM | the TDX module, i.e. the platform | `tdx/measure.go` comment |

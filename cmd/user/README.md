@@ -6,17 +6,17 @@ You need the `att-user` binary and network access. You need no key, no ETH, no N
 ## verify
 
 ```
-att-user verify --tee-addr <enclave-ip>:5000 --rpc <url> --registry <0x...>
+att-user verify --tee-addr <tee-ip>:5000 --rpc <url> --registry <0x...>
 ```
 
-`verify` (`verifyCmd` in [verify.go](verify.go)) asks the enclave for an attestation
+`verify` (`verifyCmd` in [verify.go](verify.go)) asks the TEE (a Nitro enclave, or a TDX or SEV-SNP guest) for an attestation
 (`TCPRequester.RequestFresh`), checks the document with the parser for `--format` (`AWSParser`, `TDXParser` or
 `SNPParser`), finds who registered the measurement it
 contains (`Reader.FindRecordKeys`) and checks each registration it finds (`Reader.Lookup`).
 
 [`Check`](../../internal/core/compare/check.go) passes a registration when all three hold:
 
-- Its value equals what the enclave attested.
+- Its value equals what the TEE attested.
 - It has not expired on the chain's clock (`Registration.Expires`).
 - Its approver (`Registration.Approver`) is the registry's approver or one you list with `--trusted-approvers`.
 

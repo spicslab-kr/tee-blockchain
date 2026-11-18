@@ -7,7 +7,7 @@ passed on a live guest with `snp-initrd` on 2026-11-12). Building and launching 
 amd-sev-snp-initrd | amd-sev-snp-verity`) **ran on real guests on 2026-11-15**: install, reboot and `launch --check`
 passed for both options, Option 2's PCR12 was the predicted value, and `audit` and `verify` passed from another
 machine (`docs/results/trial-2026-11-16.md`). In those runs the Auditor registered the Vendor's guest's own values.
-**The independent Auditor ran on 2026-11-16** ("The Auditor's half", two guests, both formats) and passed, and the
+**The independent Auditor ran on 2026-11-16** ("The Auditor's half", two guests, both options) and passed, and the
 **relay (T10) was reproduced** the same day: see "Same VM" (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Tools and versions: [toolchain.md](toolchain.md). A known weakness is
 written down below under "Same VM": SEV-SNP support is weaker here than Nitro or TDX, and that does not go away
 with more code.
@@ -24,10 +24,10 @@ Type the commands in order. `<guest-ip>` and `<0x…>` are values an earlier ste
 
 **What steps 1 to 13 show, and what they do not.** They run against **one** guest, and in step 11 the Auditor
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
-README describes ("an independent Auditor rebuilds it, confirms the enclave really runs those bytes"): a registration
+README describes ("an independent Auditor rebuilds it, confirms the TEE really runs those bytes"): a registration
 made that way says no more than the Vendor's own word. It shows that the chain works end to end. The Auditor's
 independent rebuild is "The Auditor's half" below, steps A1 to A9, which replace step 11; it needs two guests at once
-and **ran and passed on 2026-11-16**, both formats. The procedure was followed end to
+and **ran and passed on 2026-11-16**, both options. The procedure was followed end to
 end in a clean environment on 2026-11-15 (`docs/results/trial-2026-11-16.md`), and again from the documents alone, both
 options, on 2026-11-16 (`docs/results/trial-2026-11-16-clean.md`); the places where either needed knowledge from outside
 this page have been filled in since. If a step stops with an error, that is a finding; note it. And on
@@ -54,8 +54,10 @@ names with `PREFIX=<you>-snp` (the guest is then `<you>-snp-vendor`), and pass t
 | extra work | none | a base initrd built with our two hook scripts and `tpm2-tools` (step 4) |
 | choose it | to try the whole flow, or for small data only the boot needs | for an application that has to be there while the guest runs |
 
-The option is chosen by the format string; every command below takes it with `--platform` or `--format`. Write
-`amd-sev-snp-initrd` for Option 1 and `amd-sev-snp-verity` for Option 2, the same one everywhere.
+Each option has its own format string, which every command below takes with `--platform` or `--format`:
+`amd-sev-snp-initrd` for Option 1 and `amd-sev-snp-verity` for Option 2, the same one everywhere. They correspond one
+to one but are not the same thing: the option is how the application is carried, the format is the name its evidence
+and its registration go by (two strings, because the two register different numbers of values).
 
 ### 1. On your computer: the tools and the source
 
@@ -390,7 +392,7 @@ The firewall rule `attestamp-ra` is left in place; `gcloud compute firewall-rule
 
 ### The Auditor's half: rebuild, boot, compare, register
 
-> **Ran on 2026-11-16, both formats, and passed** (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Two guests
+> **Ran on 2026-11-16, both options, and passed** (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Two guests
 > made in one call from `ubuntu-2404-noble-amd64-v20261105`; the Auditor's own build equalled the Vendor's, both guests
 > measured the same values, `audit --vendor-tee` registered the Auditor's own value, and the User's `verify` of the
 > Vendor's guest against it gave exit 0. With one byte changed on the Vendor's side only, `audit` said `the Vendor's
@@ -842,7 +844,7 @@ evidence with an initrd, and every step below was checked there:
    rootfs image as initramfs...` and `Freeing initrd memory: 48928K`, and no longer `attempting initrdless boot`.
 6. The TPM event log (`/sys/kernel/security/tpm0/binary_bios_measurements`) holds GRUB's command `initrd
    /initrd.img-7.0.0-1017-gcp` and a measurement of that file. The parser reads that measurement as INITRD, and it equals
-   `sha256sum /boot/initrd.img-7.0.0-1017-gcp` on the instance (`4703ec07…b0a2`).
+   `sha256sum /boot/initrd.img-7.0.0-1017-gcp` on the guest (`4703ec07…b0a2`).
 
 To undo: `sudo cp -p /root/40-force-partuuid.cfg.orig /etc/default/grub.d/40-force-partuuid.cfg`, `sudo update-grub`,
 reboot.
@@ -850,7 +852,7 @@ reboot.
 The setting stays changed on the guest until it is undone; it boots with the initrd from then on. One side effect seen:
 the kernel command line lost `panic=-1`, which only the initrdless entry adds (observed in the two recordings).
 
-## The instance
+## The guest VM
 
 `e2e/cloud/gcp-cvm.sh snp create <roles…> --yes` creates it. The settings and why:
 
@@ -880,13 +882,13 @@ describe` on 2026-11-11):
 
 ## From scratch: record and check one evidence pair
 
-1. Create the instance: `bash e2e/cloud/gcp-cvm.sh snp create vendor --yes`. On the instance, set a safety stop:
+1. Create the guest: `bash e2e/cloud/gcp-cvm.sh snp create vendor --yes`. On the guest, set a safety stop:
    `sudo shutdown -h +240`.
 2. Build the recorder (`internal/tee/parse/snp/testdata/README.md`, "Recording another one") and copy it over with
    `gcloud compute scp`.
-3. On the instance: `sudo ./record -out fx -nonce-text <your text>`. It writes `att.pb`, `report.bin`, `auxblob.bin`
+3. On the guest: `sudo ./record -out fx -nonce-text <your text>`. It writes `att.pb`, `report.bin`, `auxblob.bin`
    and `record.txt` (the nonce and REPORT_DATA).
-4. Copy the files back and stop the instance: `gcloud compute instances stop <name> --zone <zone>`.
+4. Copy the files back and stop the guest: `gcloud compute instances stop <name> --zone <zone>`.
 5. Pack the three files into the document `ra-parse` reads, and check it:
    `go run ./internal/tee/parse/snp/testdata/pack -report report.bin -certs auxblob.bin -vtpm att.pb -out doc.cbor`,
    then `att-user ra-parse --doc doc.cbor --format amd-sev-snp-initrd --nonce <hex nonce>`.
@@ -897,7 +899,7 @@ entry then loads the distribution initrd and `amd-sev-snp-initrd` yields five va
 `build` and `launch`** ("Getting started" above). To record a **test fixture** that carries an application (Option 1),
 or the dm-verity image with its root hash on the command line (Option 2), follow `docs/build/app-fixture-recording.md`:
 it builds the initrd with `mkappinitrd`, the image with `make-verity-image.sh`, and the boot entry with
-`make-grub-entry.sh` from the instance's own stock entry, so nothing is hard-coded.
+`make-grub-entry.sh` from the guest's own stock entry, so nothing is hard-coded.
 
 The two roots of trust in one SEV-SNP measurement set (AMD for MEASUREMENT, Google's vTPM for the rest), and the
 check that MEASUREMENT is identical across our initrd and initrdless recordings, are written up in
@@ -992,8 +994,8 @@ boundary. That is also why our PCR4, KERNEL, CMDLINE, INITRD and PCR12 are Googl
 
 | capability | TDX | SEV-SNP on GCP |
 |---|---|---|
-| launch measurement signed by the hardware vendor | MRTD | MEASUREMENT |
-| register the guest can extend, signed by the hardware vendor | RTMR0–3 | **none** |
+| launch measurement signed by the CPU maker (Intel, AMD) | MRTD | MEASUREMENT |
+| register the guest can extend, signed by the CPU maker | RTMR0–3 | **none** |
 | Linux interface to extend it | sysfs `measurements/rtmr*`, 6.16 | none |
 | per-request guest data | REPORTDATA, 64 bytes | REPORT_DATA, 64 bytes |
 | runtime PCRs | GCP vTPM (Google-signed) | GCP vTPM (Google-signed, hypervisor-managed) |
@@ -1065,7 +1067,7 @@ by hand on 2026-11-16 (above); no script runs it.
 
 ## Checking
 
-`build --verify` builds twice on the same machine and fails if the two differ (both formats; used in step 6). Across
+`build --verify` builds twice on the same machine and fails if the two differ (both options; used in step 6). Across
 machines, the Auditor's half compares the Auditor's own build with the Vendor's (`initrd_sha256`, and for
 `amd-sev-snp-verity` `root_hash` and `pcr12`) before anything is registered; on 2026-11-16 that comparison caught two
 wrong inputs (`docs/results/sessions-2026-11-16/`).

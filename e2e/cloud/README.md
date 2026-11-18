@@ -1,7 +1,7 @@
-# Creating the instances
+# Creating the instances and guests
 
-Scripts that create, stop and delete the instances each platform needs. Each script's header comment says how to call
-it and which of the vendor's documentation its flags were checked against; the `gcloud` and `aws` calls themselves are
+Scripts that create, stop and delete the machines each platform needs: EC2 instances for Nitro, confidential VMs (the guests) for TDX and SEV-SNP. Each script's header comment says how to call
+it and which AWS or Google Cloud documentation its flags were checked against; the `gcloud` and `aws` calls themselves are
 in the script, one function or case per action.
 
 **These scripts create billable resources.** Every `create`, `run-instances`, `delete` and
@@ -118,8 +118,8 @@ The procedures: Nitro, the flows in `e2e/README.md`; TDX and SEV-SNP, "Getting s
 ```
 1. Nitro baseline        bash e2e/cloud/aws-nitro.sh create --yes        # 2 instances, eu-north-1
    (architecture rows)   bash e2e/cloud/aws-nitro.sh create-arm64 --yes  # 1 more, c7g.xlarge (Graviton), for ARM64_HOST
-2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create --yes  # 2 instances (vendor, auditor), us-central1-a
-3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create --yes  # 2 instances (vendor, auditor), us-central1-a
+2. TDX fixture           bash e2e/cloud/gcp-cvm.sh tdx create --yes  # 2 guests (vendor, auditor), us-central1-a
+3. SEV-SNP on GCP        bash e2e/cloud/gcp-cvm.sh snp create --yes  # 2 guests (vendor, auditor), us-central1-a
 ```
 
 Every word after `create` is a role, and every role is **one billable VM**. Without roles you get `vendor` and
@@ -185,7 +185,7 @@ They do not all have to exist at the same time. Each platform's rows in
 
 ## Cost
 
-Every instance is charged by the hour while it is running. `stop` ends the hourly charge; the disk
+Every instance and guest is charged by the hour while it is running. `stop` ends the hourly charge; the disk
 keeps costing until you `delete`. There is no free tier for any of these machine types.
 
 Check the current price for your region before creating anything:
@@ -224,5 +224,5 @@ GCP needs none of this: `--confidential-compute-type=SEV_SNP` and the vTPM is al
 |---|---|---|
 | SEV-SNP on? | not used (for reference: `aws ec2 describe-instances --query 'Reservations[].Instances[].CpuOptions'`) | `gcloud compute instances describe <n> --format='value(confidentialInstanceConfig)'` |
 | TDX on? | n/a (AWS has no TDX) | same field, value `TDX` |
-| vTPM present? | `ls -l /dev/tpm0` on the instance | same |
+| vTPM present? | `ls -l /dev/tpm0` on the instance | the same, on the guest |
 | Nitro Enclaves on? | `nitro-cli describe-enclaves` after installing the CLI | n/a |

@@ -103,7 +103,7 @@ att-auditor send --repo <git url> --config work/src/build-config.json \
 `send` builds `measurement-record.json` from `build-config.json` and the measurements, adds the EIF's
 sha256, and pushes the record and the image. It reads the build tool version from `nitro-cli --version`,
 or you give it with `--build-tool-version`. The full exchange is in the
-[hand-off section](../vendor/README.md#hand-off-with-the-auditor) of the vendor guide.
+[hand-off section](../vendor/README.md#hand-off-with-the-auditor) of the Vendor guide.
 One service and version has one record and one registration per CPU architecture.
 
 | Field | Content |
@@ -124,7 +124,7 @@ One service and version has one record and one registration per CPU architecture
 | `lookup` | Finds registrations by `--measurements` or `--record-key`. |
 | `compare` | Compares two sets of measurements, or a set of measurements with a registration (`--record-key`). |
 | `version` | Prints the pinned Go toolchain and the one in use. |
-| `ra-serve` | Runs inside the enclave and answers attestation requests. |
+| `ra-serve` | Answers attestation requests, inside the enclave on Nitro or on the guest on TDX and SEV-SNP. |
 | `ra-proxy` | Forwards TCP connections to the enclave's vsock. |
 | `lo-up` | Brings up loopback inside the enclave. |
 

@@ -129,7 +129,7 @@ The Auditor needs read access to the repository. Exit codes 8 to 11 report git f
 
 | command | what it does |
 |---|---|
-| `ra-request` | Sends a fresh nonce to an enclave and saves its attestation document. |
+| `ra-request` | Sends a fresh nonce to a TEE and saves its attestation document. |
 | `ra-parse` | Verifies a document and extracts its measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP the five or six values); `--format` for a guest. |
 | `register` | Signs measurements with your key and registers them. |
 | `lookup` | Reads a registration by record key or by measurements. |

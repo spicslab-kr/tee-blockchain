@@ -96,10 +96,10 @@ sha256sum mkappinitrd record-tdx record-snp
 | `record-tdx` | ConfigFS TSM quote with REPORTDATA = SHA-512 of `-nonce-text` |
 | `record-snp` | vTPM attestation (GCE AK) over SHA-256 of `-nonce-text` and an SNP report bound to it by SHA3-512 |
 
-Copy each file to the instance with `gcloud compute scp <file> <instance>:<file> --zone us-central1-a`, one file per
+Copy each file to the guest with `gcloud compute scp <file> <guest>:<file> --zone us-central1-a`, one file per
 call.
 
-## Common steps on the instance
+## Common steps on the guest
 
 Run once at the start, as the login user:
 
@@ -126,7 +126,7 @@ cat stock-entry.txt                        # one menuentry with a linux and an i
 ```
 
 An entry made from the template, changing only the title, the initrd file and, for SEV-SNP Option 2, the command line.
-`internal/setup/build/cpio/testdata/make-grub-entry.sh` does it (copy it to the instance with the other files); below,
+`internal/setup/build/cpio/testdata/make-grub-entry.sh` does it (copy it to the guest with the other files); below,
 `make_entry <id> <initrd file> [extra arguments]` stands for `sudo sh make-grub-entry.sh <id> <initrd file> [extra
 arguments]`. It writes `/etc/grub.d/41_<id>` and `/etc/default/grub.d/99-attestamp.cfg`, runs `update-grub` and prints
 the new entry.
@@ -148,7 +148,7 @@ sudo dmesg | grep -i -E 'initramfs|unpack' # a hint only
 
 Files to copy: `mkappinitrd`, `record-snp`, `make-verity-image.sh`, `initramfs-hook.sh`, `initramfs-local-bottom.sh`.
 Turn `GRUB_FORCE_PARTUUID` off (common steps): it is on in every new guest of the image. On `attestamp-snp-vendor`, the
-instance the 2026-11-11 recordings were made on, it had already been turned off that day.
+guest the 2026-11-11 recordings were made on, it had already been turned off that day.
 
 ### Option 1 (`amd-sev-snp-initrd`, `AppLast`)
 
@@ -258,7 +258,7 @@ Committed as `gcp-c3-opt2m-v1-*` and `gcp-c3-opt2m-v2-*` with their boot logs; `
 checks them. The tamper quote was not committed; its RTMR2 is above. Undone afterwards as in the next section, with
 `41_attestamp-verity` and `initrd-attestamp-verity.img` in place of the `-app` files.
 
-## Undo, fetch, stop (each instance)
+## Undo, fetch, stop (each guest)
 
 ```
 sudo rm -f /etc/grub.d/41_attestamp-app /etc/grub.d/41_attestamp-verity /etc/default/grub.d/99-attestamp.cfg
@@ -269,7 +269,7 @@ sha256sum opt*/*
 ```
 
 Fetch each recorded file with `gcloud compute scp`, one file per call, into `gcp-n2d-<opt1|opt2>-<v1|v2>-<file>`
-(SEV-SNP) or `gcp-c3-<opt1|opt2>-<v1|v2>-<file>` (TDX), compare sha256 with the instance, then
+(SEV-SNP) or `gcp-c3-<opt1|opt2>-<v1|v2>-<file>` (TDX), compare sha256 with the guest, then
 `gcloud compute instances stop <instance> --zone us-central1-a`. `GRUB_FORCE_PARTUUID` stays off.
 
 ## Afterwards, with no VM
@@ -286,7 +286,7 @@ Fetch each recorded file with `gcloud compute scp`, one file per call, into `gcp
 
 ## Results (2026-11-11)
 
-All recorded in one session per platform. The instances ran from start to stop (GCP's `lastStartTimestamp` and
+All recorded in one session per platform. The guests ran from start to stop (GCP's `lastStartTimestamp` and
 `lastStopTimestamp`): `attestamp-snp-vendor` 07:00:39–08:18:20 UTC, `attestamp-tdx-vendor` 08:31:47–08:52:50 UTC. Both guests booted
 the same base initrd (50,100,283 bytes, size mod 4 = 3, sha256 `4703ec07…b0a2`). Every recording verifies with its
 nonce, and its boot log is committed next to it (`*-boot.txt`).
