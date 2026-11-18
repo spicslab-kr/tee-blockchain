@@ -187,7 +187,9 @@ and `.jsonl`, 29 lines): the 2026-11-12 pair of `m6i.xlarge` started again and a
 `c61c988e…`. The five chain-free scripts; for the first time with `ARM64_HOST`, so T1's arm64 side and T7's arm64
 mirror ran. Two lines miss their expectation, both SSH aborts on this network, each followed by a passing line (the
 file explains them). Every value in these cells carries its commit, because the responder's bytes, and with them
-PCR0/PCR2, change with any change to a package it links (`1967749d`; `docs/build/ra-comparison.md`).
+PCR0/PCR2, change with any change to code it can run or to the lines that code sits on; until the empty build ID of
+2026-11-17 they changed with any change to a package it links, even code it never runs (`1967749d`;
+`docs/build/ra-comparison.md`).
 
 ¹⁷ **Session 4 of 2026-11-16, T1, T3, T7 and T8 on the confidential VMs**
 (`docs/results/sessions-2026-11-16/session4-t1-t3-t7-t8.md` and three `session4-*.jsonl`, 16 lines, all as expected; the TDX zone line was added later the same day, on a guest of its own):
