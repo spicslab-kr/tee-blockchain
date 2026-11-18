@@ -6,7 +6,11 @@
 #
 # The Go version comes from internal/setup/build/GO_TOOLCHAIN, the pin build enforces, and GOTOOLCHAIN=local keeps Go
 # from fetching another one. anvil 1.8.0, which the chain tests need, is checked against the release's sha256 values
-# written here (docs/build/tdx.md, step 1, gives the same amd64 value).
+# written here (docs/build/tdx.md, step 1, gives the same amd64 value). The actions are pinned by commit, not by a tag
+# that can move; the comment names the release each commit is.
+#
+# ubuntu-24.04-arm is free for public repositories. While the repository is private the arm64 job may not get a
+# runner; that is expected, not a test failure.
 name: ci
 
 on:
@@ -37,7 +41,7 @@ jobs:
     env:
       GOTOOLCHAIN: local
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # doccheck checks every commit the documents name; it skips in a shallow clone.
           fetch-depth: 0
@@ -46,7 +50,7 @@ jobs:
         id: pin
         run: echo "version=$(sed 's/^go//' internal/setup/build/GO_TOOLCHAIN)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: ${{ steps.pin.outputs.version }}
 
