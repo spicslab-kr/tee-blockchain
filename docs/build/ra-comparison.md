@@ -250,7 +250,7 @@ Where the five compared values come from in the relay:
 
 So four of the five values, and the nonce, come from A; the only value from B is one that every VM of that shape
 shares. This is a property of SEV-SNP as GCP offers it, two documents from two signers joined by a hash, and not a
-defect of this verifier. It is recorded, not patched. The 2026-11 runs had reported the same; this is the first
+defect of this verifier. It is recorded, not patched. The old out-of-repository scripts had reported the same; this is the first
 reproduction in this repository. The recordings are kept locally, not committed (they carry instance identifiers), so
 T10 is a live result, like Nitro's T8: `docs/build/app-fixture-recording.md`, "Reproducing T10", says where they are
 and how to make them again.

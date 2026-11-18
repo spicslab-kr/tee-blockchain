@@ -11,7 +11,7 @@
 #
 # The expected PCR12 (checked against the recordings in internal/tee/parse/snp/app_fixture_test.go):
 #   PCR12 = SHA-256( 32 zero bytes || SHA-256("attestamp-verity-ok:" || root hash) )
-# Record: the logic and the PCR12 value follow a 2026-11 script that is no longer available.
+# Record: the logic and the PCR12 value follow an old out-of-repository script that is no longer available.
 PREREQ=""
 prereqs() { echo "$PREREQ"; }
 case "$1" in prereqs) prereqs; exit 0;; esac

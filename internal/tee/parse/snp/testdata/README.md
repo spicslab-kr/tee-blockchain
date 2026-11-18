@@ -102,7 +102,7 @@ The nonce of each application recording is SHA-256 of its nonce text, `attestamp
   `gcp-n2d-record.txt`).
 - `gcp-n2d-initrdless-*`: REPORT_DATA = SHA-512 of the whole `gcp-n2d-initrdless-att.pb` file = `29377722…4fb7da`.
 
-The binding changed from SHA-512 to SHA3-512 on 2026-11-11. SHA-512 was what the 2026-11 SEV-SNP test scripts used
+The binding changed from SHA-512 to SHA3-512 on 2026-11-11. SHA-512 was what the old out-of-repository SEV-SNP test scripts used
 (record: those scripts are no longer available).
 
 ## Identifying information in these files

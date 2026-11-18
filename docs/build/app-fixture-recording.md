@@ -332,7 +332,7 @@ nonce, and its boot log is committed next to it (`*-boot.txt`).
 **Status: run on 2026-11-16; the relay is accepted (T10 reproduced).** The result and its reading:
 `docs/build/ra-comparison.md`, "The SEV-SNP relay, measured"; the run: `docs/results/sessions-2026-11-16/amd-sev-snp.md`;
 the recordings: "The 2026-11-16 recordings" at the end of this section. Written 2026-11-15. Test-matrix row T10 asks whether a vTPM attestation from one VM, combined with
-an SNP report from another, is refused. The only answer so far is the 2026-11 record ("it verifies"), made with a
+an SNP report from another, is refused. The only answer so far is the record of the old out-of-repository scripts ("it verifies"), made with a
 relay script that no longer exists. It is the project's main claim about SEV-SNP's weakness, so it has to be measured
 here.
 
@@ -421,7 +421,7 @@ att-user ra-parse --doc <each> --format amd-sev-snp-initrd --nonce <the nonce fr
 |---|---|---|
 | `a.cbor` | VM A, honest | accepted (exit 0) |
 | `naive.cbor` | B's own report with A's attestation | refused at the binding (exit 5, "REPORT_DATA is not SHA3-512"), as in the same-VM test |
-| `relay.cbor` | **T10**: B's report over A's attestation | the row expects **refused**; the 2026-11 record says it was **accepted** |
+| `relay.cbor` | **T10**: B's report over A's attestation | the row expects **refused**; the record of the old out-of-repository scripts says it was **accepted** |
 
 Record for `relay.cbor`, whatever happens:
 

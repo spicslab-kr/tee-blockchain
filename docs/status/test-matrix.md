@@ -17,7 +17,7 @@ Each cell says how far the row is proven, and by what:
 | mark | meaning |
 |---|---|
 | **code** | a test in this repository passes on recorded evidence, with no TEE running (`go test ./...`, anvil 1.8.0). It proves the software's verdict, not the platform's behaviour on a fresh run |
-| **2026-11 run** | observed in the 2026-11 SEV-SNP runs, made with scripts that are no longer available and cannot be re-run. Kept as a record of what was seen, not as a result this repository can reproduce. Where this repository has measured the same thing, the cell shows our result and the 2026-11 observation is in footnote ¹⁰ |
+| **old-script run** | observed in the SEV-SNP runs of the old out-of-repository scripts, which are no longer available and cannot be re-run. Kept as a record of what was seen, not as a result this repository can reproduce. Where this repository has measured the same thing, the cell shows our result and the old scripts' observation is in footnote ¹⁰ |
 | **Nitro baseline 2026-11-12** | run on two real Nitro instances at commit `ab55208`, no chain; results in `docs/results/aws-nitro-2026-11-12.md` and its `.jsonl`. Its PCR0/PCR2 values are from before `a402827` and `1967749d`, which changed them; **taken again on 2026-11-16 at `23b83f9`**, with arm64: `docs/results/aws-nitro-2026-11-16.md` ¹⁶; and **again on 2026-11-17 at `83cb2dc`**, after the empty build ID: `docs/results/aws-nitro-2026-11-17.md` ¹⁸; and **a second time on 2026-11-17 at `6146c10`**, after the Nitro request code moved into a shared package: `docs/results/aws-nitro-2026-11-17-shared-aws.md` ¹⁹ |
 | **Nitro, live …, local chain** | run on the two real Nitro instances with the registry on a local anvil, not a public network (footnote ¹¹) |
 | **script, never run** | a Nitro e2e script exists for the row but has never been run against real instances |
@@ -59,7 +59,7 @@ Closed by session 4 of 2026-11-16 (¹⁷), and what closed each:
 | T7, TDX and SEV-SNP | code in part | `e2e/cvm/build-env-check.sh` on a guest of each, four verdicts each, written by the script |
 | T8, TDX and SEV-SNP | code only, GCP not checked | the Compute API (`v1`, `alpha`) and `gcloud` checked: no debug confidential VM, so the live run is not applicable (above) |
 
-¹ `docs/build/sev-snp.md`, "Variables", keeps the 2026-11 observations as a record. The 2026-11 numbering of "the seven
+¹ `docs/build/sev-snp.md`, "Variables", keeps the observations of the old out-of-repository scripts as a record. The old scripts' numbering of "the seven
 SEV-SNP tests" was the scripts' own and is not the same as T1–T10 here.
 
 ² Nitro behaves differently here by design. Attestamp pins the toolchain and `build` **refuses**
@@ -107,13 +107,13 @@ distribution's on both guests.
 ⁷ The claim: a vTPM attestation from an approved VM plus an SNP report from a different VM passes verification. It is
 the reason SEV-SNP is weaker than the other two, and it has to appear in the table rather than in a footnote. By the
 structure of the evidence it should hold with the SHA3-512 binding too (the relaying VM writes the hash of the
-other's attestation into its own report), but the only observation is the 2026-11 record, made with the SHA-512
+other's attestation into its own report), but the only observation is the record of the old out-of-repository scripts, made with the SHA-512
 binding and scripts that are gone. Until "Reproducing T10" is run, this repository cannot show it. *(Run on 2026-11-16: the relay reproduced, row T10 and ¹⁵.)*
 
-¹⁰ The 2026-11 observations these SEV-SNP cells used to show, kept as a record (scripts no longer available, results
+¹⁰ The observations of the old out-of-repository scripts these SEV-SNP cells used to show, kept as a record (scripts no longer available, results
 not reproducible; `docs/build/sev-snp.md`, "Variables"):
 
-| row | 2026-11 observation | what replaced it in the cell |
+| row | old-script observation | what replaced it in the cell |
 |---|---|---|
 | T1 | the application, its cpio archive and the dm-verity image hashed the same on two GCP machines | our measurement of the image on two guests (2026-11-11) and the cpio golden tests |
 | T2 | Go 1.22.2 and 1.23.4 gave different application binaries | our responder bytes under two Go patch versions (2026-11-12); the SEV-SNP measurement itself was "needs VM" until it was measured live on 2026-11-16 ¹⁵ |

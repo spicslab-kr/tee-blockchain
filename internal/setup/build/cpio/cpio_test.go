@@ -145,7 +145,7 @@ func TestWrite_RefusesDuplicatesAndBadNames(t *testing.T) {
 }
 
 // The archives mkcpio.py wrote, kept as files. Each must be reproduced byte for byte. mkcpio.py itself, a script of the
-// 2026-11 SEV-SNP runs, is no longer available (testdata/README.md), so these files are the only record of its output:
+// SEV-SNP runs of the old out-of-repository scripts, is no longer available (testdata/README.md), so these files are the only record of its output:
 // they pin that this package still writes what the archives of those runs were.
 func TestWrite_MatchesMkcpioGolden(t *testing.T) {
 	for file, tree := range map[string][]Entry{

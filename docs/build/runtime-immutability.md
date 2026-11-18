@@ -81,7 +81,7 @@ Where step 5 starts from: the TDX boot of 2026-11-12 with v2's image under v1's 
 nothing, and **went on to a normal login** (`docs/build/app-fixture-recording.md`, "TDX Option 2 mounted at boot").
 That is enough for a verifier, since the measurement differs from every registered value, but a locked guest must stop
 the boot instead. Still to do: the same on SEV-SNP, a changed data block under an unchanged root hash, and the root
-image. The 2026-11 script that flipped one byte at offset 5000 for this is no longer available.
+image. The old out-of-repository script that flipped one byte at offset 5000 for this is no longer available.
 
 When the guest is locked, the responder moves into the locked root image; today it runs from the guest's disk and is
 not measured (`docs/build/ra-comparison.md`).

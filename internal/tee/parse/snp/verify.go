@@ -123,7 +123,7 @@ func quoteExtraData(ev evidence) ([]byte, error) {
 }
 
 // bindingSum is the hash REPORT_DATA must hold: SHA3-512 of the vTPM attestation bytes. It is 64 bytes, the size of
-// REPORT_DATA. Until 2026-11-11 the binding was SHA-512 (the 2026-11 test scripts used it); evidence bound that way is
+// REPORT_DATA. Until 2026-11-11 the binding was SHA-512 (the old out-of-repository test scripts used it); evidence bound that way is
 // refused.
 func bindingSum(b []byte) []byte {
 	s := sha3.Sum512(b)

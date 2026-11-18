@@ -606,7 +606,7 @@ it covers exactly the vTPM evidence carried next to it. SHA3-512 gives 64 bytes,
 goes in unchanged.
 
 The binding was SHA-512 until **2026-11-11**, when the project changed it to SHA3-512.
-*Record:* SHA-512 is what the 2026-11 test scripts used; those scripts are no longer available (`docs/results/build-info-gaps-2026-11.md`, #5).
+*Record:* SHA-512 is what the old out-of-repository test scripts used; those scripts are no longer available (`docs/results/build-info-gaps-2026-11.md`, #5).
 Results from 2026-11-10 and earlier were produced with SHA-512. Evidence bound with SHA-512 is now refused
 (`TestVerifySig_SHA512BindingIsRefused`, on the one SHA-512 recording this repository keeps).
 
@@ -759,7 +759,7 @@ updated.
 
 ## Variables
 
-*Record:* each row changed a hash in the 2026-11 tests, with the same source code (observed on GCP and AWS, with
+*Record:* each row changed a hash in the tests of the old out-of-repository scripts, with the same source code (observed on GCP and AWS, with
 scripts that are no longer available and cannot be re-run). Where this repository has measured the same thing itself,
 the row says so.
 
@@ -767,14 +767,14 @@ the row says so.
 |---|---|---|
 | Go version | Go 1.22.2 and 1.23.4 gave different application binaries (record) | the same Go version on both sides. **Ours:** the responder built with go1.26.1 and go1.26.2 differs (Nitro baseline 2026-11-12, `toolchain-pin-check.sh`), and `build` refuses another version. **On a SEV-SNP guest (2026-11-16, T2):** the same application under the two versions booted to INITRD `48e09d59…` vs `bca95760…` |
 | build path | without `-trimpath`, two folders gave two different binaries (record) | `-trimpath`. **Ours:** `TestBuildResponderForArch_ReproducibleAcrossCheckoutPaths`, and two checkout paths gave the same Nitro PCRs (2026-11-12). **On a SEV-SNP guest (2026-11-16, T3):** one Go application from two checkout paths, built into an initrd from two folders of different depth, gave the same INITRD `48e09d59…` (booted and measured) and, for Option 2, the same image and root hash `4a517772…` |
-| cpio tool | GNU cpio 2.13 (Amazon Linux 2023) and 2.15 (Ubuntu) packed the same files into different bytes (directory link counts) (record) | our own cpio writer: `internal/setup/build/cpio` (sorted names, time 0, owner 0, fixed inode numbers). It was byte-identical to the 2026-11 scripts' `mkcpio.py`, which is no longer available; the golden files in `internal/setup/build/cpio/testdata` pin that output |
+| cpio tool | GNU cpio 2.13 (Amazon Linux 2023) and 2.15 (Ubuntu) packed the same files into different bytes (directory link counts) (record) | our own cpio writer: `internal/setup/build/cpio` (sorted names, time 0, owner 0, fixed inode numbers). It was byte-identical to the old out-of-repository scripts' `mkcpio.py`, which is no longer available; the golden files in `internal/setup/build/cpio/testdata` pin that output |
 | distribution base initrd | `mkinitramfs` and `dracut` build a different file every time (it contains a random seed) | none possible. The Auditor uses the base initrd the Vendor publishes and rebuilds only the application part |
 | folder permissions (umask) | the same files in a squashfs image gave a different image and root hash under umask 022 (folders 755) and umask 002 (folders 775) | **fixed (2026-11-11):** `internal/setup/build/cpio/testdata/make-verity-image.sh` sets **`umask 022`** and sets every folder and file to mode **755** explicitly. With it, the image built on `attestamp-snp-vendor` and on `attestamp-tdx-vendor` was byte-identical (`app.img` sha256 `28bdfcff…ec1c`, root hash `e29ec085…af0c9`). A build that sets neither still depends on the caller's umask |
 | squashfs timestamps | `mksquashfs` writes the build time by default | `-mkfs-time 0 -all-time 0`, file times set to 0 |
 | dm-verity salt and UUID | `veritysetup format` picks them at random | fixed `--salt` and `--uuid` |
 
 *Record:* with all of the above fixed, the application, its cpio archive and the dm-verity image hashed the same on GCP
-(Ubuntu 24.04, 26.04) and AWS (Amazon Linux 2023), across squashfs-tools 4.4, 4.6.1 and 4.7.5, in the 2026-11 runs.
+(Ubuntu 24.04, 26.04) and AWS (Amazon Linux 2023), across squashfs-tools 4.4, 4.6.1 and 4.7.5, in the runs of the old out-of-repository scripts.
 **Ours:** the dm-verity image was byte-identical on the SEV-SNP and the TDX guest (2026-11-11, squashfs-tools 4.6.1 on
 both; `docs/status/test-matrix.md`, T1).
 
@@ -793,13 +793,13 @@ What else changes the registered values (from the evidence's structure; **not me
 attempting initrdless boot.` and measures no initrd). An application in an initrd is then never loaded or measured.
 `ra-parse` refuses evidence without an initrd measurement. Turning the setting off, as below, makes the stock entry
 load the initrd; `internal/setup/build/cpio/testdata/make-grub-entry.sh` makes a separate entry from it for an
-application (`docs/build/app-fixture-recording.md`). (*Record:* the 2026-11 scripts avoided it by booting their own
+application (`docs/build/app-fixture-recording.md`). (*Record:* the old out-of-repository scripts avoided it by booting their own
 GRUB entry with `grub-reboot`.)
 
 ### Correction: SEV-SNP Option 1 as appended in 2026-11
 
 The 2026-10-23 slides (slide 7) say both options work on AWS and GCP. **For SEV-SNP Option 1 that is wrong**, as
-measured on 2026-11-11 on `attestamp-snp-vendor` with the same unpadded append the 2026-11 scripts used (*record:* they
+measured on 2026-11-11 on `attestamp-snp-vendor` with the same unpadded append the old out-of-repository scripts used (*record:* they
 ran `cat i.bin app.cpio`):
 
 - The base initrd, `/boot/initrd.img-7.0.0-1017-gcp`, is 50,100,283 bytes: **length mod 4 = 3**.
@@ -817,7 +817,7 @@ ran `cat i.bin app.cpio`):
 Fixed in `cpio.Join(AppLast)`, which now pads the base (commit `393b1d9`). Both pairs are kept as fixtures with their
 boot logs: `internal/tee/parse/snp/testdata/gcp-n2d-opt1-*` (unpadded) and `gcp-n2d-opt1p-*` (padded).
 
-Whether the 2026-11 SEV-SNP Option 1 runs, on GCP or AWS, actually ran the application depends on the length of the
+Whether the SEV-SNP Option 1 runs of the old out-of-repository scripts, on GCP or AWS, actually ran the application depends on the length of the
 base initrd they used. Those files, their scripts and any boot logs are gone, so it cannot be checked.
 
 Option 2 does not have this problem. The image is on disk, and a failed check shows as `fail` in PCR12 or a zero PCR12
@@ -1027,7 +1027,7 @@ A's attestation next to a report B made over its *own* attestation is not the at
 | REPORT_ID | **different on every boot** of the same VM | no: it does not stay with a VM, and nothing in A's vTPM evidence carries it |
 | CHIP_ID | **changed** between our recordings of the same VM, as it moved hosts | no: it names the physical host, not the VM, and two VMs may share a host |
 
-The two findings fit together. T10 was an observation (the 2026-11 record says the relay verified); these
+The two findings fit together. T10 was an observation (the record of the old out-of-repository scripts says the relay verified); these
 measurements explain why it can work: B's report contains nothing a verifier could compare with A's vTPM evidence, so
 once the binding holds, there is no remaining check that could tell the two VMs apart. Whatever names A sits on the
 Google side (the AK certificate), and nothing on the AMD side matches it.
@@ -1062,7 +1062,7 @@ shell scripts outside this repository (`vendor/`, `auditor/`, `user/`, `option1-
 `relay-test/`, `mkcpio.py`). Their author has left the lab and they are no longer available anywhere (`docs/results/build-info-gaps-2026-11.md`,
 #5, #6). This document no longer points to them. Everything they did that this repository relies on was redone here:
 the recordings, their measured values and the procedures in `docs/build/app-fixture-recording.md`. Lost and not
-replaced: "the seven 2026-11 tests" as one runnable set. The relay test (T10) was lost with them and reproduced here
+replaced: "the seven tests" of the old scripts as one runnable set. The relay test (T10) was lost with them and reproduced here
 by hand on 2026-11-16 (above); no script runs it.
 
 ## Checking
