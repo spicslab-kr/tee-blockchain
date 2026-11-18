@@ -63,7 +63,7 @@ The values both sides must match to get the same measurements are a separate lis
 
 | | |
 |---|---|
-| what it is | bit 28 of the TD attributes, as Intel's TDX module specification (A.3.4) numbers them. **We do not set it**: GCP launches the TD, and the bit is set in GCP's quotes |
+| what it is | bit 28 of the TD attributes, as Intel's DCAP quoting library document numbers them (`Intel_TDX_DCAP_Quoting_Library_API.pdf`, A.3.4; the TDX Module specification, which would be the authority, was not retrieved: `tdx.md`, "Byte order"). **We do not set it**: GCP launches the TD, and the bit is set in GCP's quotes |
 | what we do with it | nothing, except as a test anchor: read little endian, the recorded quote's TD attributes have exactly bit 28 set and no reserved bit, which pins the byte order the parser uses for bit 0, DEBUG (`internal/tee/parse/tdx/endian_test.go`). DEBUG is the only attribute bit checked: a debug TD is refused |
 | what it does inside the TDX module, and what would change if it were clear | **not checked** here |
 
