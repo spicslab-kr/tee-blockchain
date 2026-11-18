@@ -82,7 +82,10 @@ CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-audit
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-user         ./cmd/user
 ```
 
-For a TEE instance or guest, which is Linux on x86_64 (add `.exe` nowhere; on Windows run this in Git Bash):
+For a TEE instance or guest, which runs Linux (add `.exe` nowhere; on Windows run this in Git Bash). The lines below are
+for x86_64, which every TDX and SEV-SNP guest is, and Nitro instances such as `m6i`; for an arm64 (Graviton) one use
+`GOARCH=arm64`. The two architectures give different measurements, each registered on its own (measured on a
+`c7g.xlarge`: [aws-nitro-2026-11-17-shared-aws.md](docs/results/aws-nitro-2026-11-17-shared-aws.md)):
 
 ```
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-vendor       ./cmd/vendor
