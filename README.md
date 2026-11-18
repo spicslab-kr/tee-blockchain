@@ -227,8 +227,10 @@ prints the address that `--registry` takes:
 
 A key file is one line, a 32-byte Ethereum private key in hex (with or without `0x`); how to make one and get its
 address: [e2e/README.md, Key files](e2e/README.md#key-files). On a public network both keys need a balance: test ETH
-from a Sepolia faucet. To try it all without any ETH or key files, run the registry on a local `anvil` chain:
-[Running without a public testnet](e2e/README.md#running-without-a-public-testnet). On TDX and SEV-SNP the roles are
+from a Sepolia faucet. To try it without any ETH, run the registry on a local `anvil` chain. The e2e scripts then need
+no key files either ([Running without a public testnet](e2e/README.md#running-without-a-public-testnet)); the commands
+above still read keys from files, so write anvil's development keys into them, as
+[TDX step 11](docs/build/tdx.md#11-on-your-computer-register-with-audit) does. On TDX and SEV-SNP the roles are
 the same but the commands differ: `build` and `launch` run on the guest with `--platform` (and take a folder of files
 and a base initrd, not a Dockerfile), and `audit`, `self-register` and `verify` need `--format` (`audit` and
 `self-register` take it from `--config` when given). The getting-started
