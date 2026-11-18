@@ -21,18 +21,20 @@ if [ "$HAVE_GO" != "$WANT_GO" ]; then
   exit 1
 fi
 echo "toolchain: $HAVE_GO (pinned)"
-# Linux binaries for the instances, then binaries for this machine.
+# Linux binaries for the instances, into linux/ as in README.md "The binaries" (the repository root holds the binaries
+#   README builds for this machine, which these would otherwise overwrite under the same names), then binaries for this
+#   machine into e2e-work/bin.
 #   CGO_ENABLED=0 keeps a native Linux build with gcc from linking cgo (a different att-ra-responder than a cross-build).
 #   -trimpath keeps the absolute build folder path out of the binary. att-ra-responder goes into the enclave image
 #   unchanged, so the checkout path would otherwise change the measurement.
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-vendor ./cmd/vendor
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-auditor ./cmd/auditor
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-ra-responder ./cmd/ra-responder
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-vendor ./cmd/vendor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-auditor ./cmd/auditor
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-ra-responder ./cmd/ra-responder
 mkdir -p "$BIN"
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o "$VENDOR_BIN" ./cmd/vendor
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o "$AUDITOR_BIN" ./cmd/auditor
 CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o "$USER_BIN" ./cmd/user
-echo "responder sha256: $(sha256 att-ra-responder | cut -c1-64)"  # compared with the checksum printed on each instance after the upload
+echo "responder sha256: $(sha256 linux/att-ra-responder | cut -c1-64)"  # compared with the checksum printed on each instance after the upload
 
 # The flow and arch scripts clone the test application with git on the instances, and the Amazon Linux 2023 image has
 #   no git (seen on the 2026-11-12 baseline: this step installed git 2.50.1 on both). Installed only when missing; git
@@ -51,8 +53,8 @@ step "STOPPING OLD ENCLAVES"
 V 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x att-vendor; true'
 A 'sudo nitro-cli terminate-enclave --all >/dev/null 2>&1; pkill -x att-auditor; true'
 step "UPLOADING BINARIES"
-$SCP att-vendor att-ra-responder "$SSH_USER@$VENDOR_HOST:~/"
-$SCP att-auditor att-ra-responder "$SSH_USER@$AUDITOR_HOST:~/"
+$SCP linux/att-vendor linux/att-ra-responder "$SSH_USER@$VENDOR_HOST:~/"
+$SCP linux/att-auditor linux/att-ra-responder "$SSH_USER@$AUDITOR_HOST:~/"
 V 'chmod +x att-vendor att-ra-responder; sha256sum att-ra-responder'
 A 'chmod +x att-auditor att-ra-responder; sha256sum att-ra-responder'
 echo "uploaded. next: bash e2e/flow1-auditor-registers/1-Auditor-build-audit-handoff.sh   (run on your machine; it connects to the Auditor instance and builds there)"

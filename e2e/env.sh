@@ -57,7 +57,7 @@ SERVICE=nginx
 VERSION=1.31.6
 
 # 0-Setup-local-upload.sh builds the binaries for your own machine here, apart from the Linux att-vendor and
-# att-auditor binaries that go to the instances
+# att-auditor binaries that go to the instances (those are built into linux/)
 BIN=e2e-work/bin
 WORK=e2e-work
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE=.exe;; *) EXE="";; esac   # Git Bash reports MINGW/MSYS

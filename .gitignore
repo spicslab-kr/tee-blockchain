@@ -9,7 +9,7 @@ dist/
 /user.exe
 /ra-responder
 /ra-responder.exe
-# e2e/0-Setup-local-upload.sh cross-builds the Linux binaries for the instances into the repo root.
+# README.md "The binaries" builds the binaries for your own machine into the repo root.
 /att-vendor
 /att-auditor
 /att-user
@@ -23,8 +23,9 @@ e2e-work/
 /contracts/evm/out/
 /contracts/evm/cache/
 
-# docs/build/tdx.md and sev-snp.md, run from the repository root on your computer: the guest binaries (step 2) and the
-# evidence, nonce and measurements fetched in steps 10-11
+# README.md "The binaries", e2e/0-Setup-local-upload.sh, and docs/build/tdx.md and sev-snp.md step 2: the Linux binaries for
+# the instances and guests. tdx.md and sev-snp.md, run from the repository root on your computer, also fetch the
+# evidence, nonce and measurements in steps 10-11
 /linux/
 /quote.bin*
 /evidence.cbor*
