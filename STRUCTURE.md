@@ -17,10 +17,14 @@ This page lists every folder in the repository, then explains the one idea that 
 ├── .gitignore              keys, e2e work files, stray build outputs
 │
 ├── cmd/                    one folder per binary, plus the end-to-end Go tests
-│   ├── vendor/             att-vendor:       build, launch, send, self-register
-│   ├── auditor/            att-auditor:      receive, build, launch, audit, registry-deploy, send
-│   ├── user/               att-user:         verify (no key, no register)
-│   ├── ra-responder/       att-ra-responder: runs inside the enclave and answers attestation requests
+│   ├── vendor/             att-vendor:       build, pack, launch, send, receive, self-register, registry-deploy,
+│   │                                         register, lookup, compare, ra-request, ra-parse, ra-serve, ra-proxy,
+│   │                                         lo-up, version
+│   ├── auditor/            att-auditor:      receive, build, pack, launch, audit, send, registry-deploy, register,
+│   │                                         lookup, compare, ra-request, ra-parse, ra-serve, ra-proxy, lo-up,
+│   │                                         version
+│   ├── user/               att-user:         verify, ra-request, ra-parse, lookup, compare (no key, no register)
+│   ├── ra-responder/       att-ra-responder: answers attestation requests, inside the enclave or on the guest
 │   └── *_e2e_test.go       build the real binaries and drive them against a local anvil chain
 │
 ├── internal/               all library code; nothing here is importable from outside the module
@@ -96,8 +100,15 @@ In flow 2 the Vendor runs step 3 itself with `att-vendor self-register`.
 ### Inside `internal/<feature>/`
 
 Every feature folder under `internal/` (`tee/request`, `tee/parse`, `setup/build`, `setup/launch`,
-`chain/register`, `chain/lookup`, `core/compare`, `core/transfer`) has the same two kinds of
-sub-package.
+`chain/register`, `chain/lookup`, `core/compare`, `core/transfer`) has role packages. What sits below them differs:
+
+- `tee/request`, `setup/build`, `setup/launch`: one platform module per platform, a sub-folder of the role package
+  (shown below), over role-independent code next to the role packages.
+- `tee/parse`: one file per platform in the role package (`aws.go`, `tdx.go`, …), over the role-independent parsers
+  next to it ("Why parse adapters are files and the others are folders").
+- `chain/register`, `chain/lookup`: one sub-folder, `ether`, the chain side, not a platform.
+- `core/compare`, `core/transfer`: no sub-folders; `core/compare` keeps its role-independent decision next to the role
+  packages (`check.go`, `compare.go`).
 
 ```
 internal/tee/request/
@@ -130,7 +141,7 @@ while the `auditor` and `user` folders are lowercase. The Go package name inside
 `vendor` in all three cases, so imports read the same. Renaming the folders to `vendor` touches the
 import paths in `cmd/vendor`, in the other role packages and in the tests.
 
-### Platform modules: aws, gcp, azure
+### Platform modules: aws, tdx, snp, gcp, azure
 
 A platform module is the code that is specific to one TEE platform. It lives one level below a role
 package (`internal/tee/request/Vendor/aws`) or, for logic that does not depend on the role, next to
@@ -266,9 +277,8 @@ the role-neutral logic is pulled out into the shared pieces above wherever Go al
 | `setup/build/<role>/aws` and `setup/launch/<role>/aws` | Vendor, auditor |
 | `setup/build/<role>/tdx` and `setup/launch/<role>/tdx` | Vendor, auditor |
 | `setup/build/<role>/snp` and `setup/launch/<role>/snp` | Vendor, auditor |
-| `cmd/<role>/snp.go` | Vendor, auditor, apart from the next-step hint |
-| `cmd/<role>/tdx.go` | Vendor, auditor, apart from the next-step hint (the Vendor registers, the Auditor audits) |
-| `tee/request` (`request.go`, `nonce.go`, `tcp.go`, `wire.go`, `aws/*`, `gcp/*`, `azure/*`, `tdx/*`, `snp/*`) | Vendor, auditor; the user copy of `request.go`, `nonce.go`, `tcp.go`, `wire.go` is the same too |
+| `cmd/<role>/snp.go`, `cmd/<role>/tdx.go` | Vendor, auditor, apart from the role in the imports and in the commands the printed hints name, the hint after `launch --check` (the Vendor registers, the Auditor audits), and the `--base-initrd` help (the initrd the Vendor publishes, or published) |
+| `tee/request` (`request.go`, `nonce.go`, `tcp.go`, `wire.go`, `fixture.go`, `aws/*`, `gcp/*`, `azure/*`, `tdx/*`, `snp/*`) | Vendor, auditor; the user copy of `request.go`, `nonce.go`, `tcp.go`, `wire.go` is the same too |
 | `tee/parse` (`parse.go`, `aws.go`, `gcp.go`, `azure.go`, `tdx.go`, `snp.go`) | Vendor, auditor, user |
 | `chain/lookup` (`lookup.go`, `ether/reader.go`) | Vendor, auditor |
 | `core/compare/<role>` | Vendor, auditor |
@@ -348,7 +358,8 @@ Two details the table hides:
 | `internal/setup/build/GO_TOOLCHAIN` | The pinned Go version, read by `build` and by CONTRIBUTING |
 | `internal/tee/parse/aws/` | Shared Nitro parser, `root.pem`, and a recorded document under `testdata/` |
 | `internal/tee/request/testdata/` | A recorded Nitro attestation document used by tests |
-| `internal/chain/*/<role>/ether/` | Go side of the registry contract; `registry.go` is generated by `go generate` from `contracts/evm/Registry.sol` |
+| `internal/chain/register/<role>/ether/` | Go side of the registry contract: deploy, sign, register; `registry.go` is generated by `go generate` from `contracts/evm/Registry.sol` |
+| `internal/chain/lookup/<role>/ether/` | reading registrations (`reader.go`), through the role's binding in `chain/register/<role>/ether` (the User, which has no register package, through the Auditor's); nothing generated here |
 | `contracts/evm/` | `Registry.sol`; `lib/openzeppelin-contracts` is a git submodule |
 | `e2e/` | Shell scripts, not run by `go test`; the Go end-to-end tests are in `cmd/` |
 | `docs/build/` | Guides and procedures a reader follows; the other docs folders point here for "how" |
