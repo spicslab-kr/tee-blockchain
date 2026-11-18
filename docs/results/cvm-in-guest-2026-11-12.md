@@ -19,7 +19,7 @@ What the run does **not** prove:
   existed for these platforms yet. The run proves request, verification, registration and lookup on fresh evidence.
   The Auditor's own rebuild ran later (2026-11-16, [`sessions-2026-11-16/`](sessions-2026-11-16/)).
 - **The verifier ran inside the attested guest.** A verifier on another machine ran on 2026-11-15
-  ([`trial-2026-11-16.md`](trial-2026-11-16.md)).
+  ([`trial-2026-11-15.md`](trial-2026-11-15.md)).
 
 ## Results
 

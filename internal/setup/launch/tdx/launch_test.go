@@ -171,7 +171,7 @@ func checkSetup(t *testing.T, log []byte) (Check, string) {
 
 // The check verifies the quote first, and then refuses an event log that is not this quote's. Without a guest no log
 // replays to a real quote's RTMRs, so the passing path is not a unit test; it passed on TDX guests on 2026-11-15 and
-// -16 (docs/results/trial-2026-11-16.md, docs/results/sessions-2026-11-16/intel-tdx.md).
+// -16 (docs/results/trial-2026-11-15.md, docs/results/sessions-2026-11-16/intel-tdx.md).
 func TestCheck_RecordedQuoteVerifiesThenForeignLogIsRefused(t *testing.T) {
 	q, rd := recordedQuote(t)
 	raw, _ := ccel(bootEvents(builtInitrd))
