@@ -9,4 +9,7 @@ export PATH="${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bi
 /att-ra ra-serve --listen "vsock:${ATT_RA_PORT:-5000}" --extractor nsm &
 set --
 while IFS= read -r arg; do set -- "$@" "$arg"; done < /att-app-cmd
+# The enclave starts this script in /, so it changes into the original image's WORKDIR (written to /att-app-workdir by
+# build) before running the command; a command with a relative path then runs as it did under docker run.
+[ -f /att-app-workdir ] && { IFS= read -r wd < /att-app-workdir; cd "$wd" || echo "att: cd $wd failed" >&2; }
 exec "$@"

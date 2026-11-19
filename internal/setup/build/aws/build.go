@@ -190,13 +190,13 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 	}
 
 	step(fmt.Sprintf("Adding the attestation responder to the image: %s → %s", appImage, res.Image), "a small program that runs inside the enclave next to the software and hands out signed attestation documents on request, which lets anyone ask the enclave what it is running")
-	appCmd, err := r.imageCommand(ctx, appImage)
+	appCmd, workDir, err := r.imageCommand(ctx, appImage)
 	if err != nil {
 		return res, err
 	}
-	fmt.Fprintf(log, "software command: %s\n", strings.Join(appCmd, " "))
+	fmt.Fprintf(log, "software command: %s (in %s)\n", strings.Join(appCmd, " "), workDir)
 	fmt.Fprintln(log, build.ToolchainLine())
-	if err := b.layerResponder(ctx, r, appImage, res.Image, appCmd); err != nil {
+	if err := b.layerResponder(ctx, r, appImage, res.Image, appCmd, workDir); err != nil {
 		return res, err
 	}
 
@@ -232,8 +232,9 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 }
 
 // layerResponder layers the responder binary and the entrypoint on top of the software image. The original command is passed as a file,
-// because nitro-cli drops a Docker CMD behind a script entrypoint.
-func (b Build) layerResponder(ctx context.Context, r runner, from, to string, appCmd []string) error {
+// because nitro-cli drops a Docker CMD behind a script entrypoint. The original WORKDIR is passed the same way: the enclave starts the
+// entrypoint in /, so a command with a relative path (CMD ["python", "server.py"] under WORKDIR /app) would not be found.
+func (b Build) layerResponder(ctx context.Context, r runner, from, to string, appCmd []string, workDir string) error {
 	dir, err := os.MkdirTemp("", "att-ra-image")
 	if err != nil {
 		return err
@@ -252,10 +253,14 @@ func (b Build) layerResponder(ctx context.Context, r runner, from, to string, ap
 	if err := os.WriteFile(filepath.Join(dir, "att-app-cmd"), []byte(strings.Join(appCmd, "\n")+"\n"), 0o644); err != nil {
 		return err
 	}
+	if err := os.WriteFile(filepath.Join(dir, "att-app-workdir"), []byte(workDir+"\n"), 0o644); err != nil {
+		return err
+	}
 	dockerfile := fmt.Sprintf(`FROM %s
 COPY att-ra /att-ra
 COPY entrypoint.sh /att-entrypoint.sh
 COPY att-app-cmd /att-app-cmd
+COPY att-app-workdir /att-app-workdir
 ENV ATT_RA_PORT=%d
 ENTRYPOINT ["/att-entrypoint.sh"]
 `, from, b.Port)
@@ -467,26 +472,31 @@ func (r runner) output(ctx context.Context, name string, args ...string) ([]byte
 	return out, nil
 }
 
-// imageCommand returns the image ENTRYPOINT followed by CMD.
-func (r runner) imageCommand(ctx context.Context, image string) ([]string, error) {
+// imageCommand returns the image ENTRYPOINT followed by CMD, and its WORKDIR ("/" when the image sets none).
+func (r runner) imageCommand(ctx context.Context, image string) ([]string, string, error) {
 	out, err := r.output(ctx, "docker", "image", "inspect", image)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	var v []struct {
 		Config struct {
 			Entrypoint []string
 			Cmd        []string
+			WorkingDir string
 		}
 	}
 	if err := json.Unmarshal(out, &v); err != nil || len(v) != 1 {
-		return nil, fmt.Errorf("docker inspect %s: unexpected output", image)
+		return nil, "", fmt.Errorf("docker inspect %s: unexpected output", image)
 	}
 	cmd := append(v[0].Config.Entrypoint, v[0].Config.Cmd...)
 	if len(cmd) == 0 {
-		return nil, fmt.Errorf("%s has no ENTRYPOINT or CMD; nothing to run", image)
+		return nil, "", fmt.Errorf("%s has no ENTRYPOINT or CMD; nothing to run", image)
 	}
-	return cmd, nil
+	workDir := v[0].Config.WorkingDir
+	if workDir == "" {
+		workDir = "/"
+	}
+	return cmd, workDir, nil
 }
 
 // envChange is one ENV line for docker import --change. When the value contains spaces (measured: the official php image's
