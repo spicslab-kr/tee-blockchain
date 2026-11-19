@@ -286,7 +286,7 @@ func (r runner) ensureAllocator(ctx context.Context, memory, cpus int) error {
 		}
 	}
 	if curMem >= memory && curCPU >= cpus {
-		return nil
+		return checkHugepages(memory)
 	}
 	fmt.Fprintf(r.log, "enclave resources %d MiB / %d cpu → %d MiB / %d cpu\n", curMem, curCPU, max(curMem, memory), max(curCPU, cpus))
 	c := r.cmd(ctx, "tee", allocatorFile)
@@ -294,7 +294,52 @@ func (r runner) ensureAllocator(ctx context.Context, memory, cpus int) error {
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("write %s: %w", allocatorFile, err)
 	}
-	return r.run(ctx, "systemctl", "restart", "nitro-enclaves-allocator.service")
+	if memory > maxRegions*2 {
+		// Above 8 GiB the enclave needs 1 GiB pages, and the allocator can only reserve those from contiguous free memory.
+		// Dropping the page cache and compacting first (a large docker build leaves memory fragmented) makes that likely.
+		fmt.Fprintf(r.log, "%d MiB is more than %d × 2 MiB pages: freeing the page cache so the allocator can reserve 1 GiB pages\n", memory, maxRegions)
+		_ = r.run(ctx, "sync")
+		_ = r.run(ctx, "sh", "-c", "echo 3 > /proc/sys/vm/drop_caches")
+		_ = r.run(ctx, "sh", "-c", "echo 1 > /proc/sys/vm/compact_memory")
+	}
+	if err := r.run(ctx, "systemctl", "restart", "nitro-enclaves-allocator.service"); err != nil {
+		return err
+	}
+	return checkHugepages(memory)
+}
+
+// maxRegions is how many memory regions one enclave can take (the nitro_enclaves driver logs "Reached max memory regions 4096").
+// Each hugepage is one region, so with 2 MiB pages alone an enclave cannot get more than 8192 MiB.
+const maxRegions = 4096
+
+// usableMiB is the most memory an enclave can take from n1G 1 GiB pages and n2M 2 MiB pages within maxRegions regions,
+// using the 1 GiB pages first.
+func usableMiB(n1G, n2M int) int {
+	big := min(n1G, maxRegions)
+	return big*1024 + min(n2M, maxRegions-big)*2
+}
+
+// checkHugepages fails early, with the reason and the way out, when the reserved hugepages cannot hold memory MiB in
+// maxRegions regions. Without it nitro-cli run-enclave fails later with a general ioctl error (E29).
+func checkHugepages(memory int) error {
+	if memory <= maxRegions*2 {
+		return nil
+	}
+	count := func(size string) int {
+		b, err := os.ReadFile("/sys/kernel/mm/hugepages/hugepages-" + size + "/nr_hugepages")
+		if err != nil {
+			return 0
+		}
+		n, _ := strconv.Atoi(strings.TrimSpace(string(b)))
+		return n
+	}
+	n1G, n2M := count("1048576kB"), count("2048kB")
+	if got := usableMiB(n1G, n2M); got < memory {
+		return fmt.Errorf("enclave memory %d MiB does not fit: an enclave takes at most %d memory regions, and the allocator reserved "+
+			"%d × 1 GiB and %d × 2 MiB pages, which gives %d MiB. Reboot the instance and run launch again before anything else "+
+			"uses the memory, so the allocator can reserve 1 GiB pages, or give a smaller --memory", memory, maxRegions, n1G, n2M, got)
+	}
+	return nil
 }
 
 // launchStep: two lines per step, what is being done and one sentence on why.
