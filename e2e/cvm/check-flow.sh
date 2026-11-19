@@ -270,6 +270,12 @@ start "guest: install on amd-sev-snp-verity uses --build-value"
 gstep install auditor amd-sev-snp-verity 2; exitis 0; call '^att-auditor launch --platform amd-sev-snp-verity --build-value out/build-value.json$'; finish
 start "guest: build intel-tdx option 2 runs as root, with --option 2 and base-initrd-v.img"
 gstep build vendor intel-tdx 2; exitis 0; call '^sudo \./att-vendor build'; call '^att-vendor build --platform intel-tdx --app-dir app --base-initrd base-initrd-v.img --option 2 --verify$'; finish
+start "guest: after a build as root, out/ goes back to the user (R9)"
+call "^sudo chown -R $(id -un) out$"; finish
+start "guest: out/ goes back to the user also when the build as root fails"
+printf '#!/usr/bin/env bash\nprintf "att-auditor %%s\\n" "$*" >> "$STANDIN_LOG"\nexit 3\n' > "$g/run/att-auditor"
+gstep build auditor amd-sev-snp-verity 2; exitis 3; call '^sudo chown -R '; finish
+printf '#!/usr/bin/env bash\nprintf "att-auditor %%s\\n" "$*" >> "$STANDIN_LOG"\n' > "$g/run/att-auditor"
 start "guest: build amd-sev-snp-initrd, not as root, no --option"
 gstep build vendor amd-sev-snp-initrd 1; exitis 0; nocall '^sudo'; call '^att-vendor build --platform amd-sev-snp-initrd --app-dir app --base-initrd base-initrd.img --verify$'; finish
 start "guest: the tampered application differs from the original in exactly one byte"

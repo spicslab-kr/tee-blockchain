@@ -78,7 +78,12 @@ app)
   ;;
 build)
   extra=(); [ "$fmt" = intel-tdx ] && extra=(--option "$opt")
-  "${as_root[@]}" "$att" build --platform "$fmt" --app-dir app --base-initrd "$base" "${extra[@]}" --verify
+  rc=0
+  "${as_root[@]}" "$att" build --platform "$fmt" --app-dir app --base-initrd "$base" "${extra[@]}" --verify || rc=$?
+  # A build as root leaves out/ to root, and a later Option 1 build, as the user, cannot write there (on 2026-11-19,
+  # docs/results/cvm-flow-rehearsal-2026-11-19.md, R9). Give it back, also after a failed build.
+  if [ "$verity" = 1 ] && [ -d out ]; then sudo chown -R "$(id -un)" out; fi
+  [ "$rc" -eq 0 ] || exit "$rc"
   cat out/build-value.json
   ;;
 install)
