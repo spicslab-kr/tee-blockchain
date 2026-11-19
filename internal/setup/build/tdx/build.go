@@ -149,7 +149,11 @@ func (b Build) Run(ctx context.Context, log io.Writer) (Result, error) {
 		fmt.Fprintf(log, "\n%s %s…\n           %s\n", cli.Green(fmt.Sprintf("[build %d/5]", n)), what, why)
 	}
 
-	step("Checking the tools", "Option 2 makes the image with mksquashfs and veritysetup; their versions are part of what makes the bytes, so they are recorded")
+	if b.Option == Option2 {
+		step("Checking the tools", "Option 2 makes the image with mksquashfs and veritysetup; their versions are part of what makes the bytes, so they are recorded")
+	} else {
+		step("Checking the tools", "Option 1 needs none: this binary writes the application archive itself")
+	}
 	tools, err := b.tools(ctx)
 	if err != nil {
 		return res, err
