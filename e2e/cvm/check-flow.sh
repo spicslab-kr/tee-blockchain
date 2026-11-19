@@ -146,27 +146,40 @@ newwork setup
 start "setup intel-tdx: binaries to their guests, both prepared, through IAP, no hooks"
 run bash "$S" intel-tdx; exitis 0
 call 'compute disks describe attestamp-tdx-vendor'; call 'compute instances describe attestamp-tdx-auditor .*machineType'
-call 'compute scp linux/att-vendor attestamp-tdx-vendor:att-vendor .*--tunnel-through-iap'
-call 'compute scp linux/att-ra-responder attestamp-tdx-auditor:att-ra-responder'
-call 'compute scp linux/att-auditor attestamp-tdx-auditor:att-auditor'
-call 'compute scp .*guest/guest-step.sh attestamp-tdx-vendor:attestamp-guest-step.sh'
+call 'compute scp linux/att-vendor attestamp-tdx-vendor:att-vendor\.attestamp-new .*--tunnel-through-iap'
+call 'compute scp linux/att-ra-responder attestamp-tdx-auditor:att-ra-responder\.attestamp-new '
+call 'compute scp linux/att-auditor attestamp-tdx-auditor:att-auditor\.attestamp-new '
+call 'compute scp .*guest/guest-step.sh attestamp-tdx-vendor:attestamp-guest-step\.sh\.attestamp-new '
 call 'compute ssh attestamp-tdx-vendor .*--command .*bash attestamp-guest-step.sh prepare vendor intel-tdx 1'
 call 'compute ssh attestamp-tdx-auditor .*--command .*bash attestamp-guest-step.sh prepare auditor intel-tdx 1'
 call 'go build .*-trimpath -buildvcs=false -ldflags=-buildid= -o linux/att-ra-responder'
-nocall 'initramfs-hook'; finish
+nocall 'initramfs-hook'
+# Every copy to a guest goes to a temporary name.
+if grep -E 'compute scp [^ ]+ [^ ]+:' "$log" | grep -v '\.attestamp-new ' > "$tmp/direct.txt"; then bad="$bad; copied straight onto its name: $(cat "$tmp/direct.txt")"; fi
+finish
+start "setup renames each copied file into place, so a running responder cannot stop the copy (R8)"
+call 'compute ssh attestamp-tdx-vendor .*--command mv -f att-vendor\.attestamp-new att-vendor && mv -f att-ra-responder\.attestamp-new att-ra-responder$'
+call 'compute ssh attestamp-tdx-auditor .*--command mv -f att-auditor\.attestamp-new att-auditor && mv -f att-ra-responder\.attestamp-new att-ra-responder$'
+call 'compute ssh attestamp-tdx-vendor .*--command rm -f \.attestamp-step\.rc; mv -f attestamp-guest-step\.sh\.attestamp-new attestamp-guest-step\.sh \|\| exit 1; bash attestamp-guest-step\.sh prepare '
+finish
+start "a copy to a path, not a plain name in the guest's home, is refused before any copy"
+run bash -c "cd \"$root\" && . e2e/env.sh && . e2e/cvm/env-cvm.sh intel-tdx && guest_put attestamp-tdx-vendor linux/att-vendor sub/att-vendor"
+exitis 2; nocall 'compute scp'; said 'not a plain file name'; finish
 start "setup refuses guests of different images, before copying anything"
 run FAKE_AUDITOR_IMAGE=ubuntu-2404-noble-amd64-v20990101 bash "$S" intel-tdx; exitis 1; nocall 'compute scp'; said 'differ in image'; finish
 start "setup refuses a base initrd that differs between the guests"
 run FAKE_BASE_DIFF=1 bash "$S" amd-sev-snp-initrd; exitis 1; said 'base initrd differs'; finish
 start "setup intel-tdx option 2: TDX's hooks to the Vendor, its base-initrd-v.img to the Auditor"
 run bash "$S" intel-tdx 2; exitis 0
-call 'compute scp internal/tee/parse/tdx/testdata/record/initramfs-hook.sh attestamp-tdx-vendor:initramfs-hook.sh'
+call 'compute scp internal/tee/parse/tdx/testdata/record/initramfs-hook.sh attestamp-tdx-vendor:initramfs-hook\.sh\.attestamp-new '
 call 'compute scp attestamp-tdx-vendor:base-initrd-v.img '
-call 'compute scp .*vendor-base-initrd-v.img attestamp-tdx-auditor:base-initrd-v.img'
+call 'compute scp .*vendor-base-initrd-v.img attestamp-tdx-auditor:base-initrd-v\.img\.attestamp-new '
+call 'compute ssh attestamp-tdx-vendor .*--command mv -f .* && mv -f initramfs-local-bottom\.sh\.attestamp-new initramfs-local-bottom\.sh$'
+call 'compute ssh attestamp-tdx-auditor .*--command mv -f .* && mv -f base-initrd-v\.img\.attestamp-new base-initrd-v\.img$'
 call 'prepare auditor intel-tdx 2'; finish
 start "setup amd-sev-snp-verity: SEV-SNP's hooks, guests named attestamp-snp-*"
 run bash "$S" amd-sev-snp-verity; exitis 0
-call 'compute scp internal/tee/parse/snp/testdata/record/initramfs-local-bottom.sh attestamp-snp-vendor:initramfs-local-bottom.sh'
+call 'compute scp internal/tee/parse/snp/testdata/record/initramfs-local-bottom.sh attestamp-snp-vendor:initramfs-local-bottom\.sh\.attestamp-new '
 call 'prepare vendor amd-sev-snp-verity 2'; finish
 
 # The flow, intel-tdx on a local chain

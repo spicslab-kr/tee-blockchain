@@ -54,12 +54,17 @@ guest_put "$VENDOR_VM" linux/att-vendor att-vendor || exit 1
 guest_put "$VENDOR_VM" linux/att-ra-responder att-ra-responder || exit 1
 guest_put "$AUDITOR_VM" linux/att-auditor att-auditor || exit 1
 guest_put "$AUDITOR_VM" linux/att-ra-responder att-ra-responder || exit 1
+vendor_files=(att-vendor att-ra-responder); auditor_files=(att-auditor att-ra-responder)
 verity=0; { [ "$FORMAT" = amd-sev-snp-verity ] || { [ "$FORMAT" = intel-tdx ] && [ "$OPTION" = 2 ]; }; } && verity=1
 if [ "$verity" = 1 ]; then
   hooks=internal/tee/parse/$PLAT/testdata/record
   guest_put "$VENDOR_VM" "$hooks/initramfs-hook.sh" initramfs-hook.sh || exit 1
   guest_put "$VENDOR_VM" "$hooks/initramfs-local-bottom.sh" initramfs-local-bottom.sh || exit 1
+  vendor_files+=(initramfs-hook.sh initramfs-local-bottom.sh)
 fi
+# Each file went to a temporary name; renamed into place now, so that a responder still running from an earlier take
+# does not stop the copy (env-cvm.sh, guest_put).
+guest_place "$VENDOR_VM" "${vendor_files[@]}" || exit 1
 step_stop
 
 tstep "PREPARING THE VENDOR'S GUEST" guest_step "$VENDOR_VM" vendor prepare || exit 1
@@ -67,8 +72,10 @@ if [ "$verity" = 1 ]; then
   step_start "COPYING THE VENDOR'S base-initrd-v.img TO THE AUDITOR"
   guest_get "$VENDOR_VM" base-initrd-v.img "$CVM_WORK/vendor-base-initrd-v.img" || exit 1
   guest_put "$AUDITOR_VM" "$CVM_WORK/vendor-base-initrd-v.img" base-initrd-v.img || exit 1
+  auditor_files+=(base-initrd-v.img)
   step_stop
 fi
+guest_place "$AUDITOR_VM" "${auditor_files[@]}" || exit 1
 tstep "PREPARING THE AUDITOR'S GUEST" guest_step "$AUDITOR_VM" auditor prepare || exit 1
 
 step_start "COMPARING THE BASE INITRD"

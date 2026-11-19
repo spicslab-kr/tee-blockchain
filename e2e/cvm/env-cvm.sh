@@ -75,9 +75,22 @@ tstep() { local t0=$SECONDS rc; step "$@"; rc=$?; printf '  (%s: %d s)\n' "$1" $
 
 # guest_run <vm> <command> - one command line on the guest, its output here.
 guest_run() { gcloud_retry compute ssh "$1" --zone "$ZONE" "${IAP_FLAG[@]}" --command "$2"; }
-# guest_put <vm> <local file> <remote name>, guest_get <vm> <remote file> <local file> - one file per call.
-guest_put() { gcloud_retry compute scp "$2" "$1:$3" --zone "$ZONE" "${IAP_FLAG[@]}"; }
+# guest_put <vm> <local file> <name> - copies one file to <name>$GUEST_NEW in the guest's home; guest_place (or, for the
+# guest-side script, guest_step) then renames it to <name>. Copying straight onto <name> failed on 2026-11-19 while the
+# responder ran from that file ("Text file busy", docs/results/cvm-flow-rehearsal-2026-11-19.md, R8); a rename only
+# changes the directory entry, and the running process keeps its old file. That holds only within one file system, so
+# <name> must be a plain file name in the home, next to its temporary copy: a path is refused.
+# guest_get <vm> <remote file> <local file> - one file per call.
+GUEST_NEW=.attestamp-new
+guest_put() {
+  case "$3" in ''|*/*) echo "guest_put: '$3' is not a plain file name in the guest's home" >&2; return 2 ;; esac
+  gcloud_retry compute scp "$2" "$1:$3$GUEST_NEW" --zone "$ZONE" "${IAP_FLAG[@]}"
+}
 guest_get() { gcloud_retry compute scp "$1:$2" "$3" --zone "$ZONE" "${IAP_FLAG[@]}"; }
+# place_cmd <name>... - the guest command that renames each copied file into place; place_cmd stops at the first failure.
+place_cmd() { local c="" f; for f in "$@"; do c="$c${c:+ && }mv -f $f$GUEST_NEW $f"; done; printf '%s' "$c"; }
+# guest_place <vm> <name>... - renames the files guest_put copied, in one ssh call.
+guest_place() { local vm=$1; shift; guest_run "$vm" "$(place_cmd "$@")"; }
 # guest_ip <vm> - the guest's public address, which the RA port (attestamp-ra) is reached on.
 guest_ip() {
   gcloud compute instances describe "$1" --zone "$ZONE" --format='value(networkInterfaces[0].accessConfigs[0].natIP)'
@@ -90,7 +103,8 @@ STEP_RC=.attestamp-step.rc
 guest_step() {
   local vm=$1 role=$2 action=$3 rc g; shift 3
   guest_put "$vm" "$here_cvm/guest/guest-step.sh" "$GUEST_STEP" || return 1
-  guest_run "$vm" "rm -f $STEP_RC; bash $GUEST_STEP $action $role $FORMAT $OPTION $*; rc=\$?; echo \$rc > $STEP_RC; exit \$rc"
+  # The old exit code goes first, so that a failed rename leaves none behind to be read as this action's.
+  guest_run "$vm" "rm -f $STEP_RC; $(place_cmd "$GUEST_STEP") || exit 1; bash $GUEST_STEP $action $role $FORMAT $OPTION $*; rc=\$?; echo \$rc > $STEP_RC; exit \$rc"
   rc=$?
   [ $rc -eq 0 ] && return 0
   g=$(guest_run "$vm" "cat $STEP_RC 2>/dev/null" | tr -d '\r\n ')
