@@ -144,3 +144,6 @@ where Option 1 ran first. Got past by `sudo mv out out-verity` on both guests, w
 Both guests were stopped, not deleted. To be fixed after this record: R5 and the `build` wording; R8, by copying to a
 temporary name in the guest's home and renaming it into place (a rename within one file system leaves a running
 process its old file); R9, by giving `out/` back to the user after an Option 2 `build`.
+
+Note, 2026-11-20: fixed in `f02a286` (R5), `a09d1de` (the `build` wording), `df0c426` (R8) and `1e4cfc2` (R9), and
+checked with the stand-in gcloud of `e2e/cvm/check-flow.sh`; not yet run on a guest.
