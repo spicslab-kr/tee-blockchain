@@ -156,8 +156,8 @@ type(scope): what changed, in the imperative
   `go test ./...` runs. If you changed what `build --platform` writes, run flow 1 on two guests,
   `e2e/cvm/0-Setup-guests.sh` and then `e2e/cvm/flow1-auditor-registers/` 1 and 2 (e2e/README.md, "Flow 1 on TDX and
   SEV-SNP"): step 1 builds with `--verify` on the Auditor's guest, and step 2 requires the Vendor's guest to attest the
-  Auditor's values. They have run on TDX guests, both options (`docs/results/cvm-flow-rehearsal-2026-11-18.md`); for
-  SEV-SNP, where they have not run yet, "The Auditor's half" of `docs/build/sev-snp.md` is the procedure that has.
+  Auditor's values. They have run on TDX guests, both options (`docs/results/cvm-flow-rehearsal-2026-11-18.md`), and
+  on SEV-SNP guests, both formats (`docs/results/cvm-flow-rehearsal-2026-11-19.md`).
 - If you changed a command's flags or output, update the README section for that role.
 - Unless you say otherwise, code you contribute is licensed as MIT and
   documentation as CC BY 4.0, the same as the rest of the project.

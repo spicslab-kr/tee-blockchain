@@ -249,8 +249,9 @@ address changed").
   lookup calls, the exit codes 2b and 4b accept, the printed `verify` line, and the guest-side script's launch and build
   flags per format. **Not checked without a guest:** gcloud ssh and scp through IAP from Git Bash, the build, the GRUB
   entry and the reboot, `launch --check`, the responder, and the chain. On guests the flow ran for `intel-tdx`,
-  Option 1 and Option 2, with `NET=local`, every step passing, with the time of each step
-  (`docs/results/cvm-flow-rehearsal-2026-11-18.md`); SEV-SNP and Sepolia have not run yet.
+  Option 1 and Option 2 (`docs/results/cvm-flow-rehearsal-2026-11-18.md`), and for `amd-sev-snp-verity` and
+  `amd-sev-snp-initrd` (`docs/results/cvm-flow-rehearsal-2026-11-19.md`), with `NET=local`, every step passing, with
+  the time of each step; Sepolia has not run yet.
 
 ## Checks outside the two flows
 
