@@ -108,7 +108,7 @@ func (in Install) Run(ctx context.Context, log io.Writer) (Installed, error) {
 	}
 	res.ID, res.InitrdPath = in.ID, "/boot/"+file
 
-	step(2, "Copying the initrd to "+res.InitrdPath, "GRUB reads it from /boot and measures its SHA-384 into RTMR2 as it loads it")
+	step(2, "Copying the initrd to "+res.InitrdPath, "GRUB reads it from /boot and measures it as it loads it: its SHA-384 into RTMR2 on TDX, its SHA-256 (INITRD) on SEV-SNP")
 	if err := os.WriteFile(filepath.Join(in.Root, "boot", file), initrd, 0o644); err != nil {
 		return res, err
 	}
