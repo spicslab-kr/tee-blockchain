@@ -155,7 +155,13 @@ And then one more, which is why they were taken a second time on 2026-11-17:
 | `53bfd5e` | moves the Nitro build and launch into shared packages | none: the responder does not link them, and stayed `d6e3422d…` / `f581d95c…` |
 | `f0fb80d` | moves the Nitro request code, which the responder links, into the shared `internal/tee/request/aws` | moved: the responder became `b9ae17f3…` (amd64), `294efd1b…` (arm64) |
 
-**The current values**, at `6146c10`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder
+And one more since, 2026-11-20, not measured yet (`docs/status/build-info-gaps.md`, row 38):
+
+| commit | what it changes | effect on the test application's PCR0/PCR2 |
+|---|---|---|
+| `89c0063` | `build` runs the application in its image's WORKDIR: it layers a new file `/att-app-workdir` and a changed `/att-entrypoint.sh` into every image | moves them, for every image, not measured; the responder is unchanged |
+
+**The last measured values**, at `6146c10`, test application `docker-nginx` `ef5a25a6` `mainline/alpine-slim`, responder
 `b9ae17f3…` (amd64) / `294efd1b…` (arm64), 2026-11-17: x86_64, two machines identical: PCR0 `05662eae…`, PCR1
 `4b4d5b36…`, PCR2 `a3049e0d…`. On arm64 (`c7g.xlarge`) all three differ: PCR0 `a653991e…`, PCR1 `3b4a7e1b…`, PCR2
 `9660bc5e…`. PCR1 is the same as on 2026-11-16 on both (nitro-cli 1.5.0). The values at `83cb2dc` (responder
