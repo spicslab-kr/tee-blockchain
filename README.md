@@ -168,8 +168,11 @@ differs, with the hashes used and who chose each: [docs/build/settings-and-hashe
 steps 1 to 13 use one guest, and their Auditor registers the Vendor's guest's values without rebuilding them; the
 independent Auditor of the trust model above is each page's "The Auditor's half", which needs two guests and **passed
 on both platforms on 2026-11-16** ([TDX](docs/results/sessions-2026-11-16/intel-tdx.md),
-[SEV-SNP](docs/results/sessions-2026-11-16/amd-sev-snp.md)). What each platform's evidence gives the verifier, side
-by side, and which one to use: [RA comparison](docs/build/ra-comparison.md#which-one-to-use).
+[SEV-SNP](docs/results/sessions-2026-11-16/amd-sev-snp.md)). The same two-guest flow is also scripted
+([Flow 1 on TDX and SEV-SNP](e2e/README.md#flow-1-on-tdx-and-sev-snp)) and ran end to end with a local chain on
+2026-11-18 and 11-19, for `intel-tdx` Option 1 and 2, `amd-sev-snp-verity` and `amd-sev-snp-initrd`
+([TDX](docs/results/cvm-flow-rehearsal-2026-11-18.md), [SEV-SNP](docs/results/cvm-flow-rehearsal-2026-11-19.md)); not
+yet on Sepolia. What each platform's evidence gives the verifier, side by side, and which one to use: [RA comparison](docs/build/ra-comparison.md#which-one-to-use).
 
 ## Quick start
 
@@ -323,6 +326,8 @@ hash, and register its own signed hash. The User can then require both registrie
   Auditor rebuilt the Vendor's application on its own guest, got the same values, registered them, and a User's
   `verify` of the Vendor's guest passed; one byte changed on the Vendor's side was refused
   ([TDX](docs/results/sessions-2026-11-16/intel-tdx.md), [SEV-SNP](docs/results/sessions-2026-11-16/amd-sev-snp.md)).
+  The scripted flow (`e2e/cvm`) ran the same on 2026-11-18 and 11-19, for TDX Option 1 and 2 and both SEV-SNP
+  formats, with a local chain.
   SEV-SNP evidence is two documents from two signers, and nothing binds them to one VM: a relay that hashes one VM's
   vTPM evidence into another VM's report verifies (reproduced 2026-11-16; see
   [RA comparison](docs/build/ra-comparison.md) and [AMD SEV-SNP](docs/build/sev-snp.md#same-vm)).
@@ -342,7 +347,7 @@ hash, and register its own signed hash. The User can then require both registrie
 - [Contributing](CONTRIBUTING.md): build and test rules, commit messages, adding a platform
 - [Security](SECURITY.md): how to report a vulnerability privately, and what is in scope
 - [Project structure](STRUCTURE.md): every folder and module, and how the roles fit together
-- [End-to-end scripts](e2e/README.md): our runs against real Nitro instances
+- [End-to-end scripts](e2e/README.md): our runs against real Nitro instances, and flow 1 on two TDX or SEV-SNP guests
 - [Running without a public testnet](e2e/README.md#running-without-a-public-testnet): both flows on real enclaves
   with a local chain (`anvil`) and `NET=local`, so you can run the whole thing without any ETH
 
