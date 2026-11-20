@@ -48,7 +48,7 @@ The values both sides must match to get the same measurements are a separate lis
 | | |
 |---|---|
 | what it does | `build` packs the application into a read-only squashfs image and makes a dm-verity hash tree over it (`veritysetup format --hash=sha256`, 4096-byte blocks); the guest opens it read-only and mounts it on `/opt/app-verity` |
-| why these values | reproducibility: `mksquashfs -mkfs-time 0 -all-time 0`, file times 0, `umask 022` and mode 755 on every file and folder, and a **fixed** `--salt` and `--uuid` (`internal/setup/build/verity/verity.go`; `veritysetup` picks random ones otherwise). Read-only plus dm-verity: a changed block fails to read |
+| why these values | reproducibility: `mksquashfs -mkfs-time 0 -all-time 0`, file times 0, mode 755 set on every file and folder (explicitly, so the umask does not matter; the old script `internal/setup/build/cpio/testdata/make-verity-image.sh` used `umask 022`), and a **fixed** `--salt` and `--uuid` (`internal/setup/build/verity/verity.go`; `veritysetup` picks random ones otherwise). Read-only plus dm-verity: a changed block fails to read |
 | what breaks if it differs | a random salt or UUID, another umask, or a build time gives another image and root hash on every build (the record of the old out-of-repository scripts; `sev-snp.md`, "Variables"). On a root-hash mismatch the image is not opened, the hook writes `fail` to `/run/attestamp-status` and **the boot continues** (measured on TDX, 2026-11-12); RTMR2 / PCR12 then differ from any registered value and `launch --check` refuses. Stopping the boot instead is part of locking the guest, not done (`docs/build/runtime-immutability.md`, "What building layers 2 and 3 takes"). The same tamper case on SEV-SNP: **not checked** |
 
 ### The SEV-SNP Option 2 hook and PCR12
@@ -95,10 +95,11 @@ leaves Go's build ID out of the binary. That ID is a hash of every input of the 
 package `att-ra-responder` links moved Nitro's PCR0 and PCR2 even when no code it can run changed (`1967749d`); without
 it, code it never runs and comments that move no line of code leave the responder as it is (measured,
 `docs/status/build-info-gaps.md`, Q1). `build` refuses a responder that carries one, read from the ELF note
-`.note.go.buildid`, because Go does not record `-ldflags` in a `-trimpath` binary's build info. One
-setting changes the image itself: on Nitro, `build` and `pack` empty field 3 of `/etc/shadow` and `/etc/shadow-` (the
-day of the last password change), because it carried the build day into PCR0 and PCR2 (`a402827`; `aws-nitro.md`,
-"Two builds compared").
+`.note.go.buildid`, because Go does not record `-ldflags` in a `-trimpath` binary's build info. On Nitro `build` and
+`pack` also change the image itself: they repack it, empty `/tmp`, remove package-manager logs and caches, and add the
+responder and its files (the full list: `aws-nitro.md`, "What `build` changes in the image"). One of those changes
+undoes a setting: they empty field 3 of `/etc/shadow` and `/etc/shadow-` (the day of the last password change),
+because it carried the build day into PCR0 and PCR2 (`a402827`; `aws-nitro.md`, "Two builds compared").
 
 ## Hashes
 

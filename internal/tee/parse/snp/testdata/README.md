@@ -163,11 +163,11 @@ Then on an SEV-SNP guest booted with an initrd: `sudo ./record-snp -out fx -nonc
 
 For test-matrix row T10 the recorder also has `-relay-att <att.pb from another VM>`: it makes no vTPM attestation and
 requests this VM's report over SHA3-512 of the given file. The procedure is `docs/build/app-fixture-recording.md`,
-"Reproducing T10" (not run yet).
+"Reproducing T10" (run on 2026-11-16: the relay is accepted).
 
 ## Checking a recording with `ra-parse`
 
-A recording is three files; `att-user ra-parse` reads the one CBOR container the responder sends. `pack/main.go` joins
+The evidence of a recording is three files (the fourth, `record.txt`, is notes); `att-user ra-parse` reads the one CBOR container the responder sends. `pack/main.go` joins
 them with `snp.Encode`:
 
 ```

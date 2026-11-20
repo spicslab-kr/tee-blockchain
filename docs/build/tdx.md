@@ -19,7 +19,7 @@ Statements are marked **confirmed** (read from our recorded quote, a spec, a lib
 
 This takes one TDX guest on Google Cloud and your own computer, and goes all the way: build the application's
 initrd on the guest, boot it, read the measurements, register them on a chain, and have a User verify the guest. Type
-the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; in "The Auditor's half" so are `<auditor-guest-ip>`, the image name and the commit, which the Vendor hands over.
+the commands in order. `<guest-ip>` and `<0x…>` are values an earlier step prints; in "The Auditor's half" so are `<auditor-guest-ip>`, which the Auditor's own `status` prints, and the image name and the commit, which the Vendor hands over.
 
 **What steps 1 to 13 show, and what they do not.** They run against **one** guest, and in step 11 the Auditor
 registers the values the **Vendor's** guest measured, without rebuilding anything. That is **not** the trust model
@@ -480,7 +480,7 @@ condition the whole half rests on.
 | the machine type (`c3-standard-4`) | `MACHINE=` the Vendor's. **Required**: the Auditor's and the Vendor's guest must have the same machine type | **RTMR0** (measured 2026-11-16, T1). One guest, one boot entry, only the type changed: `c3-standard-4` RTMR0 `8847ec5d…`, `c3-standard-8` **`eba48352…`**; MRTD, RTMR1 and RTMR2 did not change. Whether the vCPU count or the memory moves it could not be separated: GCP refused `c3-highmem-4` and `c3-highcpu-8` for TDX, and in `c3-standard` both grow together. RTMR0 is where the firmware measures the VM's configuration (its ACPI tables and memory layout) |
 | the zone (`us-central1-a`) | `ZONE=` the Vendor's | nothing, where measured: a TDX guest made in `us-central1-b` from the same image and type gave the same MRTD, RTMR0, RTMR1 and RTMR2 as `us-central1-a` (2026-11-16, T1; measured on TDX itself, not taken from SEV-SNP). That is one other zone on one day, not every zone for good, so keep the Vendor's zone; it costs nothing |
 | the base initrd | Option 1: the image's own `/boot/initrd.img-<kernel>`, the same file on every guest of one image (`4703ec07…` on all three). Option 2: **the Vendor's** `base-initrd-v.img`; `mkinitramfs` never makes the same file twice, so the Auditor must not make its own | the initrd hash, so RTMR2 |
-| the application folder | the same files byte for byte (and the same modes; `build` normalises them) | the initrd hash, so RTMR2 |
+| the application folder | the same files byte for byte, and for Option 1 the same execute bits: Option 1 writes every file as 0644, or 0755 if it is executable; Option 2 makes every file and folder 0755 | the initrd hash, so RTMR2 |
 | the option (1 or 2) | the Vendor says which | the initrd, and for Option 2 the image |
 | this repository's commit | the same commit, built as in step 2 | the archive `build` writes (the cpio format is pinned by tests, but only the same code is sure to give the same bytes) |
 
@@ -495,8 +495,8 @@ gcloud compute scp attestamp-tdx-vendor:base-initrd-v.img vendor-base-initrd-v.i
 
 #### The steps
 
-The order with both halves: the Vendor's steps 1 to 10, then A1 to A9 instead of step 11, then step 12, then step 13 on
-both guests. A1 to A9 are the Auditor's, on the Auditor's computer and its own guest.
+The order with both halves: the Vendor's steps 1 to 10, then A1 to A9 instead of steps 11 and 12 (A9 is step 12,
+against the registry of A8), then step 13 on both guests. A1 to A9 are the Auditor's, on the Auditor's computer and its own guest.
 
 **A1. On the Auditor's computer: tools and binaries.** Step 1 as written, then `git checkout <the Vendor's commit>` in the clone, so that both sides build the same code. Step 2, with
 `att-auditor` for the guest instead of `att-vendor`:
@@ -909,7 +909,7 @@ the boot stopped.
 | confidential type | `--confidential-compute-type=TDX` | |
 | CPU platform | none | the script header says TDX must be created **without** `--min-cpu-platform` |
 | maintenance | `--maintenance-policy=TERMINATE` | these VMs cannot live-migrate |
-| image | `ubuntu-os-cloud/ubuntu-2404-lts-amd64` | must carry `TDX_CAPABLE`; the script checks it |
+| image | the family `ubuntu-os-cloud/ubuntu-2404-lts-amd64` by default, resolved once to an exact version (or `IMAGE=<exact name>`) | must carry `TDX_CAPABLE`; the script checks it. Both sides use the same exact version ("The same inputs") |
 | zone | `us-central1-a` (default) | |
 
 Our recorded guest, `attestamp-tdx-vendor` (read with `gcloud compute instances describe` and `gcloud compute disks

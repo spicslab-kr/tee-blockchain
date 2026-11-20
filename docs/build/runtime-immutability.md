@@ -69,7 +69,7 @@ the way layer 1 was. In order:
 
 | # | step | passes when |
 |---|---|---|
-| 1 | Build a locked root image: the root file system as a squashfs + dm-verity image with no `sshd` and no other login, writable paths on `tmpfs`, and outbound traffic blocked by a firewall configuration that lives inside the image; `att-ra-responder` started at boot with `--extractor tdx` or `snp-verity` and `--listen tcp:0.0.0.0:5000` | two builds give the same root hash (the Option 2 settings: squashfs times 0, fixed salt and UUID, `umask 022`) |
+| 1 | Build a locked root image: the root file system as a squashfs + dm-verity image with no `sshd` and no other login, writable paths on `tmpfs`, and outbound traffic blocked by a firewall configuration that lives inside the image; `att-ra-responder` started at boot with `--extractor tdx` or `snp-verity` and `--listen tcp:0.0.0.0:5000` | two builds give the same root hash (the Option 2 settings: squashfs times 0, fixed salt and UUID, mode 755 on every file and folder) |
 | 2 | Boot it, with the root image's verity root hash on the kernel command line (`root=/dev/mapper/...`, set up by the initrd against that hash) | the guest boots; SSH is refused; the responder answers from another machine |
 | 3 | Record evidence from the locked guest through the responder, not over SSH | a fixture recorded with `att-user ra-request` from the verifier's machine |
 | 4 | A test in which the verifier reads the root hash out of the measured command line (CMDLINE on SEV-SNP, the command-line event behind RTMR2 on TDX) and compares it with the hash of the image it was given | the hash in the evidence equals the published image's; a different image gives a different measurement |
