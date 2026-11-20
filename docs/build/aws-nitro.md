@@ -92,7 +92,7 @@ have to take care of all of it. The sections after this one say which items `bui
 - the CPU architecture (`amd64` or `arm64`)
 - the Go version, `-trimpath`, `-buildvcs=false`, `-ldflags=-buildid=` and `CGO_ENABLED=0` of `att-ra-responder`, and the very same responder file on both sides
 - the file order, timestamps and owners inside the Docker layers, which `docker build` decides anew on every run
-- `ENTRYPOINT`, `CMD` and `ENV` of the image
+- `ENTRYPOINT`, `CMD`, `ENV` and `WORKDIR` of the image
 - files left in `/tmp` and `/var/tmp`
 - package-manager logs, which record the install time
 - apk virtual-package versions, which are the install time
@@ -116,7 +116,7 @@ what remains.
 
 | step | what it removes |
 |---|---|
-| repack in name order, time 0, owner 0 (`tar --sort=name --mtime=@0 --owner=0 --group=0`), then restore `ENTRYPOINT`, `CMD`, `ENV` | file order and timestamps from `docker build` |
+| repack in name order, time 0, owner 0 (`tar --sort=name --mtime=@0 --owner=0 --group=0`), then restore `ENTRYPOINT`, `CMD`, `ENV`, and write `WORKDIR` to `/att-app-workdir`, which the entrypoint changes into before it runs the command (`docker import` drops `WORKDIR`; since `89c0063`) | file order and timestamps from `docker build` |
 | empty `/tmp` and `/var/tmp` | random-named files left by `mktemp` (memcached) |
 | remove package-manager logs: `/var/log/apk.log`, `dpkg.log`, `alternatives.log`, `apt`, `yum.log`, `dnf*.log`, `hawkey.log` | install times (nginx alpine-slim: only `apk.log` differed out of 725 files) |
 | set apk virtual-package versions to 0 in `/etc/apk/world` and `/lib/apk/db/installed` | the install time used as a version (haproxy, memcached) |
@@ -250,7 +250,7 @@ checking a Vendor's self-registration later in flow 2.
 | `--verify` fails and lists files | a Dockerfile line reads the time, the host or randomness (table above) |
 | `--verify` passes, but the other side's values differ | architecture, Go version, responder file, base image content, or tool versions |
 | only PCR1 differs | the kernel files, probably a different `nitro-cli` version (not measured) |
-| PCR0 and PCR2 differ | different files or a different `ENTRYPOINT` in the image |
+| PCR0 and PCR2 differ | different files or a different `ENTRYPOINT`, `CMD`, `ENV` or `WORKDIR` in the image |
 
 ## Settings that matter
 
@@ -265,7 +265,7 @@ checking a Vendor's self-registration later in flow 2.
 | `--verify` (`build`) | builds twice and compares | yes, but then you do not know whether the build is reproducible |
 | `--ignore-env` (`receive`) | turns a `build_env` mismatch into a warning | only to look around; the values will not match |
 | `--build-measurements` (`launch`) | starts a received image only if it measures the same | yes, but then a swapped image starts unchecked |
-| `--memory`, `--cpus` (`launch`) | the enclave's memory and CPU count | they are set when the enclave starts, not part of the build; the image must fit in the memory |
+| `--memory`, `--cpus` (`launch`) | the enclave's memory and CPU count | they are set when the enclave starts, not part of the build; the image must fit in the memory. Above 8192 MiB the enclave needs 1 GiB pages (an enclave takes at most 4096 memory regions, one per page): `launch` frees the page cache before the allocator reserves them, and stops with the reason if they still do not fit (since `971b0a4`; before, `nitro-cli` failed with ioctl error E29). Then reboot the instance and launch first, or give a smaller `--memory` |
 | `--arch` (`register`, `self-register`, `audit`) | names the architecture of the registration; not a build setting | it defaults to `build-config.json` or this machine |
 
 ## Ports, vsock address and enclave resources
