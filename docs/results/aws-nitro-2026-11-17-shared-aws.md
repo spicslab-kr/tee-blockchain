@@ -1,5 +1,9 @@
 # Nitro baseline after the shared Nitro request package, 2026-11-17 (second run)
 
+*(Noted 2026-11-20: `89c0063` changed what `build` layers into every image, so the PCR0 and PCR2 below are the last
+measured values, stale for the current code, and not taken again yet; `docs/status/build-info-gaps.md`, row 38. The
+responder is unchanged, `b9ae17f3…` / `294efd1b…`.)*
+
 `f0fb80d` moved the Nitro request code into the shared `internal/tee/request/aws`, with thin role adapters, and
 `att-ra-responder` links it, so the responder is another file and the values taken earlier the same day
 ([`aws-nitro-2026-11-17.md`](aws-nitro-2026-11-17.md), at `83cb2dc`) are stale for x86_64 and arm64 alike. `53bfd5e`

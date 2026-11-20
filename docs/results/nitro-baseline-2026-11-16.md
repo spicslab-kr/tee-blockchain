@@ -3,6 +3,11 @@
 Written before the run, while SSH to the instances was blocked by a changed public address (the security group allows
 only the old ones; the operator updates it). Everything below needs no SSH to prepare.
 
+*(Noted 2026-11-20: a plan written before the run, kept as it was. The run itself is
+[`aws-nitro-2026-11-16.md`](aws-nitro-2026-11-16.md). The finding below, that a change to any package the responder
+links moves PCR0/PCR2, was settled on 2026-11-17 by building the responder with an empty Go build ID (`45887c8`;
+`docs/status/build-info-gaps.md`, Q1). "Current" below means the code of 2026-11-16.)*
+
 ## Why the recorded values are stale
 
 Three commits since the 2026-11-12 baseline change what a Nitro build gives for the same source:

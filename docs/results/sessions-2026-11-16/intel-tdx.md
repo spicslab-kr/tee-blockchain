@@ -60,7 +60,8 @@ go1.26.2, each alone in `app/`, built with `att-auditor build --option 1` and bo
 | MRTD, RTMR0, RTMR1 | equal | equal |
 
 Also: an `att-vendor` built with go1.26.2 refuses `build` on the guest (exit 1), as on Nitro. Its message gives the
-responder's bytes as the reason, which is Nitro's reason; on TDX the responder is not measured.
+responder's bytes as the reason, which is Nitro's reason; on TDX the responder is not measured. *(Fixed since in
+`718b3b2`: the refusal now gives each platform's own reason; noted 2026-11-20.)*
 
 ## T3: only the build path differs
 

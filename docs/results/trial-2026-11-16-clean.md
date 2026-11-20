@@ -11,7 +11,8 @@
   and SEV-SNP evidence from a guest booted without our initrd is refused (exit 7) where TDX's is accepted.
 - **Biggest blocker:** `bash e2e/0-Setup-local-upload.sh` exits 1 **with no output at all** unless all five of
   `VENDOR_HOST AUDITOR_HOST ARM64_HOST AUDITOR_ADDR VENDOR_ADDR` are declared in the environment: `e2e/env.sh` line 14
-  runs `declare -p` on all five, which fails under the script's `set -euo pipefail` (F3).
+  runs `declare -p` on all five, which fails under the script's `set -euo pipefail` (F3). *(Fixed since in
+  `36d1775`; noted 2026-11-20.)*
 
 Run on 2026-11-15/16 (UTC 18:40–21:10) at commit `6a92a1f`, following the documents alone,
 without the earlier sessions' knowledge, in a WSL Ubuntu 24.04.5 on the development machine, with the

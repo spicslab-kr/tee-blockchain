@@ -5,6 +5,14 @@ that were filled or closed in 2026-11: when, by what, and why. What is still mis
 in [`docs/status/build-info-gaps.md`](../status/build-info-gaps.md). The row numbers are the same in both files,
 so a reference such as "#20" or "gap 27" finds its row here, and #2, #15, #36 and #37 are there.
 
+*Note, 2026-11-20 (the documentation check of that day): references that changed since, left as written below.* `docs/status/cvm-port.md` is no longer tracked (what other documents cited from
+it was moved into them), so "now carries" and "status of 2026-11-16" about it describe that file at the time. Two
+tests of #27 were renamed in `08bc8c6`, when the three fields became required: `TestCheckBuildEnvNitro_AMIRelease` is
+now `TestCheckBuildEnv_AMIRelease`, and `TestBuildEnv_SendOffAmazonLinuxLeavesNitroFieldsEmpty` is now
+`TestBuildEnv_SendOffAmazonLinuxRefusesNitro`. The Nitro `build`, its `dnf install` and `entrypoint.sh` have been in
+`internal/setup/build/aws/` since `53bfd5e`, not in the role folders (#27 and Q1). The status file now also has
+row #38 (2026-11-20).
+
 The rule (project lead, 2026-11-11): every piece of information needed to build and run the project, however small,
 must be in the repository. This list is the audit of 2026-11-11: what someone with only this repository would be
 missing, for each platform. It is kept up to date as gaps are filled.
