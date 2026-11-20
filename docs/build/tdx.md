@@ -120,9 +120,19 @@ The two hashes must be equal, and equal to the one in [toolchain.md](toolchain.m
 file is `…_linux_amd64.sha256`, not `….tar.gz.sha256`.
 
 On Windows without WSL, download `foundry_v1.8.0_win32_amd64.zip` from
-https://github.com/foundry-rs/foundry/releases/tag/v1.8.0 and put `anvil.exe` on `PATH`, and `cast.exe` from the same zip
-if you will run the e2e scripts on a public network (`e2e/README.md`, "Key files", uses it). The `curl` line needs
-`curl` (`sudo apt-get install -y curl` on a minimal Ubuntu). Versions we used: [toolchain.md](toolchain.md).
+https://github.com/foundry-rs/foundry/releases/tag/v1.8.0 and put `anvil.exe` in `~/.foundry/bin`, and `cast.exe` from
+the same zip if you will run the e2e scripts on a public network (`e2e/README.md`, "Key files", uses it). `foundryup`
+run in Git Bash installs into the same folder. Either way Git Bash does not search that folder: `go test` finds anvil
+there on its own, but a typed `anvil` gives `anvil: command not found`. Add the folder to `PATH` (and the same line to
+`~/.bashrc` to keep it), then check:
+
+```
+export PATH="$PATH:$HOME/.foundry/bin"
+anvil --version
+```
+
+The `curl` line needs `curl` (`sudo apt-get install -y curl` on a minimal Ubuntu). Versions we used:
+[toolchain.md](toolchain.md).
 
 ### 2. On your computer: the binaries
 
@@ -174,6 +184,10 @@ Copy the binaries to it, one file per command:
 gcloud compute scp linux/att-vendor       attestamp-tdx-vendor:att-vendor       --zone us-central1-a
 gcloud compute scp linux/att-ra-responder attestamp-tdx-vendor:att-ra-responder --zone us-central1-a
 ```
+
+To copy a new `att-ra-responder` later, while the responder of step 9 is running from that file, stop it first (the
+`pkill` line of step 13): Linux refuses to write to a running program's file (`Text file busy`), and `pscp` says only
+`unable to open att-ra-responder` (`docs/results/cvm-flow-rehearsal-2026-11-19.md`, R8).
 
 For Option 2 also the two hook scripts:
 
@@ -255,6 +269,10 @@ and runs as root, as the image of our recordings was made (`internal/setup/build
 ```
 sudo ./att-vendor build --platform intel-tdx --app-dir app --base-initrd base-initrd-v.img --option 2 --verify
 ```
+
+Run as root, it leaves `out/` and its files to root. Before an Option 1 build on the same guest, which runs as you,
+give them back with `sudo chown -R $USER out`, or that build stops with `mkdir out/…: permission denied`
+(`docs/results/cvm-flow-rehearsal-2026-11-19.md`, R9).
 
 It ends with `✓ reproducible on this host` and `✓ initrd ready: out/initrd-app.img   build value:
 out/build-value.json`. `build-value.json` holds the initrd's SHA-384, the digest GRUB will measure.

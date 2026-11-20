@@ -75,7 +75,9 @@ The same as [TDX step 1](tdx.md#1-on-your-computer-the-tools-and-the-source), wh
    `us-central1-a`. Under WSL a Windows `gcloud` is also found and works, slowly; the Linux one is meant.
 4. `anvil` 1.8.0: `curl -fsSL https://foundry.paradigm.xyz | bash`, `source ~/.bashrc`, `foundryup --install v1.8.0`;
    or the release archive `foundry_v1.8.0_linux_amd64.tar.gz`, checked against `foundry_v1.8.0_linux_amd64.sha256`
-   (commands in the TDX step); on Windows without WSL, `anvil.exe` from the v1.8.0 release zip.
+   (commands in the TDX step); on Windows without WSL, `anvil.exe` from the v1.8.0 release zip, put in
+   `~/.foundry/bin`. On Windows that folder is not on Git Bash's `PATH`, with the zip or with `foundryup` alike:
+   `export PATH="$PATH:$HOME/.foundry/bin"` (also in `~/.bashrc`), or `anvil` is `command not found`.
 
 Versions we used: [toolchain.md](toolchain.md).
 
@@ -130,6 +132,10 @@ Copy the binaries to it, one file per command:
 gcloud compute scp linux/att-vendor       attestamp-snp-vendor:att-vendor       --zone us-central1-a
 gcloud compute scp linux/att-ra-responder attestamp-snp-vendor:att-ra-responder --zone us-central1-a
 ```
+
+To copy a new `att-ra-responder` later, while the responder of step 9 is running from that file, stop it first (the
+`pkill` line of step 13): Linux refuses to write to a running program's file (`Text file busy`), and `pscp` says only
+`unable to open att-ra-responder` (`docs/results/cvm-flow-rehearsal-2026-11-19.md`, R8).
 
 For Option 2 also the two hook scripts (SEV-SNP's own: they extend PCR12, TDX's do not):
 
@@ -213,6 +219,10 @@ our recordings was made (`internal/setup/build/cpio/testdata/make-verity-image.s
 ```
 sudo ./att-vendor build --platform amd-sev-snp-verity --app-dir app --base-initrd base-initrd-v.img --verify
 ```
+
+Run as root, it leaves `out/` and its files to root. Before an Option 1 build on the same guest, which runs as you,
+give them back with `sudo chown -R $USER out`, or that build stops with `mkdir out/att-snp-…: permission denied`
+(`docs/results/cvm-flow-rehearsal-2026-11-19.md`, R9).
 
 It ends with `✓ reproducible on this host` and `✓ ready: out/initrd-app.img   build value: out/build-value.json`.
 `build-value.json` holds INITRD (the initrd's SHA-256); for Option 2 also the root hash, the PCR12 the hook will
