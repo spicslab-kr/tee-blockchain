@@ -2,6 +2,7 @@ package auditor
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,6 +60,19 @@ func TestGit_RepoAccessError(t *testing.T) {
 	}
 	if !errorsIs(err, ErrRepoAccess) {
 		t.Fatalf("want ErrRepoAccess, got %v", err)
+	}
+}
+
+// With no login for the host, git stops at its prompt (GIT_TERMINAL_PROMPT=0) instead of saying "not found". The
+// first line is git 2.46's for a private GitHub repository with no credential helper (docs/results/git-transport-2026-11-20.md).
+func TestClassify_NoCredentialsIsRepoAccess(t *testing.T) {
+	for _, stderr := range []string{
+		"fatal: could not read Username for 'https://github.com': terminal prompts disabled\n",
+		"fatal: could not read Password for 'https://someone@github.com': terminal prompts disabled\n",
+	} {
+		if err := classify(stderr, errors.New("exit status 128")); !errorsIs(err, ErrRepoAccess) {
+			t.Errorf("%q: want ErrRepoAccess, got %v", stderr, err)
+		}
 	}
 }
 

@@ -50,7 +50,10 @@ func classify(stderr string, err error) error {
 	case strings.Contains(s, "authentication failed"), strings.Contains(s, "permission denied"),
 		strings.Contains(s, "could not read from remote"), strings.Contains(s, "repository not found"),
 		strings.Contains(s, "does not appear to be a git repository"), strings.Contains(s, "403"), strings.Contains(s, "401"),
-		strings.Contains(s, "fatal: repository '") && strings.Contains(s, "does not exist"): // git 2.43 (Ubuntu 24.04) for a missing local path
+		strings.Contains(s, "fatal: repository '") && strings.Contains(s, "does not exist"), // git 2.43 (Ubuntu 24.04) for a missing local path
+		// no login for the host: GIT_TERMINAL_PROMPT=0 (run, above) makes git stop where it would ask for one
+		strings.Contains(s, "could not read username"), strings.Contains(s, "could not read password"),
+		strings.Contains(s, "terminal prompts disabled"):
 		return fmt.Errorf("%w: %s", ErrRepoAccess, strings.TrimSpace(stderr))
 	case strings.Contains(s, "unknown revision"), strings.Contains(s, "did not match any"), strings.Contains(s, "bad object"),
 		strings.Contains(s, "reference is not a tree"), strings.Contains(s, "not a valid object name"), strings.Contains(s, "unable to read tree"):
