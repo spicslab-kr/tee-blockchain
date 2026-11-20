@@ -117,6 +117,7 @@ exitis() { [ "$got" = "$1" ] || bad="$bad; exit $got, want $1"; }
 call()   { grep -qE -- "$1" "$log" || bad="$bad; no call matching /$1/"; }
 nocall() { ! grep -qE -- "$1" "$log" || bad="$bad; a call matches /$1/, want none"; }
 said()   { printf '%s\n' "$out" | grep -qE -- "$1" || bad="$bad; output lacks /$1/"; }
+nosaid() { ! printf '%s\n' "$out" | grep -qE -- "$1" || bad="$bad; output has /$1/, want none"; }
 finish() {
   if [ -n "$bad" ]; then
     fails=$((fails + 1)); echo "FAIL  $cur:${bad#;}"
@@ -218,7 +219,8 @@ call 'guest-step.sh install vendor intel-tdx 1'
 call 'att-vendor ra-request --tee-addr 192.0.2.10:5000 --format intel-tdx'
 call 'att-vendor compare --attested .*parsed.json --expected .*auditor-measurements.json'
 call 'att-vendor lookup .*--platform intel-tdx'; call 'att-vendor compare .*--record-key 0xabab'
-said "att-user verify --tee-addr 192.0.2.10:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry $REG"
+said "/bin/att-user(.exe)? verify --tee-addr 192.0.2.10:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry $REG"
+said "NET=local: only this machine reaches the chain"; nosaid "On another computer"
 said 'expected: trusted'; finish
 start "2: a Vendor guest that differs from the Auditor's values fails the step"
 run NET=local FAKE_COMPARE_EXIT=1 bash "$F2" intel-tdx; exitis 1; said MISMATCH; finish
@@ -231,7 +233,7 @@ start "4: one byte changed, rebuilt, rebooted; the verify line expects not trust
 run NET=local bash "$F4" intel-tdx; exitis 0
 call 'guest-step.sh app vendor intel-tdx 1 tampered'; call 'guest-step.sh build vendor intel-tdx 1'
 call 'compute ssh attestamp-tdx-vendor .*systemd-run'
-said "att-user verify --tee-addr 192.0.2.10:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry $REG"
+said "/bin/att-user(.exe)? verify --tee-addr 192.0.2.10:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry $REG"
 said 'expected: not trusted'; finish
 start "4b: exit 12 is the pass"
 run NET=local FAKE_AUDIT_EXIT=12 bash "$F4b" intel-tdx; exitis 0; call 'audit .*--vendor-tee 192.0.2.10:5000'; said 'exit 12'; finish
@@ -246,7 +248,8 @@ call "att-auditor registry-deploy --rpc $SEPOLIA "; call 'guest-step.sh install 
 call 'compute ssh attestamp-snp-auditor'; nocall '^curl '; finish
 start "2 amd-sev-snp-initrd: the verify line names Sepolia and the step-1 registry"
 run bash "$F2" amd-sev-snp-initrd; exitis 0
-said "att-user verify --tee-addr 192.0.2.10:5000 --format amd-sev-snp-initrd --rpc $SEPOLIA --registry $REG"; finish
+said "/bin/att-user(.exe)? verify --tee-addr 192.0.2.10:5000 --format amd-sev-snp-initrd --rpc $SEPOLIA --registry $REG"
+said "^  ./att-user verify --tee-addr 192.0.2.10:5000 --format amd-sev-snp-initrd --rpc $SEPOLIA --registry $REG"; finish
 newwork verity
 start "1 amd-sev-snp-verity on its own work folder"
 run bash "$F1" amd-sev-snp-verity; exitis 0; call 'guest-step.sh build auditor amd-sev-snp-verity 2'; finish

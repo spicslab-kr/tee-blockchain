@@ -237,12 +237,13 @@ of "Key files".
 | `cvm/flow1-auditor-registers/4-Vendor-tamper-rebuild-launch.sh` | Vendor | changes one byte of the application, builds, reboots. Prints the `verify` line again: not trusted |
 | `cvm/flow1-auditor-registers/4b-Auditor-audit-vendor-tampered.sh` | Auditor | `audit --vendor-tee` again: the Auditor's value is registered and the Vendor's guest runs something else, exit 12 (the pass) |
 
-There is no User script: steps 3 and 5 are the printed `verify` line, typed by hand. With Sepolia a User can type it on
-another computer; with `NET=local` it names `--rpc http://127.0.0.1:8545` and works only on the machine that runs anvil
-(both rehearsals typed it there). The computer that types it needs `att-user`: on the machine that ran the flow it is
-`e2e-work/bin/att-user` (`att-user.exe` on Windows), which `0-Setup-guests.sh` builds; elsewhere build it as in the
-main README, "The binaries". That computer's address must be allowed on port 5000 by the firewall rule `attestamp-ra`
-(`e2e/cloud/README.md`, "From another computer, or after your address changed").
+There is no User script: steps 3 and 5 are the printed `verify` line, typed by hand. Steps 2 and 4 print it ready to
+paste: with this machine's `att-user` (`e2e-work/bin/att-user`, `att-user.exe` on Windows, which `0-Setup-guests.sh`
+builds), run from the repository root. With `NET=local` that is the only place it works: it names
+`--rpc http://127.0.0.1:8545`, and both rehearsals typed it there. With Sepolia the steps also print the line for
+another computer, as `./att-user` in the folder that holds it (build it as in the main README, "The binaries"). That
+computer's address must be allowed on port 5000 by the firewall rule `attestamp-ra` (`e2e/cloud/README.md`, "From
+another computer, or after your address changed").
 
 - **Commands on a guest** are a script file (`cvm/guest/guest-step.sh`) copied with `gcloud compute scp` and run with
   `gcloud compute ssh --command`; nothing is piped into ssh, whose handling of piped input through PuTTY on Windows was

@@ -162,13 +162,21 @@ need_bins() {
   done
 }
 
-# print_verify_line <vendor address> <registry> <expected> - the command a User types on another computer, complete.
+# print_verify_line <vendor address> <registry> <expected> - the User's verify command, complete and ready to paste:
+# with this machine's att-user (USER_BIN, run from the repository root), and, when the chain is not this machine's
+# anvil, the same for another computer with att-user in its current folder. verify-command.txt keeps this machine's.
 print_verify_line() {
-  local line="att-user verify --tee-addr $1:$RA_PORT --format $FORMAT --rpc $RPC --registry $2"
-  echo "$line" > "$CVM_WORK/verify-command.txt"
+  local args="verify --tee-addr $1:$RA_PORT --format $FORMAT --rpc $RPC --registry $2"
+  echo "$USER_BIN $args" > "$CVM_WORK/verify-command.txt"
   echo
-  echo "On the other computer, type (expected: $3):"
-  echo "  $line"
+  echo "On this machine, from the repository root, type (expected: $3):"
+  echo "  $USER_BIN $args"
+  if [ "$NET" = local ]; then
+    echo "NET=local: only this machine reaches the chain at $RPC, so type it here."
+  else
+    echo "On another computer, with att-user built there (README.md, \"The binaries\") and in its current folder:"
+    echo "  ./att-user $args"
+  fi
 }
 
 # deploy_registry - deploys a Registry with the Auditor's address as its approver and prints the address.
