@@ -12,6 +12,9 @@ This page lists every folder in the repository, then explains the one idea that 
 ├── README.md               overview, install, quick start
 ├── CONTRIBUTING.md         build, test, layout and commit conventions
 ├── STRUCTURE.md            this file
+├── SECURITY.md             how to report a vulnerability
+├── LICENSE, LICENSE-CC-BY  MIT for the code, CC BY 4.0 for the documents and images
+├── .github/workflows/      ci.yml: the whole test suite on every push and pull request (Linux, amd64 and arm64)
 ├── .gitattributes          line-ending and diff rules
 ├── .gitmodules             path and URL of the OpenZeppelin submodule (contracts/evm/lib); the gitlink pins v5.7.0
 ├── .gitignore              keys, e2e work files, stray build outputs
@@ -69,8 +72,10 @@ This page lists every folder in the repository, then explains the one idea that 
     │                       platform comparison, runtime immutability (and what a locked guest would take),
     │                       recording test fixtures
     ├── results/            dated records: every run's report and its JSONL result lines (the Nitro baselines, the
-    │                       confidential-VM sessions and the in-guest run, the trials, the 2026-11-12 audit), and
-    │                       the record of the build-info gaps filled in 2026-11. Measured values are never changed;
+    │                       confidential-VM sessions (sessions-2026-11-16/) and the in-guest run, the trials (the
+    │                       2026-11-16 one's result lines in trial-2026-11-16-clean/), the CVM flow rehearsals, the
+    │                       2026-11-12 audit), the record of the build-info gaps filled in 2026-11, and the
+    │                       documentation checks. Measured values are never changed;
     │                       labels, interpretation and status are updated as more is learned, each update
     │                       marked where it is made with when and what changed
     ├── status/             where things stand, as a pair: test-matrix.md (what is proven, and by what) and
@@ -347,8 +352,8 @@ The table is read from the imports of each `cmd/*` package (`go list -deps ./cmd
 Two details the table hides:
 
 - `att-user` does not link any role's commands, but it does link `chain/register/auditor/ether`
-  (the generated Registry binding) and, through it, `chain/lookup/auditor`, `tee/parse/auditor` and
-  `tee/request/auditor`. `chain/lookup/user/ether/reader.go` imports that binding directly.
+  (the generated Registry binding) and, through it, `chain/register/auditor`, `chain/lookup/auditor`,
+  `tee/parse/auditor` and `tee/request/auditor`. `chain/lookup/user/ether/reader.go` imports that binding directly.
 - `att-ra-responder` is built from the Vendor request package only. On Nitro `build` layers it into the
   enclave image; on TDX and SEV-SNP it runs from the guest's disk and is not measured.
 

@@ -124,7 +124,7 @@ One service and version has one record and one registration per CPU architecture
 | `lookup` | Finds registrations by `--measurements` or `--record-key`. |
 | `compare` | Compares two sets of measurements, or a set of measurements with a registration (`--record-key`). |
 | `version` | Prints the pinned Go toolchain and the one in use. |
-| `ra-serve` | Answers attestation requests, inside the enclave on Nitro or on the guest on TDX and SEV-SNP. |
+| `ra-serve` | Answers attestation requests inside the enclave on Nitro (`--extractor nsm`), or serves a recorded document for tests (`fixture=<doc>`). On TDX and SEV-SNP guests the responder is `att-ra-responder ra-serve --extractor <tdx, snp-initrd or snp-verity>`. |
 | `ra-proxy` | Forwards TCP connections to the enclave's vsock. |
 | `lo-up` | Brings up loopback inside the enclave. |
 

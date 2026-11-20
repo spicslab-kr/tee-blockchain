@@ -40,7 +40,7 @@ The approver signs a typed `Registration`, under the EIP-712 domain `Registry`, 
 | `arch` | the CPU architecture the image was built for, `amd64` or `arm64`. Display only; it is signed but is not part of the record key |
 | `service` | service name, for example `nginx` |
 | `version` | service version, for example `1.31.6` |
-| `measurement` | one 32-byte value: the measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP MEASUREMENT, PCR4, KERNEL, CMDLINE, INITRD and PCR12), ordered by name and hashed with keccak256 |
+| `measurement` | one 32-byte value: the measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP MEASUREMENT, PCR4, KERNEL, CMDLINE and INITRD, and for `amd-sev-snp-verity` also PCR12), ordered by name and hashed with keccak256 |
 | `expires` | unix seconds, required and in the future |
 
 The type string is

@@ -90,7 +90,7 @@ the codes below. Codes 4 to 6 mean different things depending on where the error
 | 11 | push rejected: no write access, or the remote is ahead, so pull first (`send`) |
 | 12 | `audit --vendor-tee`: the Auditor's own value **was registered**, but the Vendor's TEE runs something else. Not a failed audit: do not run it again (a second run ends with 5, already registered). Since 2026-11-16; before, this case exited 0 |
 
-`att-user` uses only 1 and 3 to 7. Codes 8 to 11 exist only in `att-vendor` and `att-auditor`.
+`att-user` uses only 1 and 3 to 7. Codes 8 to 11 exist only in `att-vendor` and `att-auditor`, and 12 only in `att-auditor`.
 
 ## Code layout of cmd/
 
