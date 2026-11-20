@@ -252,10 +252,12 @@ registers the hash it gets. The User trusts what the Auditor signed.
 
 **Flow 2: the Vendor registers itself.** Without an Auditor, the Vendor signs and registers the hash
 of its own TEE. An Auditor can check it later: rebuild the source, ask the Vendor's TEE for its
-hash, and register its own signed hash. The User can then require both registries to agree.
+hash, and register its own signed hash. One contract takes the signature of one approver only, so
+the Auditor registers on a second contract of its own, and the User can require both registries to
+agree.
 
 <p align="center">
-  <img src="docs/img/flow-vendor.svg" alt="Flow 2, with two registries: the Vendor signs and registers its TEE's hash on its own registry, where a User can check it; later an Auditor fetches the source, rebuilds it, asks the Vendor's TEE and registers its own signed hash on a second registry of its own, and a User who requires both registries trusts the Vendor's TEE only if both vouch">
+  <img src="docs/img/flow-vendor.svg" alt="Flow 2, with two registries on one blockchain: the Vendor signs and registers its TEE's hash on its own registry, whose approver is the Vendor, and the User asks the TEE for its hash and looks it up there; later an Auditor rebuilds the source, asks the Vendor's TEE for its hash and registers its own signed hash on a second registry whose approver is the Auditor, so the User can look the hash up in one registry or in both">
 </p>
 
 ### Three roles, four binaries

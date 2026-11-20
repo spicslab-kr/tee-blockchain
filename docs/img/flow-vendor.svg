@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1330 770" width="1330" height="770" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1330 660" width="1330" height="660" role="img" aria-labelledby="t d">
   <title id="t">How Attestamp works: the Vendor registers itself</title>
-  <desc id="d">1: The Vendor builds its code, runs it in its TEE, and registers the hash, signed with its own key, on its own registry, whose approver is the Vendor. 2: A User asks the Vendor's TEE for its hash. 3: The User looks the hash up on the Vendor's registry. Up to here no Auditor takes part, and the trust rests on the Vendor's word. Later, if an Auditor joins: 4: it fetches the source from the public repository; 5: it rebuilds the source in its own TEE and checks that its TEE's hash equals the build; 6: it asks the Vendor's TEE for its hash; 7: it registers its own signed hash on a separate registry, whose approver is the Auditor. 8: A User who requires both registries trusts the Vendor's TEE only if both vouch for its hash.</desc>
+  <desc id="d">1: The Vendor builds its code, runs it in its TEE, and registers the hash, signed with its own key, on its own registry, whose approver is the Vendor. 2: A User asks the Vendor's TEE for its hash. 3: The User looks it up, in that registry alone or in both. Up to here no Auditor takes part, and the trust rests on the Vendor's word. Later, an Auditor can rebuild the public source in its own TEE, ask the Vendor's TEE for its hash, and register its own signed hash on a second registry of its own, whose approver is the Auditor: one contract takes the signature of one approver only, so two approvers mean two contracts. A User can then require both registries to vouch for what the Vendor's TEE runs.</desc>
   <style>
     :root { --ink: #1f2937; --sub: #4b5563; --line: #8a94a6; --accent: #0d9488; }
     @media (prefers-color-scheme: dark) {
@@ -13,13 +13,11 @@
     .tee    { fill: var(--accent); fill-opacity: 0.10; stroke: var(--accent); stroke-width: 3; }
     .role   { font-size: 40px; font-weight: 800; }
     .sub    { font-size: 22px; fill: var(--sub); }
-    .tag    { font-size: 28px; font-weight: 800; fill: var(--accent); }
+    .tag    { font-size: 26px; font-weight: 800; fill: var(--accent); }
     .body   { font-size: 24px; font-weight: 600; }
     .lbl    { font-size: 22px; font-weight: 600; fill: var(--sub); }
-    .start  { text-anchor: start; }
     .arrow  { fill: none; stroke: var(--line); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
     .read   { fill: none; stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
-    .divider { fill: none; stroke: var(--line); stroke-width: 2; stroke-dasharray: 10 8; }
   </style>
   <defs>
     <marker id="head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
@@ -30,66 +28,47 @@
     </marker>
   </defs>
 
-  <!-- Without an Auditor: steps 1 to 3 -->
   <path class="arrow" d="M170 94V68Q170 44 194 44H1136Q1160 44 1160 68V88" marker-end="url(#head)"/>
-  <text class="lbl" x="665" y="32">1. Build and run in its TEE, sign with its own key, register</text>
+  <text class="lbl" x="665" y="32">1. Sign and register hash</text>
+
   <rect class="box" x="10" y="100" width="320" height="270" rx="18"/>
   <text class="role" x="170" y="156">Vendor</text>
   <text class="sub" x="170" y="188">runs and registers</text>
   <rect class="tee" x="35" y="215" width="270" height="130" rx="14"/>
   <text class="tag" x="170" y="260">TEE</text>
-  <text class="body" x="170" y="308">Code  →  Hash</text>
+  <text class="body" x="170" y="308">Code  &#8594;  Hash</text>
 
-  <rect class="box" x="505" y="170" width="320" height="130" rx="18"/>
-  <text class="role" x="665" y="226">User</text>
-  <text class="sub" x="665" y="260">TEE hash = registry hash?</text>
-  <path class="read" d="M499 245H336" marker-end="url(#headA)"/>
-  <text class="lbl" x="417" y="198">2. Ask the TEE</text>
-  <text class="lbl" x="417" y="222">for its hash</text>
-  <path class="read" d="M831 245H1019" marker-end="url(#headA)"/>
-  <text class="lbl" x="912" y="198">3. Look up</text>
-  <text class="lbl" x="912" y="222">the hash</text>
+  <rect class="box later" x="505" y="100" width="320" height="270" rx="18"/>
+  <text class="role" x="665" y="156">Auditor</text>
+  <text class="sub" x="665" y="188">checks it later</text>
+  <rect class="tee" x="530" y="215" width="270" height="130" rx="14"/>
+  <text class="tag" x="665" y="260">TEE</text>
+  <text class="body" x="665" y="298">Rebuilds and</text>
+  <text class="body" x="665" y="326">compares the hash</text>
 
-  <rect class="chain" x="1000" y="100" width="320" height="650" rx="18"/>
+  <rect class="chain" x="1000" y="100" width="320" height="330" rx="18"/>
   <text class="role" x="1160" y="156">Blockchain</text>
   <text class="sub" x="1160" y="188">Ethereum</text>
-  <rect class="tee" x="1025" y="215" width="270" height="130" rx="14"/>
-  <text class="tag" x="1160" y="262">Vendor's registry</text>
-  <text class="body" x="1160" y="308">approver: Vendor</text>
-  <text class="sub" x="1160" y="398">two contracts,</text>
-  <text class="sub" x="1160" y="426">one approver each</text>
-  <rect class="tee" x="1025" y="595" width="270" height="130" rx="14"/>
-  <text class="tag" x="1160" y="642">Auditor's registry</text>
-  <text class="body" x="1160" y="688">approver: Auditor</text>
+  <rect class="tee" x="1025" y="210" width="270" height="90" rx="14"/>
+  <text class="tag" x="1160" y="245">Vendor's registry</text>
+  <text class="body" x="1160" y="278">approver: Vendor</text>
+  <rect class="tee" x="1025" y="315" width="270" height="90" rx="14"/>
+  <text class="tag" x="1160" y="350">Auditor's registry</text>
+  <text class="body" x="1160" y="383">approver: Auditor</text>
 
-  <!-- Later, if an Auditor joins: steps 4 to 8 -->
-  <path class="divider" d="M10 400H990"/>
-  <text class="lbl start" x="20" y="432">Later, if an Auditor joins</text>
+  <path class="arrow" d="M499 280H336" marker-end="url(#head)"/>
+  <text class="lbl" x="417" y="214">Later: ask the</text>
+  <text class="lbl" x="417" y="238">TEE for its hash</text>
+  <path class="arrow" d="M831 360H994" marker-end="url(#head)"/>
+  <text class="lbl" x="912" y="300">Later: sign and</text>
+  <text class="lbl" x="912" y="324">register hash</text>
 
-  <rect class="box" x="10" y="480" width="320" height="130" rx="18"/>
-  <text class="role" x="170" y="536">Source</text>
-  <text class="sub" x="170" y="570">public repository</text>
-  <path class="arrow later" d="M336 560H499" marker-end="url(#head)"/>
-  <text class="lbl" x="417" y="592">4. Fetch</text>
-  <text class="lbl" x="417" y="616">the source</text>
-
-  <rect class="box later" x="505" y="480" width="320" height="270" rx="18"/>
-  <text class="role" x="665" y="536">Auditor</text>
-  <text class="sub" x="665" y="568">checks it later</text>
-  <rect class="tee" x="530" y="595" width="270" height="130" rx="14"/>
-  <text class="tag" x="665" y="636">TEE</text>
-  <text class="body" x="665" y="676">5. Rebuild, and</text>
-  <text class="body" x="665" y="706">TEE hash = build?</text>
-
-  <path class="arrow later" d="M499 505H417V320H336" marker-end="url(#head)"/>
-  <text class="lbl start" x="430" y="440">6. Ask the Vendor's</text>
-  <text class="lbl start" x="430" y="464">TEE for its hash</text>
-
-  <path class="arrow later" d="M831 660H1019" marker-end="url(#head)"/>
-  <text class="lbl" x="912" y="614">7. Sign and</text>
-  <text class="lbl" x="912" y="638">register hash</text>
-
-  <path class="read later" d="M780 306V470H1136Q1160 470 1160 494V589" marker-end="url(#headA)"/>
-  <text class="lbl" x="890" y="430">8. Look up both:</text>
-  <text class="lbl" x="890" y="454">both must vouch</text>
+  <rect class="box" x="505" y="500" width="320" height="130" rx="18"/>
+  <text class="role" x="665" y="556">User</text>
+  <text class="sub" x="665" y="590">TEE hash = registry hash?</text>
+  <path class="read" d="M499 565H170 V378" marker-end="url(#headA)"/>
+  <text class="lbl" x="337" y="546">2. Ask the TEE for its hash</text>
+  <path class="read" d="M831 565H1160 V438" marker-end="url(#headA)"/>
+  <text class="lbl" x="992" y="524">3. Look up the hash</text>
+  <text class="lbl" x="992" y="548">in one registry, or both</text>
 </svg>
