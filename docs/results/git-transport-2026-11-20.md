@@ -363,6 +363,30 @@ att-vendor: open vendor/no-such-config.json: The system cannot find the file spe
 exit=1
 ```
 
+## Fixed afterwards, 2026-11-21
+
+The defects of 7, 8 and the printout of 9 were fixed after this record was written, each with a test that fails
+without the fix (`docs/status/build-info-gaps.md`, row 39):
+
+- `fix(core/transfer): say an empty repository needs the source first, on the Vendor's send` (7);
+- `fix(core/transfer): treat a send of unchanged content as up to date` (8), both copies;
+- `fix(cmd/auditor): print tee_info sorted by key in receive` (9).
+
+The two `send` cases again, with `att-vendor` built after the second of these, in `fix3/` (7 with a build after the
+first, in `fix2/`), against the same local bare repositories:
+
+```
+$ fix2/att-vendor.exe send --repo <scratch>/empty.git --config vendor/build-config.json
+att-vendor: <scratch>/empty.git: the repository is empty: push the source the Auditor is to build first, then send build-config.json
+exit=10
+$ fix3/att-vendor.exe send --repo <scratch>/seeded.git --config vendor/pinned.json
+already up to date: build-config.json in <scratch>/seeded.git @ 94598e934bd9d886a9ad2bc3ce4f8c98a9b93ae5 is this content; nothing new committed
+build env: windows/amd64 go1.26.1 trimpath=true
+exit=0
+```
+
+94598e9 is the commit the first send of `vendor/pinned.json` made in 8. Neither case was run again against GitHub.
+
 ## Not run
 
 - **A second `send` of the same content on GitHub.** The repository of 9 is the operator's private copy of this
