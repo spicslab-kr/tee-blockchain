@@ -9,7 +9,7 @@ Results, all as expected: verity
 
 | | |
 |---|---|
-| guests | `attestamp-snp-vendor`, `attestamp-snp-auditor`, made in one call (`IMAGE=ubuntu-2404-noble-amd64-v20261105 gcp-cvm.sh snp create --yes`), `n2d-standard-2`, `us-central1-a`, tag `attestamp-ra`; the API reports both `SEV_SNP`. The two TDX guests of 2026-11-18 were deleted first (two instances at most) |
+| guests | `attestamp-snp-vendor`, `attestamp-snp-auditor`, made in one call (`IMAGE=ubuntu-2404-noble-amd64-v20261105 gcp-cvm.sh snp create --yes`), `n2d-standard-2`, `us-central1-a`, tag `attestamp-ra`; the API reports both `SEV_SNP`. The two TDX guests of 2026-11-18 were deleted first, under a working rule of these runs of at most two instances; it was not a GCP quota (noted 2026-11-20: the quotas would have allowed all four, `doc-check-2026-11-20.md`) |
 | chain | `NET=local`: an anvil 1.8.0 already running on the machine running the flow (Sepolia was not used) |
 | scripts | at `38ef80b` |
 | the machine running the flow | Windows, Git Bash, gcloud through IAP (PuTTY plink and pscp) |
