@@ -4,8 +4,8 @@ These scripts run both flows against real Nitro instances and a public chain, or
 ([without a public testnet](#running-without-a-public-testnet)). Everything runs from
 your own machine, in Git Bash, macOS or Linux; steps that must build or launch inside an instance
 connect over SSH and stream the script, so nothing is uploaded except the binaries. Run every
-script from the repository root. Flow 1 also runs on TDX and SEV-SNP guests on GCP:
-[Flow 1 on TDX and SEV-SNP](#flow-1-on-tdx-and-sev-snp).
+script from the repository root. Both flows also run on TDX and SEV-SNP guests on GCP:
+[Flow 1 on TDX and SEV-SNP](#flow-1-on-tdx-and-sev-snp) and [Flow 2 on TDX and SEV-SNP](#flow-2-on-tdx-and-sev-snp).
 
 For tests that need no Nitro hardware, see `go test ./...` in the main README.
 
@@ -258,7 +258,7 @@ another computer, or after your address changed").
 - **Checked without a guest** by `cvm/check-flow.sh` (also run by `go test ./cmd`, `TestCVMFlowScripts`): stand-in
   gcloud, go, curl and att; the arguments, what goes to which guest, the boot_id wait and its timeout, the audit and
   lookup calls, the exit codes 2b and 4b accept, the printed `verify` line, and the guest-side script's launch and build
-  flags per format. **Not checked without a guest:** gcloud ssh and scp through IAP from Git Bash, the build, the GRUB
+  flags per format; the same for flow 2 below. **Not checked without a guest:** gcloud ssh and scp through IAP from Git Bash, the build, the GRUB
   entry and the reboot, `launch --check`, the responder, and the chain. On guests the flow ran for `intel-tdx`,
   Option 1 and Option 2 (`docs/results/cvm-flow-rehearsal-2026-11-18.md`), and for `amd-sev-snp-verity` and
   `amd-sev-snp-initrd` (`docs/results/cvm-flow-rehearsal-2026-11-19.md`), with `NET=local`, every step passing, with
@@ -303,6 +303,39 @@ What those runs needed that the table above does not say (R1 to R9 are the findi
   into place (2026-11-19, R8, fixed in `df0c426`). The running responder keeps its old file until `check-serve`
   restarts it. An Option 1 run after an Option 2 run on the same guests works too: the Option 2 `build` runs as root,
   and the guest-side script gives `out/` back to the user afterwards (R9, fixed in `1e4cfc2`).
+
+## Flow 2 on TDX and SEV-SNP
+
+The Vendor registers its own guest, as in [Flow 2](#flow-2-the-vendor-registers-its-own-enclave), on the same two
+guests as flow 1, with the same arguments, setup (`cvm/0-Setup-guests.sh`) and chain. The Vendor's registry has the
+Vendor as its approver (`VENDOR_ADDR`, `deployer.key`; anvil account 0 with `NET=local`), the Auditor's has the
+Auditor. A registry's approver is fixed when it is deployed (`contracts/README.md`), so these are two contracts.
+
+| script | who | what it does |
+|---|---|---|
+| `cvm/flow2-vendor-self-registers/1-Vendor-build-launch-self-register.sh` | Vendor | builds the application on its guest, installs it, reboots, checks the boot, deploys a registry of its own and runs `self-register`. Prints the `verify` line for step 2: trusted, on the Vendor's word alone. Option `-c 0x...` |
+| `cvm/flow2-vendor-self-registers/3-Vendor-tamper-rebuild-self-register.sh` | Vendor | changes one byte of the application, builds, reboots, and self-registers that value on a new registry of its own. Option `-c 0x...` |
+| `cvm/flow2-vendor-self-registers/4-Auditor-audit-vendor.sh` | Auditor | `audit --vendor-tee` with the Auditor's own value, on a registry of its own: registered, and the Vendor's guest runs something else, exit 12 (the pass). Prints the `verify` line for step 5 with both registries: not trusted. Option `-c 0x...` |
+
+Steps 2 and 5 are the printed `verify` lines, typed by hand as in flow 1. Step 4 needs the Auditor's own value, which
+`cvm/flow1-auditor-registers/1-Auditor-rebuild-launch-audit.sh` writes after building and booting on the Auditor's
+guest (as Nitro's flow 2 step 4 needs flow 1 step 1); run it with the same arguments any time before step 4. Without
+it, step 4 stops and names it.
+
+- **Why step 3 deploys a new registry.** Step 1's registry would accept the changed value (another value has another
+  record key), so the contract does not require it. But a new one leaves step 1's registry vouching only for the
+  original build, and a second run of step 3 does not stop at exit 5 on a value already registered there, since the
+  guest build gives the same value every time. The hand runs of 2026-11-16 used a registry of the Vendor's for the
+  changed value too. Step 4 deploys the Auditor's registry for the exit-5 reason of 2b and 4b.
+- **Files** go to flow 1's `e2e-work/cvm/<format>/`, under names of their own: `flow2-vendor-registry.txt` (step 1),
+  `flow2-vendor-registry-tampered.txt` (step 3) and `flow2-auditor-registry.txt` (step 4), and the Vendor's values in
+  `flow2-vendor-measurements.json` and `flow2-vendor-tampered-measurements.json`. The result lines are T6.
+- **"Before and during a CVM run" applies as it stands**: with `NET=local`, anvil keeps running from step 1 until step
+  5, whose line names the registries of steps 3 and 4 (flow 1's step 1 needs a chain too, when it runs); the firewall
+  rule; the four-hour stop; a new address after a start.
+- **Checked without a guest** by `cvm/check-flow.sh`, as flow 1. **Not yet run on a guest** (written 2026-11-20). What
+  the steps do ran by hand on 2026-11-16, the changed half only (steps 3 to 5), on `intel-tdx` and
+  `amd-sev-snp-initrd`: `docs/results/sessions-2026-11-16/intel-tdx.md` and `amd-sev-snp.md`, "T6".
 
 ## Checks outside the two flows
 

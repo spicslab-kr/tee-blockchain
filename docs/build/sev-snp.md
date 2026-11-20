@@ -573,6 +573,78 @@ Exit 0 and `✓ matches  hello 1.0.0 (amd64) by 0x7099…` now mean what README 
 [Same VM](#same-vm): the Vendor's guest runs what an Auditor rebuilt and booted itself. Then step 13 on both guests
 (`attestamp-snp-auditor` too) and `bash e2e/cloud/gcp-cvm.sh snp stop`, which stops both if they share a prefix (once per prefix otherwise).
 
+### Flow 2: the Vendor registers its own guest
+
+> **F3 to F5 ran by hand on 2026-11-16 with `amd-sev-snp-initrd` and passed** (`docs/results/sessions-2026-11-16/amd-sev-snp.md`,
+> "T6"): the Vendor's own registry vouched for its guest running a one-byte-changed application, `audit --vendor-tee`
+> said `the Vendor's guest runs something else`, and `verify` with both registries required gave exit 1. F1 and F2 have
+> not run on a guest, nor has any step with `amd-sev-snp-verity`. The scripts `e2e/cvm/flow2-vendor-self-registers/`
+> (2026-11-20; `e2e/README.md`, "Flow 2 on TDX and SEV-SNP") do F1 to F5 for both formats; they were checked against
+> stand-ins only and have not run on a guest yet.
+
+Everything above is flow 1: an Auditor rebuilds and registers. In flow 2 the Vendor registers its own guest with
+`self-register`, on a registry whose approver is the Vendor, and no Auditor has to take part. A User who trusts that
+registry trusts the Vendor's word. An Auditor who joins later registers on **its own** registry: a registry's approver
+is fixed when it is deployed (`contracts/README.md`), so the Vendor's and the Auditor's registrations sit in two
+contracts, and a User who requires both names both. Nitro's flow 2 (`e2e/flow2-vendor-self-registers`) is the same with
+an enclave. The commands show Option 1; for Option 2 write `amd-sev-snp-verity`, as in "The steps".
+
+**F1. On the Vendor's computer: the guest, and self-register.** Steps 1 to 10 as written, and in step 2 also
+`att-vendor` for your computer:
+
+```
+CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags=-buildid= -o att-vendor ./cmd/vendor
+```
+
+anvil and the two keys as in step 11. A registry whose approver is the Vendor (account 0,
+`0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`); it prints `Registry deployed at 0x…`, which is `<0xV…>` below. Then the
+values the guest measured, and `self-register`: it asks the guest for fresh evidence, checks it equals those values,
+and registers them signed with the Vendor's key.
+
+```
+./att-vendor registry-deploy --rpc http://127.0.0.1:8545 --deployer-key-file deployer.key --approver 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+gcloud compute scp attestamp-snp-vendor:out/measurements.json measurements.json --zone us-central1-a
+./att-vendor self-register --tee-addr <guest-ip>:5000 --format amd-sev-snp-initrd --build-measurements measurements.json \
+  --rpc http://127.0.0.1:8545 --registry <0xV…> --signing-key-file deployer.key \
+  --service hello --version 1.0.0 --arch amd64
+```
+
+It prints `PASS: registered by myself (no Auditor)`.
+
+**F2. Any User: verify against the Vendor's registry.**
+
+```
+./att-user verify --tee-addr <guest-ip>:5000 --format amd-sev-snp-initrd --rpc http://127.0.0.1:8545 --registry <0xV…>
+```
+
+Exit 0 and `✓ matches  hello 1.0.0 (amd64) by 0xf39F…`: trusted, and the one who vouches is the Vendor itself.
+
+**F3. The Vendor changes the application and registers that too.** On the guest, one byte changed:
+
+```
+printf 'Hello from attestamp\n' > app/hello.txt
+```
+
+Then steps 6 to 9 again (build, install and boot, check, responder) and the `measurements.json` copy of F1. A new
+registry of the Vendor's, as in F1 (`<0xV2…>`), and `self-register` against it with the new `measurements.json`: exit
+0, because `self-register` checks only that the guest runs what the Vendor built. `verify` against `<0xV2…>` alone also
+gives exit 0. F1's registry would have taken the changed value too (another value has another record key); a new one
+leaves F1's vouching only for the original.
+
+**F4. The Auditor: audit, and ask the Vendor's guest.** A1 to A8 as written, with the **original** application (the
+`app` folder handed over before F3, or written again with step 5's line), and the Auditor's own registry in A8
+(`registry-deploy` with the Auditor as approver, as in step 11; `<0xA…>`). `audit` registers the Auditor's value,
+prints `the Vendor's guest runs something else`, and exits 12.
+
+**F5. Any User: both registries required.** `--registry` once for each:
+
+```
+./att-user verify --tee-addr <guest-ip>:5000 --format amd-sev-snp-initrd --rpc http://127.0.0.1:8545 --registry <0xV2…> --registry <0xA…>
+```
+
+Exit 1 and `not trusted: only 1 of 2 registries vouch for what this guest runs`. The Vendor's registry says yes; the
+Auditor never approved the changed value. Then step 13 on both guests.
+
 ### Use the same image as the other side
 
 The Vendor's and the Auditor's guests must be made from the **same exact image version**, for example
