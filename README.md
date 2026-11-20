@@ -41,7 +41,7 @@ without a key from anyone.
 
 <p align="center">
   <img src="https://img.shields.io/badge/go-1.26.1%20pinned-00ADD8?logo=go&logoColor=white" alt="Go 1.26.1 pinned">
-  <img src="https://img.shields.io/badge/TEE-AWS%20Nitro%20Enclaves-FF9900?logo=amazonaws&logoColor=white" alt="TEE AWS Nitro Enclaves">
+  <img src="https://img.shields.io/badge/TEE-AWS%20Nitro%20%C2%B7%20Intel%20TDX%20%C2%B7%20AMD%20SEV--SNP-FF9900" alt="TEE AWS Nitro Enclaves, Intel TDX, AMD SEV-SNP">
   <img src="https://img.shields.io/badge/chain-Ethereum%20%C2%B7%20Solidity-3C3C3D?logo=ethereum&logoColor=white" alt="Chain Ethereum and Solidity">
 </p>
 
