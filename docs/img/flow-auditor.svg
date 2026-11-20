@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1330 560" width="1330" height="560" role="img" aria-labelledby="t d">
   <title id="t">How Attestamp works: an Auditor registers</title>
-  <desc id="d">The Vendor runs code in a TEE and sends the source and build info to the Auditor. The Auditor rebuilds the same source in its own TEE, gets the same hash, signs it and registers it on the blockchain. The User asks the Vendor's TEE for its hash, looks the hash up on the blockchain, and trusts the service only if the two are the same.</desc>
+  <desc id="d">1: The Vendor runs code in a TEE and sends the source and build info to the Auditor. 2: The Auditor rebuilds the same source in its own TEE, gets the same hash, signs it and registers it on the blockchain. 3, a dashed arrow because it is not required: the Auditor can hand the image it built back to the Vendor, which then runs exactly those bytes (the Nitro scripts do this; on TDX and SEV-SNP the Vendor can also rebuild the same bytes itself). 4: The User asks the Vendor's TEE for its hash. 5: The User looks the hash up on the blockchain, and trusts the service only if the two are the same.</desc>
   <style>
     :root { --ink: #1f2937; --sub: #4b5563; --line: #8a94a6; --accent: #0d9488; }
     @media (prefers-color-scheme: dark) {
@@ -16,8 +16,10 @@
     .tag    { font-size: 28px; font-weight: 800; fill: var(--accent); }
     .body   { font-size: 24px; font-weight: 600; }
     .lbl    { font-size: 22px; font-weight: 600; fill: var(--sub); }
+    .start  { text-anchor: start; }
     .arrow  { fill: none; stroke: var(--line); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
     .read   { fill: none; stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+    .divider { fill: none; stroke: var(--line); stroke-width: 2; stroke-dasharray: 10 8; }
   </style>
   <defs>
     <marker id="head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
@@ -51,6 +53,9 @@
   <path class="arrow" d="M336 200H499" marker-end="url(#head)"/>
   <text class="lbl" x="417" y="150">1. Send source</text>
   <text class="lbl" x="417" y="176">+ build info</text>
+  <path class="arrow later" d="M499 245H336" marker-end="url(#head)"/>
+  <text class="lbl" x="417" y="278">3. Hand back</text>
+  <text class="lbl" x="417" y="302">the image</text>
   <path class="arrow" d="M831 200H994" marker-end="url(#head)"/>
   <text class="lbl" x="912" y="150">2. Sign and</text>
   <text class="lbl" x="912" y="176">register hash</text>
@@ -58,7 +63,7 @@
   <text class="role" x="665" y="476">User</text>
   <text class="sub" x="665" y="510">TEE hash = registry hash?</text>
   <path class="read" d="M499 485H170 V298" marker-end="url(#headA)"/>
-  <text class="lbl" x="337" y="466">3. Ask the TEE for its hash</text>
+  <text class="lbl" x="337" y="466">4. Ask the TEE for its hash</text>
   <path class="read" d="M831 485H1160 V298" marker-end="url(#headA)"/>
-  <text class="lbl" x="992" y="466">4. Look up the hash</text>
+  <text class="lbl" x="992" y="466">5. Look up the hash</text>
 </svg>
