@@ -104,7 +104,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false -ldflag
 
 `att-ra-responder` goes next to `att-vendor` or `att-auditor` on the instance: on Nitro, `build` layers that file
 into the enclave image; on TDX and SEV-SNP it runs on the guest and answers attestation requests.
-`go test ./...` checks everything without any TEE (see [Testing](#testing)).
+`go test -timeout 30m ./...` checks everything without any TEE (see [Testing](#testing)).
 
 ### The TEE image, with the same measurements every time
 
@@ -356,10 +356,11 @@ agree.
 ## Testing
 
 ```
-go test ./...
+go test -timeout 30m ./...
 ```
 
-Unit tests run anywhere. `cmd/*_e2e_test.go` build the real binaries and drive them against a local
+The end-to-end tests of the `cmd` package take about ten minutes, which is Go's default limit per package, hence
+`-timeout 30m`. Unit tests run anywhere. `cmd/*_e2e_test.go` build the real binaries and drive them against a local
 [anvil](https://getfoundry.sh) chain and recorded attestation evidence (Nitro, TDX and SEV-SNP). No TEE
 hardware is needed for any test. The tests look for anvil on `PATH` or in `~/.foundry/bin` and skip the
 chain tests without it; they were last run with anvil 1.8.0 (Foundry v1.8.0, commit `61ae26af`). To install exactly

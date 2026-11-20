@@ -36,10 +36,11 @@ for byte.
 ## Test
 
 ```
-go test ./...
+go test -timeout 30m ./...
 ```
 
-Unit tests run anywhere. `cmd/*_e2e_test.go` build the binaries and run them against a local
+`-timeout 30m` is needed: the end-to-end tests of the `cmd` package took 584 to 618 seconds on Windows in 2026-11,
+against Go's default limit of 10 minutes per package, so without it they fail or pass by chance. Unit tests run anywhere. `cmd/*_e2e_test.go` build the binaries and run them against a local
 `anvil` and recorded Nitro, TDX and SEV-SNP evidence; the chain-backed ones skip themselves when `anvil`
 is neither on `PATH` nor in `~/.foundry/bin`. No TEE hardware is needed for any test.
 Files the `e2e/` scripts fetch from instances land in `e2e-work/`, which is ignored.
@@ -148,7 +149,7 @@ type(scope): what changed, in the imperative
 ## Pull requests
 
 - Branch from `main`, open a PR, and get one review from a maintainer other than the author.
-- `go vet ./...` and `go test ./...` must pass. If you touched `build` or the responder, also
+- `go vet ./...` and `go test -timeout 30m ./...` must pass. If you touched `build` or the responder, also
   run the measurement check once on an instance (`e2e/arch-measurement-compare.sh`): the
   point of this project is that the bytes come out identical. That script is Nitro only, where the responder is
   inside the measured image. On TDX and SEV-SNP the responder is not measured, and what `build --platform` writes is

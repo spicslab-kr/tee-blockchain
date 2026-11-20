@@ -7,7 +7,7 @@ connect over SSH and stream the script, so nothing is uploaded except the binari
 script from the repository root. Both flows also run on TDX and SEV-SNP guests on GCP:
 [Flow 1 on TDX and SEV-SNP](#flow-1-on-tdx-and-sev-snp) and [Flow 2 on TDX and SEV-SNP](#flow-2-on-tdx-and-sev-snp).
 
-For tests that need no Nitro hardware, see `go test ./...` in the main README.
+For tests that need no Nitro hardware, see `go test -timeout 30m ./...` in the main README.
 
 ## env.sh and env.local.sh
 
