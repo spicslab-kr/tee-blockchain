@@ -104,8 +104,11 @@ created them; nothing in them follows you to another computer or another network
   to `0.0.0.0/0` it says so and prints the command that removes it; never add one.
 - **GCP, SSH.** Through IAP (above) your address does not matter, once the project has the IAP rule.
 - **GCP, the RA port.** `attestamp-ra` allows tcp:5000 from the `/32` of the machine that ran the first `gcp-cvm.sh
-  create`. Only a verifier outside the guest needs it (the procedures can run the whole chain on the guest). To allow
-  another address, list what is there with `gcloud compute firewall-rules describe attestamp-ra
+  create`. Only a verifier outside the guest needs it (the procedures can run the whole chain on the guest; the CVM
+  flow scripts in `e2e/cvm` do not, they reach port 5000 from the machine running them). `gcp-cvm.sh create` makes the
+  rule only when the project has none and never changes it afterwards, also when the creating machine's address
+  changes. Your current address is what `curl -fsS https://checkip.amazonaws.com` prints (the service `gcp-cvm.sh`
+  asks). To allow another address, list what is there with `gcloud compute firewall-rules describe attestamp-ra
   --format='value(sourceRanges)'` and set the full list again, one `/32` each:
   `gcloud compute firewall-rules update attestamp-ra --source-ranges=<old>/32,<new>/32`. `gcp-cvm.sh` does not check
   this for you.

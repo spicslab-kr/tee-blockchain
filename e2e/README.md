@@ -129,7 +129,9 @@ registry; the contract is the same bytecode.
    foundryup --install v1.8.0
    ```
 
-   The release archive without an installer script, and Windows without WSL: `docs/build/tdx.md`, step 1.
+   The release archive without an installer script, and Windows without WSL: `docs/build/tdx.md`, step 1. On Windows,
+   `anvil` is then in `~/.foundry/bin`, which Git Bash does not search: `export PATH="$PATH:$HOME/.foundry/bin"`
+   first, or the next step says `anvil: command not found`.
 2. Start it in a terminal of its own and leave it running until the last script of the flow has finished. A later
    script reads the registry an earlier one deployed, and an anvil that is restarted starts empty:
 
@@ -221,6 +223,11 @@ for TDX the option: `intel-tdx [1|2]`, `amd-sev-snp-initrd`, `amd-sev-snp-verity
 default, so that a User on another computer reaches it and the transactions show on Etherscan; `NET=local` for
 development.
 
+The prerequisites above are Nitro's: this flow needs no EC2 instance, no `pem2.pem` and no `env.local.sh`. It needs
+`gcloud` signed in to the project the guests are in (`docs/build/tdx.md`, step 1), the pinned Go and `git` on this
+machine (`0-Setup-local-install.sh`), and, for `NET=local`, anvil (below); for Sepolia, the key files and addresses
+of "Key files".
+
 | script | who | what it does |
 |---|---|---|
 | `cvm/0-Setup-guests.sh` | both | checks both guests have the same image and machine type, builds the binaries, copies them, and prepares each guest (an initrd boot, the base initrd, the Option 2 packages; for Option 2 the Auditor gets the Vendor's `base-initrd-v.img`). Leaves what is done as it is, so it can be run before every take |
@@ -230,9 +237,12 @@ development.
 | `cvm/flow1-auditor-registers/4-Vendor-tamper-rebuild-launch.sh` | Vendor | changes one byte of the application, builds, reboots. Prints the `verify` line again: not trusted |
 | `cvm/flow1-auditor-registers/4b-Auditor-audit-vendor-tampered.sh` | Auditor | `audit --vendor-tee` again: the Auditor's value is registered and the Vendor's guest runs something else, exit 12 (the pass) |
 
-There is no User script: steps 3 and 5 are the printed `verify` line, typed on another computer. Its address must be
-allowed on port 5000 by the firewall rule `attestamp-ra` (`e2e/cloud/README.md`, "From another computer, or after your
-address changed").
+There is no User script: steps 3 and 5 are the printed `verify` line, typed by hand. With Sepolia a User can type it on
+another computer; with `NET=local` it names `--rpc http://127.0.0.1:8545` and works only on the machine that runs anvil
+(both rehearsals typed it there). The computer that types it needs `att-user`: on the machine that ran the flow it is
+`e2e-work/bin/att-user` (`att-user.exe` on Windows), which `0-Setup-guests.sh` builds; elsewhere build it as in the
+main README, "The binaries". That computer's address must be allowed on port 5000 by the firewall rule `attestamp-ra`
+(`e2e/cloud/README.md`, "From another computer, or after your address changed").
 
 - **Commands on a guest** are a script file (`cvm/guest/guest-step.sh`) copied with `gcloud compute scp` and run with
   `gcloud compute ssh --command`; nothing is piped into ssh, whose handling of piped input through PuTTY on Windows was
@@ -252,6 +262,48 @@ address changed").
   Option 1 and Option 2 (`docs/results/cvm-flow-rehearsal-2026-11-18.md`), and for `amd-sev-snp-verity` and
   `amd-sev-snp-initrd` (`docs/results/cvm-flow-rehearsal-2026-11-19.md`), with `NET=local`, every step passing, with
   the time of each step; Sepolia has not run yet.
+
+### Before and during a CVM run
+
+What those runs needed that the table above does not say (R1 to R9 are the findings of those two records):
+
+- **anvil, with `NET=local`.** Start it before step 1 and leave it running until 4b has finished, through the pauses at
+  steps 3 and 5: the `verify` line names step 1's registry, and a restarted anvil starts empty. The scripts do not
+  start it; steps 1, 2b and 4b stop at once if nothing answers at `LOCAL_RPC`, and step 2 fails at its `lookup`.
+  Typing `anvil` needs it on `PATH`. On Windows,
+  `anvil.exe` usually sits in `~/.foundry/bin`, where `go test` finds it without `PATH`, but Git Bash does not look
+  there and says `anvil: command not found`: run `export PATH="$PATH:$HOME/.foundry/bin"` first (add it to
+  `~/.bashrc` to keep it), then `anvil --version`.
+- **The firewall rule `attestamp-ra`.** Steps 1, 2, 2b and 4b reach port 5000 of the guests from the machine running
+  the flow, and the `verify` line from the machine typing it. The rule allows only the addresses in it: the one that
+  first ran `gcp-cvm.sh create`, and whatever was added by hand. `gcp-cvm.sh` makes the rule only when it is missing
+  and never updates it, so after your address changes those calls time out with no other message. Compare
+  `curl -fsS https://checkip.amazonaws.com` (the address `gcp-cvm.sh` uses) with
+  `gcloud compute firewall-rules describe attestamp-ra --format='value(sourceRanges)'`, and update the rule as
+  `e2e/cloud/README.md` says ("From another computer, or after your address changed").
+- **The guests stop themselves after four hours.** `prepare` and `check-serve` set `sudo shutdown -h +240` on the guest
+  (a reboot cancels it, so it is set again after each one). A flow left waiting at step 3 or 5 for longer finds both
+  guests `TERMINATED` (2026-11-19, R6). To carry on: start them (`bash e2e/cloud/gcp-cvm.sh <tdx|snp> start`). They
+  boot the installed entry again, and only the responder has to be restarted. Run `check-serve` alone on each, with no
+  build or install: `gcloud compute ssh <PREFIX>-vendor --zone us-central1-a --tunnel-through-iap --command 'bash
+  attestamp-guest-step.sh check-serve vendor <format> <option>'`, and the same with `auditor`. The option is 1 or 2,
+  2 for `amd-sev-snp-verity`. It prints the values; they must be the ones from before the stop (they were, on
+  2026-11-19).
+- **A started guest can have a new public address.** The scripts read the addresses anew each time (`guest_ip`), but a
+  `verify` line printed before the stop still names the old one, and so does `e2e-work/cvm/<format>/verify-command.txt`.
+  Take the Vendor's new `EXTERNAL_IP` from `bash e2e/cloud/gcp-cvm.sh <tdx|snp> status`, put it in the line, and keep
+  the registry. Check the firewall rule again from the machine that types it.
+- **How long it takes.** On 2026-11-18 and 11-19 setup took 184 to 1207 s, and steps 1, 2 and 4 took 266 to 377 s
+  each. Most of that time went to the reboot (111 to 161 s until the new boot answered) and to `gcloud` through IAP
+  (15 to 20 s per call). 2b and 4b took 16 to 20 s. Of setup's 1207 s, the Vendor's Option 2 `prepare` took 920 s,
+  for reasons not found (R7).
+- **gcloud on Windows can crash after a command has finished on the guest** (`Segmentation fault`, exit 139; R3 in
+  `docs/results/cvm-flow-rehearsal-2026-11-18.md`). The scripts go by the exit code the guest recorded and are not
+  affected. For a command typed by hand, read its output rather than the exit code.
+- **Running setup again** is safe also while a responder runs: files are copied under a temporary name and renamed
+  into place (2026-11-19, R8, fixed in `df0c426`). The running responder keeps its old file until `check-serve`
+  restarts it. An Option 1 run after an Option 2 run on the same guests works too: the Option 2 `build` runs as root,
+  and the guest-side script gives `out/` back to the user afterwards (R9, fixed in `1e4cfc2`).
 
 ## Checks outside the two flows
 
