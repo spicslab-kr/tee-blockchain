@@ -14,7 +14,8 @@ This run puts the two commands against GitHub. No TEE is needed.
 
 **Status: partly run.** The failure paths ran against GitHub. The round trip (send, receive, the byte comparison,
 `--ref` to the sent commit, a second send with the same content) **has not run**: it needs a private throwaway
-repository, and none was available for this session (below, "Not run").
+repository, and none was available for this session (below, "Not run"). Two wrong exit codes found here were fixed
+afterwards and run again ("After the fixes"); a third defect, in `send` run twice, is recorded and not fixed (8).
 
 ## Setup
 
@@ -167,25 +168,90 @@ and `att-auditor receive` refuses a config whose `source.commit` is not in the h
 "the given commit is not in the repository" where "the repository is empty: push the source first" is meant. The round
 trip needs a repository with at least one commit.
 
+### 8. send twice with the same content: no "nothing to commit" (local bare repository, not GitHub)
+
+Run after the fixes below, with the binaries at `128dcd5` in `fixed/`, against a local bare repository `seeded.git`
+holding one commit of one file (10b0843 there; the hashes in this section are that repository's, not this one's). First the config above, whose `source` is empty, twice:
+
+```
+$ fixed/att-vendor.exe send --repo <scratch>/seeded.git --config vendor/build-config.json
+sent build-config.json → <scratch>/seeded.git @ c2469b5b69accc93efa2cc6d59c25f99a13e1946
+build env: windows/amd64 go1.26.1 trimpath=true
+exit=0
+$ fixed/att-vendor.exe send --repo <scratch>/seeded.git --config vendor/build-config.json
+sent build-config.json → <scratch>/seeded.git @ 01f92ec86502b2464bae787ef1dfd12113de471c
+build env: windows/amd64 go1.26.1 trimpath=true
+exit=0
+```
+
+The second is a new commit, not "nothing to commit": `send` fills an empty `source.commit` with the clone's `HEAD`, which
+is now the first send's commit (`git show 01f92ec:build-config.json` has `"commit": "c2469b5…"`). So "the same config"
+sent again is different content. With `source` written into the config (`vendor/pinned.json`: `source.commit` the seed
+commit, `build_env` as `send` filled it in), twice:
+
+```
+$ fixed/att-vendor.exe send --repo <scratch>/seeded.git --config vendor/pinned.json
+sent build-config.json → <scratch>/seeded.git @ 94598e934bd9d886a9ad2bc3ce4f8c98a9b93ae5
+build env: windows/amd64 go1.26.1 trimpath=true
+exit=0
+$ fixed/att-vendor.exe send --repo <scratch>/seeded.git --config vendor/pinned.json
+att-vendor: git: exit status 1: 
+exit=1
+```
+
+**`ErrNothingToCommit` is never returned.** `git commit` with nothing staged writes `nothing to commit, working tree
+clean` to **stdout**, and `classify` reads only stderr, which is empty: the error is unclassified, and its message ends
+after the colon. No test covers `ErrNothingToCommit` in either copy. Not fixed here.
+
 ## Exit codes, against `cmd/README.md`
 
-| case | documented | got |
-|---|---|---|
-| repository not found (send, receive) | 9 | 9 |
-| no credentials for the host | 9 | **1** |
-| commit not found (`--ref`) | 10 | 10 |
-| `git` not on PATH | 8 | 8 |
-| push rejected | 11 | not run |
-| a file that does not exist (`build-config.json` after the clone; `--config`) | 1 | **3** |
-| empty repository (`send`, local) | none given | 10, with a misleading message |
+| case | documented | got at `dc94652` | got at `128dcd5` (after the fixes) |
+|---|---|---|---|
+| repository not found (send, receive) | 9 | 9 | not run again |
+| no credentials for the host | 9 | **1** | 9 |
+| commit not found (`--ref`) | 10 | 10 | not run again |
+| `git` not on PATH | 8 | 8 | not run again |
+| push rejected | 11 | not run | not run |
+| a file that does not exist (`build-config.json` after the clone; `--config`) | 1 | **3** | 1 |
+| empty repository (`send`, local) | none given | 10, with a misleading message | not run again |
+| the same content sent twice (local) | 1, "nothing changed, nothing to commit" | not run | 1, with an empty message (8) |
+
+## After the fixes
+
+Two commits fixed the two wrong codes, each with a test:
+
+- `fix(core/transfer): classify a missing login as a repository access error`: `classify` takes `could not read
+  Username`, `could not read Password` and `terminal prompts disabled` as `ErrRepoAccess`, in both copies
+  (`TestClassify_NoCredentialsIsRepoAccess` in each `git_common_test.go`).
+- `fix(cmd): stop file errors from exiting 3, the network error code`: in `exitCode` of all three binaries a
+  `net.Error` that is a bare `syscall.Errno` no longer counts as a network error; a `*net.OpError` or `*net.DNSError`
+  still exits 3 (`TestExitCode_FileErrorIsNotNetwork` in `cmd/{vendor,auditor,user}/exitcode_test.go`, which fails
+  with exit 3 for the three file errors when the fix is taken out).
+
+`att-ra-responder` links neither package (`go list -deps ./cmd/ra-responder`), so no measurement moves.
+
+Built again at `128dcd5` into `fixed/`, the cases 3 and 5 again:
+
+```
+$ GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null fixed/att-auditor.exe receive --repo https://github.com/<owner>/<private repository>.git --into g3/src
+att-auditor: cannot access the repository: check the URL and read permission, or ask the repository owner for access: fatal: could not read Username for 'https://github.com': terminal prompts disabled
+exit=9
+$ fixed/att-auditor.exe receive --repo https://github.com/octocat/Hello-World.git --into g5/src
+att-auditor: https://github.com/octocat/Hello-World.git: open g5\src\build-config.json: The system cannot find the file specified.
+exit=1
+$ fixed/att-vendor.exe send --repo https://github.com/octocat/Hello-World.git --config vendor/no-such-config.json
+att-vendor: open vendor/no-such-config.json: The system cannot find the file specified.
+exit=1
+```
 
 ## Not run
 
 - **The round trip on GitHub:** `att-vendor send` into a private throwaway repository, `att-auditor receive` from it,
   the byte comparison of the received `build-config.json` with the pushed one, `receive --ref` to that commit, and a
-  second `send` with the same content (expected: `nothing changed, nothing to commit`). No repository could be created
-  here: `gh` is not installed on this machine, and the stored GitHub login was not to be read out for the GitHub API.
-  It needs a private repository with at least one commit (7).
+  second `send` with the same content (on a local repository it does not give `nothing changed, nothing to commit`:
+  8). No repository could be created here: `gh` is not installed on this machine, and the stored GitHub login was not
+  to be read out for the GitHub API. The URL meant to be given for it did not arrive. It needs a private repository
+  with at least one commit (7).
 - **Exit 11** (push rejected). It needs a repository where the push is refused: a stale `--workdir` clone of the
   throwaway repository would do. Pushing to someone else's public repository to provoke it was not done on purpose.
 - **SSH remotes** (`git@github.com:…`): only HTTPS was used.
