@@ -105,6 +105,7 @@ sha256, and pushes the record and the image. It reads the build tool version fro
 or you give it with `--build-tool-version`. The full exchange is in the
 [hand-off section](../vendor/README.md#hand-off-with-the-auditor) of the Vendor guide.
 One service and version has one record and one registration per CPU architecture.
+Sending content the repository already has commits nothing: `send` prints `already up to date` and exits 0, so re-running it is safe.
 
 | Field | Content |
 |---|---|

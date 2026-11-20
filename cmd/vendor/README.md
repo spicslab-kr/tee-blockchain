@@ -95,6 +95,7 @@ att-vendor receive --repo <auditor git url> --into from-auditor
 ```
 
 `send` commits the file to the repository root and pushes it. `--workdir` reuses an existing clone.
+Sending content the repository already has commits nothing: `send` prints `already up to date` and exits 0, so re-running it is safe.
 If you leave `build_env` out, `send` fills it in
 from the running binary. On `aws-nitro` it also fills in, where empty (all three are required there), the Amazon Linux release (`ami_release`, from `/etc/os-release`) and the docker and
 aws-nitro-enclaves-cli versions (`docker`, `nitro_cli`, from `rpm -q`), so run it on the instance that ran
