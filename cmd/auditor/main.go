@@ -628,9 +628,20 @@ func exitCode(err error) int {
 	case errors.Is(err, errVendorDiffers):
 		return 12
 	}
-	var ne net.Error
-	if errors.As(err, &ne) {
+	if isNetworkError(err) {
 		return 3
 	}
 	return 1
+}
+
+// isNetworkError reports an error to exit 3 with. A file error is not one, although the syscall.Errno at its bottom
+// (ENOENT, EACCES, …) has Timeout and Temporary and so satisfies net.Error, and errors.As finds it under any
+// *fs.PathError. A network error is a *net.OpError, *net.DNSError or *url.Error, found before the Errno it may wrap.
+func isNetworkError(err error) bool {
+	var ne net.Error
+	if !errors.As(err, &ne) {
+		return false
+	}
+	_, isErrno := ne.(syscall.Errno)
+	return !isErrno
 }

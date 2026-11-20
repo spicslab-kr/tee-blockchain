@@ -109,4 +109,6 @@ Each role is one `main` package. Files with the same name in different roles do 
 | [vendor/quiet.go](vendor/quiet.go), [auditor/quiet.go](auditor/quiet.go), [user/quiet.go](user/quiet.go) | The `quiet` flag that silences single-step commands when a bundled command calls them. |
 | [ra-responder/main.go](ra-responder/main.go) | `att-ra-responder`: the one binary layered into the enclave image; it only runs `lo-up` and `ra-serve`. |
 
-The `*_e2e_test.go` files in this folder are end-to-end tests that drive the built binaries.
+The `*_e2e_test.go` files in this folder are end-to-end tests that drive the built binaries. Each role folder has one
+unit test, [vendor/exitcode_test.go](vendor/exitcode_test.go) and its copies in `auditor/` and `user/`: a file error
+exits 1 and a network error 3.
