@@ -14,11 +14,10 @@ import (
 // These helpers run the installed git. Authentication comes from the user's git configuration.
 
 var (
-	ErrGitMissing      = errors.New("git is not installed or not on PATH")
-	ErrRepoAccess      = errors.New("cannot access the repository: check the URL and read permission, or ask the repository owner for access")
-	ErrCommitNotFound  = errors.New("the given commit is not in the repository")
-	ErrPushRejected    = errors.New("push rejected: no write permission, or the remote is ahead (pull first)")
-	ErrNothingToCommit = errors.New("nothing changed, nothing to commit")
+	ErrGitMissing     = errors.New("git is not installed or not on PATH")
+	ErrRepoAccess     = errors.New("cannot access the repository: check the URL and read permission, or ask the repository owner for access")
+	ErrCommitNotFound = errors.New("the given commit is not in the repository")
+	ErrPushRejected   = errors.New("push rejected: no write permission, or the remote is ahead (pull first)")
 )
 
 type gitRunner struct{ dir string }
@@ -60,8 +59,6 @@ func classify(stderr string, err error) error {
 		return fmt.Errorf("%w: %s", ErrCommitNotFound, strings.TrimSpace(stderr))
 	case strings.Contains(s, "rejected"), strings.Contains(s, "non-fast-forward"), strings.Contains(s, "failed to push"):
 		return fmt.Errorf("%w: %s", ErrPushRejected, strings.TrimSpace(stderr))
-	case strings.Contains(s, "nothing to commit"):
-		return ErrNothingToCommit
 	}
 	return fmt.Errorf("git: %w: %s", err, strings.TrimSpace(stderr))
 }
@@ -91,21 +88,32 @@ func cloneAt(ctx context.Context, repo, ref, dir string) (string, error) {
 	return sha, err
 }
 
-// commitAndPush stages paths, commits, pushes HEAD to origin and returns the commit.
-func commitAndPush(ctx context.Context, dir, message string, paths ...string) (string, error) {
+// commitAndPush stages paths, commits when that changed anything, pushes HEAD to origin and returns the commit. When
+// the staged files are what HEAD already has, nothing is committed, changed is false and the commit is HEAD, pushed all
+// the same so that the remote has it. Whether anything is staged is asked of git (diff --cached --quiet, which also
+// works on an unborn branch), not read from commit's output.
+func commitAndPush(ctx context.Context, dir, message string, paths ...string) (sha string, changed bool, err error) {
 	g := gitRunner{dir: dir}
 	if _, err := g.run(ctx, append([]string{"add", "--"}, paths...)...); err != nil {
-		return "", err
+		return "", false, err
 	}
-	if _, err := g.run(ctx, "commit", "--quiet", "-m", message); err != nil {
-		return "", err
+	_, err = g.run(ctx, "diff", "--cached", "--quiet")
+	var ee *exec.ExitError
+	switch {
+	case err == nil: // exit 0: nothing staged
+	case errors.As(err, &ee) && ee.ExitCode() == 1: // exit 1: something staged
+		changed = true
+		if _, err := g.run(ctx, "commit", "--quiet", "-m", message); err != nil {
+			return "", false, err
+		}
+	default:
+		return "", false, err
 	}
-	sha, err := g.run(ctx, "rev-parse", "HEAD")
-	if err != nil {
-		return "", err
+	if sha, err = g.run(ctx, "rev-parse", "HEAD"); err != nil {
+		return "", false, err
 	}
 	if _, err := g.run(ctx, "push", "--quiet", "origin", "HEAD"); err != nil {
-		return "", err
+		return "", false, err
 	}
-	return sha, nil
+	return sha, changed, nil
 }

@@ -37,6 +37,59 @@ func TestGitSend_PushesRecordAndImage(t *testing.T) {
 	}
 }
 
+// The same record and image sent again is a success with nothing committed: the remote already holds them. Before, git
+// said "nothing to commit" on stdout, classify read stderr, and the send failed with an empty message
+// (docs/results/git-transport-2026-11-20.md, 8).
+func TestGitSend_SameContentAgainIsUpToDate(t *testing.T) {
+	remote := newRemote(t)
+	eif := filepath.Join(t.TempDir(), "svc.eif")
+	if err := os.WriteFile(eif, []byte("eif-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rec := recAWS()
+	rec.Image = Image{Path: eif}
+	first, err := GitTransport{WorkDir: clientDir(t, remote)}.Send(context.Background(), rec, remote)
+	if err != nil || first.Unchanged {
+		t.Fatalf("first send: %+v, %v", first, err)
+	}
+	again, err := GitTransport{WorkDir: clientDir(t, remote)}.Send(context.Background(), rec, remote)
+	if err != nil {
+		t.Fatalf("the same content again must succeed: %v", err)
+	}
+	if !again.Unchanged || again.Commit != first.Commit {
+		t.Errorf("again: %+v, want Unchanged at %s", again, first.Commit)
+	}
+	check := filepath.Join(t.TempDir(), "check")
+	run(t, "", "clone", "--quiet", remote, check)
+	if head := strings.TrimSpace(run(t, check, "rev-parse", "HEAD")); head != first.Commit {
+		t.Errorf("remote HEAD %s, want the first send's %s: nothing new is committed", head, first.Commit)
+	}
+}
+
+// Into an empty repository the record becomes its first commit (cloneAt's branch for an empty repository).
+// commitAndPush asks diff --cached on an unborn branch, which must count the staged files as a change.
+func TestGitSend_EmptyRepoFirstCommit(t *testing.T) {
+	remote := filepath.Join(t.TempDir(), "empty.git")
+	run(t, "", "init", "--quiet", "--bare", "--initial-branch=main", remote)
+	work := filepath.Join(t.TempDir(), "work")
+	run(t, "", "clone", "--quiet", remote, work)
+	run(t, work, "config", "user.email", "t@t")
+	run(t, work, "config", "user.name", "t")
+	eif := filepath.Join(t.TempDir(), "svc.eif")
+	if err := os.WriteFile(eif, []byte("eif-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rec := recAWS()
+	rec.Image = Image{Path: eif}
+	res, err := GitTransport{WorkDir: work}.Send(context.Background(), rec, remote)
+	if err != nil || res.Unchanged || res.Commit == "" {
+		t.Fatalf("send into an empty repository: %+v, %v", res, err)
+	}
+	if head := strings.TrimSpace(run(t, "", "--git-dir", remote, "rev-parse", "main")); head != res.Commit {
+		t.Errorf("remote main %s, want %s", head, res.Commit)
+	}
+}
+
 func TestGitReceive_ClonesAndChecksSourceCommit(t *testing.T) {
 	remote := newRemote(t)
 	// Act as the Vendor: commit and push build-config.json (source.commit is the HEAD before that commit)

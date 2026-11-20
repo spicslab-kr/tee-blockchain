@@ -32,11 +32,14 @@ func (emptyRepo) Error() string {
 
 func (emptyRepo) Is(target error) bool { return target == ErrCommitNotFound }
 
-// SendResult is the repository, the pushed commit and the file path within it.
+// SendResult is the repository, the pushed commit and the file path within it. Unchanged is a send of what the
+// repository already had: nothing was committed, and Commit is the commit that already holds it. That is a success,
+// not an error: the remote is in the state the send asked for.
 type SendResult struct {
-	Repo   string
-	Commit string
-	Path   string
+	Repo      string
+	Commit    string
+	Path      string
+	Unchanged bool
 }
 
 // Send commits and pushes build-config.json at the repository root. An empty source.repo and source.commit
@@ -82,11 +85,11 @@ func (g GitTransport) Send(ctx context.Context, cfg BuildConfig, repo string) (S
 	if err := writeAtomic(path, b); err != nil {
 		return SendResult{}, err
 	}
-	sha, err := commitAndPush(ctx, dir, "att: build-config for "+cfg.Service+" "+cfg.Version, BuildConfigFile)
+	sha, changed, err := commitAndPush(ctx, dir, "att: build-config for "+cfg.Service+" "+cfg.Version, BuildConfigFile)
 	if err != nil {
 		return SendResult{}, err
 	}
-	return SendResult{Repo: repo, Commit: sha, Path: BuildConfigFile}, nil
+	return SendResult{Repo: repo, Commit: sha, Path: BuildConfigFile, Unchanged: !changed}, nil
 }
 
 // Receive clones repo at ref into the directory into, then reads the measurement record and checks the image against its sha256.

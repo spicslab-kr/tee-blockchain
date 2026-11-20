@@ -177,7 +177,11 @@ func send(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("sent %s → %s @ %s\n", res.Path, res.Repo, res.Commit)
+	if res.Unchanged {
+		fmt.Printf("already up to date: %s in %s @ %s is this content; nothing new committed\n", res.Path, res.Repo, res.Commit)
+	} else {
+		fmt.Printf("sent %s → %s @ %s\n", res.Path, res.Repo, res.Commit)
+	}
 	fmt.Printf("build env: %s\n", cfg.BuildEnv)
 	return nil
 }

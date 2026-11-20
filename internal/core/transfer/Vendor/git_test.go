@@ -39,6 +39,31 @@ func TestGitSend_PushesBuildConfig(t *testing.T) {
 	}
 }
 
+// The same build-config.json sent again is a success with nothing committed: the remote already holds it. Before, git
+// said "nothing to commit" on stdout, classify read stderr, and the send failed with an empty message
+// (docs/results/git-transport-2026-11-20.md, 8). source is written in, as Send would otherwise fill source.commit with
+// the first send's commit and the content would differ.
+func TestGitSend_SameContentAgainIsUpToDate(t *testing.T) {
+	remote := newRemote(t)
+	cfg := cfgAWS()
+	first, err := GitTransport{WorkDir: clientDir(t, remote)}.Send(context.Background(), cfg, remote)
+	if err != nil || first.Unchanged {
+		t.Fatalf("first send: %+v, %v", first, err)
+	}
+	again, err := GitTransport{WorkDir: clientDir(t, remote)}.Send(context.Background(), cfg, remote)
+	if err != nil {
+		t.Fatalf("the same content again must succeed: %v", err)
+	}
+	if !again.Unchanged || again.Commit != first.Commit {
+		t.Errorf("again: %+v, want Unchanged at %s", again, first.Commit)
+	}
+	check := filepath.Join(t.TempDir(), "check")
+	run(t, "", "clone", "--quiet", remote, check)
+	if head := strings.TrimSpace(run(t, check, "rev-parse", "HEAD")); head != first.Commit {
+		t.Errorf("remote HEAD %s, want the first send's %s: nothing new is committed", head, first.Commit)
+	}
+}
+
 // An empty repository holds no source for source.commit to name. Send says so, and what to do, instead of "the given
 // commit is not in the repository" from its own rev-parse HEAD (docs/results/git-transport-2026-11-20.md, 7). The exit
 // code stays 10: it is an ErrCommitNotFound.

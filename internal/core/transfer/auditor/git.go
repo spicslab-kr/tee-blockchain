@@ -18,11 +18,14 @@ type GitTransport struct {
 	WorkDir string // an already-cloned working tree; when empty, Send clones repo into a temporary directory
 }
 
-// SendResult is the repository, the pushed commit and the file path within it.
+// SendResult is the repository, the pushed commit and the file path within it. Unchanged is a send of what the
+// repository already had: nothing was committed, and Commit is the commit that already holds it. That is a success,
+// not an error: the remote is in the state the send asked for.
 type SendResult struct {
-	Repo   string
-	Commit string
-	Path   string
+	Repo      string
+	Commit    string
+	Path      string
+	Unchanged bool
 }
 
 // Receive clones repo at ref into the directory into and reads the build config. source.commit must be in
@@ -69,9 +72,9 @@ func (g GitTransport) Send(ctx context.Context, rec MeasurementRecord, repo stri
 	if rec.Image.Path != "" {
 		paths = append(paths, filepath.Base(rec.Image.Path))
 	}
-	sha, err := commitAndPush(ctx, dir, "att: measurement-record for "+rec.Service+" "+rec.Version, paths...)
+	sha, changed, err := commitAndPush(ctx, dir, "att: measurement-record for "+rec.Service+" "+rec.Version, paths...)
 	if err != nil {
 		return SendResult{}, err
 	}
-	return SendResult{Repo: repo, Commit: sha, Path: MeasurementRecordFile}, nil
+	return SendResult{Repo: repo, Commit: sha, Path: MeasurementRecordFile, Unchanged: !changed}, nil
 }
