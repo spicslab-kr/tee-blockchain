@@ -247,7 +247,7 @@ procedures linked above go through them step by step.
 registers the hash it gets. The User trusts what the Auditor signed.
 
 <p align="center">
-  <img src="docs/img/flow-auditor.svg" alt="Flow 1: the Vendor sends source and build info, the Auditor rebuilds, signs and registers the hash on the blockchain and can hand the built image back to the Vendor, and the User compares the Vendor's TEE hash with the registry">
+  <img src="docs/img/flow-auditor.svg" alt="Flow 1: the Vendor sends source and build info, the Auditor rebuilds it in a TEE of its own and registers the hash it gets, signed with its own key, on the blockchain; the User asks the Vendor's TEE for its hash and looks that hash up in the registry, so a Vendor running anything else is not found there">
 </p>
 
 **Flow 2: the Vendor registers itself.** Without an Auditor, the Vendor signs and registers the hash
