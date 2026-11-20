@@ -5,8 +5,9 @@ value, it can only be trusted if both builds give the same measurements. On Nitr
 measurements are PCR0, PCR1 and PCR2. The short version is in the README under
 [Build](../../README.md#build). What both sides must match, with a check for each: [reproduce.md](reproduce.md).
 Tools, which step calls them, and the versions used: [toolchain.md](toolchain.md)
-(the instance's AMI, kernel, docker and nitro-cli for each baseline). The reference PCRs of the test application, at
-commit `6146c10`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-17-shared-aws.md](../results/aws-nitro-2026-11-17-shared-aws.md)
+(the instance's AMI, kernel, docker and nitro-cli for each baseline). The last measured PCRs of the test application,
+at commit `6146c10`, x86_64 and arm64 (since `89c0063` they no longer describe what `build` makes, and new ones are
+not measured yet: `docs/status/build-info-gaps.md`, row 38): [docs/results/aws-nitro-2026-11-17-shared-aws.md](../results/aws-nitro-2026-11-17-shared-aws.md)
 (earlier, each at its own commit: `83cb2dc`, [aws-nitro-2026-11-17.md](../results/aws-nitro-2026-11-17.md); `23b83f9`,
 [aws-nitro-2026-11-16.md](../results/aws-nitro-2026-11-16.md); the first baseline, at `ab55208`,
 [aws-nitro-2026-11-12.md](../results/aws-nitro-2026-11-12.md)).
@@ -17,7 +18,12 @@ commit `6146c10`, x86_64 and arm64: [docs/results/aws-nitro-2026-11-17-shared-aw
 |---|---|
 | PCR0 | the whole enclave image file (EIF) |
 | PCR1 | the Linux kernel and boot ramdisk that Nitro puts in the image |
-| PCR2 | the application: your software's files and the responder |
+| PCR2 | the application: your software's files and what `build` adds to them (below) |
+
+`build` layers onto your image `/att-ra` (the responder), `/att-entrypoint.sh` (which starts the responder, changes
+into your `WORKDIR` and runs your command), `/att-app-cmd` (your `ENTRYPOINT` and `CMD`), `/att-app-workdir` (your
+`WORKDIR`) and `ENV ATT_RA_PORT=<port>`, and makes `/att-entrypoint.sh` the image's `ENTRYPOINT`
+(`internal/setup/build/aws/build.go`, `layerResponder`). Any change to one of them moves PCR0 and PCR2 for every image.
 
 One differing file in the image, `/etc/shadow`, gave a different PCR0 and PCR2
 ([aws-nitro-2026-11-15-local-chain.md](../results/aws-nitro-2026-11-15-local-chain.md)). That a different `ENTRYPOINT`
@@ -169,8 +175,9 @@ And one more since, 2026-11-20, not measured yet (`docs/status/build-info-gaps.m
 PCR2 `79d0abea…`; at `23b83f9` (responder `c61c988e…`) x86_64 PCR0 `0c905480…`, PCR2 `6347a146…` and arm64 PCR0
 `f1d4d679…`, PCR2 `6e865138…`. **Every Nitro value is written next to the commit
 it was measured at**: the responder's bytes, and so PCR0 and PCR2, changed with any change to a package the responder
-links until 2026-11-17, and still change with any change to code it can run or to the lines that code sits on, so a
-value without its commit cannot be compared.
+links until 2026-11-17, and still change with any change to code it can run or to the lines that code sits on, and
+PCR0 and PCR2 also change with any change to what `build` adds to or removes from the image (`a402827`, `89c0063`),
+so a value without its commit cannot be compared.
 
 ### Two builds compared (2026-11-15)
 
@@ -270,7 +277,7 @@ checking a Vendor's self-registration later in flow 2.
 
 ## Ports, vsock address and enclave resources
 
-These values were only in the code (`internal/setup/{build,launch}/*/aws`, `cmd/{vendor,auditor}/main.go`). Defaults,
+These values were only in the code (`internal/setup/{build,launch}/aws`, `cmd/{vendor,auditor}/main.go`). Defaults,
 and where each one goes:
 
 | value | default | set by | where it ends up |
@@ -281,7 +288,7 @@ and where each one goes:
 | source the RA port is opened to | **none**: nothing is opened | `launch --open-port-to <CIDR>` | the instance's first security group, only when given and when the instance role allows `ec2:AuthorizeSecurityGroupIngress`; see below |
 | enclave vsock CID | 16 | `launch --cid` | `nitro-cli run-enclave --enclave-cid`, and the target of `ra-proxy --vsock` (default `16:5000`) |
 | enclave CPUs | 2 | `launch --cpus` | `nitro-cli run-enclave --cpu-count`; `launch` raises `cpu_count` in `/etc/nitro_enclaves/allocator.yaml` if it is lower |
-| enclave memory | four times the EIF size, rounded up to 512 MiB, at least 512 MiB (`MemoryFor`) | `launch --memory <MiB>` | `nitro-cli run-enclave --memory`; `launch` raises `memory_mib` in the allocator file if it is lower. Raising the allocator stops any running enclave |
+| enclave memory | four times the EIF size, rounded up to 512 MiB, at least 512 MiB (`MemoryFor`) | `launch --memory <MiB>` | `nitro-cli run-enclave --memory`; `launch` raises `memory_mib` in the allocator file if it is lower. Raising the allocator stops any running enclave. The default goes above 8192 MiB for an EIF over 2 GiB, and then the 1 GiB-page rule of `--memory` above applies |
 | responder default when run by hand | `tcp:127.0.0.1:5000` | `att-ra-responder ra-serve --listen` | only for a manual run; inside the EIF the entrypoint always passes `vsock:` |
 
 CID, CPUs and memory are given when the enclave starts and are not part of the measured image.
