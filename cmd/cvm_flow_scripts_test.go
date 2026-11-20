@@ -29,6 +29,9 @@ func TestCVMFlowScripts(t *testing.T) {
 		"e2e/cvm/flow1-auditor-registers/2b-Auditor-audit-vendor.sh",
 		"e2e/cvm/flow1-auditor-registers/4-Vendor-tamper-rebuild-launch.sh",
 		"e2e/cvm/flow1-auditor-registers/4b-Auditor-audit-vendor-tampered.sh",
+		"e2e/cvm/flow2-vendor-self-registers/1-Vendor-build-launch-self-register.sh",
+		"e2e/cvm/flow2-vendor-self-registers/3-Vendor-tamper-rebuild-self-register.sh",
+		"e2e/cvm/flow2-vendor-self-registers/4-Auditor-audit-vendor.sh",
 	} {
 		if _, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(f))); err != nil {
 			t.Fatal(err)

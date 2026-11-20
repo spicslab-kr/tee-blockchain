@@ -36,7 +36,7 @@ cat "$CVM_WORK/auditor-measurements.json"
 
 if [ -z "$REGISTRY" ]; then
   step_start "DEPLOYING THE REGISTRY ($NET)"
-  REGISTRY=$(deploy_registry) || exit 1
+  REGISTRY=$(deploy_registry "$AUDITOR_BIN" "$AUDITOR_ADDR") || exit 1
   step_stop
 fi
 echo "$REGISTRY" > "$CVM_WORK/registry.txt"

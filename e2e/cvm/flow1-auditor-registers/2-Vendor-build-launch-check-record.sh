@@ -49,5 +49,5 @@ else
   result T4 vendor-checks-own-guest rejected accepted "compare with the Auditor's values exit $a, lookup exit $l, compare with the registration exit $b" "option $OPTION, registry $REGISTRY"
   exit 1
 fi
-print_verify_line "$VENDOR_IP" "$REGISTRY" "trusted, exit 0"
+print_verify_line "$VENDOR_IP" "trusted, exit 0" "$REGISTRY"
 echo "next: the verify above on the other computer, then 2b-Auditor-audit-vendor.sh $*"

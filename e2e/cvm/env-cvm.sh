@@ -162,14 +162,17 @@ need_bins() {
   done
 }
 
-# print_verify_line <vendor address> <registry> <expected> - the User's verify command, complete and ready to paste:
+# print_verify_line <vendor address> <expected> <registry>... - the User's verify command, complete and ready to paste:
 # with this machine's att-user (USER_BIN, run from the repository root), and, when the chain is not this machine's
 # anvil, the same for another computer with att-user in its current folder. verify-command.txt keeps this machine's.
+# With more than one registry, each gets its own --registry, and verify trusts only when every one of them vouches.
 print_verify_line() {
-  local args="verify --tee-addr $1:$RA_PORT --format $FORMAT --rpc $RPC --registry $2"
+  local addr=$1 expected=$2 args r; shift 2
+  args="verify --tee-addr $addr:$RA_PORT --format $FORMAT --rpc $RPC"
+  for r in "$@"; do args="$args --registry $r"; done
   echo "$USER_BIN $args" > "$CVM_WORK/verify-command.txt"
   echo
-  echo "On this machine, from the repository root, type (expected: $3):"
+  echo "On this machine, from the repository root, type (expected: $expected):"
   echo "  $USER_BIN $args"
   if [ "$NET" = local ]; then
     echo "NET=local: only this machine reaches the chain at $RPC, so type it here."
@@ -179,10 +182,12 @@ print_verify_line() {
   fi
 }
 
-# deploy_registry - deploys a Registry with the Auditor's address as its approver and prints the address.
+# deploy_registry <att binary> <approver address> - deploys a Registry with that approver and prints its address. One
+# registry has one approver for good (contracts/README.md), so the Vendor's and the Auditor's are separate contracts:
+#   deploy_registry "$AUDITOR_BIN" "$AUDITOR_ADDR"     deploy_registry "$VENDOR_BIN" "$VENDOR_ADDR"
 deploy_registry() {
   local out reg
-  out=$("$AUDITOR_BIN" registry-deploy --rpc "$RPC" --deployer-key-file "$DEPLOYER_KEY" --approver "$AUDITOR_ADDR" 2>&1)
+  out=$("$1" registry-deploy --rpc "$RPC" --deployer-key-file "$DEPLOYER_KEY" --approver "$2" 2>&1)
   echo "$out" >&2
   reg=$(echo "$out" | grep -oE 'deployed at 0x[0-9a-fA-F]{40}' | awk '{print $3}')
   [ -n "$reg" ] || { echo "no registry address in the registry-deploy output" >&2; return 1; }

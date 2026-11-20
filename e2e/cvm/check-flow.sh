@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Runs the CVM flow scripts (0-Setup-guests.sh and flow1-auditor-registers/) against stand-in gcloud, go and curl and
-# stand-in att binaries, and checks what each script asked of them. No guest, no chain and no network are used, and
-# nothing is written outside a temporary folder.
+# Runs the CVM flow scripts (0-Setup-guests.sh, flow1-auditor-registers/ and flow2-vendor-self-registers/) against
+# stand-in gcloud, go and curl and stand-in att binaries, and checks what each script asked of them. No guest, no
+# chain and no network are used, and nothing is written outside a temporary folder.
 #
 #   bash e2e/cvm/check-flow.sh          # also run by go test ./cmd (TestCVMFlowScripts)
 #
 # What it checks: the arguments (format, option); which binary, file and hook script goes to which guest; that every
 # guest command is a script copied with scp and run with ssh --command, never piped into ssh; the boot_id wait (a new
 # boot after the old one and a failed connection, and the timeout with its message); the audit and lookup calls; the
-# exit codes 2b and 4b accept (0 and 12); and the verify line the flow prints. It also runs the guest-side script
-# here, with a stand-in sudo and att, for the launch and build flags each format gets.
+# exit codes 2b and 4b accept (0 and 12); and the verify line the flow prints. For flow 2: which registry each step
+# deploys and with which approver, self-register's calls, that step 4 needs flow 1's step 1 and passes on exit 12 only,
+# and its verify line with both registries. It also runs the guest-side script here, with a stand-in sudo and att, for
+# the launch and build flags each format gets.
 # What it cannot check, because only a real guest has it: gcloud ssh and scp through IAP from this machine, the build,
 # the GRUB entry, the reboot itself, launch --check, the responder on port 5000, and the chain.
 #
@@ -20,6 +22,7 @@ set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 flow="$here/flow1-auditor-registers"
+flow2="$here/flow2-vendor-self-registers"
 tmp=$(mktemp -d) || exit 1
 trap 'rm -rf "$tmp"' EXIT
 fake="$tmp/fakebin"; mkdir -p "$fake" "$tmp/state"
@@ -95,6 +98,7 @@ out=""; prev=""; for x in "\$@"; do [ "\$prev" = --out-file ] && out=\$x; prev=\
 case "\$1" in
   registry-deploy) echo "Registry deployed at 0x5FbDB2315678afecb367f032d93F642f64180aa3" ;;
   audit) exit "\${FAKE_AUDIT_EXIT:-0}" ;;
+  self-register) exit "\${FAKE_SELFREG_EXIT:-0}" ;;
   lookup) echo "  record key  0x$(printf 'ab%.0s' $(seq 32))" ;;
   ra-request|ra-parse) [ -n "\$out" ] && echo '{"MRTD":"aa"}' > "\$out" ;;
   compare) exit "\${FAKE_COMPARE_EXIT:-0}" ;;
@@ -107,10 +111,11 @@ EOF
 
 fails=0; n=0; cur=""; bad=""; out=""; got=0
 AUDITOR=0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+VENDOR=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 # run <env assignments...> <script> <args...> - runs a script with WORK and BIN in the current work folder.
 run() {
   : > "$log"; rm -f "$STANDIN_STATE"/*
-  out=$(env WORK="$work" BIN="$work/bin" AUDITOR_ADDR=$AUDITOR REBOOT_POLL=0 "$@" 2>&1 </dev/null); got=$?
+  out=$(env WORK="$work" BIN="$work/bin" AUDITOR_ADDR=$AUDITOR VENDOR_ADDR=$VENDOR REBOOT_POLL=0 "$@" 2>&1 </dev/null); got=$?
 }
 start()  { cur=$1; n=$((n + 1)); bad=""; }
 exitis() { [ "$got" = "$1" ] || bad="$bad; exit $got, want $1"; }
@@ -133,6 +138,8 @@ S="$here/0-Setup-guests.sh"
 F1="$flow/1-Auditor-rebuild-launch-audit.sh"; F2="$flow/2-Vendor-build-launch-check-record.sh"
 F2b="$flow/2b-Auditor-audit-vendor.sh"; F4="$flow/4-Vendor-tamper-rebuild-launch.sh"
 F4b="$flow/4b-Auditor-audit-vendor-tampered.sh"
+G1="$flow2/1-Vendor-build-launch-self-register.sh"; G3="$flow2/3-Vendor-tamper-rebuild-self-register.sh"
+G4="$flow2/4-Auditor-audit-vendor.sh"
 REG=0x5FbDB2315678afecb367f032d93F642f64180aa3
 SEPOLIA=https://ethereum-sepolia-rpc.publicnode.com
 
@@ -254,11 +261,68 @@ newwork verity
 start "1 amd-sev-snp-verity on its own work folder"
 run bash "$F1" amd-sev-snp-verity; exitis 0; call 'guest-step.sh build auditor amd-sev-snp-verity 2'; finish
 
+# Flow 2, intel-tdx on a local chain
+newwork f2tdx
+OTHER=0x1111111111111111111111111111111111111111; AREG=0x2222222222222222222222222222222222222222
+start "flow 2, 3 without step 1's self-registration stops before any call"
+run NET=local bash "$G3" intel-tdx; exitis 1; nocall '^gcloud '; said 'run 1-Vendor-build-launch-self-register.sh intel-tdx first'; finish
+start "flow 2, 1 intel-tdx: the Vendor's guest built and booted, a registry of the Vendor's, self-register; verify line: trusted"
+run NET=local bash "$G1" intel-tdx; exitis 0
+call 'guest-step.sh app vendor intel-tdx 1 original'; call 'guest-step.sh build vendor intel-tdx 1'
+call 'guest-step.sh install vendor intel-tdx 1'; call 'compute ssh attestamp-tdx-vendor .*systemd-run'
+call 'guest-step.sh check-serve vendor intel-tdx 1'; nocall 'attestamp-tdx-auditor'; nocall '^att-auditor '
+call "att-vendor registry-deploy --rpc http://127.0.0.1:8545 .*--approver $VENDOR\$"
+call "att-vendor self-register --tee-addr 192.0.2.10:5000 --format intel-tdx --build-measurements .*flow2-vendor-measurements.json --rpc http://127.0.0.1:8545 --registry $REG --signing-key-file .*deployer.key "
+said "/bin/att-user(.exe)? verify --tee-addr 192.0.2.10:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry $REG\$"
+said 'expected: trusted'; said "NET=local: only this machine reaches the chain"; finish
+start "flow 2, 1: self-register refusing ends the step with its exit code, and no verify line"
+run NET=local FAKE_SELFREG_EXIT=1 bash "$G1" intel-tdx; exitis 1; nosaid 'verify --tee-addr'; finish
+start "flow 2, 1 -c: the given registry, none deployed"
+run NET=local bash "$G1" intel-tdx -c $OTHER; exitis 0
+nocall 'registry-deploy'; call "att-vendor self-register .*--registry $OTHER "; finish
+start "flow 2, 3: one byte changed, rebuilt, rebooted, self-registered on a new registry; step 1's registry kept"
+run NET=local bash "$G3" intel-tdx; exitis 0
+call 'guest-step.sh app vendor intel-tdx 1 tampered'; call 'guest-step.sh build vendor intel-tdx 1'
+call 'compute ssh attestamp-tdx-vendor .*systemd-run'; call 'guest-step.sh check-serve vendor intel-tdx 1'
+call "att-vendor registry-deploy --rpc http://127.0.0.1:8545 .*--approver $VENDOR\$"
+call "att-vendor self-register --tee-addr 192.0.2.10:5000 --format intel-tdx --build-measurements .*flow2-vendor-tampered-measurements.json --rpc http://127.0.0.1:8545 --registry $REG "
+nosaid 'verify --tee-addr'
+[ "$(cat "$work/cvm/intel-tdx-opt1/flow2-vendor-registry.txt" 2>/dev/null)" = "$OTHER" ] || bad="$bad; step 1's registry file changed"
+[ "$(cat "$work/cvm/intel-tdx-opt1/flow2-vendor-registry-tampered.txt" 2>/dev/null)" = "$REG" ] || bad="$bad; no registry file from step 3"
+finish
+start "flow 2, 4 without flow 1's step 1 stops before any call and names the script to run"
+run NET=local FAKE_AUDIT_EXIT=12 bash "$G4" intel-tdx; exitis 1; nocall '^gcloud '; nocall '^att-'
+said 'bash e2e/cvm/flow1-auditor-registers/1-Auditor-rebuild-launch-audit.sh intel-tdx$'; finish
+run NET=local bash "$F1" intel-tdx   # flow 1's step 1, for the Auditor's own value
+start "flow 2, 4 intel-tdx: audit --vendor-tee with the Auditor's own value, exit 12 passes; verify line: both registries"
+run NET=local FAKE_AUDIT_EXIT=12 bash "$G4" intel-tdx -c $AREG; exitis 0; nocall 'registry-deploy'
+call "att-auditor audit --tee-addr 192.0.2.20:5000 --format intel-tdx --build-measurements .*auditor-measurements.json --vendor-tee 192.0.2.10:5000 --rpc http://127.0.0.1:8545 --registry $AREG --signing-key-file .*auditor.key "
+said "/bin/att-user(.exe)? verify --tee-addr 192.0.2.10:5000 --format intel-tdx --rpc http://127.0.0.1:8545 --registry $REG --registry $AREG\$"
+said 'expected: not trusted, exit 1'; finish
+start "flow 2, 4: by default a registry of its own, the Auditor its approver"
+run NET=local FAKE_AUDIT_EXIT=12 bash "$G4" intel-tdx; exitis 0
+call "att-auditor registry-deploy --rpc http://127.0.0.1:8545 .*--approver $AUDITOR\$"; call "att-auditor audit .*--registry $REG "; finish
+start "flow 2, 4: exit 0 (the Vendor's guest not found different) fails, with no verify line"
+run NET=local FAKE_AUDIT_EXIT=0 bash "$G4" intel-tdx; exitis 1; said 'run step 3 first'; nosaid 'verify --tee-addr'; finish
+start "flow 2, 4: any other exit fails"
+run NET=local FAKE_AUDIT_EXIT=5 bash "$G4" intel-tdx; exitis 1; nosaid 'verify --tee-addr'; finish
+
+# Flow 2, SEV-SNP on the default chain, Sepolia
+newwork f2snp
+start "flow 2, 1 amd-sev-snp-verity on Sepolia: the Vendor's registry, and the line for another computer"
+run bash "$G1" amd-sev-snp-verity; exitis 0
+call "att-vendor registry-deploy --rpc $SEPOLIA .*--approver $VENDOR\$"; call 'guest-step.sh build vendor amd-sev-snp-verity 2'
+said "^  ./att-user verify --tee-addr 192.0.2.10:5000 --format amd-sev-snp-verity --rpc $SEPOLIA --registry $REG\$"; finish
+run bash "$G3" amd-sev-snp-verity; run bash "$F1" amd-sev-snp-verity
+start "flow 2, 4 on Sepolia: both registries on the line for another computer"
+run FAKE_AUDIT_EXIT=12 bash "$G4" amd-sev-snp-verity -c $AREG; exitis 0
+said "^  ./att-user verify --tee-addr 192.0.2.10:5000 --format amd-sev-snp-verity --rpc $SEPOLIA --registry $REG --registry $AREG\$"; finish
+
 # No guest command goes through ssh's standard input: no heredoc and no `bash -s` in the scripts that reach a guest.
 start "no guest command is piped into ssh"
 bad=""; out=""; : > "$log"
 # A heredoc is << followed by its delimiter word (the arithmetic shift in env-cvm.sh, "10 << (n - 1)", is not one).
-if grep -nE "<<-?[[:space:]]*['\"]?[A-Za-z_]|bash -s" "$here/env-cvm.sh" "$S" "$flow"/*.sh > "$tmp/pipes.txt"; then bad="; $(cat "$tmp/pipes.txt")"; fi
+if grep -nE "<<-?[[:space:]]*['\"]?[A-Za-z_]|bash -s" "$here/env-cvm.sh" "$S" "$flow"/*.sh "$flow2"/*.sh > "$tmp/pipes.txt"; then bad="; $(cat "$tmp/pipes.txt")"; fi
 finish
 
 # The guest-side script, run here: which launch and build flags each format gets.

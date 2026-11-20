@@ -25,5 +25,5 @@ VENDOR_IP=$(guest_ip "$VENDOR_VM")
 echo "registered (step 1):"; cat "$CVM_WORK/auditor-measurements.json"
 echo "running now:";         cat "$CVM_WORK/vendor-tampered-measurements.json"
 result T5 vendor-runs-changed-app different different "the Vendor's guest now runs a one-byte-changed application" "option $OPTION, registry $REGISTRY"
-print_verify_line "$VENDOR_IP" "$REGISTRY" "not trusted, exit 1"
+print_verify_line "$VENDOR_IP" "not trusted, exit 1" "$REGISTRY"
 echo "next: the verify above on the other computer, then 4b-Auditor-audit-vendor-tampered.sh $*"

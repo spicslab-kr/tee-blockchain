@@ -26,7 +26,7 @@ AUDITOR_IP=$(guest_ip "$AUDITOR_VM"); VENDOR_IP=$(guest_ip "$VENDOR_VM")
 
 if [ -z "$REGISTRY" ]; then
   step_start "DEPLOYING A REGISTRY FOR THIS AUDIT ($NET)"
-  REGISTRY=$(deploy_registry) || exit 1
+  REGISTRY=$(deploy_registry "$AUDITOR_BIN" "$AUDITOR_ADDR") || exit 1
   step_stop
 fi
 echo "$REGISTRY" > "$CVM_WORK/registry-2b.txt"
