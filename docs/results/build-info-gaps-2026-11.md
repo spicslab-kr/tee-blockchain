@@ -11,7 +11,8 @@ tests of #27 were renamed in `08bc8c6`, when the three fields became required: `
 now `TestCheckBuildEnv_AMIRelease`, and `TestBuildEnv_SendOffAmazonLinuxLeavesNitroFieldsEmpty` is now
 `TestBuildEnv_SendOffAmazonLinuxRefusesNitro`. The Nitro `build`, its `dnf install` and `entrypoint.sh` have been in
 `internal/setup/build/aws/` since `53bfd5e`, not in the role folders (#27 and Q1). The status file now also has
-row #38 (2026-11-20).
+row #38 (2026-11-20). "It is kept up to date as gaps are filled" below was said of the status file this record was
+moved from; this record itself is not updated.
 
 The rule (project lead, 2026-11-11): every piece of information needed to build and run the project, however small,
 must be in the repository. This list is the audit of 2026-11-11: what someone with only this repository would be

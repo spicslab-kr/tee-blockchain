@@ -21,3 +21,15 @@ executable files: there `os.path.relpath` joined with `\` and every existing fil
 Removed on 2026-11-15: a test that ran mkcpio.py live (`ATTESTAMP_MKCPIO=<path>`), since there is no script left to
 run. Its `FromDir` comparison is kept as `TestFromDir_MatchesMkcpioGolden`, which, like the old test, runs on Linux
 and macOS only.
+
+## The other files here: how the app fixtures were made
+
+These are not test inputs. They are the tools the app-fixture recordings of 2026-11-11 were made with
+(`docs/build/app-fixture-recording.md`), kept as the record of how those fixtures came about. `build` and `launch`
+do not use them.
+
+| File | What it did for the recordings | What does it now |
+|---|---|---|
+| `mkappinitrd/main.go` | wrote the application archive with `internal/setup/build/cpio`, plus a marker that shows after boot that the kernel unpacked it, and joined it to the guest's base initrd | `build` (Option 1: `internal/setup/build/tdx` and `snp`) |
+| `make-verity-image.sh` | made the Option 2 squashfs image and its dm-verity hash tree with fixed settings | `build` (Option 2: `internal/setup/build/verity`, which sets every mode itself rather than relying on a umask) |
+| `make-grub-entry.sh` | made the GRUB entry from the stock one, changing only the title, the initrd and the kernel arguments | `launch` (`internal/setup/launch/grub`) |

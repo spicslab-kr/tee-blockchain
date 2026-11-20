@@ -35,8 +35,11 @@ This page lists every folder in the repository, then explains the one idea that 
 │   │   ├── request/        send a nonce, receive an attestation document
 │   │   └── parse/          verify the document's signature and nonce, extract the measurements
 │   ├── setup/              getting the measured image built and running
-│   │   ├── build/          reproducible image build, reproducibility scan, toolchain and responder checks
-│   │   └── launch/         Nitro: start the enclave, bridge the port; TDX, SEV-SNP: boot entry, --check; measure it
+│   │   ├── build/          reproducible image build, reproducibility scan, toolchain and responder checks; shared:
+│   │   │                   aws (Nitro image), tdx and snp (the initrd), cpio (the application archive), verity
+│   │   │                   (the Option 2 image); role adapters in Vendor/ and auditor/
+│   │   └── launch/         Nitro: start the enclave, bridge the port; TDX, SEV-SNP: boot entry, --check; measure it;
+│   │                       shared: aws, tdx, snp, grub (the boot entry both CVMs use); role adapters as in build/
 │   ├── chain/              the Ethereum side: register and look up measurements
 │   │   ├── register/       sign a measurement (EIP-712) and write it to the registry
 │   │   └── lookup/         read registrations back (read only)

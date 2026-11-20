@@ -276,12 +276,10 @@ What those runs needed that the table above does not say (R1 to R9 are the findi
   there and says `anvil: command not found`: run `export PATH="$PATH:$HOME/.foundry/bin"` first (add it to
   `~/.bashrc` to keep it), then `anvil --version`.
 - **The firewall rule `attestamp-ra`.** Steps 1, 2, 2b and 4b reach port 5000 of the guests from the machine running
-  the flow, and the `verify` line from the machine typing it. The rule allows only the addresses in it: the one that
-  first ran `gcp-cvm.sh create`, and whatever was added by hand. `gcp-cvm.sh` makes the rule only when it is missing
-  and never updates it, so after your address changes those calls time out with no other message. Compare
-  `curl -fsS https://checkip.amazonaws.com` (the address `gcp-cvm.sh` uses) with
-  `gcloud compute firewall-rules describe attestamp-ra --format='value(sourceRanges)'`, and update the rule as
-  `e2e/cloud/README.md` says ("From another computer, or after your address changed").
+  the flow, and the `verify` line from the machine typing it. The rule allows only the addresses in it and is never
+  updated by the scripts, so after your address changes those calls time out with no other message. How to compare
+  your address with the rule and add it: `e2e/cloud/README.md`, "From another computer, or after your address
+  changed".
 - **The guests stop themselves after four hours.** `prepare` and `check-serve` set `sudo shutdown -h +240` on the guest
   (a reboot cancels it, so it is set again after each one). A flow left waiting at step 3 or 5 for longer finds both
   guests `TERMINATED` (2026-11-19, R6). To carry on: start them (`bash e2e/cloud/gcp-cvm.sh <tdx|snp> start`). They

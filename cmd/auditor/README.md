@@ -118,6 +118,7 @@ One service and version has one record and one registration per CPU architecture
 
 | Command | What it does |
 |---|---|
+| `pack` | Nitro: turns a Docker image you built yourself into an enclave image, with the same normalising and responder layering as `build` (`--docker-image`). |
 | `ra-request` | Fetches an attestation document from `--tee-addr`. |
 | `ra-parse` | Verifies a document and extracts its measurements (Nitro PCR0–2, TDX MRTD and RTMR0–2, SEV-SNP the five or six values); `--format` for a guest. |
 | `register` | Signs and registers measurements. `audit` calls it. |

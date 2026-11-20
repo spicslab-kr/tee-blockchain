@@ -224,7 +224,7 @@ Run as root, it leaves `out/` and its files to root. Before an Option 1 build on
 give them back with `sudo chown -R $USER out`, or that build stops with `mkdir out/att-snp-…: permission denied`
 (`docs/results/cvm-flow-rehearsal-2026-11-19.md`, R9).
 
-It ends with `✓ reproducible on this host` and `✓ ready: out/initrd-app.img   build value: out/build-value.json`.
+It prints `✓ reproducible on this host` and `✓ ready: out/initrd-app.img   build value: out/build-value.json`.
 `build-value.json` holds INITRD (the initrd's SHA-256); for Option 2 also the root hash, the PCR12 the hook will
 extend for it, and the kernel argument `attestamp.roothash=<root hash>`. Option 2 also writes `out/app.img` and
 `out/app.hash`.
@@ -267,7 +267,7 @@ sudo ./att-vendor launch --platform amd-sev-snp-initrd --check
 
 (`amd-sev-snp-verity` for Option 2.) It asks the guest for evidence (the SNP report and the vTPM attestation),
 verifies it as a User would, requires INITRD to be the built initrd's and, for Option 2, PCR12 to be what the built
-image gives, and requires the application to have been unpacked or mounted. It ends with `✓ the boot measured the
+image gives, and requires the application to have been unpacked or mounted. It prints `✓ the boot measured the
 build` and writes the values to `out/measurements.json`. If it refuses because INITRD is not the built initrd, or
 because GRUB loaded no initrd, and the boot ID is the old one, you are on the old boot: wait and log in again (step 7).
 For Option 2, also:
@@ -292,7 +292,7 @@ typed: without it the background process holds the session's input and the comma
 
 Evidence is usable only from our boot. A responder started on the **stock** boot (before step 7, or after step 13)
 answers, but every format refuses its evidence with exit 7, `GRUB loaded no initrd, so the application archive was
-never measured`, after `signature ok` and `nonce ok`: Google's stock boot loads no initrd (2026-11-16). TDX evidence
+never measured`, after the `signature` and `nonce` lines say `ok`: Google's stock boot loads no initrd (2026-11-16). TDX evidence
 from the same state parses; there the refusal comes only at `verify`, when the values are not registered.
 
 ### 10. On your computer: get the evidence
@@ -302,7 +302,7 @@ from the same state parses; there the refusal comes only at `verify`, when the v
 ./att-user ra-parse   --doc evidence.cbor --format amd-sev-snp-initrd
 ```
 
-`ra-parse` prints `signature ok`, `nonce ok` and the values; they are the ones in `out/measurements.json` on the guest.
+`ra-parse` prints `signature  ok (chain to platform root)`, `nonce      ok` and the values; they are the ones in `out/measurements.json` on the guest.
 If `ra-request` times out, your address is not the one the firewall rule allows (it was set when the rule was first
 made): `gcloud compute firewall-rules describe attestamp-ra` shows it.
 
@@ -344,7 +344,7 @@ gcloud compute scp attestamp-snp-vendor:out/measurements.json measurements.json 
   --service hello --version 1.0.0 --arch amd64
 ```
 
-It ends with `PASS: audited and registered`.
+It prints `PASS: audited and registered`.
 
 ### 12. On your computer: verify, as any User
 
@@ -534,7 +534,7 @@ sudo ./att-auditor launch --platform amd-sev-snp-initrd --check
 ```
 
 This is the comparison: it verifies fresh evidence and requires INITRD to be the one A4 built, and for Option 2 PCR12
-to be the value A4 predicted. It ends with `✓ the boot measured the build` and writes the values to
+to be the value A4 predicted. It prints `✓ the boot measured the build` and writes the values to
 `out/measurements.json`. If it refuses, the Auditor registers nothing. Those values should equal the Vendor's step 8
 values; whether they do is checked against the Vendor's running guest in A8, not by trusting a file the Vendor sent.
 
@@ -1045,7 +1045,7 @@ certificate), and nothing on the AMD side matches it.
 
 **Reproduced on 2026-11-16.** Two guests of one image: A ran the registered application, B a one-byte-changed one. B's
 report requested over SHA3-512 of A's vTPM attestation (`record-snp -relay-att`) passed `ra-parse` with exit 0,
-`signature ok` and `nonce ok`, yielded A's values, and those found the Auditor's registration for A; B's own pair had
+signature and nonce `ok`, yielded A's values, and those found the Auditor's registration for A; B's own pair had
 values nobody registered. The control, B's own report next to A's attestation, was refused at the binding (exit 5).
 The binding works; the relay passes it. A and B ran on different hosts (different `CHIP_ID`s). The four documents,
 the table of where each value comes from, and a mitigation to study (pinning the AK certificate's instance, with its

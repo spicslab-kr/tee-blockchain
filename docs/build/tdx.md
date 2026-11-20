@@ -274,7 +274,7 @@ Run as root, it leaves `out/` and its files to root. Before an Option 1 build on
 give them back with `sudo chown -R $USER out`, or that build stops with `mkdir out/…: permission denied`
 (`docs/results/cvm-flow-rehearsal-2026-11-19.md`, R9).
 
-It ends with `✓ reproducible on this host` and `✓ initrd ready: out/initrd-app.img   build value:
+It prints `✓ reproducible on this host` and `✓ initrd ready: out/initrd-app.img   build value:
 out/build-value.json`. `build-value.json` holds the initrd's SHA-384, the digest GRUB will measure.
 
 ### 7. On the guest: install and boot
@@ -311,7 +311,7 @@ sudo ./att-vendor launch --platform intel-tdx --check
 ```
 
 It asks the guest for a quote, verifies it, replays the boot's event log against it, requires the initrd GRUB measured
-to be the one built, and requires the application to have been unpacked. It ends with `✓ the boot measured the built
+to be the one built, and requires the application to have been unpacked. It prints `✓ the boot measured the built
 initrd` and writes MRTD and RTMR0–2 to `out/measurements.json`. If it says "RTMR2 has no GRUB initrd command, so no
 initrd was loaded", you are on the old boot: wait and log in again (step 7). For Option 2, also:
 
@@ -337,7 +337,7 @@ session's input and the command does not return.
 ./att-user ra-parse   --doc quote.bin --format intel-tdx
 ```
 
-`ra-parse` prints `signature ok`, `nonce ok` and the four values; they are the ones in `out/measurements.json` on the
+`ra-parse` prints `signature  ok (chain to platform root)`, `nonce      ok` and the four values; they are the ones in `out/measurements.json` on the
 guest. If `ra-request` times out, your address is not the one the firewall rule allows (it was set when the rule was
 first made): `gcloud compute firewall-rules describe attestamp-ra` shows it.
 
@@ -379,7 +379,7 @@ gcloud compute scp attestamp-tdx-vendor:out/measurements.json measurements.json 
   --service hello --version 1.0.0 --arch amd64
 ```
 
-It ends with `PASS: audited and registered`.
+It prints `PASS: audited and registered`.
 
 ### 12. On your computer: verify, as any User
 
@@ -565,7 +565,7 @@ sudo ./att-auditor launch --platform intel-tdx --check
 ```
 
 This is the comparison: it verifies a fresh quote, replays the event log against it and requires GRUB to have loaded
-exactly the initrd A4 built. It ends with `✓ the boot measured the built initrd` and writes the four values to
+exactly the initrd A4 built. It prints `✓ the boot measured the built initrd` and writes the four values to
 `out/measurements.json`. If it refuses, the Auditor registers nothing. Those four values should equal the Vendor's
 step 8 values; whether they do is checked against the Vendor's running guest in A8, not by trusting a file the Vendor
 sent.

@@ -232,7 +232,7 @@ four documents were checked with `att-user ra-parse --format amd-sev-snp-initrd`
 | A's own pair | A's report over A's vTPM attestation | **exit 0**, A's values (INITRD `11cd710e…`) |
 | B's own pair | B's report over B's vTPM attestation | **exit 0**, B's values (INITRD `db9c9779…`); **not registered** |
 | naive mix | B's **own** report, put next to A's vTPM attestation | **exit 5**, refused at the binding: `REPORT_DATA is not SHA3-512 of the vTPM attestation` |
-| relay (`record-snp -relay-att`) | B's report **requested over** SHA3-512 of A's vTPM attestation | **exit 0**, `signature ok`, `nonce ok`, **A's** values; `lookup` finds the Auditor's registration for A |
+| relay (`record-snp -relay-att`) | B's report **requested over** SHA3-512 of A's vTPM attestation | **exit 0**, signature and nonce `ok`, **A's** values; `lookup` finds the Auditor's registration for A |
 
 **The binding works, and the relay passes it.** The naive mix shows the binding check doing its job: a report that was
 not requested over these exact vTPM bytes is refused. The relay passes because B **did** request its report over those
