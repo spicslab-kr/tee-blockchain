@@ -18,7 +18,7 @@ cd "$here/../../.."
 . "$here/../../env.sh"
 REGISTRY=""
 args=()
-while [ $# -gt 0 ]; do case "$1" in -c) REGISTRY=${2:-}; shift 2 ;; *) args+=("$1"); shift ;; esac; done
+while [ $# -gt 0 ]; do case "$1" in -c) [ $# -ge 2 ] || { echo "-c needs a registry address" >&2; exit 2; }; REGISTRY=$2; shift 2 ;; *) args+=("$1"); shift ;; esac; done
 . "$here/../env-cvm.sh" "${args[@]}"
 need_addr VENDOR_ADDR
 need_bins

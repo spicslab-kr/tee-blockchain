@@ -148,6 +148,12 @@ newwork args
 start "a format that does not exist is refused before any call"; run bash "$F1" bogus; exitis 2; nocall '^gcloud '; finish
 start "intel-tdx takes option 1 or 2 only";                      run bash "$S" intel-tdx 3; exitis 2; nocall '^gcloud '; finish
 start "step 2 without step 1's registration stops before any call"; run bash "$F2" intel-tdx; exitis 1; nocall '^gcloud '; said 'run 1-Auditor'; finish
+# -c as the last argument: `shift 2` with one argument left shifts nothing, and the option loop ran for ever until
+# 2026-11-20. timeout ends a script that loops again; 124 is its exit code then.
+start "-c with no address stops with exit 2 before any call (flow 1 step 1)"
+run timeout 20 bash "$F1" intel-tdx -c; exitis 2; nocall '^gcloud '; said '-c needs a registry address'; finish
+start "-c with no address stops with exit 2 before any call (flow 2 step 4)"
+run timeout 20 bash "$G4" intel-tdx -c; exitis 2; nocall '^gcloud '; said '-c needs a registry address'; finish
 
 # 0-Setup-guests.sh
 newwork setup
