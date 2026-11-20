@@ -12,7 +12,7 @@ covers four cells, each option on each platform, all four expected to work by th
 
 ## Why: two recordings per cell, one byte apart
 
-[Test-matrix](../status/test-matrix.md#state-updated-through-2026-11-17) row T5 ("application swapped after registration → not trusted") is the project's central claim. On TDX
+[Test-matrix](../status/test-matrix.md#state) row T5 ("application swapped after registration → not trusted") is the project's central claim. On TDX
 and SEV-SNP it was empty, because no recorded evidence carried an application.
 
 So every cell is recorded **twice on the same VM, with only the application changed by one byte** (`attestamp app v1`

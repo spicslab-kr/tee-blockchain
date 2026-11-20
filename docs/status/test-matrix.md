@@ -10,7 +10,9 @@ as the other two, not quoted from the README.
 This page says what is proven, and by what. Its pair, [build-info-gaps.md](build-info-gaps.md), says what the
 repository still lacks and which design questions are open.
 
-## State (updated through 2026-11-17)
+## State
+
+Updated through 2026-11-20.
 
 Each cell says how far the row is proven, and by what:
 

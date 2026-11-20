@@ -13,7 +13,7 @@ of the evidence are used.
 |---|---|---|---|
 | Must the evidence also cover the program that hands it out (`att-ra-responder`)? | **yes, it does**: the responder is inside the EIF, in PCR0 and PCR2 | no: the responder runs from the guest's disk; nothing proves which program answered (its answer is still hardware-signed) | no, as TDX |
 | Must the reference values survive changes to this repository's code? | **no**: a change to code the responder can run, or to the lines that code sits on, or to what `build` adds to or removes from the image (`89c0063`), moves PCR0 and PCR2, so every value needs its commit. Code it never runs moved them too (`1967749d`, measured) until the empty build ID of 2026-11-17 (below) | **yes**: the values follow the application, the image and the VM; they move with the machine type (RTMR0, measured), not with the zone | **yes**, as TDX; MEASUREMENT moves with the vCPU count (measured), not with memory or zone |
-| Must the evidence come from one VM, provably? | **yes**, one signed document | **yes**, one quote | **no**: a report from another VM, requested over this VM's vTPM attestation, verifies and finds this VM's registration ([T10](../status/test-matrix.md#state-updated-through-2026-11-17), measured) |
+| Must the evidence come from one VM, provably? | **yes**, one signed document | **yes**, one quote | **no**: a report from another VM, requested over this VM's vTPM attestation, verifies and finds this VM's registration ([T10](../status/test-matrix.md#state), measured) |
 | Who has to be trusted for the registered values? | one signer: AWS | one signer: Intel | two: AMD for MEASUREMENT (the firmware only), and Google's vTPM, run by the hypervisor, for PCR4, KERNEL, CMDLINE, INITRD (and PCR12) |
 
 In one line each:

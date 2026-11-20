@@ -91,7 +91,7 @@ not measured (`docs/build/ra-comparison.md`).
 Nitro gets layer 2 structurally: an enclave has no persistent storage, no external network and no interactive access
 (AWS's description of Nitro Enclaves); the only way in or out is the vsock to the parent instance. Debug mode is
 visible in the evidence because PCR0 reads all zero (`internal/tee/parse/aws/measure.go` treats it that way). A debug
-enclave's document was recorded and refused live on 2026-11-15 ([test-matrix](../status/test-matrix.md#state-updated-through-2026-11-17) row T8,
+enclave's document was recorded and refused live on 2026-11-15 ([test-matrix](../status/test-matrix.md#state) row T8,
 `docs/results/aws-nitro-2026-11-15.md`); it is not committed as a fixture, because it carries the instance ID.
 
 A confidential VM is a full virtual machine and has none of that by default: a disk, a network, and SSH are all there

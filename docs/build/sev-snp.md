@@ -8,7 +8,7 @@ amd-sev-snp-initrd | amd-sev-snp-verity`) **ran on real guests on 2026-11-15**: 
 passed for both options, Option 2's PCR12 was the predicted value, and `audit` and `verify` passed from another
 machine (`docs/results/trial-2026-11-15.md`). In those runs the Auditor registered the Vendor's guest's own values.
 **The independent Auditor ran on 2026-11-16** ("The Auditor's half", two guests, both options) and passed, and the
-**relay ([T10](../status/test-matrix.md#state-updated-through-2026-11-17)) was reproduced** the same day: see "Same VM" (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Tools and versions: [toolchain.md](toolchain.md). A known weakness is
+**relay ([T10](../status/test-matrix.md#state)) was reproduced** the same day: see "Same VM" (`docs/results/sessions-2026-11-16/amd-sev-snp.md`). Tools and versions: [toolchain.md](toolchain.md). A known weakness is
 written down below under "Same VM": SEV-SNP support is weaker here than Nitro or TDX, and that does not go away
 with more code.
 
