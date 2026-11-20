@@ -19,6 +19,19 @@ type GitTransport struct {
 	WorkDir string
 }
 
+// ErrEmptyRepo is Send into a repository with no commit. The repository is where the Auditor clones the source from,
+// and source.commit, which receive requires to be in the history it clones, has nothing to name. It is an
+// ErrCommitNotFound (exit 10), with a message that says what to do.
+var ErrEmptyRepo error = emptyRepo{}
+
+type emptyRepo struct{}
+
+func (emptyRepo) Error() string {
+	return "the repository is empty: push the source the Auditor is to build first, then send build-config.json"
+}
+
+func (emptyRepo) Is(target error) bool { return target == ErrCommitNotFound }
+
 // SendResult is the repository, the pushed commit and the file path within it.
 type SendResult struct {
 	Repo   string
@@ -47,8 +60,12 @@ func (g GitTransport) Send(ctx context.Context, cfg BuildConfig, repo string) (S
 	if cfg.Source.Repo == "" {
 		cfg.Source.Repo = repo
 	}
-	head, err := gitRunner{dir: dir}.run(ctx, "rev-parse", "HEAD")
+	git := gitRunner{dir: dir}
+	head, err := git.run(ctx, "rev-parse", "HEAD")
 	if err != nil {
+		if out, e2 := git.run(ctx, "rev-list", "-n", "1", "--all"); e2 == nil && out == "" {
+			return SendResult{}, fmt.Errorf("%s: %w", repo, ErrEmptyRepo)
+		}
 		return SendResult{}, err
 	}
 	if cfg.Source.Commit == "" {

@@ -39,6 +39,24 @@ func TestGitSend_PushesBuildConfig(t *testing.T) {
 	}
 }
 
+// An empty repository holds no source for source.commit to name. Send says so, and what to do, instead of "the given
+// commit is not in the repository" from its own rev-parse HEAD (docs/results/git-transport-2026-11-20.md, 7). The exit
+// code stays 10: it is an ErrCommitNotFound.
+func TestGitSend_EmptyRepoSaysPushSourceFirst(t *testing.T) {
+	remote := filepath.Join(t.TempDir(), "empty.git")
+	run(t, "", "init", "--quiet", "--bare", "--initial-branch=main", remote)
+	_, err := GitTransport{}.Send(context.Background(), cfgAWS(), remote)
+	if !errorsIs(err, ErrEmptyRepo) || !errorsIs(err, ErrCommitNotFound) {
+		t.Fatalf("want ErrEmptyRepo, an ErrCommitNotFound; got %v", err)
+	}
+	if !strings.Contains(err.Error(), "push the source") {
+		t.Errorf("the message must say what to do: %v", err)
+	}
+	if out := strings.TrimSpace(run(t, "", "--git-dir", remote, "rev-list", "-n", "1", "--all")); out != "" {
+		t.Errorf("nothing must reach the remote, it has %s", out)
+	}
+}
+
 func TestGitSend_InvalidConfigNotPushed(t *testing.T) {
 	remote := newRemote(t)
 	work := clientDir(t, remote)

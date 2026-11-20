@@ -86,7 +86,7 @@ the codes below. Codes 4 to 6 mean different things depending on where the error
 | 7 | attestation document malformed |
 | 8 | `git` not found (`send`, `receive`) |
 | 9 | repository unreachable, URL or permissions (`send`, `receive`) |
-| 10 | commit not found, see `--ref` (`send`, `receive`) |
+| 10 | commit not found, see `--ref` (`send`, `receive`); from `att-vendor send`: the repository is empty, so push the source the Auditor is to build first |
 | 11 | push rejected: no write access, or the remote is ahead, so pull first (`send`) |
 | 12 | `audit --vendor-tee`: the Auditor's own value **was registered**, but the Vendor's TEE runs something else. Not a failed audit: do not run it again (a second run ends with 5, already registered). Since 2026-11-16; before, this case exited 0 |
 
