@@ -175,8 +175,8 @@ func receive(args []string) error {
 	c := got.Value
 	fmt.Printf("received %s (sha256 %s)\n", got.Path, got.SHA256[:12])
 	fmt.Printf("%s %s %s · source %s @ %s\n", c.Service, c.Version, c.Platform, c.Source.Repo, c.Source.Commit[:12])
-	for k, v := range c.TEEInfo {
-		fmt.Printf("  tee_info.%s = %s\n", k, v)
+	for _, l := range teeInfoLines(c.TEEInfo) {
+		fmt.Println(l)
 	}
 	// the Vendor said which environment it built in. this instance must be the same one, or
 	// a rebuild here can't reproduce its measurements, and would look like a lying Vendor.
@@ -209,6 +209,21 @@ func receive(args []string) error {
 	// the config carries the platform, service, version and build_env, so audit needs none of them typed again
 	fmt.Printf("next: att-auditor audit --config %s --tee-addr <this-instance>:5000 --build-measurements out/measurements.json --rpc <url> --registry <0x…> --signing-key-file <key>\n", got.Path)
 	return nil
+}
+
+// teeInfoLines formats tee_info for receive, one line per key, sorted by key: ranging over the map would print them in
+// another order on every run, while build-config.json keeps them sorted.
+func teeInfoLines(info map[string]string) []string {
+	keys := make([]string, 0, len(info))
+	for k := range info {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	lines := make([]string, len(keys))
+	for i, k := range keys {
+		lines[i] = fmt.Sprintf("  tee_info.%s = %s", k, info[k])
+	}
+	return lines
 }
 
 func send(args []string) error {
